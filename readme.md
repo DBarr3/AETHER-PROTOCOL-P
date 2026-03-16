@@ -40,21 +40,15 @@ This is the **Ontological Root of Trust**: security grounded in physics, not mat
 
 ## How It Works
 
-```
-## How It Works
+The Protocol operates on a three-phase session model: initialization, operation, and destruction.
 
-The Protocol operates on a three-phase session model:
-initialization, operation, and destruction.
+- **Initialization**: IBM Quantum hardware executes a quantum entropy circuit. The measurement outcome — physically unpredictable — seeds an ephemeral asymmetric keypair held exclusively in volatile memory.
+- **Operation**: Every AI decision is cryptographically signed before dispatch. Execution layers verify the signature before acting. Unsigned or tampered instructions are dropped before execution.
+- **Destruction**: The private key is explicitly zeroed in memory at session end. No valid signatures for this session can be produced by any party after destruction.
 
-Full architecture is documented in the white paper:
-[`docs/AETHER_PROTOCOL_WHITEPAPER.md`](docs/AETHER_PROTOCOL_WHITEPAPER.md)
+Full architecture is documented in the white paper: [`docs/AETHER_PROTOCOL_WHITEPAPER.md`](docs/AETHER_PROTOCOL_WHITEPAPER.md)
 
-The white paper applies black box disclosure — architecture
-and results are shared openly. Implementation details are
-available under a Mutual Non-Disclosure Agreement.
-```
-
-**Application to CVE-2025-59536:**
+The white paper applies black box disclosure — architecture and results are shared openly. Implementation details are available under a Mutual Non-Disclosure Agreement.
 
 ---
 
@@ -63,17 +57,10 @@ available under a Mutual Non-Disclosure Agreement.
 This is not theoretical. Two production systems are running the Protocol today.
 
 ### AetherSecurity
-Autonomous penetration testing platform with:
-- IBM Quantum ibm_fez 30-qubit entropy circuit
-- QuantumOracle signing every approved agent decision
-- QOPC exploit search over 1.1 trillion configurations
-- Barcode Quantum Defense Scrambler — 5 mutation types
+Autonomous penetration testing platform integrating live IBM Quantum hardware for defense entropy, quantum-guided exploit search, and cryptographically signed agent decisions.
 
 ### Aether Terminal
-Institutional-grade trading platform with:
-- Redux quantum middleware verifying every AI trade decision
-- Feature flag `ENABLE_QUANTUM_SIGNED_DISPATCH = True` live
-- Qwen + Claude hybrid AI decision engine
+Institutional-grade trading platform with quantum middleware verifying every AI-generated trade decision before execution.
 
 ### Live Statistics (March 16, 2026)
 
@@ -81,7 +68,7 @@ Institutional-grade trading platform with:
 ═══════════════════════════════════════════════════════════
   U-SCORE    27.2 / 100  ↑  [ACTIVE]
 ═══════════════════════════════════════════════════════════
-  Q  Quantum Entropy    0.123   ibm_fez — live hardware
+  Q  Quantum Entropy    0.123   IBM Quantum — live hardware
   S  Session Depth      0.548   43 sessions accumulated
   D  Mutation Diversity 0.200   Defense rotations active
   R  Resilience         1.000   3,371 probes / 0 breaches
@@ -97,7 +84,7 @@ Combined test coverage: **3,705 passing tests** across both systems.
 
 ## The U-Score: Deployment Maturity
 
-The Unlearnability Score measures the demonstrated difficulty of attacking a specific deployment given its documented operational history.
+The Unlearnability Score measures the demonstrated difficulty of attacking a specific deployment given its documented operational history. Unlike static certifications, it reflects real adversarial pressure absorbed over time.
 
 ```
 U = 5th-root(Q × S × D × R × A) × 100
@@ -118,19 +105,19 @@ A system built from scratch today starts at **Nascent (0)**. This deployment is 
 ## Security Properties
 
 **P1 — Ontological Seed Unpredictability**
-The quantum seed cannot be predicted before the session. No algorithm improves on random guessing over 2^n states.
+The session seed cannot be predicted before measurement. No algorithm improves on random guessing over the quantum state space.
 
 **P2 — Signature Unforgeability**
-Predict the quantum measurement (physically impossible) or solve ECDLP (computationally infeasible). Both barriers must fall simultaneously.
+Two simultaneous barriers: predict the quantum measurement (physically impossible) or recover the private key from the public key (computationally infeasible).
 
 **P3 — Temporal Quantum Safety**
-Key lifetime: hours. Shor's attack time: days minimum. Key destroyed before any quantum attack completes.
+Key lifetime is hours. The quantum attack that threatens classical cryptography requires days at minimum. The key is destroyed before any such attack could complete.
 
 **P4 — Perfect Forward Secrecy**
-Each session: independent quantum measurement, independent keypair. Compromise of any session reveals nothing about any other.
+Each session derives an independent keypair from an independent quantum measurement. Compromise of any session reveals nothing about any other.
 
 **P5 — Tamper Detection**
-Any modification to a signed decision — a single bit — invalidates the signature. Detected before execution.
+Any modification to a signed decision — a single bit — invalidates the signature and is detected before execution.
 
 ---
 
@@ -141,10 +128,10 @@ Any modification to a signed decision — a single bit — invalidates the signa
 | Security basis | Mathematical hardness (harder problems) | Physical non-determinism |
 | Degrades with compute scaling? | Slower — but yes | No — physics does not change |
 | Key lifetime | Months to years | Hours (one session) |
-| Shor's algorithm threat | Resistant (different problems) | Irrelevant — key destroyed first |
+| Quantum attack threat | Resistant (different problems) | Irrelevant — key destroyed first |
 | Root of trust | Mathematical | **Ontological** |
 
-PQC and the Aether Protocol are complementary — PQC hardens long-lived infrastructure keys, the Protocol authenticates individual AI decisions at the dispatch layer. The Protocol's v2.0 roadmap includes CRYSTALS-Dilithium as a backup layer.
+PQC and the Aether Protocol are complementary — PQC hardens long-lived infrastructure keys, the Protocol authenticates individual AI decisions at the dispatch layer.
 
 ---
 
@@ -152,8 +139,8 @@ PQC and the Aether Protocol are complementary — PQC hardens long-lived infrast
 
 These can be independently verified without source code or an MNDA:
 
-- **IBM Quantum workloads are real** — job records on ibm_fez and ibm_torino visible in IBM's dashboard
-- **Signatures are verifiable without source code** — session public key + signed decision objects contain everything needed for standard ECDSA verification
+- **IBM Quantum workloads are real** — job records on IBM Quantum hardware visible in IBM's dashboard, verifiable by any IBM Quantum account holder
+- **Signatures are verifiable without source code** — signed decision objects contain everything needed for standard asymmetric signature verification
 - **Patent is real** — US Application 64/006,746, filed March 16, 2026, Confirmation #2009, verifiable through USPTO Patent Center
 
 ---
@@ -162,7 +149,7 @@ These can be independently verified without source code or an MNDA:
 
 Full technical specification: [`docs/AETHER_PROTOCOL_WHITEPAPER.md`](docs/AETHER_PROTOCOL_WHITEPAPER.md)
 
-Covers: CVE-2025-59536 attack analysis, Ontological Root of Trust, session lifecycle, formal security properties, complete threat model, verifiable claims, Frontier Safety Roadmap alignment, U-Score formal definition, and commercial applications.
+Covers: CVE-2025-59536 attack analysis, Ontological Root of Trust, session lifecycle architecture, formal security properties (P1–P5), complete threat model (T1–T6), verifiable claims, Anthropic Frontier Safety Roadmap alignment, U-Score formal definition, and commercial applications.
 
 Black box disclosure — architecture and results shared openly. Implementation details available under MNDA.
 
@@ -171,26 +158,26 @@ Black box disclosure — architecture and results shared openly. Implementation 
 ## Roadmap
 
 **v1.0 — Live (March 2026)**
-- IBM Quantum entropy circuit (20-30 qubits)
+- IBM Quantum entropy circuit
 - Ephemeral asymmetric signer — zero external cryptographic dependencies
-- AetherSecurity: QuantumOracle, Scrambler, QOPC
-- Aether Terminal: Redux quantum middleware live
+- AetherSecurity: QuantumOracle, Scrambler, exploit search
+- Aether Terminal: quantum middleware live
 - U-Score engine — 43 sessions, R = 1.000
 - Patent filed: US Application 64/006,746
 
 **v1.1 — Near-term**
-- 30-qubit entropy circuit (1,073,741,824 states)
-- Nonce registry for replay protection
+- Higher qubit entropy circuit
+- Replay protection nonce registry
 - Federated Adversarial Intelligence (anonymized delta sharing)
 
 **v1.2 — Medium-term**
-- TEE integration (Intel SGX) for host key protection
-- Claude Code integration proof of concept
+- Trusted Execution Environment integration for host key protection
 - Enterprise deployment tooling
+- Claude Code integration proof of concept
 
 **v2.0 — Long-term**
 - IBM Quantum fault-tolerant logical qubits (2029+)
-- CRYSTALS-Dilithium backup layer
+- Post-quantum backup layer
 - Multi-party quantum signing
 
 ---
@@ -226,7 +213,7 @@ Research collaboration, licensing inquiries, and demonstration requests welcome.
 
 Proprietary and Confidential. © 2026 Aether Systems LLC. All Rights Reserved.
 
-Trade secrets protected under applicable law and US Provisional Patent Application 64/006,746. White paper shared under black box disclosure for research evaluation. Source code not included — available under signed MNDA only.
+This repository contains trade secrets of Aether Systems LLC protected under applicable trade secret law and US Provisional Patent Application 64/006,746. The white paper is shared under black box disclosure for research evaluation purposes. Source code is not included in this repository and is available only under a signed Mutual Non-Disclosure Agreement.
 
 *Patent Pending — US Application 64/006,746*
 
