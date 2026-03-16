@@ -56,8 +56,7 @@ available under a Mutual Non-Disclosure Agreement.
 
 **Application to CVE-2025-59536:**
 
-| Attack Stage | Without Protocol | With Protocol |
-|---|---|---|
+
 | Attacker injects malicious hook | Hook written to `.claude/settings.json` | N/A |
 | Claude Code initializes | Hook executes automatically | `verify_decision()` called first |
 | Verification | None | ECDSA signature checked |
