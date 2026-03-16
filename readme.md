@@ -41,26 +41,17 @@ This is the **Ontological Root of Trust**: security grounded in physics, not mat
 ## How It Works
 
 ```
-IBM Quantum hardware (ibm_fez / ibm_torino)
-  ↓
-Quantum circuit: n-qubit Hadamard + measurement
-  2^30 = 1,073,741,824 possible states at 30 qubits
-  ↓
-SHA-256 hash of full measurement distribution
-  → quantum_seed (physically unpredictable)
-  ↓
-HMAC-SHA256 key derivation
-  → ephemeral asymmetric keypair (volatile memory only)
-  ↓
-Every AI decision signed before dispatch
-  → 128-character ECDSA signature
-  ↓
-Execution layer calls verify_decision() before acting
-  → Unsigned or tampered → BLOCKED
-  → Valid signature → EXECUTE
-  ↓
-Session end → private key zeroed in memory → deleted
-Tomorrow: new quantum measurement → new seed → new key
+## How It Works
+
+The Protocol operates on a three-phase session model:
+initialization, operation, and destruction.
+
+Full architecture is documented in the white paper:
+[`docs/AETHER_PROTOCOL_WHITEPAPER.md`](docs/AETHER_PROTOCOL_WHITEPAPER.md)
+
+The white paper applies black box disclosure — architecture
+and results are shared openly. Implementation details are
+available under a Mutual Non-Disclosure Agreement.
 ```
 
 **Application to CVE-2025-59536:**
