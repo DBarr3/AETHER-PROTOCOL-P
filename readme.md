@@ -56,13 +56,6 @@ available under a Mutual Non-Disclosure Agreement.
 
 **Application to CVE-2025-59536:**
 
-
-| Attacker injects malicious hook | Hook written to `.claude/settings.json` | N/A |
-| Claude Code initializes | Hook executes automatically | `verify_decision()` called first |
-| Verification | None | ECDSA signature checked |
-| Outcome | Arbitrary shell execution | Unsigned instruction dropped |
-| Attacker's path around this | — | Forge ECDSA without key (infeasible) or predict IBM measurement (physically impossible) |
-
 ---
 
 ## Proof: What Is Running Today
