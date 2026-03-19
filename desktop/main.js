@@ -3,19 +3,28 @@
  * Aether Systems LLC · Patent Pending
  *
  * Flow: installer.html → login.html → app.html
+ * Spawns Python FastAPI server on localhost:8741.
  * Each page transition uses IPC so the main process controls window
  * geometry, frameless chrome, and secure context isolation.
  */
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { spawn } = require('child_process');
 const path  = require('path');
 const fs    = require('fs');
+const http  = require('http');
 
 // ── State ────────────────────────────────────────────
 const PAGES_DIR    = path.join(__dirname, 'pages');
+const PROJECT_ROOT = path.join(__dirname, '..');
 const INSTALL_FLAG = path.join(app.getPath('userData'), '.installed');
 const isDev        = process.argv.includes('--dev');
+const API_PORT     = 8741;
+const API_BASE     = `http://127.0.0.1:${API_PORT}`;
+
 let mainWindow     = null;
+let pythonProcess  = null;
+let appQuitting    = false;
 
 // ── Window geometry per page ─────────────────────────
 const WINDOW_CONFIGS = {
@@ -41,7 +50,118 @@ function markInstalled() {
   }));
 }
 
-// ── Create / navigate window ─────────────────────────
+// ═══════════════════════════════════════════════════
+// PYTHON PROCESS MANAGEMENT
+// ═══════════════════════════════════════════════════
+function findPython() {
+  // Try common Python executables
+  const candidates = process.platform === 'win32'
+    ? ['python', 'python3', 'py']
+    : ['python3', 'python'];
+  return candidates[0]; // spawn will search PATH
+}
+
+function startPython() {
+  if (pythonProcess) return;
+
+  const pythonPath = findPython();
+  const scriptPath = path.join(PROJECT_ROOT, 'main.py');
+
+  console.log(`[Python] Starting: ${pythonPath} ${scriptPath} --serve`);
+
+  pythonProcess = spawn(pythonPath, [scriptPath, '--serve'], {
+    cwd: PROJECT_ROOT,
+    env: { ...process.env },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  pythonProcess.stdout.on('data', (data) => {
+    console.log(`[Python] ${data.toString().trim()}`);
+  });
+
+  pythonProcess.stderr.on('data', (data) => {
+    const msg = data.toString().trim();
+    // uvicorn logs to stderr by default — not necessarily errors
+    if (msg) console.log(`[Python] ${msg}`);
+  });
+
+  pythonProcess.on('error', (err) => {
+    console.error(`[Python] Failed to start: ${err.message}`);
+    pythonProcess = null;
+  });
+
+  pythonProcess.on('close', (code) => {
+    console.log(`[Python] Process exited with code ${code}`);
+    pythonProcess = null;
+    // Auto-restart on unexpected exit (unless app is quitting)
+    if (code !== 0 && !appQuitting) {
+      console.log('[Python] Unexpected exit — restarting in 2s...');
+      setTimeout(startPython, 2000);
+    }
+  });
+}
+
+function stopPython() {
+  if (!pythonProcess) return;
+  console.log('[Python] Stopping server...');
+  try {
+    if (process.platform === 'win32') {
+      // On Windows, spawn taskkill to ensure child processes are killed
+      spawn('taskkill', ['/pid', pythonProcess.pid.toString(), '/f', '/t']);
+    } else {
+      pythonProcess.kill('SIGTERM');
+    }
+  } catch (e) {
+    console.error('[Python] Error stopping:', e.message);
+  }
+  pythonProcess = null;
+}
+
+/**
+ * Poll the /status endpoint until the Python server is ready.
+ * Returns a promise that resolves when server responds,
+ * or rejects after maxWait ms.
+ */
+function waitForPython(maxWait = 15000, interval = 500) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + maxWait;
+
+    function poll() {
+      if (Date.now() > deadline) {
+        return reject(new Error('Python server did not start in time'));
+      }
+
+      const req = http.get(`${API_BASE}/status`, (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            console.log(`[Python] Server ready — Protocol-L: ${data.protocol_l}, Agent: ${data.agent}`);
+            resolve(data);
+          } catch (e) {
+            setTimeout(poll, interval);
+          }
+        });
+      });
+
+      req.on('error', () => {
+        setTimeout(poll, interval);
+      });
+
+      req.setTimeout(2000, () => {
+        req.destroy();
+        setTimeout(poll, interval);
+      });
+    }
+
+    poll();
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// WINDOW MANAGEMENT
+// ═══════════════════════════════════════════════════
 function createWindow(page) {
   const cfg = WINDOW_CONFIGS[page] || WINDOW_CONFIGS.app;
 
@@ -74,7 +194,7 @@ function createWindow(page) {
       preload:            path.join(__dirname, 'preload.js'),
       contextIsolation:   true,
       nodeIntegration:    false,
-      sandbox:            true,
+      sandbox:            false,       // Disabled so preload can use fetch
       devTools:           isDev,
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
@@ -93,7 +213,9 @@ function createWindow(page) {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// ── IPC handlers ─────────────────────────────────────
+// ═══════════════════════════════════════════════════
+// IPC HANDLERS
+// ═══════════════════════════════════════════════════
 
 // Navigation between pages
 ipcMain.on('navigate', (_event, page) => {
@@ -132,11 +254,37 @@ ipcMain.handle('app:version', () => app.getVersion());
 // Get install status
 ipcMain.handle('app:isInstalled', () => isInstalled());
 
-// ── App lifecycle ────────────────────────────────────
-app.whenReady().then(() => {
+// Get API base URL
+ipcMain.handle('api:getBase', () => API_BASE);
+
+// Check if Python server is ready
+ipcMain.handle('api:isReady', async () => {
+  try {
+    await waitForPython(2000, 500);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// APP LIFECYCLE
+// ═══════════════════════════════════════════════════
+app.whenReady().then(async () => {
+  // Start Python backend server
+  startPython();
+
   // Skip installer if already installed
   const startPage = isInstalled() ? 'login' : 'installer';
   createWindow(startPage);
+
+  // Wait for Python server to be ready (non-blocking — window shows immediately)
+  try {
+    await waitForPython(15000, 500);
+    console.log('[Electron] Python backend ready');
+  } catch (e) {
+    console.warn('[Electron] Python backend not ready:', e.message);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -145,7 +293,13 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  appQuitting = true;
+  stopPython();
+});
+
 app.on('window-all-closed', () => {
+  stopPython();
   if (process.platform !== 'darwin') app.quit();
 });
 

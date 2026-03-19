@@ -1,10 +1,17 @@
 /**
  * AetherCloud-L Desktop — Preload (context bridge)
  * Exposes a minimal, secure API to renderer pages.
+ *
+ * Two bridges:
+ *   window.aether    — Electron IPC (navigation, window controls)
+ *   window.aetherAPI — Python backend HTTP API on localhost:8741
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// ═══════════════════════════════════════════════════
+// ELECTRON IPC BRIDGE
+// ═══════════════════════════════════════════════════
 contextBridge.exposeInMainWorld('aether', {
   // ── Navigation ─────────────────────────────────────
   navigate: (page) => ipcRenderer.send('navigate', page),
@@ -23,4 +30,105 @@ contextBridge.exposeInMainWorld('aether', {
 
   // ── Shell ──────────────────────────────────────────
   openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
+
+  // ── API ────────────────────────────────────────────
+  getApiBase:    () => ipcRenderer.invoke('api:getBase'),
+  isApiReady:    () => ipcRenderer.invoke('api:isReady'),
+});
+
+// ═══════════════════════════════════════════════════
+// PYTHON BACKEND API CLIENT
+// ═══════════════════════════════════════════════════
+const API_BASE = 'http://127.0.0.1:8741';
+
+/**
+ * Internal fetch wrapper with error handling.
+ */
+async function apiFetch(endpoint, options = {}) {
+  const url = `${API_BASE}${endpoint}`;
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+    return await response.json();
+  } catch (err) {
+    // Return structured error so renderer can handle gracefully
+    return { error: true, message: err.message, endpoint };
+  }
+}
+
+/**
+ * Build Authorization header from session token.
+ */
+function authHeader(sessionToken) {
+  return { Authorization: `Bearer ${sessionToken}` };
+}
+
+contextBridge.exposeInMainWorld('aetherAPI', {
+
+  // ── Auth ───────────────────────────────────────────
+  async login(username, password) {
+    return apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  },
+
+  async logout(sessionToken) {
+    return apiFetch('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ session_token: sessionToken }),
+    });
+  },
+
+  // ── Vault ──────────────────────────────────────────
+  async listVault(sessionToken) {
+    return apiFetch('/vault/list', {
+      headers: authHeader(sessionToken),
+    });
+  },
+
+  // ── Agent ──────────────────────────────────────────
+  async chat(query, sessionToken) {
+    return apiFetch('/agent/chat', {
+      method: 'POST',
+      headers: authHeader(sessionToken),
+      body: JSON.stringify({ query }),
+    });
+  },
+
+  async analyze(filename, extension, directory, sessionToken) {
+    return apiFetch('/agent/analyze', {
+      method: 'POST',
+      headers: authHeader(sessionToken),
+      body: JSON.stringify({ filename, extension, directory }),
+    });
+  },
+
+  async scan(sessionToken) {
+    return apiFetch('/agent/scan', {
+      method: 'POST',
+      headers: authHeader(sessionToken),
+    });
+  },
+
+  // ── Audit ──────────────────────────────────────────
+  async getAudit(sessionToken, limit = 50) {
+    return apiFetch(`/audit/trail?limit=${limit}`, {
+      headers: authHeader(sessionToken),
+    });
+  },
+
+  // ── Status ─────────────────────────────────────────
+  async getStatus() {
+    return apiFetch('/status');
+  },
 });

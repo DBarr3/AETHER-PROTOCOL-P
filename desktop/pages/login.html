@@ -495,7 +495,7 @@ function drawCircuit() {
 }
 drawCircuit();
 
-// Login handler
+// Login handler — calls Python FastAPI backend
 async function handleLogin() {
   const user = document.getElementById('username').value.trim();
   const pass = document.getElementById('password').value;
@@ -513,22 +513,84 @@ async function handleLogin() {
   status.className = 'login-status info loading-dots';
   status.textContent = 'VERIFYING CREDENTIALS';
 
-  await sleep(400);
-  status.textContent = 'GENERATING QUANTUM SESSION TOKEN';
-  await sleep(500);
-  status.textContent = 'INITIALIZING PROTOCOL-L ENGINE';
-  await sleep(400);
-  status.textContent = 'STARTING VAULT WATCHER';
-  await sleep(300);
+  try {
+    // Check if API is available
+    if (window.aetherAPI) {
+      await sleep(300);
+      status.textContent = 'CONNECTING TO PROTOCOL-L ENGINE';
 
-  // Simulate auth (demo: any credentials work)
-  status.className = 'login-status ok';
-  status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
-  await sleep(600);
-  if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
+      const result = await window.aetherAPI.login(user, pass);
+
+      if (result.error) {
+        status.className = 'login-status error';
+        status.textContent = '⚠ SERVER UNAVAILABLE — ' + result.message;
+        btn.className = 'login-btn';
+        btn.textContent = 'AUTHENTICATE';
+        return;
+      }
+
+      if (result.authenticated) {
+        status.textContent = 'GENERATING QUANTUM SESSION TOKEN';
+        await sleep(400);
+
+        // Store session token for the app page
+        sessionStorage.setItem('session_token', result.session_token);
+        sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
+        sessionStorage.setItem('username', user);
+
+        status.textContent = 'INITIALIZING VAULT WATCHER';
+        await sleep(300);
+
+        status.className = 'login-status ok';
+        status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
+        await sleep(500);
+
+        if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
+      } else {
+        status.className = 'login-status error';
+        status.textContent = '⚠ AUTHENTICATION FAILED — ' + (result.reason || 'INVALID CREDENTIALS');
+        btn.className = 'login-btn';
+        btn.textContent = 'AUTHENTICATE';
+      }
+    } else {
+      // Fallback: no API available (standalone browser mode)
+      await sleep(400);
+      status.textContent = 'GENERATING QUANTUM SESSION TOKEN';
+      await sleep(500);
+      status.textContent = 'INITIALIZING PROTOCOL-L ENGINE';
+      await sleep(400);
+      status.textContent = 'STARTING VAULT WATCHER';
+      await sleep(300);
+
+      sessionStorage.setItem('session_token', 'demo_token_' + Date.now());
+      sessionStorage.setItem('username', user);
+
+      status.className = 'login-status ok';
+      status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
+      await sleep(600);
+      if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
+    }
+  } catch (err) {
+    status.className = 'login-status error';
+    status.textContent = '⚠ CONNECTION ERROR — ' + err.message;
+    btn.className = 'login-btn';
+    btn.textContent = 'AUTHENTICATE';
+  }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Check backend status on load
+window.addEventListener('load', async () => {
+  if (window.aetherAPI) {
+    const status = await window.aetherAPI.getStatus();
+    if (!status.error) {
+      // Update protocol indicators
+      const dots = document.querySelectorAll('.protocol-dot');
+      if (dots.length >= 1) dots[0].style.background = '#00ff88'; // Protocol-L ACTIVE
+    }
+  }
+});
 </script>
 </body>
 </html>

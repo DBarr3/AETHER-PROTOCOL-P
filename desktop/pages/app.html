@@ -1278,11 +1278,26 @@ function endPan() {
 // ═══════════════════════════════════════════════════
 // FILE SELECTION
 // ═══════════════════════════════════════════════════
-function selectFile(file, folder) {
+async function selectFile(file, folder) {
   addAuditEntry('FILE_READ', file.name, 'ok');
   addMessage('agent', `Analyzing <strong>${file.name}</strong>...`);
+
+  const token = sessionStorage.getItem('session_token');
+  if (window.aetherAPI && token) {
+    const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+    const result = await window.aetherAPI.analyze(file.name, ext, folder?.name || '', token);
+    if (!result.error) {
+      const conf = (result.confidence * 100).toFixed(0);
+      addMessage('agent',
+        `<strong>${file.name}</strong> — ${file.size || file.size_display} · Category: <span style="color:var(--quantum)">${result.category}</span><br>` +
+        `Suggested: <span style="color:var(--green)">${result.suggested_name}</span> · Confidence: ${conf}% ` +
+        `<span class="msg-commit">✓ ${result.commitment_hash}</span>`, true);
+      return;
+    }
+  }
+  // Fallback
   setTimeout(() => {
-    addMessage('agent', `<strong>${file.name}</strong> — ${file.size} · Category: <span style="color:var(--quantum)">${file.type}</span><br>Suggested: <span style="color:var(--green)">20260319_${file.type}_${file.name.replace(/\s/g,'_')}</span> · Confidence: 0.94 <span class="msg-commit">✓ committed</span>`);
+    addMessage('agent', `<strong>${file.name}</strong> — ${file.size} · Category: <span style="color:var(--quantum)">${file.type}</span><br>Suggested: <span style="color:var(--green)">20260319_${file.type}_${file.name.replace(/\s/g,'_')}</span> · Confidence: 94% <span class="msg-commit">✓ committed</span>`);
   }, 800);
 }
 
@@ -1342,7 +1357,7 @@ const agentResponses = {
   default: `I can help you organize files, analyze vault structure, scan for threats, or answer questions about your files. All my reasoning is cryptographically committed via Protocol-L.`
 };
 
-function sendMessage() {
+async function sendMessage() {
   const input = document.getElementById('agent-input');
   const query = input.value.trim();
   if (!query) return;
@@ -1351,6 +1366,24 @@ function sendMessage() {
   addMessage('user', query);
   addAuditEntry('AGENT_QUERY', query.slice(0,32)+'...', 'ok');
 
+  const token = sessionStorage.getItem('session_token');
+  if (window.aetherAPI && token) {
+    try {
+      const result = await window.aetherAPI.chat(query, token);
+      if (!result.error) {
+        const verified = result.verified ? '✓ verified' : '';
+        const threat = result.threat_level !== 'NONE'
+          ? ` · <span style="color:var(--red)">THREAT: ${result.threat_level}</span>` : '';
+        addMessage('agent', result.response + threat, result.verified);
+        addAuditEntry('AGENT_RESPONSE', result.commitment_hash || 'committed', 'ok');
+        return;
+      }
+    } catch (e) {
+      // Fall through to offline responses
+    }
+  }
+
+  // Offline fallback
   setTimeout(() => {
     let response = agentResponses.default;
     const q = query.toLowerCase();
@@ -1397,14 +1430,39 @@ function navigateToFolder(id) {
 // ═══════════════════════════════════════════════════
 // TOPBAR ACTIONS
 // ═══════════════════════════════════════════════════
-function runScan() {
+async function runScan() {
   addMessage('system', 'Running security scan...');
   addAuditEntry('SECURITY_SCAN', 'initiated', 'ok');
+
+  const token = sessionStorage.getItem('session_token');
+  if (window.aetherAPI && token) {
+    const result = await window.aetherAPI.scan(token);
+    if (!result.error) {
+      const findings = result.findings.length
+        ? result.findings.map(f => `· ${typeof f === 'string' ? f : JSON.stringify(f)}`).join('<br>')
+        : '✓ No threats detected';
+      const color = result.threat_level === 'NONE' ? 'var(--green)' : 'var(--red)';
+      addMessage('agent',
+        `Security scan complete. <span style="color:${color}">Threat level: ${result.threat_level}</span><br><br>` +
+        findings + `<br><br>Recommended: ${result.recommended_action} ` +
+        `<span class="msg-commit">✓ ${result.commitment_hash}</span>`, true);
+      return;
+    }
+  }
   setTimeout(() => addMessage('agent', agentResponses.scan, true), 1200);
 }
 
-function runOrganize() {
+async function runOrganize() {
   addMessage('system', 'Running organization analysis...');
+
+  const token = sessionStorage.getItem('session_token');
+  if (window.aetherAPI && token) {
+    const result = await window.aetherAPI.chat('organize my vault files', token);
+    if (!result.error) {
+      addMessage('agent', result.response, result.verified);
+      return;
+    }
+  }
   setTimeout(() => addMessage('agent', agentResponses.organize, true), 900);
 }
 
@@ -1432,20 +1490,136 @@ function moveTooltip(e) {
 // ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
-window.addEventListener('load', () => {
+// ═══════════════════════════════════════════════════
+// LIVE VAULT LOADING
+// ═══════════════════════════════════════════════════
+async function loadLiveVault() {
+  const token = sessionStorage.getItem('session_token');
+  if (!window.aetherAPI || !token) return false;
+
+  try {
+    const data = await window.aetherAPI.listVault(token);
+    if (data.error) return false;
+
+    // If we got real files from the vault, rebuild the graph
+    if (data.files && data.files.length > 0) {
+      // Convert API response to vaultData format
+      const folderAngles = [-80, -20, 40, 110, 170, -140, -50, 70, 130];
+      const iconMap = { CODE: '💻', PATENT: '📋', DOCUMENT: '📄', TRADING: '📈',
+        SECURITY: '🛡', BACKUP: '💾', PERSONAL: '📁', CONFIG: '⚙', LOG: '📋', ARCHIVE: '📦' };
+
+      data.folders.forEach((folder, i) => {
+        const angle = folderAngles[i % folderAngles.length];
+        const existing = vaultData.folders.find(f => f.id === folder.id);
+        if (!existing) {
+          vaultData.folders.push({
+            id: folder.id,
+            name: folder.name,
+            icon: iconMap[folder.files?.[0]?.category] || '📁',
+            count: folder.count,
+            angle: angle,
+            dist: 200,
+            files: folder.files.map(f => ({
+              name: f.name,
+              icon: f.icon || '📄',
+              size: f.size_display || f.size,
+              type: f.category || 'PERSONAL',
+            })),
+          });
+        }
+      });
+
+      // Update stats
+      document.getElementById('stat-files').textContent = data.stats.file_count || data.files.length;
+      document.getElementById('stat-folders').textContent = data.stats.folder_count || data.folders.length;
+
+      // Rebuild the node graph
+      document.getElementById('nodes-container').innerHTML = '';
+      // Clear old SVG connectors (keep defs)
+      const svg = document.getElementById('connector-svg');
+      while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+      buildVaultNodes();
+      applyTransform();
+    }
+
+    return true;
+  } catch (e) {
+    console.warn('Failed to load live vault:', e);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// AUDIT POLLING
+// ═══════════════════════════════════════════════════
+let auditPollTimer = null;
+
+async function pollAuditTrail() {
+  const token = sessionStorage.getItem('session_token');
+  if (!window.aetherAPI || !token) return;
+
+  try {
+    const data = await window.aetherAPI.getAudit(token, 20);
+    if (data.error || !data.entries) return;
+
+    // Only add new entries we haven't seen
+    const badge = document.getElementById('audit-badge');
+    const current = parseInt(badge.textContent) || 0;
+    if (data.entries.length > current) {
+      // Add the difference
+      const newEntries = data.entries.slice(0, data.entries.length - current);
+      newEntries.forEach(entry => {
+        const type = entry.event_type || entry.phase || 'EVENT';
+        const path = entry.data?.path || entry.order_id || '';
+        addAuditEntry(type, path, 'ok');
+      });
+    }
+  } catch (e) {
+    // Silently fail — poll will retry
+  }
+}
+
+function startAuditPolling() {
+  if (auditPollTimer) clearInterval(auditPollTimer);
+  auditPollTimer = setInterval(pollAuditTrail, 3000);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('load', async () => {
   initCircuitCanvas();
   buildVaultNodes();
   applyTransform();
 
   // Boot messages
+  const username = sessionStorage.getItem('username') || 'operator';
   addMessage('system', '◈ Protocol-L engine initialized · quantum seed active');
   addMessage('system', '◈ Vault watcher active · unauthorized access detection enabled');
-  addMessage('agent', 'Vault loaded. I can see 6 folders and 33 files. Type a command or ask me anything about your vault.');
+  addAuditEntry('SESSION_START', username + ' · local session', 'ok');
 
-  // Initial audit entries
-  addAuditEntry('SESSION_START', 'brandon · local session', 'ok');
-  addAuditEntry('VAULT_LOADED', 'root · 33 files', 'ok');
+  // Try to load live data from Python backend
+  const liveLoaded = await loadLiveVault();
+  if (liveLoaded) {
+    addMessage('agent', `Vault loaded from live backend. Type a command or ask me anything about your vault.`);
+    addAuditEntry('VAULT_LOADED', 'live backend connected', 'ok');
+
+    // Check backend status
+    const status = await window.aetherAPI.getStatus();
+    if (!status.error) {
+      addAuditEntry('BACKEND_STATUS', `Protocol-L: ${status.protocol_l} · Agent: ${status.agent}`, 'ok');
+      const agentModel = document.querySelector('.agent-model');
+      if (agentModel) agentModel.textContent = `${status.agent} · Protocol-L verified`;
+    }
+  } else {
+    addMessage('agent', 'Vault loaded. I can see 6 folders and 33 files. Type a command or ask me anything about your vault.');
+    addAuditEntry('VAULT_LOADED', 'root · demo data', 'ok');
+  }
+
   addAuditEntry('WATCHER_START', 'filesystem monitor active', 'ok');
+
+  // Start polling audit trail from backend
+  startAuditPolling();
 });
 
 window.addEventListener('resize', () => {
