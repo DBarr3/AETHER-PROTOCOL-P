@@ -38,9 +38,10 @@ from config.settings import (
     CLAUDE_API_KEY,
     CLAUDE_MODEL,
     CLAUDE_MAX_TOKENS,
-    AGENT_SYSTEM_PROMPT,
     DEFAULT_AUDIT_DIR,
 )
+from config.agent_prompt import AETHER_AGENT_SYSTEM_PROMPT, TASK_SUFFIXES
+from agent.qopc_feedback import QOPCLoop
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +131,16 @@ class HardenedClaudeAgent:
         self.client = Anthropic(api_key=self._api_key)
         self.model = model or CLAUDE_MODEL
         self.max_tokens = max_tokens or CLAUDE_MAX_TOKENS
-        self.system_prompt = AGENT_SYSTEM_PROMPT
+        self.system_prompt = AETHER_AGENT_SYSTEM_PROMPT
         self.conversation_history: list[dict] = []
+
+        # QOPC feedback loop — recursive truth loop
+        self._qopc: Optional[QOPCLoop] = None
+        try:
+            self._qopc = QOPCLoop()
+            logger.info("QOPC feedback loop initialized")
+        except Exception as e:
+            logger.warning("QOPC feedback loop unavailable: %s", e)
 
         # Session binding — every response is bound to this session
         self._session_token = session_token or hashlib.sha256(
@@ -340,38 +349,51 @@ class HardenedClaudeAgent:
         extension: str,
         directory: str,
         vault_context: Optional[dict] = None,
+        vault=None,
     ) -> dict:
         """
-        Analyze a single file with full Protocol-L verification.
+        Analyze a single file with full Protocol-L verification
+        and QOPC feedback loop integration.
 
         The Claude response is committed and verified before being
         returned. If verification fails, falls back to rule-based.
 
-        Returns same structure as AetherClaudeAgent.analyze_file().
+        QOPC cycle:
+          1. Capture vault state (DQVL)
+          2. Select optimal prompt variant (QOPGC)
+          3. Call Claude with variant prompt (LLMRE)
+          4. Validate response against state (QOVL)
+          5. Outcome recorded later via record_outcome()
         """
+        # QOPC: Begin reasoning cycle
+        cycle = None
+        variant = None
+        suffix = TASK_SUFFIXES.get("ANALYZE", "")
+
+        if self._qopc and vault:
+            try:
+                cycle, variant = self._qopc.begin_cycle(
+                    vault, "ANALYZE", f"{filename}{extension}"
+                )
+                suffix = variant.suffix
+            except Exception as e:
+                logger.warning("QOPC begin_cycle failed: %s", e)
+
         prompt = (
             f"Analyze this file and respond with a JSON object only. No other text.\n\n"
             f"filename: {filename}\n"
             f"extension: {extension}\n"
             f"current_directory: {directory}\n\n"
-            f"Respond with exactly:\n"
-            f'{{\n'
-            f'  "suggested_name": "YYYYMMDD_CATEGORY_Description{extension}",\n'
-            f'  "category": "PATENT|CODE|BACKUP|LEGAL|FINANCE|TRADING|SECURITY|PERSONAL|ARCHIVE|CONFIG|LOG",\n'
-            f'  "suggested_directory": "relative/path",\n'
-            f'  "confidence": 0.0-1.0,\n'
-            f'  "reasoning": "one sentence",\n'
-            f'  "security_flag": true|false,\n'
-            f'  "security_note": "note if flagged, null otherwise"\n'
-            f'}}'
+            f"{suffix}"
         )
 
         try:
-            # Call Claude API
+            # Node 3: LLMRE — Call Claude
+            system = variant.system_prompt if variant else self.system_prompt
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=system,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -384,7 +406,22 @@ class HardenedClaudeAgent:
             self._verify_response(hardened)
 
             # Parse only after verification passes
-            return json.loads(hardened.response_text)
+            parsed = json.loads(hardened.response_text)
+
+            # Node 4: QOVL — Validate response
+            if self._qopc and cycle:
+                validation = self._qopc.validate_response(cycle, parsed)
+                if not validation["valid"]:
+                    logger.warning("QOVL issues: %s", validation["issues"])
+                    parsed = validation["adjusted"]
+
+            # Store cycle_id on result for later outcome recording
+            if cycle:
+                parsed["_cycle_id"] = cycle.cycle_id
+                if hardened:
+                    cycle.commitment_hash = hardened.response_hash
+
+            return parsed
 
         except ResponseTamperingError as e:
             logger.error("TAMPERING DETECTED: %s", e)
@@ -584,6 +621,40 @@ class HardenedClaudeAgent:
                 "recommended_action": "Manual review required",
             }
 
+    # ─── QOPC Feedback ────────────────────────────────────────
+
+    def record_outcome(
+        self,
+        cycle_id: str,
+        user_action: str,
+        user_correction: Optional[str] = None,
+    ) -> Optional[float]:
+        """
+        Node 5: Record user outcome for a QOPC reasoning cycle.
+        Feeds delta back to prompt optimizer.
+
+        Args:
+            cycle_id: The _cycle_id from a previous analyze_file result
+            user_action: ACCEPTED | REJECTED | CORRECTED | IGNORED
+            user_correction: Optional correction text
+
+        Returns:
+            Delta value (prediction - reality), or None if no QOPC loop
+        """
+        if not self._qopc:
+            return None
+        return self._qopc.record_outcome(
+            cycle_id, user_action, user_correction
+        )
+
+    def get_qopc_stats(self) -> dict:
+        """Return QOPC feedback loop statistics."""
+        if not self._qopc:
+            return {"enabled": False}
+        stats = self._qopc.get_loop_stats()
+        stats["enabled"] = True
+        return stats
+
     # ─── Verification report ─────────────────────────────────
 
     def get_verification_report(self) -> dict:
@@ -593,7 +664,7 @@ class HardenedClaudeAgent:
         This is the audit evidence for the third patent claim:
         cryptographically verified AI reasoning.
         """
-        return {
+        report = {
             "session_token_hash": self._session_token_hash,
             "model": self.model,
             "total_responses": self._total_responses,
@@ -611,7 +682,9 @@ class HardenedClaudeAgent:
                 if self._tamper_detections == 0
                 else f"COMPROMISED ({self._tamper_detections} detections)"
             ),
+            "qopc": self.get_qopc_stats(),
         }
+        return report
 
     # ─── Utility methods ─────────────────────────────────────
 
