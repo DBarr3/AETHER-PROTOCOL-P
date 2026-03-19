@@ -49,6 +49,7 @@ class AetherCloudTerminal:
         "organize": "Run AI organization [--dry-run]",
         "chat": "Ask the AI agent a question",
         "scan": "Run security threat analysis",
+        "verify": "Show agent verification report",
         "rename": "Get AI name suggestion for a file",
         "move": "Move a file with audit log",
         "status": "Show vault stats + Protocol-L status",
@@ -203,6 +204,7 @@ class AetherCloudTerminal:
             "organize": self._cmd_organize,
             "chat": self._cmd_chat,
             "scan": self._cmd_scan,
+            "verify": self._cmd_verify,
             "rename": self._cmd_rename,
             "move": self._cmd_move,
             "status": self._cmd_status,
@@ -417,6 +419,40 @@ class AetherCloudTerminal:
             )
         )
 
+    def _cmd_verify(self, args: list[str]) -> None:
+        """Handle verify command — show agent verification report."""
+        if not self._ensure_authenticated():
+            return
+
+        if not self._agent:
+            self.console.print("[red]No agent initialized.[/red]")
+            return
+
+        report = self._agent.get_verification_report()
+        integrity = report.get("integrity", "UNKNOWN")
+        integrity_style = "green" if integrity == "CLEAN" else "red"
+
+        panel_content = (
+            f"[cyan]Session Hash:[/cyan]      {report.get('session_token_hash', 'N/A')[:32]}...\n"
+            f"[cyan]Model:[/cyan]             {report.get('model', 'N/A')}\n"
+            f"[cyan]Total Responses:[/cyan]   {report.get('total_responses', 0)}\n"
+            f"[cyan]Verified:[/cyan]          {report.get('verified_responses', 0)}\n"
+            f"[cyan]Failed:[/cyan]            {report.get('failed_verifications', 0)}\n"
+            f"[cyan]Tamper Detections:[/cyan] {report.get('tamper_detections', 0)}\n"
+            f"[cyan]RFC 3161:[/cyan]          {'[green]ENABLED[/green]' if report.get('rfc3161_enabled') else '[yellow]DISABLED[/yellow]'}\n"
+            f"[cyan]Verification Rate:[/cyan] {report.get('verification_rate', '0/0')}\n"
+            f"[cyan]Integrity:[/cyan]         [{integrity_style}]{integrity}[/{integrity_style}]"
+        )
+
+        self.console.print(
+            Panel(
+                panel_content,
+                title="[bold cyan]Agent Verification Report[/bold cyan]",
+                border_style="cyan" if integrity == "CLEAN" else "red",
+                box=box.DOUBLE,
+            )
+        )
+
     def _cmd_rename(self, args: list[str]) -> None:
         """Handle rename command."""
         if not self._ensure_authenticated():
@@ -482,8 +518,11 @@ class AetherCloudTerminal:
             else "none"
         )
 
+        hardened_tag = ""
+        if self._agent and self._agent.is_hardened:
+            hardened_tag = " [bold magenta]HARDENED[/bold magenta]"
         agent_status = (
-            f"[green]ACTIVE[/green] (Claude {self._agent._claude_agent.model if self._agent._claude_available else 'N/A'})"
+            f"[green]ACTIVE[/green]{hardened_tag} (Claude {self._agent._claude_agent.model if self._agent._claude_available else 'N/A'})"
             if self._agent and self._agent.is_claude_available
             else "[yellow]RULE-BASED FALLBACK[/yellow]"
         )

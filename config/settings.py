@@ -52,6 +52,10 @@ Rules you follow:
 You are part of Aether Systems LLC's quantum-secured file intelligence platform.
 Every action you take is logged to a tamper-proof audit trail."""
 
+# ─── Hardened Agent ───────────────────────────────────
+HARDENED_AGENT_ENABLED = os.getenv("AETHER_HARDENED_AGENT", "true").lower() == "true"
+RFC3161_ENABLED = os.getenv("AETHER_RFC3161_ENABLED", "true").lower() == "true"
+
 # ─── Legacy (kept for backward compat) ─────────────────
 DEFAULT_OLLAMA_MODEL = os.getenv("AETHER_OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -66,7 +70,7 @@ CATEGORIES = frozenset({
 
 # ─── UI ─────────────────────────────────────────────────
 APP_NAME = "AetherCloud-L"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 APP_BANNER = f"""
 ╔══════════════════════════════════════════════╗
 ║   AETHER CLOUD-L  v{APP_VERSION}                     ║

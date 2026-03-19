@@ -43,15 +43,28 @@ class AetherFileAgent:
         self._init_claude_agent()
 
     def _init_claude_agent(self) -> None:
-        """Initialize Claude agent, gracefully handle missing API key."""
+        """Initialize Claude agent with Protocol-L hardening when enabled."""
         try:
-            from agent.claude_agent import AetherClaudeAgent
-            self._claude_agent = AetherClaudeAgent()
-            self._claude_available = True
-            logger.info("Claude agent initialized successfully")
+            from config.settings import HARDENED_AGENT_ENABLED, RFC3161_ENABLED
+
+            if HARDENED_AGENT_ENABLED:
+                from agent.hardened_claude_agent import HardenedClaudeAgent
+                self._claude_agent = HardenedClaudeAgent(
+                    enable_rfc3161=RFC3161_ENABLED,
+                )
+                self._claude_available = True
+                self._hardened = True
+                logger.info("Hardened Claude agent initialized (Protocol-L secured)")
+            else:
+                from agent.claude_agent import AetherClaudeAgent
+                self._claude_agent = AetherClaudeAgent()
+                self._claude_available = True
+                self._hardened = False
+                logger.info("Claude agent initialized (standard mode)")
         except Exception as e:
             logger.warning("Claude agent unavailable: %s — using rule-based fallback", e)
             self._claude_available = False
+            self._hardened = False
 
     @property
     def organizer(self):
@@ -64,6 +77,17 @@ class AetherFileAgent:
     def is_claude_available(self) -> bool:
         """Whether the Claude API agent is active."""
         return self._claude_available
+
+    @property
+    def is_hardened(self) -> bool:
+        """Whether the agent is using Protocol-L hardened mode."""
+        return getattr(self, "_hardened", False)
+
+    def get_verification_report(self) -> dict:
+        """Get the Protocol-L verification report from the hardened agent."""
+        if self._hardened and self._claude_agent:
+            return self._claude_agent.get_verification_report()
+        return {"integrity": "NOT_HARDENED", "total_responses": 0}
 
     def analyze_file(self, path: str) -> dict:
         """

@@ -53,8 +53,9 @@ class TestAetherCloudTerminal:
         assert cmd == "organize"
         assert "--dry-run" in args
 
-    def test_commands_dict_includes_scan(self, terminal):
+    def test_commands_dict_includes_all(self, terminal):
         assert "scan" in terminal.COMMANDS
+        assert "verify" in terminal.COMMANDS
         assert "login" in terminal.COMMANDS
         assert "logout" in terminal.COMMANDS
         assert "ls" in terminal.COMMANDS
@@ -141,3 +142,12 @@ class TestAetherCloudTerminal:
         cmd, args = AetherCloudTerminal.parse_command("scan")
         assert cmd == "scan"
         assert args == []
+
+    def test_parse_verify_command(self):
+        cmd, args = AetherCloudTerminal.parse_command("verify")
+        assert cmd == "verify"
+        assert args == []
+
+    def test_dispatch_verify_not_authenticated(self, terminal):
+        terminal._dispatch("verify")
+        # Should print auth error, not crash
