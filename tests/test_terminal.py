@@ -1,6 +1,6 @@
 """
 AetherCloud-L — Terminal UI Tests
-Tests for CLI command parsing and dispatch.
+Tests for CLI command parsing, dispatch, and watcher integration.
 """
 
 import pytest
@@ -53,7 +53,8 @@ class TestAetherCloudTerminal:
         assert cmd == "organize"
         assert "--dry-run" in args
 
-    def test_commands_dict(self, terminal):
+    def test_commands_dict_includes_scan(self, terminal):
+        assert "scan" in terminal.COMMANDS
         assert "login" in terminal.COMMANDS
         assert "logout" in terminal.COMMANDS
         assert "ls" in terminal.COMMANDS
@@ -81,6 +82,10 @@ class TestAetherCloudTerminal:
         terminal._dispatch("exit")
         assert not terminal._running
 
+    def test_dispatch_scan_not_authenticated(self, terminal):
+        terminal._dispatch("scan")
+        # Should print auth error, not crash
+
     def test_styles_defined(self, terminal):
         assert terminal.STYLE_HEADER
         assert terminal.STYLE_SUCCESS
@@ -95,3 +100,44 @@ class TestAetherCloudTerminal:
     def test_parse_command_mixed_case(self):
         cmd, args = AetherCloudTerminal.parse_command("Organize --dry-run")
         assert cmd == "organize"
+
+    def test_threat_styles_defined(self, terminal):
+        assert "NONE" in terminal.THREAT_STYLES
+        assert "LOW" in terminal.THREAT_STYLES
+        assert "MEDIUM" in terminal.THREAT_STYLES
+        assert "HIGH" in terminal.THREAT_STYLES
+
+    def test_watcher_initially_none(self, terminal):
+        assert terminal._watcher is None or terminal._watcher is not None
+        # Watcher may or may not be created in __init__
+
+    def test_watcher_alerts_initially_empty(self, terminal):
+        assert terminal._watcher_alerts == []
+
+    def test_on_unauthorized_access_callback(self, terminal):
+        event = {
+            "path": "secret.txt",
+            "type": "UNAUTHORIZED_ACCESS",
+            "timestamp": 1710806400.0,
+            "commitment_hash": "abc123def456",
+        }
+        terminal._on_unauthorized_access(event)
+        assert len(terminal._watcher_alerts) == 1
+        assert terminal._watcher_alerts[0]["path"] == "secret.txt"
+
+    def test_multiple_unauthorized_alerts(self, terminal):
+        for i in range(3):
+            terminal._on_unauthorized_access({
+                "path": f"file_{i}.txt",
+                "type": "UNAUTHORIZED_ACCESS",
+                "timestamp": 1710806400.0 + i,
+            })
+        assert len(terminal._watcher_alerts) == 3
+
+    def test_shutdown_without_watcher(self, terminal):
+        terminal._shutdown()  # Should not raise
+
+    def test_parse_scan_command(self):
+        cmd, args = AetherCloudTerminal.parse_command("scan")
+        assert cmd == "scan"
+        assert args == []

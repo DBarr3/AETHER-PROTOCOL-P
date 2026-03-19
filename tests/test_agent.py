@@ -1,6 +1,7 @@
 """
 AetherCloud-L — Agent Tests
-Tests for AI file agent (with mocked Ollama).
+Tests for AI file agent (rule-based fallback mode).
+Claude-specific tests are in test_claude_agent.py.
 """
 
 import pytest
@@ -15,10 +16,18 @@ class TestAetherFileAgent:
 
     @pytest.fixture
     def agent(self, populated_vault):
-        return AetherFileAgent(populated_vault, model="qwen2.5:7b")
+        """Create an agent with Claude disabled (rule-based mode)."""
+        with patch("agent.file_agent.AetherFileAgent._init_claude_agent"):
+            a = AetherFileAgent(populated_vault)
+            a._claude_available = False
+            a._claude_agent = None
+        return a
 
     def test_agent_creation(self, agent):
         assert agent is not None
+
+    def test_is_claude_available_false(self, agent):
+        assert not agent.is_claude_available
 
     def test_rule_based_analysis_python(self, agent):
         result = agent._rule_based_analysis("/vault/script.py")
@@ -58,24 +67,11 @@ class TestAetherFileAgent:
         assert result["category"] == "security"
 
     def test_analyze_file_fallback(self, agent):
-        """When Ollama is unavailable, falls back to rule-based."""
+        """When Claude is unavailable, falls back to rule-based."""
         result = agent.analyze_file("/vault/script.py")
         assert "category" in result
         assert "suggested_name" in result
         assert "confidence" in result
-
-    @patch("agent.file_agent.AetherFileAgent._query_ollama")
-    def test_analyze_file_with_ai(self, mock_ollama, agent):
-        mock_ollama.return_value = '{"suggested_name": "main.py", "category": "code", "reasoning": "Python script"}'
-        result = agent.analyze_file("/vault/script.py")
-        assert result["category"] == "code"
-        assert result["confidence"] == 0.85
-
-    @patch("agent.file_agent.AetherFileAgent._query_ollama")
-    def test_analyze_file_ai_invalid_json(self, mock_ollama, agent):
-        mock_ollama.return_value = "not json"
-        result = agent.analyze_file("/vault/script.py")
-        assert result["confidence"] == 0.7  # Falls back to rule-based
 
     def test_organize_vault_dry_run(self, agent):
         suggestions = agent.organize_vault(dry_run=True)
@@ -112,14 +108,61 @@ class TestAetherFileAgent:
         response = agent.chat("quantum entanglement theories")
         assert isinstance(response, str)
 
+    def test_chat_security_scan(self, agent):
+        response = agent.chat("security scan")
+        assert isinstance(response, str)
+        assert "Threat" in response or "scan" in response.lower()
+
     def test_suggest_name(self, agent):
         name = agent.suggest_name("/vault/script.py")
         assert isinstance(name, str)
         assert name.endswith(".py")
 
-    def test_query_ollama_failure(self, agent):
-        """Ollama unavailable returns empty string."""
-        # Use a bad URL to force connection failure
-        agent._ollama_url = "http://127.0.0.1:1"
-        result = agent._query_ollama("test prompt")
-        assert result == ""
+    def test_security_scan(self, agent):
+        result = agent.security_scan()
+        assert "threat_level" in result
+        assert "findings" in result
+        assert "recommended_action" in result
+
+    def test_security_scan_no_threats(self, agent):
+        result = agent.security_scan()
+        assert result["threat_level"] in {"NONE", "LOW", "MEDIUM", "HIGH"}
+
+    def test_reset_conversation_no_claude(self, agent):
+        agent.reset_conversation()  # Should not raise
+
+    def test_rule_based_chat_help(self, agent):
+        response = agent._rule_based_chat("help me please")
+        assert "I can help with" in response
+
+    def test_rule_based_security_scan_empty(self, agent):
+        result = agent._rule_based_security_scan([])
+        assert result["threat_level"] == "NONE"
+
+    def test_rule_based_security_scan_high(self, agent):
+        events = []
+        for i in range(12):
+            events.append({
+                "data": {
+                    "trade_details": {
+                        "event_type": "UNAUTHORIZED_ACCESS",
+                        "path": f"file_{i}.txt",
+                    }
+                }
+            })
+        result = agent._rule_based_security_scan(events)
+        assert result["threat_level"] == "HIGH"
+
+    def test_rule_based_security_scan_medium(self, agent):
+        events = []
+        for i in range(4):
+            events.append({
+                "data": {
+                    "trade_details": {
+                        "event_type": "UNAUTHORIZED_ACCESS",
+                        "path": f"file_{i}.txt",
+                    }
+                }
+            })
+        result = agent._rule_based_security_scan(events)
+        assert result["threat_level"] == "MEDIUM"

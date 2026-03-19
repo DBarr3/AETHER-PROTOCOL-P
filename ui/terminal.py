@@ -1,6 +1,7 @@
 """
 AetherCloud-L — Retro Terminal Interface
 Dark background, cyan/amber/green semantic colors.
+VaultWatcher wired into boot sequence.
 Aether Systems LLC — Patent Pending
 """
 
@@ -21,6 +22,7 @@ from config.settings import APP_NAME, APP_VERSION, APP_BANNER
 from auth.login import AetherCloudAuth
 from auth.session import SessionManager
 from vault.filebase import AetherVault
+from vault.watcher import VaultWatcher
 from agent.file_agent import AetherFileAgent
 
 
@@ -28,6 +30,7 @@ class AetherCloudTerminal:
     """
     Retro terminal interface for AetherCloud-L.
     Rich-based CLI with Aether aesthetic styling.
+    VaultWatcher integrated into boot sequence.
     """
 
     STYLE_HEADER = "bold cyan"
@@ -45,11 +48,20 @@ class AetherCloudTerminal:
         "audit": "Show audit trail [path]",
         "organize": "Run AI organization [--dry-run]",
         "chat": "Ask the AI agent a question",
+        "scan": "Run security threat analysis",
         "rename": "Get AI name suggestion for a file",
         "move": "Move a file with audit log",
         "status": "Show vault stats + Protocol-L status",
         "help": "Show available commands",
         "exit": "Exit AetherCloud-L",
+    }
+
+    THREAT_STYLES = {
+        "NONE": "bold green",
+        "LOW": "bold yellow",
+        "MEDIUM": "bold dark_orange",
+        "HIGH": "bold red",
+        "UNKNOWN": "bold magenta",
     }
 
     def __init__(
@@ -62,8 +74,29 @@ class AetherCloudTerminal:
         self._session_token: Optional[str] = None
         self._vault: Optional[AetherVault] = None
         self._agent: Optional[AetherFileAgent] = None
+        self._watcher: Optional[VaultWatcher] = None
         self._vault_root = vault_root
         self._running = False
+        self._watcher_alerts: list[dict] = []
+
+    def _on_unauthorized_access(self, event: dict) -> None:
+        """Callback for VaultWatcher unauthorized access alerts."""
+        self._watcher_alerts.append(event)
+        self.console.print()
+        self.console.print("[bold red]⚠ UNAUTHORIZED ACCESS DETECTED[/bold red]")
+        self.console.print(f"[red]  File:[/red]  {event.get('path', 'unknown')}")
+        self.console.print(f"[red]  Event:[/red] {event.get('type', 'unknown')}")
+        ts = event.get("timestamp", "")
+        if isinstance(ts, (int, float)):
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+        self.console.print(f"[red]  Time:[/red]  {ts}")
+        ch = event.get("commitment_hash", "")
+        if ch:
+            self.console.print(f"[red]  Commitment:[/red] {ch[:32]}...")
+        self.console.print(
+            "[yellow]  Signed audit entry created. Run 'audit' to view full log.[/yellow]"
+        )
+        self.console.print()
 
     def _ensure_authenticated(self) -> bool:
         """Check if user is authenticated."""
@@ -73,7 +106,7 @@ class AetherCloudTerminal:
         return False
 
     def _boot_sequence(self) -> None:
-        """Display boot sequence on launch."""
+        """Display boot sequence on launch with VaultWatcher initialization."""
         self.console.print(
             Panel(
                 APP_BANNER.strip(),
@@ -90,32 +123,60 @@ class AetherCloudTerminal:
             f"  [cyan]Timestamp[/cyan]   {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
             style=self.STYLE_MUTED,
         )
+
+        # Initialize VaultWatcher
+        vault_root = self._vault_root or str(Path.home() / "AetherVault")
+        try:
+            self._watcher = VaultWatcher(
+                vault_root=vault_root,
+                on_alert=self._on_unauthorized_access,
+            )
+            self._watcher.start()
+            self.console.print(
+                "  [green]✓[/green] Vault watcher [green]ACTIVE[/green] "
+                "— unauthorized access detection enabled",
+                style=self.STYLE_MUTED,
+            )
+        except Exception as e:
+            self.console.print(
+                f"  [yellow]⚠[/yellow] Vault watcher failed to start: {e}",
+                style=self.STYLE_MUTED,
+            )
+
         self.console.print()
+
+    def _shutdown(self) -> None:
+        """Shutdown watcher and cleanup."""
+        if self._watcher:
+            self._watcher.stop()
+        if self._agent:
+            self._agent.reset_conversation()
 
     def run(self) -> None:
         """Main run loop."""
         self._running = True
         self._boot_sequence()
 
-        self.console.print(
-            "[yellow]Please login to continue.[/yellow]\n"
-        )
+        self.console.print("[yellow]Please login to continue.[/yellow]\n")
 
-        while self._running:
-            try:
-                prompt_text = (
-                    "[cyan]aether[/cyan]:[green]cloud[/green]> "
-                    if self._session_token
-                    else "[dim]aether:cloud>[/dim] "
-                )
-                raw = Prompt.ask(prompt_text, console=self.console, default="")
-                if not raw.strip():
-                    continue
-                self._dispatch(raw.strip())
-            except KeyboardInterrupt:
-                self.console.print("\n[yellow]Use 'exit' to quit.[/yellow]")
-            except EOFError:
-                self._running = False
+        try:
+            while self._running:
+                try:
+                    prompt_text = (
+                        "[cyan]aether[/cyan]:[green]cloud[/green]> "
+                        if self._session_token
+                        else "[dim]aether:cloud>[/dim] "
+                    )
+                    raw = Prompt.ask(prompt_text, console=self.console, default="")
+                    if not raw.strip():
+                        continue
+                    self._dispatch(raw.strip())
+                except KeyboardInterrupt:
+                    self.console.print("\n[yellow]Use 'exit' to quit.[/yellow]")
+                except EOFError:
+                    self._running = False
+        finally:
+            self._shutdown()
 
         self.console.print(
             "\n[cyan]AetherCloud-L terminated. Audit trail preserved.[/cyan]"
@@ -141,6 +202,7 @@ class AetherCloudTerminal:
             "audit": self._cmd_audit,
             "organize": self._cmd_organize,
             "chat": self._cmd_chat,
+            "scan": self._cmd_scan,
             "rename": self._cmd_rename,
             "move": self._cmd_move,
             "status": self._cmd_status,
@@ -159,7 +221,6 @@ class AetherCloudTerminal:
     def _cmd_login(self, args: list[str]) -> None:
         """Handle login command."""
         username = Prompt.ask("[cyan]Username[/cyan]", console=self.console)
-        from rich.prompt import Prompt as RichPrompt
         password = Prompt.ask(
             "[cyan]Password[/cyan]", console=self.console, password=True
         )
@@ -168,12 +229,13 @@ class AetherCloudTerminal:
 
         if result["authenticated"]:
             self._session_token = result["session_token"]
-            # Initialize vault
-            vault_root = self._vault_root or str(
-                Path.home() / "AetherVault"
-            )
+            vault_root = self._vault_root or str(Path.home() / "AetherVault")
             self._vault = AetherVault(vault_root, self._session_token)
             self._agent = AetherFileAgent(self._vault)
+
+            # Restart watcher with vault's audit log if needed
+            if self._watcher and not self._watcher.is_running:
+                self._watcher.start()
 
             self.console.print(
                 f"\n[green]✓ Authenticated as {username}[/green]"
@@ -185,12 +247,16 @@ class AetherCloudTerminal:
                 f"  [dim]Commitment: {result['commitment_hash'][:24]}...[/dim]"
             )
             self.console.print(
-                f"  [dim]Vault: {vault_root}[/dim]\n"
+                f"  [dim]Vault: {vault_root}[/dim]"
             )
+            agent_status = (
+                "[green]Claude API ACTIVE[/green]"
+                if self._agent.is_claude_available
+                else "[yellow]Rule-based fallback[/yellow]"
+            )
+            self.console.print(f"  [dim]AI Agent: {agent_status}[/dim]\n")
         else:
-            self.console.print(
-                f"\n[red]✗ Authentication failed[/red]"
-            )
+            self.console.print(f"\n[red]✗ Authentication failed[/red]")
             self.console.print(
                 f"  [dim]Audit ID: {result['audit_id']} (logged)[/dim]\n"
             )
@@ -199,6 +265,8 @@ class AetherCloudTerminal:
         """Handle logout command."""
         if not self._ensure_authenticated():
             return
+        if self._agent:
+            self._agent.reset_conversation()
         result = self._auth.logout(self._session_token)
         self._session_token = None
         self._vault = None
@@ -323,6 +391,32 @@ class AetherCloudTerminal:
         response = self._agent.chat(query)
         self.console.print(f"\n[green]{response}[/green]\n")
 
+    def _cmd_scan(self, args: list[str]) -> None:
+        """Handle security scan command."""
+        if not self._ensure_authenticated():
+            return
+
+        self.console.print("[cyan]Running security scan...[/cyan]")
+
+        result = self._agent.security_scan()
+        threat = result.get("threat_level", "UNKNOWN")
+        style = self.THREAT_STYLES.get(threat, "bold white")
+
+        self.console.print(
+            Panel(
+                f"[{style}]Threat Level: {threat}[/{style}]\n\n"
+                f"[white]Findings:[/white]\n"
+                + "\n".join(
+                    f"  • {f}" for f in result.get("findings", ["None"])
+                )
+                + f"\n\n[yellow]Recommended Action:[/yellow]\n"
+                f"  {result.get('recommended_action', 'None')}",
+                title="[bold cyan]Security Scan Results[/bold cyan]",
+                border_style="cyan" if threat == "NONE" else "red",
+                box=box.DOUBLE,
+            )
+        )
+
     def _cmd_rename(self, args: list[str]) -> None:
         """Handle rename command."""
         if not self._ensure_authenticated():
@@ -333,15 +427,9 @@ class AetherCloudTerminal:
             return
 
         path = args[0]
-        suggested = self._agent.suggest_name(
-            str(self._vault.root / path)
-        )
-        self.console.print(
-            f"  Current:   [white]{Path(path).name}[/white]"
-        )
-        self.console.print(
-            f"  Suggested: [green]{suggested}[/green]"
-        )
+        suggested = self._agent.suggest_name(str(self._vault.root / path))
+        self.console.print(f"  Current:   [white]{Path(path).name}[/white]")
+        self.console.print(f"  Suggested: [green]{suggested}[/green]")
 
         confirm = Prompt.ask(
             "[yellow]Apply rename?[/yellow]",
@@ -379,15 +467,38 @@ class AetherCloudTerminal:
 
         stats = self._vault.get_stats()
 
+        watcher_status = (
+            "[green]ACTIVE[/green]"
+            if self._watcher and self._watcher.is_running
+            else "[yellow]INACTIVE[/yellow]"
+        )
+        watcher_events = len(self._watcher_alerts)
+        last_event = (
+            time.strftime(
+                "%Y-%m-%d %H:%M:%S",
+                time.localtime(self._watcher_alerts[-1].get("timestamp", 0))
+            )
+            if self._watcher_alerts
+            else "none"
+        )
+
+        agent_status = (
+            f"[green]ACTIVE[/green] (Claude {self._agent._claude_agent.model if self._agent._claude_available else 'N/A'})"
+            if self._agent and self._agent.is_claude_available
+            else "[yellow]RULE-BASED FALLBACK[/yellow]"
+        )
+
         panel_content = (
-            f"[cyan]Vault Root:[/cyan]    {stats['vault_root']}\n"
-            f"[cyan]Files:[/cyan]         {stats['file_count']}\n"
-            f"[cyan]Total Size:[/cyan]    {stats['total_size_mb']} MB\n"
-            f"[cyan]Protocol-L:[/cyan]    [green]ACTIVE[/green] — SHA-256 commitment layer\n"
-            f"[cyan]Session:[/cyan]       [green]VALID[/green]\n"
-            f"[cyan]Watcher:[/cyan]       [green]MONITORING[/green]\n"
-            f"[cyan]AI Agent:[/cyan]      [green]READY[/green] (Qwen 2.5)\n"
-            f"[cyan]Timestamp:[/cyan]     {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}"
+            f"[cyan]Vault Root:[/cyan]      {stats['vault_root']}\n"
+            f"[cyan]Files:[/cyan]           {stats['file_count']}\n"
+            f"[cyan]Total Size:[/cyan]      {stats['total_size_mb']} MB\n"
+            f"[cyan]Protocol-L:[/cyan]      [green]ACTIVE[/green] — SHA-256 commitment layer\n"
+            f"[cyan]Session:[/cyan]         [green]VALID[/green]\n"
+            f"[cyan]Vault Watcher:[/cyan]   {watcher_status}\n"
+            f"[cyan]Watcher Events:[/cyan]  {watcher_events} unauthorized access events\n"
+            f"[cyan]Last Event:[/cyan]      {last_event}\n"
+            f"[cyan]AI Agent:[/cyan]        {agent_status}\n"
+            f"[cyan]Timestamp:[/cyan]       {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}"
         )
 
         self.console.print(
