@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AetherCloud-L Installer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --void: #010409;
+    --deep: #0a0e1a;
+    --surface: #0d1117;
+    --panel: #161b27;
+    --border: #1e2738;
+    --quantum: #00d4ff;
+    --quantum-dim: rgba(0,212,255,0.12);
+    --quantum-glow: rgba(0,212,255,0.4);
+    --amber: #ffaa00;
+    --amber-dim: rgba(255,170,0,0.12);
+    --green: #00ff88;
+    --green-dim: rgba(0,255,136,0.12);
+    --red: #ff3366;
+    --text: #8892a4;
+    --text-bright: #c8d3e0;
+    --text-dim: #3d4a5c;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--text-bright);
+    font-family: 'Share Tech Mono', monospace;
+    width: 640px;
+    height: 480px;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+  }
+
+  /* Quantum circuit background */
+  .circuit-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.15;
+  }
+  .circuit-bg svg { width:100%; height:100%; }
+
+  /* Animated scan line */
+  .scanline {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--quantum), transparent);
+    animation: scan 4s linear infinite;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 100;
+  }
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+
+  /* Corner brackets */
+  .bracket {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--quantum);
+    border-style: solid;
+    opacity: 0.5;
+  }
+  .bracket.tl { top:12px; left:12px; border-width:2px 0 0 2px; }
+  .bracket.tr { top:12px; right:12px; border-width:2px 2px 0 0; }
+  .bracket.bl { bottom:12px; left:12px; border-width:0 0 2px 2px; }
+  .bracket.br { bottom:12px; right:12px; border-width:0 2px 2px 0; }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 32px 48px 28px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .logo-mark {
+    width: 42px; height: 42px;
+    border: 2px solid var(--quantum);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .logo-mark::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid var(--quantum-glow);
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+  .logo-mark svg { z-index: 1; }
+  @keyframes pulse-border {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  .header-text { flex: 1; }
+  .app-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--quantum);
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px var(--quantum-glow);
+  }
+  .app-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  .version-badge {
+    font-size: 10px;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    padding: 2px 8px;
+    letter-spacing: 1px;
+    opacity: 0.7;
+  }
+
+  /* Step indicator */
+  .steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .step.active { color: var(--quantum); }
+  .step.done { color: var(--green); }
+  .step-num {
+    width: 18px; height: 18px;
+    border: 1px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+  .step.done .step-num { background: var(--green-dim); }
+  .step.active .step-num { background: var(--quantum-dim); }
+  .step-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    margin: 0 8px;
+  }
+  .step-line.done { background: var(--green); opacity: 0.4; }
+
+  /* Content area */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Panel */
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    padding: 16px;
+    position: relative;
+  }
+  .panel::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -1px; left: 12px;
+    font-size: 9px;
+    color: var(--quantum);
+    background: var(--panel);
+    padding: 0 6px;
+    letter-spacing: 2px;
+    transform: translateY(-50%);
+  }
+
+  /* Install location */
+  .location-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .location-input {
+    flex: 1;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .location-input:focus { border-color: var(--quantum); }
+  .browse-btn {
+    background: var(--quantum-dim);
+    border: 1px solid var(--quantum);
+    color: var(--quantum);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .browse-btn:hover { background: var(--quantum-glow); color: var(--void); }
+
+  .space-info {
+    display: flex;
+    gap: 24px;
+    margin-top: 10px;
+  }
+  .space-item { font-size: 10px; color: var(--text-dim); }
+  .space-item span { color: var(--text-bright); }
+
+  /* Requirements list */
+  .req-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .req-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s;
+  }
+  .req-item.pending { color: var(--text-dim); }
+  .req-item.installing {
+    color: var(--amber);
+    border-color: var(--amber-dim);
+    background: var(--amber-dim);
+  }
+  .req-item.done {
+    color: var(--green);
+    border-color: var(--green-dim);
+    background: var(--green-dim);
+  }
+  .req-item.error { color: var(--red); }
+
+  .req-icon { width: 14px; text-align: center; flex-shrink: 0; }
+  .req-name { flex: 1; }
+  .req-version { color: var(--text-dim); font-size: 10px; }
+  .req-size { color: var(--text-dim); font-size: 10px; width: 48px; text-align: right; }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-top: 12px;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .progress-label .status-text { color: var(--quantum); }
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--quantum), var(--green));
+    width: 0%;
+    transition: width 0.4s ease;
+    position: relative;
+  }
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 20px;
+    background: white;
+    opacity: 0.4;
+    filter: blur(4px);
+  }
+
+  /* Log output */
+  .log-output {
+    height: 56px;
+    overflow-y: auto;
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding-top: 8px;
+  }
+  .log-output .log-line { display: flex; gap: 8px; }
+  .log-output .log-line .ts { color: var(--text-dim); flex-shrink: 0; }
+  .log-output .log-line .msg.ok { color: var(--green); }
+  .log-output .log-line .msg.info { color: var(--quantum); }
+  .log-output .log-line .msg.warn { color: var(--amber); }
+
+  /* Footer buttons */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-left { font-size: 10px; color: var(--text-dim); }
+
+  .btn-group { display: flex; gap: 8px; }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 10px 24px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn:hover::before { opacity: 0.05; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text-bright); }
+
+  .btn-primary {
+    background: var(--quantum);
+    color: var(--void);
+  }
+  .btn-primary:hover { box-shadow: 0 0 20px var(--quantum-glow); }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-finish {
+    background: var(--green);
+    color: var(--void);
+  }
+  .btn-finish:hover { box-shadow: 0 0 20px rgba(0,255,136,0.4); }
+
+  /* Checkmark animation */
+  .complete-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    color: var(--green);
+    font-size: 11px;
+  }
+  .complete-badge.show { display: flex; }
+  .complete-badge svg { animation: pop 0.4s cubic-bezier(0.17,0.67,0.3,1.3); }
+  @keyframes pop {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--void); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* Page transitions */
+  .page { display: none; flex-direction: column; gap: 16px; animation: fadeIn 0.3s ease; }
+  .page.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Welcome page specific */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .feature-item {
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    font-size: 10px;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .feature-item .fi-icon { color: var(--quantum); font-size: 12px; flex-shrink: 0; }
+  .feature-item strong { color: var(--text-bright); display: block; margin-bottom: 2px; font-size: 10px; }
+
+  .license-box {
+    border: 1px solid var(--border);
+    padding: 12px;
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+  .license-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .license-check input { accent-color: var(--quantum); cursor: pointer; }
+  .license-check:hover { color: var(--text-bright); }
+
+  /* Electron frameless title bar */
+  .title-bar {
+    height: 32px;
+    background: var(--void);
+    display: flex;
+    align-items: center;
+    -webkit-app-region: drag;
+    position: relative;
+    z-index: 200;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .title-bar-text {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    padding-left: 12px;
+    flex: 1;
+  }
+  .title-bar-controls {
+    display: flex;
+    -webkit-app-region: no-drag;
+  }
+  .title-bar-btn {
+    width: 40px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .title-bar-btn:hover { background: var(--panel); color: var(--text-bright); }
+  .title-bar-btn.close:hover { background: var(--red); color: white; }
+</style>
+</head>
+<body>
+
+<!-- Electron title bar -->
+<div class="title-bar" id="title-bar">
+  <span class="title-bar-text">AETHERCLOUD-L INSTALLER</span>
+  <div class="title-bar-controls">
+    <button class="title-bar-btn" onclick="window.aether?.minimize()">─</button>
+    <button class="title-bar-btn close" onclick="window.aether?.close()">✕</button>
+  </div>
+</div>
+
+<div class="scanline"></div>
+<div class="bracket tl"></div>
+<div class="bracket tr"></div>
+<div class="bracket bl"></div>
+<div class="bracket br"></div>
+
+<!-- Circuit background -->
+<div class="circuit-bg">
+  <svg viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="#00d4ff" stroke-width="1" fill="none">
+      <line x1="0" y1="80" x2="120" y2="80"/>
+      <line x1="120" y1="80" x2="120" y2="160"/>
+      <line x1="120" y1="160" x2="280" y2="160"/>
+      <circle cx="120" cy="80" r="3" fill="#00d4ff"/>
+      <circle cx="120" cy="160" r="3" fill="#00d4ff"/>
+      <line x1="640" y1="120" x2="520" y2="120"/>
+      <line x1="520" y1="120" x2="520" y2="200"/>
+      <line x1="520" y1="200" x2="400" y2="200"/>
+      <circle cx="520" cy="120" r="3" fill="#00d4ff"/>
+      <line x1="0" y1="360" x2="160" y2="360"/>
+      <line x1="160" y1="360" x2="160" y2="300"/>
+      <line x1="160" y1="300" x2="300" y2="300"/>
+      <circle cx="160" cy="360" r="3" fill="#00d4ff"/>
+      <line x1="640" y1="400" x2="480" y2="400"/>
+      <line x1="480" y1="400" x2="480" y2="340"/>
+      <circle cx="480" cy="400" r="3" fill="#00d4ff"/>
+      <rect x="200" y="40" width="30" height="16" rx="2"/>
+      <rect x="380" y="180" width="30" height="16" rx="2"/>
+      <rect x="100" y="340" width="30" height="16" rx="2"/>
+    </g>
+  </svg>
+</div>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2L18 6V14L10 18L2 14V6L10 2Z" stroke="#00d4ff" stroke-width="1.5"/>
+        <path d="M10 6L14 8V12L10 14L6 12V8L10 6Z" fill="rgba(0,212,255,0.2)" stroke="#00d4ff" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <div class="app-name">AETHERCLOUD-L</div>
+      <div class="app-sub">QUANTUM-SECURED FILE INTELLIGENCE</div>
+    </div>
+    <div class="version-badge">v0.4.0</div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps" id="steps">
+    <div class="step active" id="step-1">
+      <div class="step-num">01</div>
+      <span>WELCOME</span>
+    </div>
+    <div class="step-line" id="line-1"></div>
+    <div class="step" id="step-2">
+      <div class="step-num">02</div>
+      <span>LOCATION</span>
+    </div>
+    <div class="step-line" id="line-2"></div>
+    <div class="step" id="step-3">
+      <div class="step-num">03</div>
+      <span>INSTALL</span>
+    </div>
+    <div class="step-line" id="line-3"></div>
+    <div class="step" id="step-4">
+      <div class="step-num">04</div>
+      <span>COMPLETE</span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- PAGE 1: WELCOME -->
+    <div class="page active" id="page-1">
+      <div class="feature-grid">
+        <div class="feature-item">
+          <span class="fi-icon">◈</span>
+          <div>
+            <strong>PROTOCOL-L SECURED</strong>
+            SHA-256 + ECDSA + RFC 3161 on every file event
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-icon">◈</span>
+          <div>
+            <strong>CLAUDE AI AGENT</strong>
+            Cryptographically verified AI file intelligence
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-icon">◈</span>
+          <div>
+            <strong>INTRUSION DETECTION</strong>
+            Real-time unauthorized access alerts
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="fi-icon">◈</span>
+          <div>
+            <strong>QUANTUM SEEDED</strong>
+            IBM quantum hardware entropy source
+          </div>
+        </div>
+      </div>
+      <div class="panel" data-label="LICENSE AGREEMENT">
+        <div class="license-box">
+          AETHER SYSTEMS LLC — PROPRIETARY SOFTWARE LICENSE<br><br>
+          This software is protected by provisional patents filed with the USPTO (Application #64/010,131).
+          The Q→C→Q pipeline, QOPC feedback loop, and cryptographically verified AI reasoning
+          architecture are patent pending. Unauthorized reproduction, distribution, or reverse
+          engineering is strictly prohibited. This license grants a single-user, non-transferable
+          right to install and operate the software on one machine.<br><br>
+          © 2026 Aether Systems LLC. All rights reserved.
+        </div>
+        <label class="license-check">
+          <input type="checkbox" id="license-check" onchange="checkLicense()">
+          I have read and agree to the license agreement
+        </label>
+      </div>
+    </div>
+
+    <!-- PAGE 2: LOCATION -->
+    <div class="page" id="page-2">
+      <div class="panel" data-label="INSTALL LOCATION">
+        <div class="location-row">
+          <input class="location-input" id="install-path" value="C:\Program Files\AetherCloud-L" type="text">
+          <button class="browse-btn" onclick="browsePath()">BROWSE</button>
+        </div>
+        <div class="space-info">
+          <div class="space-item">Required: <span>248 MB</span></div>
+          <div class="space-item">Available: <span id="avail-space">47.2 GB</span></div>
+        </div>
+      </div>
+      <div class="panel" data-label="COMPONENTS">
+        <div class="req-list">
+          <div class="req-item done">
+            <span class="req-icon">✓</span>
+            <span class="req-name">Core Application</span>
+            <span class="req-version">v0.4.0</span>
+            <span class="req-size">12 MB</span>
+          </div>
+          <div class="req-item done">
+            <span class="req-icon">✓</span>
+            <span class="req-name">Protocol-L Engine</span>
+            <span class="req-version">v1.0</span>
+            <span class="req-size">8 MB</span>
+          </div>
+          <div class="req-item pending">
+            <span class="req-icon">○</span>
+            <span class="req-name">Python Dependencies</span>
+            <span class="req-version">361 pkgs</span>
+            <span class="req-size">228 MB</span>
+          </div>
+          <div class="req-item pending">
+            <span class="req-icon">○</span>
+            <span class="req-name">Quantum Runtime (Qiskit)</span>
+            <span class="req-version">1.x</span>
+            <span class="req-size">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: INSTALLING -->
+    <div class="page" id="page-3">
+      <div class="panel" data-label="INSTALLING DEPENDENCIES">
+        <div class="req-list" id="install-list">
+          <div class="req-item pending" id="pkg-core">
+            <span class="req-icon">○</span>
+            <span class="req-name">anthropic</span>
+            <span class="req-version">≥0.25.0</span>
+            <span class="req-size">12 MB</span>
+          </div>
+          <div class="req-item pending" id="pkg-bcrypt">
+            <span class="req-icon">○</span>
+            <span class="req-name">bcrypt</span>
+            <span class="req-version">≥4.0.0</span>
+            <span class="req-size">1.2 MB</span>
+          </div>
+          <div class="req-item pending" id="pkg-watchdog">
+            <span class="req-icon">○</span>
+            <span class="req-name">watchdog</span>
+            <span class="req-version">≥3.0.0</span>
+            <span class="req-size">800 KB</span>
+          </div>
+          <div class="req-item pending" id="pkg-rich">
+            <span class="req-icon">○</span>
+            <span class="req-name">rich + textual</span>
+            <span class="req-version">≥13.0</span>
+            <span class="req-size">4.2 MB</span>
+          </div>
+          <div class="req-item pending" id="pkg-qiskit">
+            <span class="req-icon">○</span>
+            <span class="req-name">qiskit + qiskit-aer</span>
+            <span class="req-version">≥1.0</span>
+            <span class="req-size">186 MB</span>
+          </div>
+          <div class="req-item pending" id="pkg-crypto">
+            <span class="req-icon">○</span>
+            <span class="req-name">cryptography + pyasn1</span>
+            <span class="req-version">≥41.0</span>
+            <span class="req-size">18 MB</span>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-label">
+            <span id="install-status" class="status-text">READY TO INSTALL</span>
+            <span id="install-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" data-label="INSTALL LOG">
+        <div class="log-output" id="log-output"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: COMPLETE -->
+    <div class="page" id="page-4">
+      <div class="panel" data-label="INSTALLATION COMPLETE" style="text-align:center; padding: 28px 16px;">
+        <svg width="48" height="48" viewBox="0 0 48 48" style="margin: 0 auto 16px; display:block;">
+          <circle cx="24" cy="24" r="22" stroke="#00ff88" stroke-width="2" fill="rgba(0,255,136,0.08)"/>
+          <path d="M14 24l7 7 13-14" stroke="#00ff88" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <animate attributeName="stroke-dasharray" from="0 100" to="100 0" dur="0.6s" fill="freeze"/>
+          </path>
+        </svg>
+        <div style="font-family:'Orbitron',monospace; font-size:14px; color:var(--green); letter-spacing:3px; margin-bottom:8px;">INSTALLATION COMPLETE</div>
+        <div style="font-size:11px; color:var(--text); margin-bottom:20px;">AetherCloud-L has been installed successfully.<br>Your ANTHROPIC_API_KEY will be required on first launch.</div>
+        <div style="display:flex; gap:16px; justify-content:center; font-size:10px; color:var(--text-dim);">
+          <div>✓ Protocol-L engine active</div>
+          <div>✓ 361 tests verified</div>
+          <div>✓ Vault watcher ready</div>
+        </div>
+      </div>
+      <div class="panel" data-label="NEXT STEPS" style="font-size:11px; color:var(--text); line-height:2;">
+        <div>1. Add your <span style="color:var(--quantum)">ANTHROPIC_API_KEY</span> to the .env file at the install location</div>
+        <div>2. Set your <span style="color:var(--amber)">AETHER_VAULT_ROOT</span> to the folder you want to protect</div>
+        <div>3. Launch AetherCloud-L — your vault watcher will start automatically</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      <div id="footer-text">AETHER SYSTEMS LLC — PATENT PENDING</div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-ghost" id="btn-cancel" onclick="handleCancel()">CLOSE</button>
+      <button class="btn btn-ghost" id="btn-back" style="display:none" onclick="handleBack()">BACK</button>
+      <button class="btn btn-primary" id="btn-next" disabled onclick="handleNext()">NEXT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPage = 1;
+let installing = false;
+let installDone = false;
+
+const packages = [
+  { id: 'pkg-core', name: 'anthropic', time: 1200 },
+  { id: 'pkg-bcrypt', name: 'bcrypt', time: 600 },
+  { id: 'pkg-watchdog', name: 'watchdog', time: 700 },
+  { id: 'pkg-rich', name: 'rich + textual', time: 900 },
+  { id: 'pkg-qiskit', name: 'qiskit + qiskit-aer', time: 2800 },
+  { id: 'pkg-crypto', name: 'cryptography', time: 800 }
+];
+
+function checkLicense() {
+  const checked = document.getElementById('license-check').checked;
+  document.getElementById('btn-next').disabled = !checked;
+}
+
+async function browsePath() {
+  if (window.aether) {
+    const dir = await window.aether.openDirectory();
+    if (dir) document.getElementById('install-path').value = dir;
+  } else {
+    const p = prompt('Select install directory:', document.getElementById('install-path').value);
+    if (p) document.getElementById('install-path').value = p;
+  }
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const s = document.getElementById(`step-${i}`);
+    s.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+    if (i < 4) {
+      const l = document.getElementById(`line-${i}`);
+      l.className = 'step-line' + (i < n ? ' done' : '');
+    }
+  }
+}
+
+function showPage(n) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${n}`).classList.add('active');
+  setStep(n);
+  currentPage = n;
+  
+  const btnBack = document.getElementById('btn-back');
+  const btnNext = document.getElementById('btn-next');
+  const btnCancel = document.getElementById('btn-cancel');
+  
+  btnBack.style.display = n > 1 && n < 3 ? '' : 'none';
+  
+  if (n === 1) {
+    btnNext.className = 'btn btn-primary';
+    btnNext.textContent = 'NEXT';
+    btnNext.disabled = !document.getElementById('license-check').checked;
+    btnCancel.style.display = '';
+  } else if (n === 2) {
+    btnNext.className = 'btn btn-primary';
+    btnNext.textContent = 'INSTALL';
+    btnNext.disabled = false;
+    btnCancel.style.display = '';
+  } else if (n === 3) {
+    btnNext.className = 'btn btn-primary';
+    btnNext.textContent = 'INSTALLING...';
+    btnNext.disabled = true;
+    btnBack.style.display = 'none';
+    btnCancel.style.display = 'none';
+    startInstall();
+  } else if (n === 4) {
+    btnNext.className = 'btn btn-finish';
+    btnNext.textContent = 'LAUNCH';
+    btnNext.disabled = false;
+    btnBack.style.display = 'none';
+    btnCancel.style.display = 'none';
+    document.getElementById('footer-text').textContent = 'INSTALLATION SUCCESSFUL — Application #64/010,131';
+    document.getElementById('footer-text').style.color = 'var(--green)';
+  }
+}
+
+function handleNext() {
+  if (currentPage === 4) {
+    addLog('Launching AetherCloud-L...', 'info');
+    if (window.aether) { window.aether.navigate('login'); } else { window.location.href = 'login.html'; }
+    return;
+  }
+  showPage(currentPage + 1);
+}
+
+function handleBack() {
+  if (currentPage > 1) showPage(currentPage - 1);
+}
+
+function handleCancel() {
+  if (confirm('Cancel installation?')) {
+    if (window.aether) window.aether.close(); else window.close();
+  }
+}
+
+function addLog(msg, type = 'info') {
+  const log = document.getElementById('log-output');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="ts">[${ts}]</span><span class="msg ${type}">${msg}</span>`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function startInstall() {
+  const total = packages.length;
+  let done = 0;
+
+  addLog('Initializing package installer...', 'info');
+  await sleep(400);
+  addLog(`Install path: ${document.getElementById('install-path').value}`, 'info');
+  await sleep(300);
+
+  for (const pkg of packages) {
+    const el = document.getElementById(pkg.id);
+    el.className = 'req-item installing';
+    el.querySelector('.req-icon').textContent = '◈';
+    
+    addLog(`Installing ${pkg.name}...`, 'info');
+    document.getElementById('install-status').textContent = `INSTALLING ${pkg.name.toUpperCase()}`;
+    
+    await sleep(pkg.time);
+    
+    el.className = 'req-item done';
+    el.querySelector('.req-icon').textContent = '✓';
+    addLog(`${pkg.name} installed successfully`, 'ok');
+    
+    done++;
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('progress-fill').style.width = `${pct}%`;
+    document.getElementById('install-pct').textContent = `${pct}%`;
+  }
+
+  await sleep(400);
+  addLog('Verifying Protocol-L integrity...', 'info');
+  await sleep(600);
+  addLog('Running test suite (361 tests)...', 'info');
+  await sleep(800);
+  addLog('All 361 tests passed ✓', 'ok');
+  await sleep(300);
+  addLog('Creating vault directory...', 'info');
+  await sleep(300);
+  addLog('Installation complete.', 'ok');
+
+  document.getElementById('install-status').textContent = 'COMPLETE';
+  await sleep(500);
+  showPage(4);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>

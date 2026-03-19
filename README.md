@@ -249,10 +249,19 @@ AETHER-CLOUD/
 │   ├── terminal.py               #   Rich retro terminal (13 commands)
 │   └── dashboard.py              #   Textual TUI 3-panel dashboard
 │
+├── desktop/                      # Electron desktop app
+│   ├── main.js                   #   Electron main process (frameless, secure)
+│   ├── preload.js                #   Context bridge (minimal IPC surface)
+│   ├── package.json              #   Electron + electron-builder config
+│   └── pages/
+│       ├── installer.html        #   4-step install wizard
+│       ├── login.html            #   Quantum-themed authentication
+│       └── app.html              #   Main vault — node graph + agent chat + sidebar
+│
 ├── config/
 │   └── settings.py               #   All configuration + system prompt
 │
-├── tests/                        # 300 tests across 13 files
+├── tests/                        # 361 tests across 15 files
 │   ├── conftest.py               #   Shared fixtures
 │   ├── test_hardened_agent.py    #   65 tests — commit/verify/tamper detection
 │   ├── test_claude_agent.py      #   30 tests — Claude API + fallback
@@ -320,6 +329,7 @@ AETHER-CLOUD/
 | **0.1.0** | Phase 0 | Initial scaffold — auth, vault, agent, UI, 177 tests |
 | **0.2.0** | Phase 1 | Claude API agent, VaultWatcher boot, Textual dashboard, 235 tests |
 | **0.3.0** | Phase 2 | HardenedClaudeAgent — Protocol-L verified AI reasoning, 300 tests |
+| **0.4.0** | Phase 3 | Electron desktop app — installer wizard, quantum login, vault node graph UI |
 
 ---
 

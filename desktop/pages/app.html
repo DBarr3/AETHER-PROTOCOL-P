@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AetherCloud-L</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --void: #010409;
+    --deep: #080d18;
+    --surface: #0c1120;
+    --panel: #0f1626;
+    --panel2: #121b2e;
+    --border: #1a2438;
+    --border2: #1e2d45;
+    --quantum: #00d4ff;
+    --quantum2: #0099cc;
+    --quantum-dim: rgba(0,212,255,0.07);
+    --quantum-glow: rgba(0,212,255,0.3);
+    --amber: #ffaa00;
+    --amber-dim: rgba(255,170,0,0.1);
+    --green: #00ff88;
+    --green-dim: rgba(0,255,136,0.1);
+    --red: #ff3366;
+    --red-dim: rgba(255,51,102,0.1);
+    --purple: #8b5cf6;
+    --text: #7a8899;
+    --text-bright: #b8c5d3;
+    --text-dim: #2d3a4a;
+    --sidebar-w: 280px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--text-bright);
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ═══ TOPBAR ═══════════════════════════════════════ */
+  .topbar {
+    height: 44px;
+    background: var(--deep);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 50;
+  }
+
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .topbar-logo-icon {
+    width: 26px; height: 26px;
+    border: 1px solid var(--quantum);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .topbar-logo-icon::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid var(--quantum);
+    opacity: 0.3;
+    animation: pulse-inner 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse-inner { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
+
+  .topbar-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--quantum);
+    letter-spacing: 3px;
+    text-shadow: 0 0 15px var(--quantum-glow);
+  }
+
+  .topbar-path {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text-dim);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .topbar-path .path-sep { margin: 0 4px; opacity: 0.4; }
+  .topbar-path .path-cur { color: var(--text); }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .topbar-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .topbar-btn:hover { border-color: var(--quantum); color: var(--quantum); }
+  .topbar-btn.alert { border-color: var(--red); color: var(--red); }
+  .topbar-btn.active { border-color: var(--quantum); color: var(--quantum); background: var(--quantum-dim); }
+
+  .session-badge {
+    font-size: 9px;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid var(--green-dim);
+    background: var(--green-dim);
+  }
+  .session-dot {
+    width: 5px; height: 5px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ═══ MAIN LAYOUT ══════════════════════════════════ */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ═══ CENTER VAULT AREA ════════════════════════════ */
+  .vault-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Circuit canvas */
+  #vault-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.12;
+  }
+
+  /* Vault viewport */
+  .vault-viewport {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  /* Zoom/pan container */
+  .vault-world {
+    position: absolute;
+    transform-origin: center center;
+    transition: transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+    will-change: transform;
+  }
+
+  /* Lock node (root) */
+  .vault-root {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px; height: 80px;
+    border: 2px solid var(--quantum);
+    background: var(--quantum-dim);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    box-shadow: 0 0 40px var(--quantum-glow), 0 0 80px rgba(0,212,255,0.1);
+    z-index: 20;
+    transition: all 0.3s;
+  }
+  .vault-root::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border: 1px solid var(--quantum);
+    opacity: 0.2;
+    animation: root-pulse 3s ease-in-out infinite;
+  }
+  .vault-root::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border: 1px solid var(--quantum);
+    opacity: 0.1;
+    animation: root-pulse 3s ease-in-out infinite 0.5s;
+  }
+  @keyframes root-pulse { 0%,100%{opacity:0.2} 50%{opacity:0.5} }
+
+  .root-label {
+    font-size: 8px;
+    color: var(--quantum);
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* Connector lines (SVG overlay) */
+  .connector-svg {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Folder nodes */
+  .folder-node {
+    position: absolute;
+    width: 100px; height: 64px;
+    border: 1px solid var(--border2);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    z-index: 10;
+    user-select: none;
+  }
+  .folder-node:hover {
+    border-color: var(--quantum);
+    background: var(--quantum-dim);
+    box-shadow: 0 0 16px var(--quantum-glow);
+    transform: scale(1.04);
+    z-index: 15;
+  }
+  .folder-node.focused {
+    border-color: var(--quantum);
+    box-shadow: 0 0 24px var(--quantum-glow);
+    z-index: 16;
+  }
+  .folder-icon { font-size: 18px; line-height: 1; }
+  .folder-name { font-size: 9px; color: var(--text); margin-top: 5px; letter-spacing: 1px; }
+  .folder-count { font-size: 8px; color: var(--text-dim); margin-top: 2px; }
+
+  /* File nodes (smaller) */
+  .file-node {
+    position: absolute;
+    width: 72px; height: 44px;
+    border: 1px solid var(--text-dim);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 8;
+    opacity: 0.7;
+  }
+  .file-node:hover {
+    border-color: var(--amber);
+    background: var(--amber-dim);
+    opacity: 1;
+    z-index: 12;
+  }
+  .file-icon { font-size: 13px; line-height: 1; }
+  .file-name { font-size: 8px; color: var(--text-dim); margin-top: 3px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+
+  /* Expanded folder overlay */
+  .folder-expanded {
+    position: absolute;
+    border: 1px solid var(--quantum);
+    background: rgba(10,14,26,0.97);
+    backdrop-filter: blur(12px);
+    padding: 16px;
+    min-width: 240px;
+    z-index: 30;
+    animation: expandIn 0.25s cubic-bezier(0.17,0.67,0.3,1.1);
+    box-shadow: 0 0 40px rgba(0,212,255,0.15);
+  }
+  @keyframes expandIn {
+    from { opacity:0; transform: scale(0.85); }
+    to { opacity:1; transform: scale(1); }
+  }
+  .folder-expanded::before {
+    content: attr(data-title);
+    position: absolute;
+    top: -1px; left: 10px;
+    font-size: 9px;
+    color: var(--quantum);
+    background: var(--void);
+    padding: 0 6px;
+    letter-spacing: 2px;
+    transform: translateY(-50%);
+  }
+  .expanded-close {
+    position: absolute;
+    top: 6px; right: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    line-height: 1;
+  }
+  .expanded-close:hover { color: var(--quantum); }
+
+  .expanded-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .expanded-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 10px;
+    color: var(--text);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .expanded-file:hover {
+    border-color: var(--amber-dim);
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
+  .expanded-file-icon { flex-shrink: 0; opacity: 0.7; }
+  .expanded-file-meta { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+
+  /* Vault toolbar */
+  .vault-toolbar {
+    height: 34px;
+    background: var(--deep);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 20;
+  }
+  .vault-stat {
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .vault-stat span { color: var(--text); }
+  .vault-stat-sep { width: 1px; height: 14px; background: var(--border); }
+  .zoom-controls { display: flex; gap: 4px; margin-left: auto; }
+  .zoom-btn {
+    width: 24px; height: 24px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .zoom-btn:hover { border-color: var(--quantum); color: var(--quantum); }
+  .zoom-level { font-size: 10px; color: var(--text-dim); align-self: center; width: 36px; text-align: center; }
+
+  /* ═══ AGENT CHAT ════════════════════════════════════ */
+  .agent-area {
+    height: 220px;
+    border-top: 1px solid var(--border);
+    background: var(--deep);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 20;
+  }
+
+  .agent-header {
+    height: 30px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .agent-label {
+    font-size: 9px;
+    color: var(--quantum);
+    letter-spacing: 2px;
+  }
+  .agent-model {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-left: auto;
+    letter-spacing: 1px;
+  }
+  .hardened-badge {
+    font-size: 8px;
+    color: var(--green);
+    border: 1px solid var(--green-dim);
+    background: var(--green-dim);
+    padding: 1px 6px;
+    letter-spacing: 1px;
+  }
+
+  .agent-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .msg {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    animation: msgIn 0.2s ease both;
+  }
+  @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+  .msg-role {
+    font-size: 9px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+    padding-top: 1px;
+    width: 48px;
+  }
+  .msg.user .msg-role { color: var(--amber); }
+  .msg.agent .msg-role { color: var(--quantum); }
+  .msg.system .msg-role { color: var(--text-dim); }
+  .msg-text { color: var(--text-bright); flex: 1; }
+  .msg.system .msg-text { color: var(--text-dim); font-size: 10px; }
+  .msg-commit {
+    font-size: 9px;
+    color: var(--green);
+    opacity: 0.6;
+    margin-left: 4px;
+  }
+
+  .agent-input-row {
+    height: 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .agent-prompt-sym {
+    color: var(--quantum);
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .agent-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-bright);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    outline: none;
+  }
+  .agent-input::placeholder { color: var(--text-dim); font-size: 11px; }
+  .agent-send {
+    background: var(--quantum-dim);
+    border: 1px solid var(--quantum);
+    color: var(--quantum);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .agent-send:hover { background: var(--quantum); color: var(--void); }
+
+  /* ═══ RIGHT SIDEBAR ════════════════════════════════ */
+  .sidebar {
+    width: var(--sidebar-w);
+    border-left: 1px solid var(--border);
+    background: var(--deep);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+    flex-shrink: 0;
+    z-index: 30;
+  }
+  .sidebar.collapsed { width: 0; }
+
+  .sidebar-toggle {
+    position: absolute;
+    right: var(--sidebar-w);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 48px;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-right: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 35;
+    transition: right 0.3s;
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+  .sidebar-toggle:hover { color: var(--quantum); border-color: var(--quantum); }
+  .sidebar.collapsed ~ .sidebar-toggle { right: 0; }
+
+  /* Sidebar sections */
+  .sb-section {
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .sb-header {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .sb-header:hover { background: var(--quantum-dim); }
+
+  .sb-caret {
+    font-size: 8px;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .sb-header.open .sb-caret { transform: rotate(90deg); }
+
+  .sb-title {
+    font-size: 10px;
+    color: var(--text);
+    letter-spacing: 2px;
+    flex: 1;
+  }
+  .sb-header.open .sb-title { color: var(--quantum); }
+
+  .sb-badge {
+    font-size: 9px;
+    color: var(--text-dim);
+    background: var(--border);
+    padding: 1px 5px;
+  }
+
+  .sb-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
+  .sb-body.open { max-height: 300px; }
+
+  /* Progress section */
+  .sb-task {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .sb-task:last-child { border-bottom: none; }
+  .sb-task-icon { flex-shrink: 0; margin-top: 1px; }
+  .sb-task.done { color: var(--text-dim); text-decoration: line-through; }
+  .sb-task.done .sb-task-icon { color: var(--green); }
+  .sb-task.active .sb-task-icon { color: var(--amber); }
+  .sb-task.pending .sb-task-icon { color: var(--text-dim); }
+
+  /* Folders section */
+  .sb-folder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 10px;
+    color: var(--text);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+  .sb-folder:last-child { border-bottom: none; }
+  .sb-folder:hover { background: var(--quantum-dim); color: var(--quantum); }
+  .sb-folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-folder-count { font-size: 9px; color: var(--text-dim); }
+
+  /* Context/Skills section */
+  .sb-skill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 10px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .sb-skill:last-child { border-bottom: none; }
+  .sb-skill-icon {
+    width: 22px; height: 22px;
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .sb-skill-name { flex: 1; font-size: 10px; }
+  .sb-skill-tag { font-size: 9px; color: var(--text-dim); }
+
+  .sb-add-btn {
+    margin: 8px 12px;
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 6px;
+    cursor: pointer;
+    width: calc(100% - 24px);
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .sb-add-btn:hover { border-color: var(--quantum); color: var(--quantum); }
+
+  /* Audit section */
+  .sb-audit-entry {
+    padding: 7px 12px;
+    font-size: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    overflow: hidden;
+  }
+  .sb-audit-entry:last-child { border-bottom: none; }
+  .sb-audit-type { color: var(--quantum); font-size: 9px; letter-spacing: 1px; }
+  .sb-audit-type.warn { color: var(--red); }
+  .sb-audit-type.ok { color: var(--green); }
+  .sb-audit-path { color: var(--text); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-audit-ts { font-size: 9px; color: var(--text-dim); }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: var(--void); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--quantum2); }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    font-size: 10px;
+    color: var(--text-bright);
+    padding: 6px 10px;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 200px;
+  }
+  .tooltip.show { opacity: 1; }
+
+  /* Electron: make topbar draggable */
+  .topbar { -webkit-app-region: drag; }
+  .topbar-actions, .topbar-btn, .session-badge { -webkit-app-region: no-drag; }
+
+  .window-controls {
+    display: flex;
+    margin-left: 8px;
+    -webkit-app-region: no-drag;
+  }
+  .win-btn {
+    width: 36px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .win-btn:hover { background: var(--panel); color: var(--text-bright); }
+  .win-btn.close:hover { background: var(--red); color: white; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="topbar-logo-icon">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M6 1L11 3.5V8.5L6 11L1 8.5V3.5L6 1Z" stroke="#00d4ff" stroke-width="1.2"/>
+        <circle cx="6" cy="6" r="2" fill="rgba(0,212,255,0.3)" stroke="#00d4ff" stroke-width="0.8"/>
+      </svg>
+    </div>
+    <span class="topbar-name">AETHERCLOUD-L</span>
+  </div>
+
+  <div class="topbar-path">
+    <span>VAULT</span>
+    <span class="path-sep">›</span>
+    <span id="current-path" class="path-cur">ROOT</span>
+  </div>
+
+  <div class="topbar-actions">
+    <button class="topbar-btn" onclick="runScan()">⟳ SCAN</button>
+    <button class="topbar-btn" onclick="runOrganize()">⊞ ORGANIZE</button>
+    <button class="topbar-btn alert" id="alert-btn" style="display:none">⚠ ALERT</button>
+    <div class="session-badge">
+      <div class="session-dot"></div>
+      SESSION ACTIVE
+    </div>
+    <button class="topbar-btn" onclick="toggleSidebar()" id="sidebar-toggle-btn">⊡ PANEL</button>
+    <div class="window-controls">
+      <button class="win-btn" onclick="window.aether?.minimize()">─</button>
+      <button class="win-btn" onclick="window.aether?.maximize()">□</button>
+      <button class="win-btn close" onclick="window.aether?.close()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- VAULT CENTER -->
+  <div class="vault-area">
+    <canvas id="vault-canvas"></canvas>
+
+    <div class="vault-viewport" id="vault-viewport"
+      onwheel="handleWheel(event)"
+      ondblclick="handleDblClick(event)"
+      onmousedown="startPan(event)"
+      onmousemove="doPan(event)"
+      onmouseup="endPan()"
+      onmouseleave="endPan()">
+
+      <div class="vault-world" id="vault-world">
+        <!-- SVG connectors -->
+        <svg class="connector-svg" id="connector-svg" width="2000" height="2000" style="position:absolute;top:-1000px;left:-1000px;">
+          <defs>
+            <marker id="dot" markerWidth="4" markerHeight="4" refX="2" refY="2">
+              <circle cx="2" cy="2" r="1.5" fill="#00d4ff" opacity="0.6"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <!-- Root lock node -->
+        <div class="vault-root" id="vault-root" style="position:absolute;top:calc(50% - 40px);left:calc(50% - 40px);">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="4" y="12" width="20" height="13" rx="1" stroke="#00d4ff" stroke-width="1.5"/>
+            <path d="M8 12V9a6 6 0 0112 0v3" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+            <circle cx="14" cy="18" r="2" fill="#00d4ff"/>
+            <line x1="14" y1="20" x2="14" y2="23" stroke="#00d4ff" stroke-width="1.5"/>
+          </svg>
+          <span class="root-label">VAULT</span>
+        </div>
+
+        <!-- Folder and file nodes will be injected here -->
+        <div id="nodes-container"></div>
+      </div>
+    </div>
+
+    <!-- Vault toolbar -->
+    <div class="vault-toolbar">
+      <div class="vault-stat">Files: <span id="stat-files">0</span></div>
+      <div class="vault-stat-sep"></div>
+      <div class="vault-stat">Folders: <span id="stat-folders">0</span></div>
+      <div class="vault-stat-sep"></div>
+      <div class="vault-stat">Events: <span id="stat-events">0</span></div>
+      <div class="vault-stat-sep"></div>
+      <div class="vault-stat">Protocol-L: <span style="color:var(--green)">ACTIVE</span></div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoom(-0.15)">−</button>
+        <span class="zoom-level" id="zoom-label">100%</span>
+        <button class="zoom-btn" onclick="zoom(0.15)">+</button>
+        <button class="zoom-btn" onclick="resetZoom()" title="Reset">⊙</button>
+      </div>
+    </div>
+
+    <!-- AGENT CHAT -->
+    <div class="agent-area">
+      <div class="agent-header">
+        <span class="agent-label">AI AGENT</span>
+        <span class="hardened-badge">HARDENED</span>
+        <span class="agent-model">claude-opus-4-5 · Protocol-L verified</span>
+      </div>
+      <div class="agent-messages" id="agent-messages"></div>
+      <div class="agent-input-row">
+        <span class="agent-prompt-sym">›</span>
+        <input class="agent-input" id="agent-input"
+          placeholder="ask the agent — organize, analyze, find files, scan for threats..."
+          onkeydown="if(event.key==='Enter')sendMessage()">
+        <button class="agent-send" onclick="sendMessage()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+
+    <!-- PROGRESS -->
+    <div class="sb-section">
+      <div class="sb-header open" onclick="toggleSection(this)" id="sh-progress">
+        <span class="sb-caret">▶</span>
+        <span class="sb-title">PROGRESS</span>
+        <span class="sb-badge" id="progress-badge">3</span>
+      </div>
+      <div class="sb-body open" id="sb-progress">
+        <div class="sb-task done">
+          <span class="sb-task-icon">✓</span>
+          <span>Protocol-L engine initialized</span>
+        </div>
+        <div class="sb-task done">
+          <span class="sb-task-icon">✓</span>
+          <span>Vault watcher active</span>
+        </div>
+        <div class="sb-task active">
+          <span class="sb-task-icon">◈</span>
+          <span>Awaiting vault selection</span>
+        </div>
+        <div class="sb-task pending">
+          <span class="sb-task-icon">○</span>
+          <span>Run initial organization scan</span>
+        </div>
+        <div class="sb-task pending">
+          <span class="sb-task-icon">○</span>
+          <span>Configure ANTHROPIC_API_KEY</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORKING FOLDERS -->
+    <div class="sb-section">
+      <div class="sb-header open" onclick="toggleSection(this)">
+        <span class="sb-caret">▶</span>
+        <span class="sb-title">WORKING FOLDERS</span>
+        <span class="sb-badge" id="folders-badge">5</span>
+      </div>
+      <div class="sb-body open" id="sb-folders">
+        <div class="sb-folder" onclick="navigateToFolder('patents')">
+          <span>📁</span>
+          <span class="sb-folder-name">patents</span>
+          <span class="sb-folder-count">4</span>
+        </div>
+        <div class="sb-folder" onclick="navigateToFolder('code')">
+          <span>📁</span>
+          <span class="sb-folder-name">code</span>
+          <span class="sb-folder-count">12</span>
+        </div>
+        <div class="sb-folder" onclick="navigateToFolder('trading')">
+          <span>📁</span>
+          <span class="sb-folder-name">trading</span>
+          <span class="sb-folder-count">8</span>
+        </div>
+        <div class="sb-folder" onclick="navigateToFolder('security')">
+          <span>📁</span>
+          <span class="sb-folder-name">security</span>
+          <span class="sb-folder-count">6</span>
+        </div>
+        <div class="sb-folder" onclick="navigateToFolder('backup')">
+          <span>📁</span>
+          <span class="sb-folder-name">backup</span>
+          <span class="sb-folder-count">3</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTEXT / SKILLS -->
+    <div class="sb-section">
+      <div class="sb-header open" onclick="toggleSection(this)">
+        <span class="sb-caret">▶</span>
+        <span class="sb-title">CONTEXT</span>
+      </div>
+      <div class="sb-body open" id="sb-context">
+        <div style="padding:6px 12px 2px; font-size:9px; color:var(--text-dim); letter-spacing:1px;">SKILLS</div>
+        <div class="sb-skill">
+          <div class="sb-skill-icon">🔒</div>
+          <span class="sb-skill-name">Protocol-L</span>
+          <span class="sb-skill-tag">ACTIVE</span>
+        </div>
+        <div class="sb-skill">
+          <div class="sb-skill-icon">🤖</div>
+          <span class="sb-skill-name">Claude Agent</span>
+          <span class="sb-skill-tag">HARDENED</span>
+        </div>
+        <div class="sb-skill">
+          <div class="sb-skill-icon">⚡</div>
+          <span class="sb-skill-name">Vault Watcher</span>
+          <span class="sb-skill-tag">LIVE</span>
+        </div>
+        <button class="sb-add-btn" onclick="addContext()">+ ADD CONTEXT</button>
+      </div>
+    </div>
+
+    <!-- AUDIT TRAIL -->
+    <div class="sb-section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <div class="sb-header open" onclick="toggleSection(this)">
+        <span class="sb-caret">▶</span>
+        <span class="sb-title">AUDIT TRAIL</span>
+        <span class="sb-badge" id="audit-badge">0</span>
+      </div>
+      <div class="sb-body open" id="sb-audit" style="overflow-y:auto; max-height:none; flex:1;">
+        <!-- Audit entries injected here -->
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+</div><!-- /main -->
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// VAULT DATA
+// ═══════════════════════════════════════════════════
+const vaultData = {
+  folders: [
+    { id: 'patents',  name: 'patents',  icon: '📋', count: 4, angle: -80,  dist: 200,
+      files: [
+        { name: 'USPTO_Filing2_FINAL.pdf', icon: '📄', size: '592 KB', type: 'PATENT' },
+        { name: 'QOPC_Filing1.pdf',        icon: '📄', size: '340 KB', type: 'PATENT' },
+        { name: 'Filing2_UNIFIED.docx',    icon: '📝', size: '1.1 MB', type: 'PATENT' },
+        { name: 'Patent_Notes.txt',        icon: '📃', size: '12 KB',  type: 'PATENT' },
+      ]
+    },
+    { id: 'code',     name: 'code',     icon: '💻', count: 12, angle: -20,  dist: 220,
+      files: [
+        { name: 'qiskit_selector.py',      icon: '🐍', size: '18 KB',  type: 'CODE' },
+        { name: 'hardened_claude_agent.py',icon: '🐍', size: '22 KB',  type: 'CODE' },
+        { name: 'ghost_protocol.py',       icon: '🐍', size: '14 KB',  type: 'CODE' },
+        { name: 'requirements.txt',        icon: '📃', size: '2.4 KB', type: 'CODE' },
+        { name: 'main.py',                 icon: '🐍', size: '4 KB',   type: 'CODE' },
+      ]
+    },
+    { id: 'trading',  name: 'trading',  icon: '📈', count: 8, angle: 40,   dist: 200,
+      files: [
+        { name: 'YM_Session_20260319.csv', icon: '📊', size: '88 KB',  type: 'TRADING' },
+        { name: 'Options_Analysis.xlsx',   icon: '📊', size: '240 KB', type: 'TRADING' },
+        { name: 'Trade_Journal.pdf',       icon: '📄', size: '1.2 MB', type: 'TRADING' },
+      ]
+    },
+    { id: 'security', name: 'security', icon: '🛡', count: 6, angle: 110,  dist: 200,
+      files: [
+        { name: 'Pentest_Report.pdf',      icon: '📄', size: '440 KB', type: 'SECURITY' },
+        { name: 'VPS_Config_Backup.zip',   icon: '🗜', size: '2.1 MB', type: 'SECURITY' },
+        { name: 'SSH_Keys.enc',            icon: '🔑', size: '4 KB',   type: 'SECURITY' },
+      ]
+    },
+    { id: 'backup',   name: 'backup',   icon: '💾', count: 3, angle: 170,  dist: 200,
+      files: [
+        { name: 'Desktop_Backup_Mar26.zip',icon: '🗜', size: '1.8 GB', type: 'BACKUP' },
+        { name: 'Config_Export.json',      icon: '📋', size: '44 KB',  type: 'BACKUP' },
+        { name: 'Vault_Snapshot.tar.gz',   icon: '🗜', size: '892 MB', type: 'BACKUP' },
+      ]
+    },
+    { id: 'archive',  name: 'archive',  icon: '📦', count: 5, angle: -140, dist: 200,
+      files: [
+        { name: 'Old_Contracts.zip',       icon: '🗜', size: '220 KB', type: 'ARCHIVE' },
+        { name: 'Project_Alpha.tar.gz',    icon: '🗜', size: '440 MB', type: 'ARCHIVE' },
+      ]
+    },
+  ]
+};
+
+// ═══════════════════════════════════════════════════
+// VIEWPORT STATE
+// ═══════════════════════════════════════════════════
+let scale = 1;
+let panX = 0, panY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let openFolder = null;
+let auditCount = 0;
+
+const viewport = document.getElementById('vault-viewport');
+const world = document.getElementById('vault-world');
+
+// ═══════════════════════════════════════════════════
+// CIRCUIT BACKGROUND CANVAS
+// ═══════════════════════════════════════════════════
+function initCircuitCanvas() {
+  const canvas = document.getElementById('vault-canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  
+  const nodes = Array.from({length:20}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: (Math.random()-0.5)*0.4,
+    vy: (Math.random()-0.5)*0.4,
+    pulse: Math.random()*Math.PI*2
+  }));
+
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = '#00d4ff';
+    ctx.fillStyle = '#00d4ff';
+    
+    nodes.forEach(n => {
+      n.x += n.vx; n.y += n.vy; n.pulse += 0.015;
+      if (n.x<0||n.x>canvas.width) n.vx*=-1;
+      if (n.y<0||n.y>canvas.height) n.vy*=-1;
+    });
+
+    for (let i=0; i<nodes.length; i++) {
+      for (let j=i+1; j<nodes.length; j++) {
+        const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if (d<180) {
+          ctx.globalAlpha=(1-d/180)*0.35;
+          ctx.lineWidth=0.5;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          // Right-angle circuit routing
+          ctx.lineTo(nodes[i].x, nodes[j].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+          // Small squares at junctions
+          ctx.globalAlpha=(1-d/180)*0.15;
+          ctx.strokeRect(nodes[i].x-3, nodes[j].y-3, 6, 6);
+        }
+      }
+    }
+
+    nodes.forEach(n => {
+      const p = 0.5+0.5*Math.sin(n.pulse);
+      ctx.globalAlpha=0.3+0.3*p;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 2, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    ctx.globalAlpha=1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD VAULT NODES
+// ═══════════════════════════════════════════════════
+function buildVaultNodes() {
+  const container = document.getElementById('nodes-container');
+  const svg = document.getElementById('connector-svg');
+  const cx = 1000, cy = 1000; // SVG center (offset from top:-1000px,left:-1000px)
+  const vcx = 0, vcy = 0; // world center
+
+  let totalFiles = 0, totalFolders = 0;
+
+  vaultData.folders.forEach(folder => {
+    const rad = folder.angle * Math.PI / 180;
+    const fx = vcx + Math.cos(rad) * folder.dist;
+    const fy = vcy + Math.sin(rad) * folder.dist;
+
+    // Connector line (right-angle routing)
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    const midX = cx + Math.cos(rad) * (folder.dist * 0.5);
+    line.setAttribute('points', `${cx},${cy} ${cx+Math.cos(rad)*folder.dist*0.4},${cy} ${cx+fx-vcx},${cy+fy-vcy}`);
+    line.setAttribute('stroke', '#00d4ff');
+    line.setAttribute('stroke-width', '1');
+    line.setAttribute('fill', 'none');
+    line.setAttribute('opacity', '0.3');
+    line.setAttribute('marker-end', 'url(#dot)');
+    svg.appendChild(line);
+
+    // Folder node
+    const node = document.createElement('div');
+    node.className = 'folder-node';
+    node.id = `folder-${folder.id}`;
+    node.style.left = `${fx - 50}px`;
+    node.style.top = `${fy - 32}px`;
+    node.innerHTML = `
+      <div class="folder-icon">${folder.icon}</div>
+      <div class="folder-name">${folder.name.toUpperCase()}</div>
+      <div class="folder-count">${folder.count} files</div>
+    `;
+    node.addEventListener('click', () => toggleFolderExpand(folder, fx, fy));
+    node.addEventListener('mouseenter', (e) => showTooltip(e, `${folder.name} — ${folder.count} files`));
+    node.addEventListener('mouseleave', hideTooltip);
+    container.appendChild(node);
+
+    totalFolders++;
+
+    // Place file nodes around the folder
+    folder.files.forEach((file, i) => {
+      const fileAngle = rad + (i - (folder.files.length-1)/2) * 0.35;
+      const fileDist = 100;
+      const fileX = fx + Math.cos(fileAngle) * fileDist;
+      const fileY = fy + Math.sin(fileAngle) * fileDist;
+
+      // File connector
+      const fLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      fLine.setAttribute('x1', cx+fx-vcx);
+      fLine.setAttribute('y1', cy+fy-vcy);
+      fLine.setAttribute('x2', cx+fileX-vcx);
+      fLine.setAttribute('y2', cy+fileY-vcy);
+      fLine.setAttribute('stroke', '#1e2738');
+      fLine.setAttribute('stroke-width', '0.8');
+      fLine.setAttribute('opacity', '0.5');
+      svg.appendChild(fLine);
+
+      // File node
+      const fNode = document.createElement('div');
+      fNode.className = 'file-node';
+      fNode.style.left = `${fileX - 36}px`;
+      fNode.style.top = `${fileY - 22}px`;
+      fNode.innerHTML = `
+        <div class="file-icon">${file.icon}</div>
+        <div class="file-name">${file.name}</div>
+      `;
+      fNode.addEventListener('click', () => selectFile(file, folder));
+      fNode.addEventListener('mouseenter', (e) => showTooltip(e, `${file.name}\n${file.size} · ${file.type}`));
+      fNode.addEventListener('mouseleave', hideTooltip);
+      container.appendChild(fNode);
+
+      totalFiles++;
+    });
+  });
+
+  document.getElementById('stat-files').textContent = totalFiles;
+  document.getElementById('stat-folders').textContent = totalFolders;
+}
+
+// ═══════════════════════════════════════════════════
+// FOLDER EXPAND (double-click or scroll)
+// ═══════════════════════════════════════════════════
+function toggleFolderExpand(folder, fx, fy) {
+  // Close any existing expanded panel
+  const existing = document.getElementById('folder-expanded-panel');
+  if (existing) { existing.remove(); openFolder = null; }
+
+  if (openFolder === folder.id) { openFolder = null; return; }
+  openFolder = folder.id;
+
+  // Highlight folder node
+  document.querySelectorAll('.folder-node').forEach(n => n.classList.remove('focused'));
+  document.getElementById(`folder-${folder.id}`)?.classList.add('focused');
+
+  // Create expanded panel
+  const panel = document.createElement('div');
+  panel.className = 'folder-expanded';
+  panel.id = 'folder-expanded-panel';
+  panel.setAttribute('data-title', folder.name.toUpperCase());
+  panel.style.left = `${fx + 60}px`;
+  panel.style.top = `${fy - 40}px`;
+
+  panel.innerHTML = `
+    <span class="expanded-close" onclick="closeExpanded()">✕</span>
+    <div class="expanded-file-list">
+      ${folder.files.map(f => `
+        <div class="expanded-file" onclick="selectFile(${JSON.stringify(f)}, ${JSON.stringify(folder)})">
+          <span class="expanded-file-icon">${f.icon}</span>
+          <span>${f.name}</span>
+          <span class="expanded-file-meta">${f.size}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  document.getElementById('nodes-container').appendChild(panel);
+  addAuditEntry('FOLDER_ACCESS', folder.name, 'ok');
+  document.getElementById('current-path').textContent = folder.name.toUpperCase();
+}
+
+function closeExpanded() {
+  const p = document.getElementById('folder-expanded-panel');
+  if (p) p.remove();
+  openFolder = null;
+  document.querySelectorAll('.folder-node').forEach(n => n.classList.remove('focused'));
+  document.getElementById('current-path').textContent = 'ROOT';
+}
+
+function handleDblClick(e) {
+  // Find if we clicked on a folder node
+  const folderEl = e.target.closest('.folder-node');
+  if (folderEl) {
+    const id = folderEl.id.replace('folder-', '');
+    const folder = vaultData.folders.find(f => f.id === id);
+    if (folder) {
+      // Zoom in on folder
+      const rect = folderEl.getBoundingClientRect();
+      const vRect = viewport.getBoundingClientRect();
+      const fx = parseFloat(folderEl.style.left) + 50;
+      const fy = parseFloat(folderEl.style.top) + 32;
+      panX = -fx * 1.5;
+      panY = -fy * 1.5;
+      scale = 1.8;
+      applyTransform();
+      toggleFolderExpand(folder, fx, fy);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// ZOOM & PAN
+// ═══════════════════════════════════════════════════
+function applyTransform() {
+  const vRect = viewport.getBoundingClientRect();
+  world.style.transform = `translate(calc(${vRect.width/2}px + ${panX}px), calc(${vRect.height/2 - 60}px + ${panY}px)) scale(${scale})`;
+  document.getElementById('zoom-label').textContent = Math.round(scale*100) + '%';
+}
+
+function zoom(delta) {
+  scale = Math.max(0.3, Math.min(3, scale + delta));
+  applyTransform();
+}
+
+function resetZoom() {
+  scale = 1; panX = 0; panY = 0;
+  applyTransform();
+  closeExpanded();
+}
+
+function handleWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+  zoom(delta);
+}
+
+function startPan(e) {
+  if (e.button === 1 || e.altKey) {
+    isPanning = true;
+    panStart = { x: e.clientX - panX, y: e.clientY - panY };
+    viewport.style.cursor = 'grabbing';
+  }
+}
+
+function doPan(e) {
+  if (!isPanning) return;
+  panX = e.clientX - panStart.x;
+  panY = e.clientY - panStart.y;
+  applyTransform();
+}
+
+function endPan() {
+  isPanning = false;
+  viewport.style.cursor = 'default';
+}
+
+// ═══════════════════════════════════════════════════
+// FILE SELECTION
+// ═══════════════════════════════════════════════════
+function selectFile(file, folder) {
+  addAuditEntry('FILE_READ', file.name, 'ok');
+  addMessage('agent', `Analyzing <strong>${file.name}</strong>...`);
+  setTimeout(() => {
+    addMessage('agent', `<strong>${file.name}</strong> — ${file.size} · Category: <span style="color:var(--quantum)">${file.type}</span><br>Suggested: <span style="color:var(--green)">20260319_${file.type}_${file.name.replace(/\s/g,'_')}</span> · Confidence: 0.94 <span class="msg-commit">✓ committed</span>`);
+  }, 800);
+}
+
+// ═══════════════════════════════════════════════════
+// AUDIT TRAIL
+// ═══════════════════════════════════════════════════
+function addAuditEntry(type, path, level = 'ok') {
+  const container = document.getElementById('sb-audit');
+  const ts = new Date().toTimeString().slice(0,8);
+  const entry = document.createElement('div');
+  entry.className = 'sb-audit-entry';
+  entry.innerHTML = `
+    <div class="sb-audit-type ${level}">${type}</div>
+    <div class="sb-audit-path">${path}</div>
+    <div class="sb-audit-ts">${ts}</div>
+  `;
+  container.insertBefore(entry, container.firstChild);
+  auditCount++;
+  document.getElementById('audit-badge').textContent = auditCount;
+  document.getElementById('stat-events').textContent = auditCount;
+}
+
+// ═══════════════════════════════════════════════════
+// AGENT CHAT
+// ═══════════════════════════════════════════════════
+function addMessage(role, html, commit = false) {
+  const container = document.getElementById('agent-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const labels = { user: 'YOU', agent: 'AGENT', system: 'SYS' };
+  div.innerHTML = `
+    <span class="msg-role">${labels[role]||role}</span>
+    <span class="msg-text">${html}${commit ? ' <span class="msg-commit">✓ signed</span>' : ''}</span>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+const agentResponses = {
+  organize: `Running vault organization scan...<br><br>Found 3 files that could be renamed:<br>
+    · <span style="color:var(--amber)">patent_filing.pdf</span> → <span style="color:var(--green)">20260319_PATENT_USPTO_Filing2.pdf</span><br>
+    · <span style="color:var(--amber)">backup21926</span> → <span style="color:var(--green)">20260219_BACKUP_Desktop.zip</span><br>
+    · <span style="color:var(--amber)">AETHERP.py</span> → <span style="color:var(--green)">20260317_CODE_AetherP_Script.py</span><br><br>
+    Run <strong>organize --confirm</strong> to apply. All actions will be logged.`,
+  scan: `Security scan complete. <span style="color:var(--green)">Threat level: NONE</span><br><br>
+    ✓ No unauthorized access events in last 24h<br>
+    ✓ All file hashes verified against commitments<br>
+    ✓ Session token valid · 6.2h remaining<br>
+    ✓ Protocol-L audit chain intact`,
+  audit: `Showing last 10 audit entries. All entries carry valid ECDSA signatures and RFC 3161 timestamps. <span style="color:var(--quantum)">Audit chain: VERIFIED</span>`,
+  patent: `Found 4 files in the <span style="color:var(--quantum)">patents</span> folder:<br>
+    · USPTO_Filing2_FINAL.pdf (592 KB) — filed 03/19/2026<br>
+    · QOPC_Filing1.pdf (340 KB) — filed 03/16/2026<br>
+    · Filing2_UNIFIED.docx (1.1 MB) — working document<br>
+    · Patent_Notes.txt (12 KB) — attorney notes<br><br>
+    Application #64/010,131 · Patent pending.`,
+  default: `I can help you organize files, analyze vault structure, scan for threats, or answer questions about your files. All my reasoning is cryptographically committed via Protocol-L.`
+};
+
+function sendMessage() {
+  const input = document.getElementById('agent-input');
+  const query = input.value.trim();
+  if (!query) return;
+  input.value = '';
+
+  addMessage('user', query);
+  addAuditEntry('AGENT_QUERY', query.slice(0,32)+'...', 'ok');
+
+  setTimeout(() => {
+    let response = agentResponses.default;
+    const q = query.toLowerCase();
+    if (q.includes('organ')) response = agentResponses.organize;
+    else if (q.includes('scan') || q.includes('threat')) response = agentResponses.scan;
+    else if (q.includes('audit') || q.includes('log')) response = agentResponses.audit;
+    else if (q.includes('patent') || q.includes('filing')) response = agentResponses.patent;
+    addMessage('agent', response, true);
+    addAuditEntry('AGENT_RESPONSE', 'committed+verified', 'ok');
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════
+let sidebarOpen = true;
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sidebarOpen = !sidebarOpen;
+  sb.classList.toggle('collapsed', !sidebarOpen);
+}
+
+function toggleSection(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+function navigateToFolder(id) {
+  const folder = vaultData.folders.find(f => f.id === id);
+  if (folder) {
+    const rad = folder.angle * Math.PI / 180;
+    const fx = Math.cos(rad) * folder.dist;
+    const fy = Math.sin(rad) * folder.dist;
+    panX = -fx * scale;
+    panY = -fy * scale;
+    scale = 1.6;
+    applyTransform();
+    toggleFolderExpand(folder, fx, fy);
+    addAuditEntry('NAVIGATE', id, 'ok');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// TOPBAR ACTIONS
+// ═══════════════════════════════════════════════════
+function runScan() {
+  addMessage('system', 'Running security scan...');
+  addAuditEntry('SECURITY_SCAN', 'initiated', 'ok');
+  setTimeout(() => addMessage('agent', agentResponses.scan, true), 1200);
+}
+
+function runOrganize() {
+  addMessage('system', 'Running organization analysis...');
+  setTimeout(() => addMessage('agent', agentResponses.organize, true), 900);
+}
+
+function addContext() {
+  const ctx = prompt('Add context (e.g. skill name):');
+  if (ctx) addMessage('system', `Context added: ${ctx}`);
+}
+
+// ═══════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════
+const tooltipEl = document.getElementById('tooltip');
+function showTooltip(e, text) {
+  tooltipEl.textContent = text;
+  tooltipEl.classList.add('show');
+  moveTooltip(e);
+}
+function hideTooltip() { tooltipEl.classList.remove('show'); }
+document.addEventListener('mousemove', moveTooltip);
+function moveTooltip(e) {
+  tooltipEl.style.left = (e.clientX + 12) + 'px';
+  tooltipEl.style.top = (e.clientY - 8) + 'px';
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  initCircuitCanvas();
+  buildVaultNodes();
+  applyTransform();
+
+  // Boot messages
+  addMessage('system', '◈ Protocol-L engine initialized · quantum seed active');
+  addMessage('system', '◈ Vault watcher active · unauthorized access detection enabled');
+  addMessage('agent', 'Vault loaded. I can see 6 folders and 33 files. Type a command or ask me anything about your vault.');
+
+  // Initial audit entries
+  addAuditEntry('SESSION_START', 'brandon · local session', 'ok');
+  addAuditEntry('VAULT_LOADED', 'root · 33 files', 'ok');
+  addAuditEntry('WATCHER_START', 'filesystem monitor active', 'ok');
+});
+
+window.addEventListener('resize', () => {
+  const c = document.getElementById('vault-canvas');
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
+  applyTransform();
+});
+</script>
+</body>
+</html>
