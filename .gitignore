@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.env
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime data
+data/runtime/
+data/audit/
+vault_data/
+*.db
+
+# Credentials
+config/credentials.json
+ibm_credentials.json
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
