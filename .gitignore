@@ -25,8 +25,7 @@ env/
 htmlcov/
 
 # Runtime data
-data/runtime/
-data/audit/
+data/
 vault_data/
 *.db
 
