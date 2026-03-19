@@ -25,6 +25,7 @@ const API_BASE     = `http://127.0.0.1:${API_PORT}`;
 let mainWindow     = null;
 let pythonProcess  = null;
 let appQuitting    = false;
+let restartDelay   = 2000;  // Exponential backoff for Python restart
 
 // ── Window geometry per page ─────────────────────────
 const WINDOW_CONFIGS = {
@@ -93,10 +94,13 @@ function startPython() {
   pythonProcess.on('close', (code) => {
     console.log(`[Python] Process exited with code ${code}`);
     pythonProcess = null;
-    // Auto-restart on unexpected exit (unless app is quitting)
+    // Auto-restart on unexpected exit with exponential backoff
     if (code !== 0 && !appQuitting) {
-      console.log('[Python] Unexpected exit — restarting in 2s...');
-      setTimeout(startPython, 2000);
+      console.log(`[Python] Unexpected exit — restarting in ${restartDelay}ms...`);
+      setTimeout(startPython, restartDelay);
+      restartDelay = Math.min(restartDelay * 2, 30000); // Cap at 30s
+    } else {
+      restartDelay = 2000; // Reset on clean exit
     }
   });
 }

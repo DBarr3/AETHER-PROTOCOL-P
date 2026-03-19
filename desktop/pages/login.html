@@ -516,7 +516,6 @@ async function handleLogin() {
   try {
     // Check if API is available
     if (window.aetherAPI) {
-      await sleep(300);
       status.textContent = 'CONNECTING TO PROTOCOL-L ENGINE';
 
       const result = await window.aetherAPI.login(user, pass);
@@ -530,20 +529,17 @@ async function handleLogin() {
       }
 
       if (result.authenticated) {
-        status.textContent = 'GENERATING QUANTUM SESSION TOKEN';
-        await sleep(400);
-
         // Store session token for the app page
         sessionStorage.setItem('session_token', result.session_token);
         sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
         sessionStorage.setItem('username', user);
 
-        status.textContent = 'INITIALIZING VAULT WATCHER';
-        await sleep(300);
+        status.textContent = 'QUANTUM SESSION TOKEN GENERATED';
+        await sleep(200);
 
         status.className = 'login-status ok';
         status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
-        await sleep(500);
+        await sleep(300);
 
         if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
       } else {

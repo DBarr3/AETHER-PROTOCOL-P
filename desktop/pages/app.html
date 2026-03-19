@@ -950,7 +950,11 @@
 // ═══════════════════════════════════════════════════
 // VAULT DATA
 // ═══════════════════════════════════════════════════
-const vaultData = {
+// Vault data — starts empty, populated from API or fallback
+const vaultData = { folders: [] };
+
+// Demo fallback data (used only when backend is unavailable)
+const DEMO_VAULT = {
   folders: [
     { id: 'patents',  name: 'patents',  icon: '📋', count: 4, angle: -80,  dist: 200,
       files: [
@@ -1304,6 +1308,8 @@ async function selectFile(file, folder) {
 // ═══════════════════════════════════════════════════
 // AUDIT TRAIL
 // ═══════════════════════════════════════════════════
+const MAX_AUDIT_ENTRIES = 100;
+
 function addAuditEntry(type, path, level = 'ok') {
   const container = document.getElementById('sb-audit');
   const ts = new Date().toTimeString().slice(0,8);
@@ -1315,6 +1321,12 @@ function addAuditEntry(type, path, level = 'ok') {
     <div class="sb-audit-ts">${ts}</div>
   `;
   container.insertBefore(entry, container.firstChild);
+
+  // Cap DOM entries to prevent unbounded growth
+  while (container.children.length > MAX_AUDIT_ENTRIES) {
+    container.removeChild(container.lastChild);
+  }
+
   auditCount++;
   document.getElementById('audit-badge').textContent = auditCount;
   document.getElementById('stat-events').textContent = auditCount;
@@ -1475,14 +1487,20 @@ function addContext() {
 // TOOLTIP
 // ═══════════════════════════════════════════════════
 const tooltipEl = document.getElementById('tooltip');
+let tooltipVisible = false;
 function showTooltip(e, text) {
   tooltipEl.textContent = text;
   tooltipEl.classList.add('show');
+  tooltipVisible = true;
   moveTooltip(e);
 }
-function hideTooltip() { tooltipEl.classList.remove('show'); }
+function hideTooltip() {
+  tooltipEl.classList.remove('show');
+  tooltipVisible = false;
+}
 document.addEventListener('mousemove', moveTooltip);
 function moveTooltip(e) {
+  if (!tooltipVisible) return;
   tooltipEl.style.left = (e.clientX + 12) + 'px';
   tooltipEl.style.top = (e.clientY - 8) + 'px';
 }
@@ -1553,6 +1571,7 @@ async function loadLiveVault() {
 // AUDIT POLLING
 // ═══════════════════════════════════════════════════
 let auditPollTimer = null;
+const seenAuditIds = new Set();
 
 async function pollAuditTrail() {
   const token = sessionStorage.getItem('session_token');
@@ -1562,18 +1581,15 @@ async function pollAuditTrail() {
     const data = await window.aetherAPI.getAudit(token, 20);
     if (data.error || !data.entries) return;
 
-    // Only add new entries we haven't seen
-    const badge = document.getElementById('audit-badge');
-    const current = parseInt(badge.textContent) || 0;
-    if (data.entries.length > current) {
-      // Add the difference
-      const newEntries = data.entries.slice(0, data.entries.length - current);
-      newEntries.forEach(entry => {
-        const type = entry.event_type || entry.phase || 'EVENT';
-        const path = entry.data?.path || entry.order_id || '';
-        addAuditEntry(type, path, 'ok');
-      });
-    }
+    // Deduplicate by unique key (timestamp + order_id)
+    data.entries.forEach(entry => {
+      const key = (entry.timestamp || '') + ':' + (entry.order_id || '');
+      if (seenAuditIds.has(key)) return;
+      seenAuditIds.add(key);
+      const type = entry.event_type || entry.phase || 'EVENT';
+      const path = entry.data?.path || entry.order_id || '';
+      addAuditEntry(type, path, 'ok');
+    });
   } catch (e) {
     // Silently fail — poll will retry
   }
@@ -1583,6 +1599,11 @@ function startAuditPolling() {
   if (auditPollTimer) clearInterval(auditPollTimer);
   auditPollTimer = setInterval(pollAuditTrail, 3000);
 }
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (auditPollTimer) clearInterval(auditPollTimer);
+});
 
 // ═══════════════════════════════════════════════════
 // INIT
@@ -1612,7 +1633,14 @@ window.addEventListener('load', async () => {
       if (agentModel) agentModel.textContent = `${status.agent} · Protocol-L verified`;
     }
   } else {
-    addMessage('agent', 'Vault loaded. I can see 6 folders and 33 files. Type a command or ask me anything about your vault.');
+    // Load demo data as fallback
+    vaultData.folders = DEMO_VAULT.folders;
+    document.getElementById('nodes-container').innerHTML = '';
+    const svg = document.getElementById('connector-svg');
+    while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+    buildVaultNodes();
+    applyTransform();
+    addMessage('agent', 'Vault loaded (offline mode). I can see 6 folders and 33 files. Type a command or ask me anything.');
     addAuditEntry('VAULT_LOADED', 'root · demo data', 'ok');
   }
 

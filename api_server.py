@@ -10,6 +10,8 @@ import os
 import sys
 import time
 import hashlib
+import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -27,7 +29,6 @@ import uvicorn
 
 from config.settings import (
     APP_NAME, APP_VERSION, DEFAULT_VAULT_ROOT, DEFAULT_AUDIT_DIR,
-    HARDENED_AGENT_ENABLED, CLAUDE_API_KEY, CLAUDE_MODEL,
 )
 from auth.login import AetherCloudAuth
 from auth.session import SessionManager
@@ -36,11 +37,132 @@ from vault.watcher import VaultWatcher
 from agent.file_agent import AetherFileAgent
 from aether_protocol.audit import AuditLog
 
-# ═══════════════════════════════════════════════════
-# STARTUP
-# ═══════════════════════════════════════════════════
-_start_time = time.time()
+log = logging.getLogger("aethercloud.api")
 
+# ═══════════════════════════════════════════════════
+# FILE METADATA — single source of truth for ext → (icon, category)
+# ═══════════════════════════════════════════════════
+_EXT_META: dict[str, tuple[str, str]] = {
+    # CODE
+    ".py":   ("🐍", "CODE"),   ".js":  ("📜", "CODE"),   ".ts": ("📜", "CODE"),
+    ".html": ("🌐", "CODE"),   ".css": ("🎨", "CODE"),
+    # CONFIG
+    ".json": ("📋", "CONFIG"), ".yaml": ("📋", "CONFIG"), ".yml": ("📋", "CONFIG"),
+    ".toml": ("📋", "CONFIG"),
+    # DOCUMENT / PATENT / LEGAL
+    ".pdf":  ("📄", "PATENT"), ".docx": ("📝", "LEGAL"),  ".doc": ("📝", "LEGAL"),
+    ".txt":  ("📃", "PERSONAL"), ".md": ("📖", "PERSONAL"), ".rst": ("📖", "PERSONAL"),
+    # FINANCE / TRADING
+    ".xlsx": ("📊", "FINANCE"), ".csv": ("📊", "FINANCE"), ".xls": ("📊", "FINANCE"),
+    # ARCHIVE / BACKUP
+    ".zip":  ("🗜", "ARCHIVE"), ".tar": ("🗜", "ARCHIVE"), ".gz":  ("🗜", "ARCHIVE"),
+    ".rar":  ("🗜", "ARCHIVE"),
+    # MEDIA
+    ".png":  ("🖼", "PERSONAL"), ".jpg": ("🖼", "PERSONAL"), ".jpeg": ("🖼", "PERSONAL"),
+    ".gif":  ("🖼", "PERSONAL"), ".svg": ("🖼", "PERSONAL"),
+    ".mp4":  ("🎬", "PERSONAL"), ".mp3": ("🎵", "PERSONAL"), ".wav":  ("🎵", "PERSONAL"),
+    # SECURITY
+    ".key":  ("🔑", "SECURITY"), ".pem": ("🔑", "SECURITY"), ".enc": ("🔑", "SECURITY"),
+    # DATA
+    ".db":   ("💾", "BACKUP"),  ".sqlite": ("💾", "BACKUP"),
+    # LOG
+    ".log":  ("📋", "LOG"),
+}
+
+
+def _file_icon(ext: str) -> str:
+    """Return emoji icon for file extension."""
+    meta = _EXT_META.get(ext.lower())
+    return meta[0] if meta else "📄"
+
+
+def _guess_category(ext: str) -> str:
+    """Guess file category from extension."""
+    meta = _EXT_META.get(ext.lower())
+    return meta[1] if meta else "PERSONAL"
+
+
+def _format_size(size_bytes: int) -> str:
+    """Human-readable file size."""
+    for unit, threshold in [("B", 1024), ("KB", 1024**2), ("MB", 1024**3)]:
+        if size_bytes < threshold:
+            divisor = threshold // 1024 if unit != "B" else 1
+            return f"{size_bytes / divisor:.1f} {unit}" if unit != "B" else f"{size_bytes} B"
+    return f"{size_bytes / (1024**3):.1f} GB"
+
+
+def _commitment_hash(data) -> str:
+    """Compute a short commitment hash for response integrity."""
+    return hashlib.sha256(str(data).encode()).hexdigest()[:16]
+
+
+# ═══════════════════════════════════════════════════
+# SERVICE CONTAINER
+# ═══════════════════════════════════════════════════
+@dataclass
+class Services:
+    """Holds all initialized backend services."""
+    audit_log: Optional[AuditLog] = None
+    auth: Optional[AetherCloudAuth] = None
+    session_mgr: Optional[SessionManager] = None
+    vault: Optional[AetherVault] = None
+    watcher: Optional[VaultWatcher] = None
+    agent: Optional[AetherFileAgent] = None
+
+    @property
+    def ready(self) -> bool:
+        return self.auth is not None and self.vault is not None
+
+
+svc = Services()
+_start_time = time.time()
+_ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
+
+security = HTTPBearer(auto_error=False)
+
+
+def _init_services():
+    """Initialize all backend services into the container."""
+    # Audit log
+    audit_dir = DEFAULT_AUDIT_DIR
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    svc.audit_log = AuditLog(audit_dir / "aether_audit.jsonl")
+
+    # Session manager
+    svc.session_mgr = SessionManager()
+
+    # Auth
+    svc.auth = AetherCloudAuth(
+        audit_log=svc.audit_log,
+        session_manager=svc.session_mgr,
+    )
+
+    # Vault
+    vault_root = str(DEFAULT_VAULT_ROOT)
+    os.makedirs(vault_root, exist_ok=True)
+    svc.vault = AetherVault(
+        vault_root=vault_root,
+        session_token="server_init",
+        audit_log=svc.audit_log,
+    )
+
+    # Watcher
+    svc.watcher = VaultWatcher(
+        vault_root=vault_root,
+        audit_log=svc.audit_log,
+    )
+    try:
+        svc.watcher.start()
+    except Exception as e:
+        log.warning("Vault watcher failed to start: %s", e)
+
+    # Agent
+    svc.agent = AetherFileAgent(vault=svc.vault)
+
+
+# ═══════════════════════════════════════════════════
+# APP
+# ═══════════════════════════════════════════════════
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Initialize services on startup, cleanup on shutdown."""
@@ -57,72 +179,11 @@ app = FastAPI(
 # CORS: allow only localhost origins (Electron renderer)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:8741",
-        "http://127.0.0.1",
-        "http://127.0.0.1:8741",
-        "file://",
-    ],
     allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── Shared state ──────────────────────────────────
-_audit_log: Optional[AuditLog] = None
-_auth: Optional[AetherCloudAuth] = None
-_session_mgr: Optional[SessionManager] = None
-_vault: Optional[AetherVault] = None
-_watcher: Optional[VaultWatcher] = None
-_agent: Optional[AetherFileAgent] = None
-
-security = HTTPBearer(auto_error=False)
-
-
-def _init_services():
-    """Initialize all backend services."""
-    global _audit_log, _auth, _session_mgr, _vault, _watcher, _agent
-
-    # Audit log
-    audit_dir = DEFAULT_AUDIT_DIR
-    audit_dir.mkdir(parents=True, exist_ok=True)
-    _audit_log = AuditLog(audit_dir / "aether_audit.jsonl")
-
-    # Session manager
-    _session_mgr = SessionManager()
-
-    # Auth
-    _auth = AetherCloudAuth(
-        audit_log=_audit_log,
-        session_manager=_session_mgr,
-    )
-
-    # Vault
-    vault_root = str(DEFAULT_VAULT_ROOT)
-    os.makedirs(vault_root, exist_ok=True)
-    _vault = AetherVault(
-        vault_root=vault_root,
-        session_token="server_init",
-        audit_log=_audit_log,
-    )
-
-    # Watcher
-    _watcher = VaultWatcher(
-        vault_root=vault_root,
-        audit_log=_audit_log,
-    )
-    try:
-        _watcher.start()
-    except Exception:
-        pass  # Watcher may fail if vault root doesn't exist yet
-
-    # Agent
-    _agent = AetherFileAgent(vault=_vault)
-
-
-## Lifespan handles startup — see lifespan() above
 
 
 # ═══════════════════════════════════════════════════
@@ -135,7 +196,7 @@ def get_session_token(
     if not credentials:
         raise HTTPException(status_code=401, detail="Missing authorization header")
     token = credentials.credentials
-    if not _session_mgr or not _session_mgr.is_valid(token):
+    if not svc.session_mgr or not svc.session_mgr.is_valid(token):
         raise HTTPException(status_code=401, detail="Invalid or expired session token")
     return token
 
@@ -212,7 +273,6 @@ class AuditTrailResponse(BaseModel):
 
 class VaultListResponse(BaseModel):
     folders: list
-    files: list
     stats: dict
 
 
@@ -235,10 +295,10 @@ class StatusResponse(BaseModel):
 @app.post("/auth/login", response_model=LoginResponse)
 async def login(req: LoginRequest):
     """Authenticate user and return quantum-seeded session token."""
-    if not _auth:
+    if not svc.auth:
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
-    result = _auth.login(req.username, req.password)
+    result = svc.auth.login(req.username, req.password)
 
     return LoginResponse(
         authenticated=result.get("authenticated", False),
@@ -252,10 +312,10 @@ async def login(req: LoginRequest):
 @app.post("/auth/logout", response_model=LogoutResponse)
 async def logout(req: LogoutRequest):
     """Terminate session and log event."""
-    if not _auth:
+    if not svc.auth:
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
-    result = _auth.logout(req.session_token)
+    result = svc.auth.logout(req.session_token)
     return LogoutResponse(
         success=result.get("success", True),
         audit_id=result.get("audit_id"),
@@ -266,17 +326,17 @@ async def logout(req: LogoutRequest):
 @app.get("/vault/list", response_model=VaultListResponse)
 async def vault_list(token: str = Depends(get_session_token)):
     """List vault contents organized by folder."""
-    if not _vault:
+    if not svc.vault:
         raise HTTPException(status_code=503, detail="Vault not initialized")
 
     try:
-        files = _vault.list_files(recursive=True)
-    except Exception:
+        files = svc.vault.list_files(recursive=True)
+    except Exception as e:
+        log.warning("vault.list_files failed: %s", e)
         files = []
 
-    # Organize files into folders
-    folder_map = {}
-    flat_files = []
+    # Organize files into folders (single pass — folders contain file refs)
+    folder_map: dict[str, dict] = {}
 
     for f in files:
         file_path = Path(f.get("path", f.get("name", "")))
@@ -294,8 +354,6 @@ async def vault_list(token: str = Depends(get_session_token)):
             "content_hash": f.get("content_hash", ""),
         }
 
-        flat_files.append(file_entry)
-
         if parent not in folder_map:
             folder_map[parent] = {
                 "id": parent.replace("/", "_").replace("\\", "_"),
@@ -306,74 +364,55 @@ async def vault_list(token: str = Depends(get_session_token)):
         folder_map[parent]["files"].append(file_entry)
 
     folders = []
-    for name, folder in folder_map.items():
+    for folder in folder_map.values():
         folder["count"] = len(folder["files"])
         folders.append(folder)
 
     try:
-        stats = _vault.get_stats()
-    except Exception:
-        stats = {
-            "file_count": len(flat_files),
-            "folder_count": len(folders),
-            "vault_root": str(DEFAULT_VAULT_ROOT),
-        }
+        stats = svc.vault.get_stats()
+    except Exception as e:
+        log.warning("vault.get_stats failed: %s", e)
+        stats = {"vault_root": str(DEFAULT_VAULT_ROOT)}
 
+    stats["file_count"] = sum(f["count"] for f in folders)
     stats["folder_count"] = len(folders)
 
-    return VaultListResponse(
-        folders=folders,
-        files=flat_files,
-        stats=stats,
-    )
+    return VaultListResponse(folders=folders, stats=stats)
 
 
 # ── Agent ─────────────────────────────────────────
 @app.post("/agent/chat", response_model=ChatResponse)
 async def agent_chat(req: ChatRequest, token: str = Depends(get_session_token)):
     """Chat with the AI agent. Response is Protocol-L committed."""
-    if not _agent:
+    if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        response_text = _agent.chat(req.query)
+        response_text = svc.agent.chat(req.query)
     except Exception as e:
+        log.warning("agent.chat failed: %s", e)
         response_text = f"Agent error: {str(e)}"
 
-    # Compute commitment hash for the response
-    commitment_hash = hashlib.sha256(response_text.encode()).hexdigest()[:16]
-
-    # Check if response mentions threats
-    threat_level = "NONE"
-    lower = response_text.lower()
-    if any(w in lower for w in ["threat", "unauthorized", "intrusion", "alert"]):
-        threat_level = "LOW"
-    if any(w in lower for w in ["critical", "breach", "compromised"]):
-        threat_level = "HIGH"
-
-    # Check verification status
-    verified = False
-    if hasattr(_agent, 'is_hardened') and _agent.is_hardened:
-        verified = True
+    verified = hasattr(svc.agent, 'is_hardened') and svc.agent.is_hardened
 
     return ChatResponse(
         response=response_text,
-        commitment_hash=commitment_hash,
+        commitment_hash=_commitment_hash(response_text),
         verified=verified,
-        threat_level=threat_level,
+        threat_level="NONE",  # Threat assessment via /agent/scan, not text parsing
     )
 
 
 @app.post("/agent/analyze", response_model=AnalyzeResponse)
 async def agent_analyze(req: AnalyzeRequest, token: str = Depends(get_session_token)):
     """Analyze a file and suggest renaming."""
-    if not _agent:
+    if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        result = _agent.analyze_file(req.filename)
-    except Exception:
-        # Fallback analysis
+        result = svc.agent.analyze_file(req.filename)
+    except Exception as e:
+        log.warning("agent.analyze_file failed: %s", e)
         result = {
             "suggested_name": req.filename,
             "category": _guess_category(req.extension),
@@ -381,15 +420,11 @@ async def agent_analyze(req: AnalyzeRequest, token: str = Depends(get_session_to
             "reasoning": "Rule-based fallback analysis",
         }
 
-    commitment_hash = hashlib.sha256(
-        str(result).encode()
-    ).hexdigest()[:16]
-
     return AnalyzeResponse(
         suggested_name=result.get("suggested_name", req.filename),
         category=result.get("category", "UNKNOWN"),
         confidence=result.get("confidence", 0.5),
-        commitment_hash=commitment_hash,
+        commitment_hash=_commitment_hash(result),
         reasoning=result.get("reasoning"),
     )
 
@@ -397,27 +432,24 @@ async def agent_analyze(req: AnalyzeRequest, token: str = Depends(get_session_to
 @app.post("/agent/scan", response_model=ScanResponse)
 async def agent_scan(token: str = Depends(get_session_token)):
     """Run security scan on vault."""
-    if not _agent:
+    if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        result = _agent.security_scan()
-    except Exception:
+        result = svc.agent.security_scan()
+    except Exception as e:
+        log.warning("agent.security_scan failed: %s", e)
         result = {
             "threat_level": "UNKNOWN",
             "findings": [],
             "recommended_action": "Manual review recommended",
         }
 
-    commitment_hash = hashlib.sha256(
-        str(result).encode()
-    ).hexdigest()[:16]
-
     return ScanResponse(
         threat_level=result.get("threat_level", "NONE"),
         findings=result.get("findings", []),
         recommended_action=result.get("recommended_action", "No action required"),
-        commitment_hash=commitment_hash,
+        commitment_hash=_commitment_hash(result),
     )
 
 
@@ -429,12 +461,16 @@ async def audit_trail(
     path: Optional[str] = Query(default=None),
 ):
     """Retrieve audit trail entries."""
-    if not _audit_log:
+    if not svc.audit_log:
         raise HTTPException(status_code=503, detail="Audit log not initialized")
 
+    # Over-fetch when filtering by path so we can still return `limit` results
+    fetch_limit = limit * 3 if path else limit
+
     try:
-        raw_entries = _audit_log.query(limit=limit)
-    except Exception:
+        raw_entries = svc.audit_log.query(limit=fetch_limit)
+    except Exception as e:
+        log.warning("audit_log.query failed: %s", e)
         raw_entries = []
 
     entries = []
@@ -447,14 +483,15 @@ async def audit_trail(
             "event_type": data.get("event_type", data.get("phase", "")),
             "data": data.get("data", {}),
         }
-        # Filter by path if specified
         if path:
             entry_path = str(data.get("data", {}).get("path", ""))
             if path.lower() not in entry_path.lower():
                 continue
         entries.append(e)
+        if len(entries) >= limit:
+            break
 
-    return AuditTrailResponse(entries=entries[:limit])
+    return AuditTrailResponse(entries=entries)
 
 
 # ── Status ────────────────────────────────────────
@@ -462,30 +499,30 @@ async def audit_trail(
 async def status():
     """System health check — no auth required."""
     watcher_status = "INACTIVE"
-    if _watcher:
+    if svc.watcher:
         try:
-            watcher_status = "ACTIVE" if _watcher.is_running else "STANDBY"
+            watcher_status = "ACTIVE" if svc.watcher.is_running else "STANDBY"
         except Exception:
             watcher_status = "STANDBY"
 
     agent_status = "UNAVAILABLE"
-    if _agent:
+    if svc.agent:
         agent_status = "HARDENED" if (
-            hasattr(_agent, "is_hardened") and _agent.is_hardened
+            hasattr(svc.agent, "is_hardened") and svc.agent.is_hardened
         ) else "ACTIVE"
 
-    session_active = False
-    if _session_mgr:
-        session_active = _session_mgr.active_count > 0
+    session_active = bool(svc.session_mgr and svc.session_mgr.active_count > 0)
 
-    # IBM Quantum status
-    ibm_status = "SIMULATOR"
-    try:
-        from aether_protocol.quantum_backend import get_quantum_seed
-        _, method = get_quantum_seed()
-        ibm_status = method
-    except Exception:
-        ibm_status = "OS_URANDOM"
+    # IBM Quantum status — cached with 30s TTL
+    now = time.time()
+    if now > _ibm_status_cache["expires"]:
+        try:
+            from aether_protocol.quantum_backend import get_quantum_seed
+            _, method = get_quantum_seed()
+            _ibm_status_cache["value"] = method
+        except Exception:
+            _ibm_status_cache["value"] = "OS_URANDOM"
+        _ibm_status_cache["expires"] = now + 30.0
 
     return StatusResponse(
         protocol_l="ACTIVE",
@@ -493,60 +530,10 @@ async def status():
         agent=agent_status,
         session_active=session_active,
         vault_root=str(DEFAULT_VAULT_ROOT),
-        ibm_status=ibm_status,
+        ibm_status=_ibm_status_cache["value"],
         uptime=round(time.time() - _start_time, 1),
         version=APP_VERSION,
     )
-
-
-# ═══════════════════════════════════════════════════
-# HELPERS
-# ═══════════════════════════════════════════════════
-def _format_size(size_bytes: int) -> str:
-    """Human-readable file size."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024*1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024*1024*1024):.1f} GB"
-
-
-_ICON_MAP = {
-    ".py": "🐍", ".js": "📜", ".ts": "📜", ".html": "🌐", ".css": "🎨",
-    ".json": "📋", ".yaml": "📋", ".yml": "📋", ".toml": "📋",
-    ".pdf": "📄", ".docx": "📝", ".doc": "📝", ".txt": "📃",
-    ".xlsx": "📊", ".csv": "📊", ".xls": "📊",
-    ".zip": "🗜", ".tar": "🗜", ".gz": "🗜", ".rar": "🗜",
-    ".png": "🖼", ".jpg": "🖼", ".jpeg": "🖼", ".gif": "🖼", ".svg": "🖼",
-    ".mp4": "🎬", ".mp3": "🎵", ".wav": "🎵",
-    ".key": "🔑", ".pem": "🔑", ".enc": "🔑",
-    ".db": "💾", ".sqlite": "💾",
-    ".md": "📖", ".rst": "📖",
-}
-
-
-def _file_icon(ext: str) -> str:
-    """Return emoji icon for file extension."""
-    return _ICON_MAP.get(ext.lower(), "📄")
-
-
-_CATEGORY_MAP = {
-    ".py": "CODE", ".js": "CODE", ".ts": "CODE", ".html": "CODE", ".css": "CODE",
-    ".json": "CONFIG", ".yaml": "CONFIG", ".yml": "CONFIG", ".toml": "CONFIG",
-    ".pdf": "DOCUMENT", ".docx": "DOCUMENT", ".doc": "DOCUMENT", ".txt": "DOCUMENT",
-    ".xlsx": "TRADING", ".csv": "TRADING", ".xls": "TRADING",
-    ".zip": "BACKUP", ".tar": "BACKUP", ".gz": "BACKUP",
-    ".key": "SECURITY", ".pem": "SECURITY", ".enc": "SECURITY",
-    ".log": "LOG", ".md": "DOCUMENT",
-}
-
-
-def _guess_category(ext: str) -> str:
-    """Guess file category from extension."""
-    return _CATEGORY_MAP.get(ext.lower(), "PERSONAL")
 
 
 # ═══════════════════════════════════════════════════

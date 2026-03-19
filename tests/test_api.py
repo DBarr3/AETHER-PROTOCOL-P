@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 # Import the FastAPI app
 import api_server
-from api_server import app, _init_services
+from api_server import app, _init_services, svc
 
 
 # ═══════════════════════════════════════════════════
@@ -46,8 +46,8 @@ def client():
 @pytest.fixture
 def registered_user():
     """Register a test user and return credentials."""
-    if api_server._auth:
-        api_server._auth.register_user("testuser", "testpass123")
+    if svc.auth:
+        svc.auth.register_user("testuser", "testpass123")
     return {"username": "testuser", "password": "testpass123"}
 
 
@@ -63,16 +63,11 @@ def auth_token(client, registered_user):
 
 
 def _create_mock_token():
-    """Create a mock session token and register it."""
-    token = hashlib.sha256(str(time.time()).encode()).hexdigest()
-    if api_server._session_mgr:
-        api_server._session_mgr.generate_token("testuser", str(time.time()))
-        # Directly insert token
-        api_server._session_mgr._sessions[token] = {
-            "username": "testuser",
-            "created": time.time(),
-        }
-    return token
+    """Create a mock session token by generating one via the public API."""
+    if svc.session_mgr:
+        token = svc.session_mgr.generate_token("testuser", str(time.time()))
+        return token
+    return hashlib.sha256(str(time.time()).encode()).hexdigest()
 
 
 def _auth_header(token):
@@ -185,10 +180,8 @@ class TestVaultList:
         assert resp.status_code == 200
         data = resp.json()
         assert "folders" in data
-        assert "files" in data
         assert "stats" in data
         assert isinstance(data["folders"], list)
-        assert isinstance(data["files"], list)
 
     def test_vault_list_stats_has_keys(self, client, auth_token):
         resp = client.get("/vault/list", headers=_auth_header(auth_token))
