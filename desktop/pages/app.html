@@ -5,39 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AetherCloud-L</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap');
 
   :root {
-    --void: #010409;
-    --deep: #080d18;
-    --surface: #0c1120;
-    --panel: #0f1626;
-    --panel2: #121b2e;
-    --border: #1a2438;
-    --border2: #1e2d45;
-    --quantum: #00d4ff;
-    --quantum2: #0099cc;
-    --quantum-dim: rgba(0,212,255,0.07);
-    --quantum-glow: rgba(0,212,255,0.3);
-    --amber: #ffaa00;
-    --amber-dim: rgba(255,170,0,0.1);
-    --green: #00ff88;
-    --green-dim: rgba(0,255,136,0.1);
-    --red: #ff3366;
-    --red-dim: rgba(255,51,102,0.1);
-    --purple: #8b5cf6;
-    --text: #7a8899;
-    --text-bright: #b8c5d3;
-    --text-dim: #2d3a4a;
-    --sidebar-w: 280px;
+    --bg: #0a0a0a;
+    --bg-2: #111111;
+    --bg-3: #1a1a1a;
+    --bg-4: #222222;
+    --border: #2a2a2a;
+    --border-2: #333333;
+    --text-primary: #efefef;
+    --text-secondary: #888888;
+    --text-muted: #444444;
+    --accent: #00d4ff;
+    --accent-dim: rgba(0,212,255,0.08);
+    --accent-glow: rgba(0,212,255,0.2);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.1);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.1);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.1);
+    --sidebar-w: 260px;
   }
 
   * { margin:0; padding:0; box-sizing:border-box; }
 
   body {
-    background: var(--void);
-    color: var(--text-bright);
-    font-family: 'Share Tech Mono', monospace;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
     height: 100vh;
     overflow: hidden;
     display: flex;
@@ -46,8 +43,8 @@
 
   /* ═══ TOPBAR ═══════════════════════════════════════ */
   .topbar {
-    height: 44px;
-    background: var(--deep);
+    height: 40px;
+    background: var(--bg-2);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -66,39 +63,30 @@
   }
   .topbar-logo-icon {
     width: 26px; height: 26px;
-    border: 1px solid var(--quantum);
+    border: 1px solid var(--accent);
     display: flex; align-items: center; justify-content: center;
     position: relative;
   }
-  .topbar-logo-icon::before {
-    content: '';
-    position: absolute;
-    inset: 3px;
-    border: 1px solid var(--quantum);
-    opacity: 0.3;
-    animation: pulse-inner 2.5s ease-in-out infinite;
-  }
-  @keyframes pulse-inner { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
 
   .topbar-name {
-    font-family: 'Orbitron', monospace;
-    font-size: 13px;
-    font-weight: 900;
-    color: var(--quantum);
-    letter-spacing: 3px;
-    text-shadow: 0 0 15px var(--quantum-glow);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0;
   }
 
   .topbar-path {
     flex: 1;
     font-size: 11px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    font-family: 'JetBrains Mono', monospace;
   }
   .topbar-path .path-sep { margin: 0 4px; opacity: 0.4; }
-  .topbar-path .path-cur { color: var(--text); }
+  .topbar-path .path-cur { color: var(--text-secondary); }
 
   .topbar-actions {
     display: flex;
@@ -109,32 +97,32 @@
   .topbar-btn {
     background: none;
     border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-secondary);
+    font-family: 'Inter', sans-serif;
     font-size: 10px;
     padding: 5px 10px;
     cursor: pointer;
-    letter-spacing: 1px;
-    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    transition: border-color 0.2s, color 0.2s;
     display: flex; align-items: center; gap: 5px;
   }
-  .topbar-btn:hover { border-color: var(--quantum); color: var(--quantum); }
+  .topbar-btn:hover { border-color: var(--border-2); color: var(--text-primary); }
   .topbar-btn.alert { border-color: var(--red); color: var(--red); }
-  .topbar-btn.active { border-color: var(--quantum); color: var(--quantum); background: var(--quantum-dim); }
+  .topbar-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
   .connect-btn {
-    border-color: var(--quantum);
-    color: var(--quantum);
-    background: var(--quantum-dim);
-    letter-spacing: 2px;
-    font-family: 'Orbitron', monospace;
-    font-weight: 700;
+    border-color: var(--accent);
+    color: var(--accent);
+    background: none;
+    letter-spacing: 0.5px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
     -webkit-app-region: no-drag;
   }
   .connect-btn:hover {
-    background: var(--quantum);
-    color: var(--void);
-    box-shadow: 0 0 20px var(--quantum-glow);
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
   }
   .connect-btn.connected {
     border-color: var(--green);
@@ -148,9 +136,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    border: 1px solid var(--green-dim);
-    background: var(--green-dim);
+    font-family: 'Inter', sans-serif;
   }
   .session-dot {
     width: 5px; height: 5px;
@@ -174,15 +160,12 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    background: var(--bg);
   }
 
-  /* Circuit canvas */
+  /* Circuit canvas — hidden */
   #vault-canvas {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.12;
+    display: none;
   }
 
   /* Vault viewport */
@@ -209,41 +192,35 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 80px; height: 80px;
-    border: 2px solid var(--quantum);
-    background: var(--quantum-dim);
+    width: 64px; height: 64px;
+    border: 1px solid var(--accent);
+    background: var(--accent-dim);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: default;
-    box-shadow: 0 0 40px var(--quantum-glow), 0 0 80px rgba(0,212,255,0.1);
     z-index: 20;
-    transition: all 0.3s;
+    transition: border-color 0.3s;
+    animation: root-border-pulse 3s ease-in-out infinite;
   }
   .vault-root::before {
     content: '';
     position: absolute;
     inset: -6px;
-    border: 1px solid var(--quantum);
-    opacity: 0.2;
+    border: 1px solid var(--accent);
+    opacity: 0.15;
     animation: root-pulse 3s ease-in-out infinite;
   }
-  .vault-root::after {
-    content: '';
-    position: absolute;
-    inset: -12px;
-    border: 1px solid var(--quantum);
-    opacity: 0.1;
-    animation: root-pulse 3s ease-in-out infinite 0.5s;
-  }
-  @keyframes root-pulse { 0%,100%{opacity:0.2} 50%{opacity:0.5} }
+  @keyframes root-border-pulse { 0%,100%{border-color: var(--accent)} 50%{border-color: rgba(0,212,255,0.4)} }
+  @keyframes root-pulse { 0%,100%{opacity:0.15} 50%{opacity:0.35} }
 
   .root-label {
     font-size: 8px;
-    color: var(--quantum);
+    color: var(--accent);
     letter-spacing: 1px;
     margin-top: 4px;
+    font-family: 'Inter', sans-serif;
   }
 
   /* Connector lines (SVG overlay) */
@@ -257,46 +234,43 @@
   /* Folder nodes */
   .folder-node {
     position: absolute;
-    width: 100px; height: 64px;
-    border: 1px solid var(--border2);
-    background: var(--panel);
+    width: 84px; height: 52px;
+    border: 1px solid var(--border-2);
+    background: var(--bg-3);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.25s;
+    transition: border-color 0.2s, background 0.2s;
     z-index: 10;
     user-select: none;
   }
   .folder-node:hover {
-    border-color: var(--quantum);
-    background: var(--quantum-dim);
-    box-shadow: 0 0 16px var(--quantum-glow);
-    transform: scale(1.04);
+    border-color: var(--border);
+    background: var(--bg-4);
     z-index: 15;
   }
   .folder-node.focused {
-    border-color: var(--quantum);
-    box-shadow: 0 0 24px var(--quantum-glow);
+    border-color: var(--accent);
     z-index: 16;
   }
   .folder-icon { font-size: 18px; line-height: 1; }
-  .folder-name { font-size: 9px; color: var(--text); margin-top: 5px; letter-spacing: 1px; }
-  .folder-count { font-size: 8px; color: var(--text-dim); margin-top: 2px; }
+  .folder-name { font-size: 9px; color: var(--text-secondary); margin-top: 5px; letter-spacing: 0.5px; font-family: 'Inter', sans-serif; }
+  .folder-count { font-size: 8px; color: var(--text-muted); margin-top: 2px; font-family: 'Inter', sans-serif; }
 
   /* File nodes (smaller) */
   .file-node {
     position: absolute;
-    width: 72px; height: 44px;
-    border: 1px solid var(--text-dim);
-    background: var(--surface);
+    width: 60px; height: 38px;
+    border: 1px solid var(--text-muted);
+    background: var(--bg-2);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s, background 0.2s;
     z-index: 8;
     opacity: 0.7;
   }
@@ -307,19 +281,18 @@
     z-index: 12;
   }
   .file-icon { font-size: 13px; line-height: 1; }
-  .file-name { font-size: 8px; color: var(--text-dim); margin-top: 3px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .file-name { font-size: 8px; color: var(--text-muted); margin-top: 3px; max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-family: 'JetBrains Mono', monospace; }
 
   /* Expanded folder overlay */
   .folder-expanded {
     position: absolute;
-    border: 1px solid var(--quantum);
-    background: rgba(10,14,26,0.97);
-    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-2);
+    background: var(--bg-3);
     padding: 16px;
     min-width: 240px;
     z-index: 30;
     animation: expandIn 0.25s cubic-bezier(0.17,0.67,0.3,1.1);
-    box-shadow: 0 0 40px rgba(0,212,255,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
   @keyframes expandIn {
     from { opacity:0; transform: scale(0.85); }
@@ -330,21 +303,22 @@
     position: absolute;
     top: -1px; left: 10px;
     font-size: 9px;
-    color: var(--quantum);
-    background: var(--void);
+    color: var(--text-secondary);
+    background: var(--bg-3);
     padding: 0 6px;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     transform: translateY(-50%);
+    font-family: 'Inter', sans-serif;
   }
   .expanded-close {
     position: absolute;
     top: 6px; right: 8px;
     font-size: 12px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     cursor: pointer;
     line-height: 1;
   }
-  .expanded-close:hover { color: var(--quantum); }
+  .expanded-close:hover { color: var(--text-primary); }
 
   .expanded-file-list {
     display: flex;
@@ -359,10 +333,11 @@
     gap: 8px;
     padding: 6px 8px;
     font-size: 10px;
-    color: var(--text);
+    color: var(--text-secondary);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: 'Inter', sans-serif;
   }
   .expanded-file:hover {
     border-color: var(--amber-dim);
@@ -370,12 +345,12 @@
     color: var(--amber);
   }
   .expanded-file-icon { flex-shrink: 0; opacity: 0.7; }
-  .expanded-file-meta { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+  .expanded-file-meta { font-size: 9px; color: var(--text-muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
 
   /* Vault toolbar */
   .vault-toolbar {
-    height: 34px;
-    background: var(--deep);
+    height: 32px;
+    background: var(--bg-2);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -385,34 +360,36 @@
     z-index: 20;
   }
   .vault-stat {
-    font-size: 10px;
-    color: var(--text-dim);
+    font-size: 11px;
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 4px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
   }
-  .vault-stat span { color: var(--text); }
+  .vault-stat span { color: var(--text-secondary); }
   .vault-stat-sep { width: 1px; height: 14px; background: var(--border); }
   .zoom-controls { display: flex; gap: 4px; margin-left: auto; }
   .zoom-btn {
     width: 24px; height: 24px;
     border: 1px solid var(--border);
     background: none;
-    color: var(--text);
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 14px;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    font-family: 'Share Tech Mono', monospace;
+    transition: border-color 0.2s, color 0.2s;
+    font-family: 'Inter', sans-serif;
   }
-  .zoom-btn:hover { border-color: var(--quantum); color: var(--quantum); }
-  .zoom-level { font-size: 10px; color: var(--text-dim); align-self: center; width: 36px; text-align: center; }
+  .zoom-btn:hover { border-color: var(--border-2); color: var(--text-primary); }
+  .zoom-level { font-size: 10px; color: var(--text-muted); align-self: center; width: 36px; text-align: center; font-family: 'Inter', sans-serif; }
 
   /* ═══ AGENT CHAT ════════════════════════════════════ */
   .agent-area {
     height: 220px;
     border-top: 1px solid var(--border);
-    background: var(--deep);
+    background: var(--bg-2);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -430,23 +407,26 @@
     flex-shrink: 0;
   }
   .agent-label {
-    font-size: 9px;
-    color: var(--quantum);
-    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0;
   }
   .agent-model {
     font-size: 9px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-left: auto;
-    letter-spacing: 1px;
+    font-family: 'Inter', sans-serif;
   }
   .hardened-badge {
     font-size: 8px;
     color: var(--green);
-    border: 1px solid var(--green-dim);
+    border: 1px solid var(--green);
     background: var(--green-dim);
     padding: 1px 6px;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    font-family: 'Inter', sans-serif;
   }
 
   .agent-messages {
@@ -464,26 +444,61 @@
     font-size: 11px;
     line-height: 1.5;
     animation: msgIn 0.2s ease both;
+    font-family: 'Inter', sans-serif;
   }
   @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
+  .msg.user {
+    justify-content: flex-end;
+  }
+  .msg.user .msg-text {
+    background: var(--bg-3);
+    padding: 6px 10px;
+    color: var(--text-primary);
+    max-width: 70%;
+  }
+  .msg.agent {
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  .msg.agent::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+  .msg.agent .msg-text {
+    color: var(--text-primary);
+    max-width: 80%;
+  }
+  .msg.system {
+    justify-content: center;
+  }
+  .msg.system .msg-text {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
   .msg-role {
     font-size: 9px;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     flex-shrink: 0;
     padding-top: 1px;
     width: 48px;
+    font-family: 'Inter', sans-serif;
   }
   .msg.user .msg-role { color: var(--amber); }
-  .msg.agent .msg-role { color: var(--quantum); }
-  .msg.system .msg-role { color: var(--text-dim); }
-  .msg-text { color: var(--text-bright); flex: 1; }
-  .msg.system .msg-text { color: var(--text-dim); font-size: 10px; }
+  .msg.agent .msg-role { color: var(--accent); }
+  .msg.system .msg-role { color: var(--text-muted); }
+  .msg-text { color: var(--text-primary); flex: 1; }
   .msg-commit {
     font-size: 9px;
     color: var(--green);
     opacity: 0.6;
     margin-left: 4px;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .agent-input-row {
@@ -496,38 +511,40 @@
     flex-shrink: 0;
   }
   .agent-prompt-sym {
-    color: var(--quantum);
+    color: var(--text-muted);
     font-size: 13px;
     flex-shrink: 0;
   }
   .agent-input {
     flex: 1;
-    background: none;
+    background: transparent;
     border: none;
-    color: var(--text-bright);
-    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
     font-size: 12px;
+    font-weight: 400;
     outline: none;
   }
-  .agent-input::placeholder { color: var(--text-dim); font-size: 11px; }
+  .agent-input::placeholder { color: var(--text-muted); font-size: 11px; }
   .agent-send {
-    background: var(--quantum-dim);
-    border: 1px solid var(--quantum);
-    color: var(--quantum);
-    font-family: 'Share Tech Mono', monospace;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: 'Inter', sans-serif;
     font-size: 10px;
-    padding: 5px 12px;
+    font-weight: 600;
+    padding: 5px 10px;
     cursor: pointer;
-    letter-spacing: 1px;
-    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, color 0.2s;
   }
-  .agent-send:hover { background: var(--quantum); color: var(--void); }
+  .agent-send:hover { background: var(--accent); color: var(--bg); }
 
   /* ═══ RIGHT SIDEBAR ════════════════════════════════ */
   .sidebar {
     width: var(--sidebar-w);
     border-left: 1px solid var(--border);
-    background: var(--deep);
+    background: var(--bg-2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -543,7 +560,7 @@
     top: 50%;
     transform: translateY(-50%);
     width: 16px; height: 48px;
-    background: var(--deep);
+    background: var(--bg-2);
     border: 1px solid var(--border);
     border-right: none;
     display: flex;
@@ -552,10 +569,10 @@
     cursor: pointer;
     z-index: 35;
     transition: right 0.3s;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 10px;
   }
-  .sidebar-toggle:hover { color: var(--quantum); border-color: var(--quantum); }
+  .sidebar-toggle:hover { color: var(--text-primary); border-color: var(--border-2); }
   .sidebar.collapsed ~ .sidebar-toggle { right: 0; }
 
   /* Sidebar sections */
@@ -568,35 +585,29 @@
     height: 32px;
     display: flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 14px;
     gap: 8px;
-    cursor: pointer;
     user-select: none;
-    transition: background 0.2s;
   }
-  .sb-header:hover { background: var(--quantum-dim); }
 
-  .sb-caret {
-    font-size: 8px;
-    color: var(--text-dim);
-    transition: transform 0.2s;
-    flex-shrink: 0;
-  }
-  .sb-header.open .sb-caret { transform: rotate(90deg); }
+  .sb-caret { display: none; }
 
   .sb-title {
     font-size: 10px;
-    color: var(--text);
-    letter-spacing: 2px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
     flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
   }
-  .sb-header.open .sb-title { color: var(--quantum); }
 
   .sb-badge {
     font-size: 9px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     background: var(--border);
     padding: 1px 5px;
+    font-family: 'Inter', sans-serif;
   }
 
   .sb-body {
@@ -611,105 +622,106 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 8px 14px;
     font-size: 10px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
+    color: var(--text-secondary);
+    font-family: 'Inter', sans-serif;
   }
-  .sb-task:last-child { border-bottom: none; }
   .sb-task-icon { flex-shrink: 0; margin-top: 1px; }
-  .sb-task.done { color: var(--text-dim); text-decoration: line-through; }
+  .sb-task.done { color: var(--text-muted); text-decoration: line-through; }
   .sb-task.done .sb-task-icon { color: var(--green); }
+  .sb-task.active { color: var(--text-primary); }
   .sb-task.active .sb-task-icon { color: var(--amber); }
-  .sb-task.pending .sb-task-icon { color: var(--text-dim); }
+  .sb-task.pending { color: var(--text-muted); }
+  .sb-task.pending .sb-task-icon { color: var(--text-muted); }
 
   /* Folders section */
   .sb-folder {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 12px;
+    padding: 7px 14px;
     font-size: 10px;
-    color: var(--text);
+    color: var(--text-secondary);
     cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: all 0.15s;
+    transition: background 0.15s;
+    font-family: 'Inter', sans-serif;
   }
-  .sb-folder:last-child { border-bottom: none; }
-  .sb-folder:hover { background: var(--quantum-dim); color: var(--quantum); }
+  .sb-folder:hover { background: var(--bg-3); }
   .sb-folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sb-folder-count { font-size: 9px; color: var(--text-dim); }
+  .sb-folder-count { font-size: 9px; color: var(--text-muted); }
 
   /* Context/Skills section */
   .sb-skill {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 12px;
+    padding: 7px 14px;
     font-size: 10px;
-    color: var(--text);
-    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'Inter', sans-serif;
   }
-  .sb-skill:last-child { border-bottom: none; }
   .sb-skill-icon {
     width: 22px; height: 22px;
-    border: 1px solid var(--border2);
+    border: 1px solid var(--border-2);
     display: flex; align-items: center; justify-content: center;
     font-size: 12px;
     flex-shrink: 0;
   }
   .sb-skill-name { flex: 1; font-size: 10px; }
-  .sb-skill-tag { font-size: 9px; color: var(--text-dim); }
+  .sb-skill-tag { font-size: 9px; color: var(--text-muted); }
 
   .sb-add-btn {
-    margin: 8px 12px;
+    margin: 8px 14px;
     background: none;
-    border: 1px dashed var(--border);
-    color: var(--text-dim);
-    font-family: 'Share Tech Mono', monospace;
+    border: 1px dashed var(--border-2);
+    color: var(--text-muted);
+    font-family: 'Inter', sans-serif;
     font-size: 10px;
     padding: 6px;
     cursor: pointer;
-    width: calc(100% - 24px);
-    letter-spacing: 1px;
-    transition: all 0.2s;
+    width: calc(100% - 28px);
+    letter-spacing: 0.5px;
+    transition: border-color 0.2s, color 0.2s;
   }
-  .sb-add-btn:hover { border-color: var(--quantum); color: var(--quantum); }
+  .sb-add-btn:hover { border-color: var(--border-2); color: var(--text-secondary); }
 
   /* Audit section */
   .sb-audit-entry {
-    padding: 7px 12px;
+    padding: 6px 14px;
     font-size: 10px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text-dim);
+    border-bottom: 1px solid var(--border-2);
+    color: var(--text-muted);
     overflow: hidden;
+    font-family: 'Inter', sans-serif;
   }
   .sb-audit-entry:last-child { border-bottom: none; }
-  .sb-audit-type { color: var(--quantum); font-size: 9px; letter-spacing: 1px; }
+  .sb-audit-type { color: var(--accent); font-size: 9px; letter-spacing: 0.5px; }
   .sb-audit-type.warn { color: var(--red); }
   .sb-audit-type.ok { color: var(--green); }
-  .sb-audit-path { color: var(--text); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sb-audit-ts { font-size: 9px; color: var(--text-dim); }
+  .sb-audit-path { color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+  .sb-audit-ts { font-size: 9px; color: var(--text-muted); }
 
   /* Scrollbars */
   ::-webkit-scrollbar { width: 3px; height: 3px; }
-  ::-webkit-scrollbar-track { background: var(--void); }
-  ::-webkit-scrollbar-thumb { background: var(--border2); }
-  ::-webkit-scrollbar-thumb:hover { background: var(--quantum2); }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-2); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
   /* Tooltip */
   .tooltip {
     position: fixed;
-    background: var(--panel2);
-    border: 1px solid var(--border2);
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
     font-size: 10px;
-    color: var(--text-bright);
+    color: var(--text-primary);
     padding: 6px 10px;
     pointer-events: none;
     z-index: 999;
     opacity: 0;
     transition: opacity 0.15s;
     max-width: 200px;
+    font-family: 'Inter', sans-serif;
   }
   .tooltip.show { opacity: 1; }
 
@@ -727,15 +739,15 @@
     height: 28px;
     border: none;
     background: none;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s;
   }
-  .win-btn:hover { background: var(--panel); color: var(--text-bright); }
+  .win-btn:hover { background: var(--bg-3); color: var(--text-primary); }
   .win-btn.close:hover { background: var(--red); color: white; }
 
   /* ═══ FILE ACCESS PERMISSION MODAL ═══════════════ */
@@ -743,19 +755,18 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(1,4,9,0.92);
+    background: rgba(0,0,0,0.6);
     z-index: 9999;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(6px);
   }
   .perm-overlay.visible { display: flex; }
 
   .perm-dialog {
-    background: var(--surface);
-    border: 1px solid var(--border2);
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
     width: 480px;
-    box-shadow: 0 8px 48px rgba(0,0,0,0.7), 0 0 1px var(--quantum-glow);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   }
 
   .perm-header {
@@ -767,23 +778,24 @@
   }
   .perm-shield {
     width: 44px; height: 44px;
-    border: 2px solid var(--quantum);
+    border: 1px solid var(--accent);
     display: flex; align-items: center; justify-content: center;
     font-size: 22px;
-    box-shadow: 0 0 20px var(--quantum-glow);
     flex-shrink: 0;
   }
   .perm-header-text h3 {
-    font-family: 'Orbitron', monospace;
-    font-size: 13px;
-    color: var(--text-bright);
-    letter-spacing: 1px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0;
     margin-bottom: 4px;
   }
   .perm-header-text p {
     font-size: 11px;
-    color: var(--text);
+    color: var(--text-secondary);
     line-height: 1.4;
+    font-family: 'Inter', sans-serif;
   }
 
   .perm-body {
@@ -791,11 +803,12 @@
   }
   .perm-info {
     font-size: 11px;
-    color: var(--text);
+    color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 16px;
+    font-family: 'Inter', sans-serif;
   }
-  .perm-info strong { color: var(--text-bright); }
+  .perm-info strong { color: var(--text-primary); }
 
   .perm-features {
     list-style: none;
@@ -803,44 +816,47 @@
   }
   .perm-features li {
     font-size: 11px;
-    color: var(--text);
+    color: var(--text-secondary);
     padding: 6px 0;
     display: flex;
     align-items: center;
     gap: 10px;
+    font-family: 'Inter', sans-serif;
   }
   .perm-features li::before {
     content: '◈';
-    color: var(--quantum);
+    color: var(--accent);
     font-size: 10px;
   }
 
   .perm-path-display {
-    background: var(--deep);
+    background: var(--bg-3);
     border: 1px solid var(--border);
     padding: 10px 14px;
     font-size: 11px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     margin-bottom: 16px;
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
   }
   .perm-path-display .path-text {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--text);
+    color: var(--text-secondary);
   }
   .perm-path-display.selected .path-text { color: var(--green); }
 
   .perm-note {
     font-size: 10px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     line-height: 1.5;
     padding-top: 12px;
     border-top: 1px solid var(--border);
+    font-family: 'Inter', sans-serif;
   }
 
   .perm-footer {
@@ -851,25 +867,27 @@
     border-top: 1px solid var(--border);
   }
   .perm-btn {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Inter', sans-serif;
     font-size: 11px;
-    letter-spacing: 1px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
     padding: 8px 20px;
     border: 1px solid var(--border);
     background: none;
-    color: var(--text);
+    color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s, color 0.2s;
   }
-  .perm-btn:hover { border-color: var(--text); color: var(--text-bright); }
+  .perm-btn:hover { border-color: var(--border-2); color: var(--text-primary); }
   .perm-btn.primary {
-    border-color: var(--quantum);
-    color: var(--quantum);
-    background: var(--quantum-dim);
+    border-color: var(--accent);
+    color: var(--bg);
+    background: var(--accent);
+    font-weight: 600;
   }
   .perm-btn.primary:hover {
-    background: rgba(0,212,255,0.15);
-    box-shadow: 0 0 12px var(--quantum-glow);
+    background: var(--accent);
+    opacity: 0.9;
   }
   .perm-btn:disabled {
     opacity: 0.3;
@@ -1120,7 +1138,7 @@
 <div id="connect-overlay" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center;">
   <div style="width:520px;border:1px solid var(--quantum);background:var(--panel);padding:28px;position:relative;box-shadow:0 0 60px var(--quantum-glow);">
     <div onclick="closeConnectDialog()" style="position:absolute;top:12px;right:16px;cursor:pointer;color:var(--text-dim);font-size:16px;">✕</div>
-    <div style="font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--quantum);letter-spacing:3px;margin-bottom:20px;">CONNECT FILEBASE</div>
+    <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--quantum);letter-spacing:3px;margin-bottom:20px;">CONNECT FILEBASE</div>
     <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">CURRENT VAULT ROOT</div>
     <div id="current-vault-display" style="background:var(--deep);border:1px solid var(--border);padding:10px 14px;font-size:11px;color:var(--text-bright);margin-bottom:20px;font-family:'Share Tech Mono',monospace;">Not connected</div>
     <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">SELECT NEW VAULT ROOT</div>
@@ -1130,7 +1148,7 @@
     </div>
     <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;">RECENT VAULTS</div>
     <div id="recent-vaults" style="display:flex;flex-direction:column;gap:4px;margin-bottom:24px;max-height:140px;overflow-y:auto;"></div>
-    <button onclick="connectVault()" style="width:100%;background:var(--quantum);color:var(--void);border:none;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:3px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 24px var(--quantum-glow)'" onmouseout="this.style.boxShadow='none'">CONNECT VAULT</button>
+    <button onclick="connectVault()" style="width:100%;background:var(--quantum);color:var(--bg);border:none;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 24px var(--quantum-glow)'" onmouseout="this.style.boxShadow='none'">CONNECT VAULT</button>
   </div>
 </div>
 

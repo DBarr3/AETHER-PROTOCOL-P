@@ -1,0 +1,9 @@
+AetherCloud-L
+Copyright 2026 Aether Systems LLC
+Provisional Patent Pending
+USPTO Application #64/010,131
+
+This software is proprietary. All rights reserved.
+Unauthorized reproduction, distribution, or reverse engineering is prohibited.
+This license grants a single-user, non-transferable right to install and
+operate the software on one machine.

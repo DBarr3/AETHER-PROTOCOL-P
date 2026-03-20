@@ -1,7 +1,7 @@
 {
   "name": "aethercloud-l",
-  "version": "0.5.0",
-  "description": "AetherCloud-L — Quantum-Secured File Intelligence",
+  "version": "0.5.1",
+  "description": "Quantum-secured AI file intelligence",
   "main": "main.js",
   "author": "Aether Systems LLC",
   "license": "UNLICENSED",
@@ -9,10 +9,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "prebuild": "cd .. && pyinstaller --onefile --name aethercloud-backend --distpath desktop/backend main.py",
-    "dist:win": "npm run prebuild && electron-builder --win --x64",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "dist": "electron-builder --win --publish never"
   },
   "dependencies": {
     "electron-store": "^8.1.0"
@@ -22,9 +21,9 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.aethersystems.aethercloud-l",
+    "appId": "com.aethersystems.aethercloud",
     "productName": "AetherCloud-L",
-    "copyright": "Copyright © 2026 Aether Systems LLC. Patent Pending.",
+    "copyright": "Copyright 2026 Aether Systems LLC",
     "directories": {
       "output": "release"
     },
@@ -35,31 +34,44 @@
       "pages/**/*",
       "assets/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "backend/aethercloud-backend.exe",
-        "to": "aethercloud-backend.exe"
-      }
-    ],
+    "extraResources": [],
     "win": {
-      "target": ["nsis"],
-      "icon": "assets/icon.ico"
-    },
-    "mac": {
-      "target": ["dmg"],
-      "icon": "assets/icon.icns",
-      "category": "public.app-category.utilities"
-    },
-    "linux": {
-      "target": ["AppImage"],
-      "icon": "assets/icon.png"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "Aether Systems LLC",
+      "signAndEditExecutable": false,
+      "sign": null
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AetherCloud-L",
+      "uninstallDisplayName": "AetherCloud-L",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
-      "license": "LICENSE"
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "menuCategory": "Aether Systems LLC",
+      "license": "assets/license.txt",
+      "runAfterFinish": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Utility"
     }
   }
 }
