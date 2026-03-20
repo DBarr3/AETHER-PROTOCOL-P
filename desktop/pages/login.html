@@ -351,96 +351,117 @@
 </div>
 
 <script>
-// Login handler — calls Python FastAPI backend
+// Login handler — authenticates against VPS backend at 143.198.162.111
 async function handleLogin() {
-  const user = document.getElementById('username').value.trim();
-  const pass = document.getElementById('password').value;
-  const btn = document.getElementById('login-btn');
-  const status = document.getElementById('login-status');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
 
-  if (!user || !pass) {
-    status.className = 'login-status error';
-    status.textContent = '⚠ VAULT IDENTIFIER AND ACCESS KEY REQUIRED';
+  if (!username || !password) {
+    showStatus('VAULT IDENTIFIER AND ACCESS KEY REQUIRED', 'error');
     return;
   }
 
-  btn.className = 'login-btn loading';
-  btn.textContent = 'AUTHENTICATING';
-  status.className = 'login-status info loading-dots';
-  status.textContent = 'VERIFYING CREDENTIALS';
+  showStatus('AUTHENTICATING...', 'info');
+  setLoading(true);
 
   try {
-    // Check if API is available
-    if (window.aetherAPI) {
-      status.textContent = 'CONNECTING TO PROTOCOL-L ENGINE';
+    // Try API bridge first (Electron preload)
+    let result;
+    if (window.aetherAPI && window.aetherAPI.login) {
+      result = await window.aetherAPI.login(username, password);
+    } else {
+      // Direct fetch fallback
+      const r = await fetch('http://143.198.162.111/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      result = await r.json();
+    }
 
-      const result = await window.aetherAPI.login(user, pass);
+    if (result.error) {
+      showStatus('SERVER UNAVAILABLE — ' + result.message, 'error');
+      setLoading(false);
+      return;
+    }
 
-      if (result.error) {
-        status.className = 'login-status error';
-        status.textContent = '⚠ SERVER UNAVAILABLE — ' + result.message;
-        btn.className = 'login-btn';
-        btn.textContent = 'AUTHENTICATE';
-        return;
-      }
+    if (result.authenticated || result.success || result.session_token || result.token) {
+      // Store session token
+      const token = result.session_token || result.token || 'active';
+      sessionStorage.setItem('session_token', token);
+      sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
+      sessionStorage.setItem('username', username);
 
-      if (result.authenticated) {
-        // Store session token for the app page
-        sessionStorage.setItem('session_token', result.session_token);
-        sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
-        sessionStorage.setItem('username', user);
+      showStatus('QUANTUM SESSION TOKEN GENERATED', 'info');
+      await sleep(200);
 
-        status.textContent = 'QUANTUM SESSION TOKEN GENERATED';
-        await sleep(200);
+      showStatus('SESSION AUTHENTICATED — LOADING VAULT', 'ok');
+      await sleep(600);
 
-        status.className = 'login-status ok';
-        status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
-        await sleep(300);
-
-        if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
+      // Navigate to app
+      if (window.aether && window.aether.navigate) {
+        window.aether.navigate('app');
       } else {
-        status.className = 'login-status error';
-        status.textContent = '⚠ AUTHENTICATION FAILED — ' + (result.reason || 'INVALID CREDENTIALS');
-        btn.className = 'login-btn';
-        btn.textContent = 'AUTHENTICATE';
+        window.location.href = 'app.html';
       }
     } else {
-      // Fallback: no API available (standalone browser mode)
-      await sleep(400);
-      status.textContent = 'GENERATING QUANTUM SESSION TOKEN';
-      await sleep(500);
-      status.textContent = 'INITIALIZING PROTOCOL-L ENGINE';
-      await sleep(400);
-      status.textContent = 'STARTING VAULT WATCHER';
-      await sleep(300);
-
-      sessionStorage.setItem('session_token', 'demo_token_' + Date.now());
-      sessionStorage.setItem('username', user);
-
-      status.className = 'login-status ok';
-      status.textContent = '✓ SESSION AUTHENTICATED — LOADING VAULT';
-      await sleep(600);
-      if (window.aether) { window.aether.navigate('app'); } else { window.location.href = 'app.html'; }
+      const msg = result.reason || result.error || result.detail || 'INVALID CREDENTIALS';
+      showStatus('AUTHENTICATION FAILED — ' + msg, 'error');
+      setLoading(false);
     }
-  } catch (err) {
-    status.className = 'login-status error';
-    status.textContent = '⚠ CONNECTION ERROR — ' + err.message;
-    btn.className = 'login-btn';
-    btn.textContent = 'AUTHENTICATE';
+  } catch (e) {
+    showStatus('CANNOT REACH SERVER — ' + e.message, 'error');
+    setLoading(false);
   }
+}
+
+function setLoading(loading) {
+  const btn = document.getElementById('login-btn');
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.className = loading ? 'login-btn loading' : 'login-btn';
+  btn.textContent = loading ? 'AUTHENTICATING...' : 'AUTHENTICATE';
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('login-status');
+  if (!el) return;
+  el.className = 'login-status ' + (type || '');
+  el.textContent = (type === 'error' ? '⚠ ' : type === 'ok' ? '✓ ' : '') + msg;
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Check backend status on load
+function updateStatusBar(data) {
+  const dots = document.querySelectorAll('.protocol-dot');
+  if (dots.length >= 1 && data.protocol_l === 'ACTIVE') {
+    dots[0].style.background = '#00ff88'; // Protocol-L green
+  }
+  if (dots.length >= 2 && data.ibm_status) {
+    dots[1].style.background = data.ibm_status !== 'OS_URANDOM' ? '#00d4ff' : '#f59e0b';
+  }
+  if (dots.length >= 3) {
+    dots[2].style.background = data.watcher === 'ACTIVE' ? '#22c55e' : '#f59e0b';
+  }
+}
+
+// Check VPS connectivity on load
 window.addEventListener('load', async () => {
-  if (window.aetherAPI) {
-    const status = await window.aetherAPI.getStatus();
-    if (!status.error) {
-      // Update protocol indicators
-      const dots = document.querySelectorAll('.protocol-dot');
-      if (dots.length >= 1) dots[0].style.background = '#00ff88'; // Protocol-L ACTIVE
+  try {
+    let statusData;
+    if (window.aetherAPI && window.aetherAPI.getStatus) {
+      statusData = await window.aetherAPI.getStatus();
+    } else {
+      const r = await fetch('http://143.198.162.111/status', {
+        signal: AbortSignal.timeout(5000),
+      });
+      statusData = await r.json();
     }
+    if (statusData && !statusData.error) {
+      updateStatusBar(statusData);
+    }
+  } catch (e) {
+    showStatus('VPS UNREACHABLE — CHECK CONNECTION', 'error');
   }
 });
 </script>

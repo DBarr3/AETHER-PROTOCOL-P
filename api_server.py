@@ -6,6 +6,7 @@ REST API on localhost:8741 for the Electron desktop app.
 Aether Systems LLC — Patent Pending
 """
 
+import json
 import os
 import sys
 import time
@@ -234,10 +235,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: allow only localhost origins (Electron renderer)
+# CORS: allow Electron renderer (file://), localhost, and VPS origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)$",
+    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|null)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -262,6 +263,11 @@ def get_session_token(
 # ═══════════════════════════════════════════════════
 # REQUEST / RESPONSE MODELS
 # ═══════════════════════════════════════════════════
+class SetupRequest(BaseModel):
+    username: str
+    password: str
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -347,6 +353,7 @@ class StatusResponse(BaseModel):
     ibm_status: str
     uptime: float
     version: str
+    needs_setup: bool = False
 
 
 # ═══════════════════════════════════════════════════
@@ -382,6 +389,42 @@ async def logout(req: LogoutRequest):
         success=result.get("success", True),
         audit_id=result.get("audit_id"),
     )
+
+
+@app.post("/auth/setup")
+async def setup_first_user(request: SetupRequest):
+    """Create initial admin user. Only works once."""
+    if not svc.auth:
+        raise HTTPException(status_code=503, detail="Auth service not initialized")
+
+    # Check if non-dev users already exist
+    creds_file = Path("config") / "credentials.json"
+    if creds_file.exists():
+        try:
+            existing = json.loads(creds_file.read_text())
+            # Allow setup if only the dev user (ZO) exists
+            non_dev_users = [u for u in existing if u != "ZO"]
+            if non_dev_users:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Setup already complete — admin user exists",
+                )
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    success = svc.auth.register_user(request.username, request.password)
+    if not success:
+        raise HTTPException(
+            status_code=409,
+            detail=f"User '{request.username}' already exists",
+        )
+
+    log.info("Setup: created admin user '%s'", request.username)
+    return {
+        "success": True,
+        "username": request.username,
+        "message": "Admin user created successfully",
+    }
 
 
 # ── Vault ─────────────────────────────────────────
@@ -772,6 +815,17 @@ async def status():
             _ibm_status_cache["value"] = "OS_URANDOM"
         _ibm_status_cache["expires"] = now + 30.0
 
+    # Check if setup is needed (no credentials file or only dev user)
+    creds_path = Path("config") / "credentials.json"
+    needs_setup = True
+    if creds_path.exists():
+        try:
+            _creds = json.loads(creds_path.read_text())
+            non_dev = [u for u in _creds if u != "ZO"]
+            needs_setup = len(non_dev) == 0
+        except Exception:
+            needs_setup = True
+
     return StatusResponse(
         protocol_l="ACTIVE",
         watcher=watcher_status,
@@ -781,6 +835,7 @@ async def status():
         ibm_status=_ibm_status_cache["value"],
         uptime=round(time.time() - _start_time, 1),
         version=APP_VERSION,
+        needs_setup=needs_setup,
     )
 
 
@@ -788,11 +843,13 @@ async def status():
 # ENTRY POINT
 # ═══════════════════════════════════════════════════
 def run_server():
-    """Run the FastAPI server on localhost:8741."""
+    """Run the FastAPI server. Binds 0.0.0.0 on VPS, 127.0.0.1 locally."""
+    host = os.environ.get("AETHER_BIND_HOST", "0.0.0.0")
+    port = int(os.environ.get("AETHER_BIND_PORT", "8741"))
     uvicorn.run(
         "api_server:app",
-        host="127.0.0.1",
-        port=8741,
+        host=host,
+        port=port,
         log_level="info",
         reload=False,
     )
