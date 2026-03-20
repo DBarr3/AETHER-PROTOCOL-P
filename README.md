@@ -180,11 +180,11 @@ Every output is Protocol-L signed. Every output improves the next one.
 | **AI Agent** | Claude-powered with 12 competencies across file intelligence and marketing. Hardened mode wraps every call in Protocol-L commit-verify. |
 | **QOPC Feedback Loop** | 5-node recursive truth loop that captures vault state, optimizes prompts, validates responses, learns from outcomes, and blends user context alignment (70% outcome + 30% context) |
 | **Protocol-L Engine** | 16-module quantum cryptographic layer — pure Python secp256k1, ephemeral key management, SHA-256 hashing, ECDSA signing, RFC 3161 timestamping |
-| **REST API** | FastAPI on VPS (143.198.162.111) — 12 endpoints for auth, vault browsing, agent chat, file analysis, security scans, audit queries, user context, and system status |
+| **REST API** | FastAPI on VPS (198.211.115.41:8742) — 12 endpoints for auth, vault browsing, agent chat, file analysis, security scans, audit queries, user context, and system status |
 | **CLI Terminal** | Rich retro terminal with 13 commands for power users who prefer the command line |
 
 ```
-Desktop (Electron)  <-->  VPS API (143.198.162.111)  <-->  Agent Layer  <-->  Protocol-L Engine
+Desktop (Electron)  <-->  VPS API (198.211.115.41:8742)  <-->  Agent Layer  <-->  Protocol-L Engine
      |                        |                    |                      |
   Installer               Auth/Session       Claude AI (Hardened)    Quantum Seeds
   Login                   Vault CRUD         QOPC Feedback Loop     ECDSA Signing
@@ -284,7 +284,7 @@ python main.py
 # API server mode (VPS deployment)
 python main.py --serve   # Binds to 0.0.0.0:8741 by default
 
-# Desktop app (Electron — connects to VPS at 143.198.162.111)
+# Desktop app (Electron — connects to VPS at 198.211.115.41:8742)
 cd desktop && npm install && npm start
 
 # Build Windows installer (.exe)

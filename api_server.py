@@ -239,7 +239,7 @@ app = FastAPI(
 # CORS: allow Electron renderer (file://), localhost, and VPS origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|null)$",
+    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|http://198\.211\.115\.41(:\d+)?|null)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
