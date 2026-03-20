@@ -29,12 +29,10 @@ const WINDOW_CONFIGS = {
 function createWindow(page) {
   const cfg = WINDOW_CONFIGS[page] || WINDOW_CONFIGS.login;
 
-  if (mainWindow) {
-    mainWindow.destroy();
-    mainWindow = null;
-  }
+  const oldWindow = mainWindow;
+  mainWindow = null;
 
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: cfg.width,
     height: cfg.height,
     minWidth: cfg.minWidth || cfg.width,
@@ -52,13 +50,22 @@ function createWindow(page) {
     },
   });
 
-  mainWindow.loadFile(path.join(PAGES_DIR, `${page}.html`));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow = win;
 
-  mainWindow.on('close', (e) => {
-    if (!appQuitting) {
+  win.loadFile(path.join(PAGES_DIR, `${page}.html`));
+  win.once('ready-to-show', () => {
+    if (mainWindow === win) win.show();
+    // Destroy old window AFTER new one is visible
+    if (oldWindow && !oldWindow.isDestroyed()) {
+      oldWindow.removeAllListeners('close');
+      oldWindow.destroy();
+    }
+  });
+
+  win.on('close', (e) => {
+    if (!appQuitting && mainWindow === win) {
       e.preventDefault();
-      mainWindow.hide();
+      win.hide();
     }
   });
 }
