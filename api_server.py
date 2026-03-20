@@ -168,6 +168,7 @@ class Services:
 
 
 svc = Services()
+session_context: dict[str, str] = {}
 _start_time = time.time()
 _ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
 
@@ -342,6 +343,10 @@ class VaultListResponse(BaseModel):
 
 class VaultScanRequest(BaseModel):
     vault_path: str
+
+
+class ContextRequest(BaseModel):
+    context: str
 
 
 class StatusResponse(BaseModel):
@@ -556,6 +561,41 @@ async def agent_scan(token: str = Depends(get_session_token)):
         recommended_action=result.get("recommended_action", "No action required"),
         commitment_hash=_commitment_hash(result),
     )
+
+
+@app.post("/agent/context")
+async def set_agent_context(
+    request: ContextRequest,
+    token: str = Depends(get_session_token),
+):
+    """Store user context preferences. Injected into every agent call."""
+    session_context[token] = request.context
+
+    # Update the agent's context scorer
+    if svc.agent and svc.agent._claude_available and svc.agent._claude_agent:
+        try:
+            svc.agent._claude_agent.set_user_context(request.context)
+        except Exception as e:
+            log.warning("Failed to set agent context: %s", e)
+
+    from agent.qopc_feedback import UserContextScorer
+    scorer = UserContextScorer(request.context)
+
+    return {
+        "stored": True,
+        "context_length": len(request.context),
+        "signals_detected": scorer.active_signals,
+    }
+
+
+@app.get("/agent/context")
+async def get_agent_context(token: str = Depends(get_session_token)):
+    """Get current user context."""
+    ctx = session_context.get(token, "")
+    return {
+        "context": ctx,
+        "has_context": bool(ctx.strip()),
+    }
 
 
 # ── Audit ─────────────────────────────────────────

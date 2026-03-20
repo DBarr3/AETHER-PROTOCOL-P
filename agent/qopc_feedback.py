@@ -39,6 +39,112 @@ _SCORES_PATH = _DATA_DIR / "prompt_scores.json"
 _CYCLES_PATH = _DATA_DIR / "qopc_cycles.jsonl"
 
 
+# ─── User Context Scorer ────────────────────────────────
+import re as _re
+
+class UserContextScorer:
+    """
+    Scores agent responses against user-defined context preferences.
+
+    When a user writes context like:
+      "organize everything cleanly but never delete files without asking"
+
+    The scorer extracts intent signals from the context and checks
+    if the agent response honored them.
+
+    This score feeds back into Node 2 (PromptOptimizer) as an additional
+    weight factor alongside the existing ACCEPTED/REJECTED/PUBLISHED outcomes.
+    """
+
+    def __init__(self, user_context: str = ""):
+        self.user_context = user_context
+        self._intent_signals = self._parse_context(user_context)
+
+    def _parse_context(self, context: str) -> dict:
+        """Extract intent signals from user context."""
+        ctx = context.lower()
+        return {
+            "never_delete": any(
+                phrase in ctx for phrase in
+                ["never delete", "don't delete", "do not delete", "keep all"]
+            ),
+            "prefer_clean": any(
+                phrase in ctx for phrase in
+                ["clean", "organized", "tidy", "neat", "structured"]
+            ),
+            "ask_before_action": any(
+                phrase in ctx for phrase in
+                ["ask before", "confirm before", "always ask", "check with me"]
+            ),
+            "date_prefix": any(
+                phrase in ctx for phrase in
+                ["date prefix", "yyyymmdd", "date format", "by date"]
+            ),
+            "custom_signals": [],
+        }
+
+    def score_response(self, agent_response: str, action_taken: str = "") -> float:
+        """
+        Score an agent response 0.0-1.0 based on alignment with user context.
+        0.0 = violated user context, 0.5 = neutral, 1.0 = fully aligned.
+        """
+        if not self.user_context.strip():
+            return 0.5  # No context — neutral
+
+        score = 0.5
+        violations = 0
+        alignments = 0
+
+        combined = (agent_response + " " + action_taken).lower()
+
+        # Check never_delete
+        if self._intent_signals["never_delete"]:
+            if any(w in combined for w in ["delete", "remove", "trash", "permanent"]):
+                violations += 1
+            else:
+                alignments += 1
+
+        # Check ask_before_action
+        if self._intent_signals["ask_before_action"]:
+            if any(p in combined for p in ["would you like", "shall i", "do you want", "confirm"]):
+                alignments += 1
+            elif any(w in combined for w in ["i have renamed", "i moved", "i deleted", "i organized"]):
+                violations += 1
+
+        # Check prefer_clean
+        if self._intent_signals["prefer_clean"]:
+            if any(w in combined for w in ["organized", "clean", "renamed", "structured", "sorted"]):
+                alignments += 1
+
+        # Check date_prefix
+        if self._intent_signals["date_prefix"]:
+            if _re.search(r'\d{8}', combined):
+                alignments += 1
+
+        # Calculate final score
+        total = violations + alignments
+        if total > 0:
+            score = alignments / total
+
+        return round(score, 3)
+
+    def update_context(self, new_context: str) -> None:
+        """Update context and re-parse signals."""
+        self.user_context = new_context
+        self._intent_signals = self._parse_context(new_context)
+
+    @property
+    def has_context(self) -> bool:
+        return bool(self.user_context.strip())
+
+    @property
+    def active_signals(self) -> list:
+        return [
+            k for k, v in self._intent_signals.items()
+            if v and k != "custom_signals"
+        ]
+
+
 # ─── Node 1: DQVL — Verified Ground Truth ────────────────
 
 @dataclass
@@ -622,6 +728,7 @@ class OutcomeObserver:
         cycle_id: str,
         user_action: str,
         user_correction: Optional[str] = None,
+        context_score: float = 0.5,
     ) -> Optional[ReasoningCycle]:
         """
         Record the user's response to an agent recommendation.
@@ -633,7 +740,9 @@ class OutcomeObserver:
             return None
 
         action_upper = user_action.upper()
-        score = self.OUTCOME_SCORES.get(action_upper, 0.5)
+        base_weight = self.OUTCOME_SCORES.get(action_upper, 0.5)
+        # Blend context score: 70% outcome + 30% context alignment
+        score = round(base_weight * 0.7 + context_score * 0.3, 3)
 
         cycle.user_action = action_upper
         cycle.user_correction = user_correction
@@ -705,6 +814,7 @@ class QOPCLoop:
         self.validator = ResponseValidator()
         self.observer = OutcomeObserver()
         self._cycle_count = 0
+        self.context_scorer = UserContextScorer("")
 
     def begin_cycle(
         self,
@@ -786,13 +896,14 @@ class QOPCLoop:
         cycle_id: str,
         user_action: str,
         user_correction: Optional[str] = None,
+        context_score: float = 0.5,
     ) -> Optional[float]:
         """
         Node 5: Record outcome and feed delta back to optimizer.
         Returns the delta value (or None if cycle not found).
         """
         cycle = self.observer.record_outcome(
-            cycle_id, user_action, user_correction
+            cycle_id, user_action, user_correction, context_score
         )
         if cycle is None:
             return None
@@ -808,8 +919,13 @@ class QOPCLoop:
 
     def get_loop_stats(self) -> dict:
         """Return QOPC loop statistics for status display."""
-        return {
+        stats = {
             "total_cycles": self._cycle_count,
             "pending_outcomes": self.observer.pending_count,
             "variant_scores": self.optimizer.get_scores(),
         }
+        stats["context_scoring"] = {
+            "has_context": self.context_scorer.has_context,
+            "active_signals": self.context_scorer.active_signals,
+        }
+        return stats

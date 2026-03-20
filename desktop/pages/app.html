@@ -552,7 +552,7 @@
     flex-shrink: 0;
     z-index: 30;
   }
-  .sidebar.collapsed { width: 0; }
+  .sidebar.collapsed { width: 0; border-left: none; }
 
   .sidebar-toggle {
     position: absolute;
@@ -686,7 +686,7 @@
   }
   .sb-add-btn:hover { border-color: var(--border-2); color: var(--text-secondary); }
 
-  /* Audit section */
+  /* Audit section (kept for audit entries in code) */
   .sb-audit-entry {
     padding: 6px 14px;
     font-size: 10px;
@@ -701,6 +701,38 @@
   .sb-audit-type.ok { color: var(--green); }
   .sb-audit-path { color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
   .sb-audit-ts { font-size: 9px; color: var(--text-muted); }
+
+  /* Previous chats */
+  .sb-chat-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 14px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .sb-chat-entry:hover { background: var(--bg-3); }
+  .sb-chat-time { font-size: 9px; color: var(--text-muted); flex-shrink: 0; width: 60px; }
+  .sb-chat-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Sidebar collapse rail */
+  .sidebar-rail {
+    width: 32px;
+    background: var(--bg-2);
+    border-left: 1px solid var(--border);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    z-index: 30;
+  }
+  .sidebar-rail:hover { background: var(--bg-3); }
+  .sidebar.collapsed + .sidebar-rail { display: flex; }
 
   /* Scrollbars */
   ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -1053,8 +1085,7 @@
 
     <!-- PROGRESS -->
     <div class="sb-section">
-      <div class="sb-header open" onclick="toggleSection(this)" id="sh-progress">
-        <span class="sb-caret">▶</span>
+      <div class="sb-header">
         <span class="sb-title">PROGRESS</span>
         <span class="sb-badge" id="progress-badge">3</span>
       </div>
@@ -1082,11 +1113,10 @@
       </div>
     </div>
 
-    <!-- WORKING FOLDERS -->
+    <!-- PROJECTS -->
     <div class="sb-section">
-      <div class="sb-header open" onclick="toggleSection(this)">
-        <span class="sb-caret">▶</span>
-        <span class="sb-title">WORKING FOLDERS</span>
+      <div class="sb-header">
+        <span class="sb-title">PROJECTS</span>
         <span class="sb-badge" id="folders-badge">5</span>
       </div>
       <div class="sb-body open" id="sb-folders">
@@ -1116,21 +1146,67 @@
           <span class="sb-folder-count">3</span>
         </div>
       </div>
+      <button class="sb-add-btn" onclick="createNewProject()">+ New Project</button>
     </div>
 
-    <!-- AUDIT TRAIL -->
-    <div class="sb-section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
-      <div class="sb-header open" onclick="toggleSection(this)">
-        <span class="sb-caret">▶</span>
-        <span class="sb-title">AUDIT TRAIL</span>
-        <span class="sb-badge" id="audit-badge">0</span>
+    <!-- PREVIOUS CHATS -->
+    <div class="sb-section">
+      <div class="sb-header">
+        <span class="sb-title">PREVIOUS CHATS</span>
+        <span class="sb-badge" id="chats-badge">0</span>
       </div>
-      <div class="sb-body open" id="sb-audit" style="overflow-y:auto; max-height:none; flex:1;">
-        <!-- Audit entries injected here -->
+      <div class="sb-body open" id="sb-chats" style="max-height:160px;overflow-y:auto;">
+        <!-- Chat entries injected here -->
+      </div>
+    </div>
+
+    <!-- CONTEXT -->
+    <div class="sb-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="sb-header">
+        <span class="sb-title">CONTEXT</span>
+      </div>
+      <div class="sb-body open" style="max-height:none;flex:1;overflow-y:auto;">
+        <!-- Skills -->
+        <div class="sb-skill">
+          <div class="sb-skill-icon">🛡</div>
+          <span class="sb-skill-name">Protocol-L</span>
+          <span class="sb-skill-tag" style="color:var(--green)">ACTIVE</span>
+        </div>
+        <div class="sb-skill">
+          <div class="sb-skill-icon">🤖</div>
+          <span class="sb-skill-name">Claude Agent</span>
+          <span class="sb-skill-tag" style="color:var(--green)">HARDENED</span>
+        </div>
+        <div class="sb-skill">
+          <div class="sb-skill-icon">👁</div>
+          <span class="sb-skill-name">Vault Watcher</span>
+          <span class="sb-skill-tag" style="color:var(--green)">LIVE</span>
+        </div>
+
+        <!-- User Context -->
+        <div style="padding:12px 14px 4px;font-size:10px;color:var(--text-muted);letter-spacing:1px;font-weight:600;text-transform:uppercase;">USER CONTEXT</div>
+        <div style="padding:0 14px 8px;">
+          <textarea id="user-context-textarea"
+            style="width:100%;background:var(--bg-3);border:1px solid transparent;color:var(--text-secondary);font-family:'Inter',sans-serif;font-size:11px;padding:8px 10px;resize:none;outline:none;line-height:1.5;min-height:54px;max-height:80px;overflow-y:auto;transition:border-color 0.2s;"
+            placeholder="Add context to personalize the agent...&#10;e.g. 'Always organize by date prefix.&#10;Never delete files without asking.'"
+            maxlength="500"
+            onfocus="this.style.borderColor='var(--accent)'"
+            onblur="this.style.borderColor='transparent';saveUserContext(this.value)"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+            <span id="context-badge" style="font-size:9px;padding:2px 6px;letter-spacing:0.5px;font-family:'Inter',sans-serif;">NO CONTEXT</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="context-counter" style="font-size:9px;color:var(--text-muted);font-family:'Inter',sans-serif;">0 / 500</span>
+              <span id="context-clear" style="font-size:9px;color:var(--text-muted);cursor:pointer;display:none;font-family:'Inter',sans-serif;" onclick="clearUserContext()">Clear</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
   </div><!-- /sidebar -->
+  <div class="sidebar-rail" id="sidebar-rail" onclick="toggleSidebar()">
+    <span style="color:var(--text-muted);font-size:12px;">⊡</span>
+  </div>
 
 </div><!-- /main -->
 
@@ -1664,6 +1740,7 @@ async function sendMessage() {
   input.value = '';
 
   addMessage('user', query);
+  saveChatToHistory(query);
   addAuditEntry('AGENT_QUERY', query.slice(0,32)+'...', 'ok');
 
   const token = sessionStorage.getItem('session_token');
@@ -1708,6 +1785,7 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   sidebarOpen = !sidebarOpen;
   sb.classList.toggle('collapsed', !sidebarOpen);
+  localStorage.setItem('aether_sidebar_open', sidebarOpen ? '1' : '0');
 }
 
 function toggleSection(header) {
@@ -1730,6 +1808,130 @@ function navigateToFolder(id) {
     addAuditEntry('NAVIGATE', id, 'ok');
   }
 }
+
+// ═══════════════════════════════════════════════════
+// USER CONTEXT
+// ═══════════════════════════════════════════════════
+async function saveUserContext(contextText) {
+  localStorage.setItem('aether_user_context', contextText);
+  updateContextBadge(contextText);
+
+  const token = sessionStorage.getItem('session_token');
+  try {
+    if (window.aetherAPI) {
+      await fetch('http://143.198.162.111/agent/context', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (token || ''),
+        },
+        body: JSON.stringify({ context: contextText }),
+      });
+    }
+  } catch (e) {
+    console.warn('Context sync failed:', e);
+  }
+}
+
+function updateContextBadge(text) {
+  const badge = document.getElementById('context-badge');
+  const counter = document.getElementById('context-counter');
+  const clearBtn = document.getElementById('context-clear');
+  if (!badge) return;
+
+  if (text && text.trim()) {
+    badge.textContent = 'CONTEXT ACTIVE';
+    badge.style.color = 'var(--green)';
+    badge.style.background = 'var(--green-dim)';
+    if (clearBtn) clearBtn.style.display = '';
+  } else {
+    badge.textContent = 'NO CONTEXT';
+    badge.style.color = 'var(--text-muted)';
+    badge.style.background = 'var(--border)';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+  if (counter) counter.textContent = (text || '').length + ' / 500';
+}
+
+function clearUserContext() {
+  const textarea = document.getElementById('user-context-textarea');
+  if (textarea) textarea.value = '';
+  saveUserContext('');
+}
+
+// ═══════════════════════════════════════════════════
+// PREVIOUS CHATS
+// ═══════════════════════════════════════════════════
+const CHAT_HISTORY_KEY = 'aether_chat_history';
+
+function saveChatToHistory(query) {
+  const history = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]');
+  history.unshift({ query: query.slice(0, 80), timestamp: Date.now() });
+  const trimmed = history.slice(0, 10);
+  localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(trimmed));
+  renderChatHistory();
+}
+
+function renderChatHistory() {
+  const container = document.getElementById('sb-chats');
+  const badge = document.getElementById('chats-badge');
+  if (!container) return;
+
+  const history = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]');
+  if (badge) badge.textContent = history.length;
+
+  if (history.length === 0) {
+    container.innerHTML = '<div style="padding:8px 14px;font-size:10px;color:var(--text-muted);">No previous chats</div>';
+    return;
+  }
+
+  container.innerHTML = history.map((entry, i) => {
+    const timeStr = formatRelativeTime(entry.timestamp);
+    const preview = entry.query.slice(0, 40) + (entry.query.length > 40 ? '...' : '');
+    return `<div class="sb-chat-entry" onclick="restoreChat(${i})">
+      <span class="sb-chat-time">◷ ${timeStr}</span>
+      <span class="sb-chat-preview">"${preview}"</span>
+    </div>`;
+  }).join('');
+}
+
+function formatRelativeTime(ts) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return mins + 'm ago';
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + 'h ago';
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  return days + 'd ago';
+}
+
+function restoreChat(index) {
+  const history = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]');
+  if (index < history.length) {
+    const input = document.getElementById('agent-input');
+    if (input) input.value = history[index].query;
+    input.focus();
+  }
+}
+
+function createNewProject() {
+  const name = prompt('New project folder name:');
+  if (name && name.trim()) {
+    addMessage('agent', 'Creating project folder: <strong>' + name.trim() + '</strong>... (folder creation requires vault access)');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('user-context-textarea');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      const counter = document.getElementById('context-counter');
+      if (counter) counter.textContent = ta.value.length + ' / 500';
+    });
+  }
+});
 
 // ═══════════════════════════════════════════════════
 // TOPBAR ACTIONS
@@ -2292,6 +2494,24 @@ function skipFileAccess() {
 }
 
 window.addEventListener('load', async () => {
+  // Restore sidebar state
+  const savedSidebarState = localStorage.getItem('aether_sidebar_open');
+  if (savedSidebarState === '0') {
+    sidebarOpen = false;
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
+
+  // Restore user context
+  const savedContext = localStorage.getItem('aether_user_context');
+  if (savedContext) {
+    const ta = document.getElementById('user-context-textarea');
+    if (ta) ta.value = savedContext;
+    updateContextBadge(savedContext);
+  }
+
+  // Render previous chats
+  renderChatHistory();
+
   initCircuitCanvas();
   // Auto-reconnect to last vault
   const lastVault = localStorage.getItem('aether_last_vault');

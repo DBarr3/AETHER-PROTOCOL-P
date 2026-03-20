@@ -41,7 +41,7 @@ from config.settings import (
     DEFAULT_AUDIT_DIR,
 )
 from config.agent_prompt import AETHER_AGENT_SYSTEM_PROMPT, TASK_SUFFIXES
-from agent.qopc_feedback import QOPCLoop
+from agent.qopc_feedback import QOPCLoop, UserContextScorer
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,9 @@ class HardenedClaudeAgent:
         self.model = model or CLAUDE_MODEL
         self.max_tokens = max_tokens or CLAUDE_MAX_TOKENS
         self.system_prompt = AETHER_AGENT_SYSTEM_PROMPT
+        self._active_system_prompt = self.system_prompt
+        self.user_context: str = ""
+        self._context_scorer = UserContextScorer("")
         self.conversation_history: list[dict] = []
 
         # QOPC feedback loop — recursive truth loop
@@ -177,6 +180,17 @@ class HardenedClaudeAgent:
             self.model,
             self._tsa is not None,
         )
+
+    def set_user_context(self, context: str) -> None:
+        """Update user context preferences for scoring and prompt injection."""
+        self.user_context = context
+        self._context_scorer.update_context(context)
+        if context.strip():
+            self._active_system_prompt = (
+                self.system_prompt + f"\n\nUSER PREFERENCES:\n{context}"
+            )
+        else:
+            self._active_system_prompt = self.system_prompt
 
     # ─── Core: Commit a Claude response ──────────────────────
 
@@ -389,7 +403,7 @@ class HardenedClaudeAgent:
 
         try:
             # Node 3: LLMRE — Call Claude
-            system = variant.system_prompt if variant else self.system_prompt
+            system = variant.system_prompt if variant else self._active_system_prompt
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
@@ -536,7 +550,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=self.conversation_history,
             )
 
@@ -847,6 +861,11 @@ class HardenedClaudeAgent:
             return {"enabled": False}
         stats = self._qopc.get_loop_stats()
         stats["enabled"] = True
+        stats["context_scoring"] = {
+            "has_context": self._context_scorer.has_context,
+            "active_signals": self._context_scorer.active_signals,
+            "user_context_length": len(self.user_context),
+        }
         return stats
 
     # ─── Verification report ─────────────────────────────────

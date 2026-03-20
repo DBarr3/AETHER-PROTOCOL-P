@@ -346,8 +346,9 @@ class TestOutcomeObserver:
 
         result = observer.record_outcome("test_cycle_001", "ACCEPTED")
         assert result is not None
-        assert result.outcome_score == 1.0
-        assert result.delta == 1.0 - 0.8  # 0.2
+        # Blended: 1.0 * 0.7 + 0.5 * 0.3 = 0.85 (default context_score=0.5)
+        assert result.outcome_score == 0.85
+        assert result.delta == 0.85 - 0.8  # 0.05
         assert result.user_action == "ACCEPTED"
         assert observer.pending_count == 0
 
@@ -356,8 +357,9 @@ class TestOutcomeObserver:
         observer.register_cycle(cycle)
 
         result = observer.record_outcome("test_cycle_001", "REJECTED")
-        assert result.outcome_score == 0.0
-        assert result.delta == 0.0 - 0.8
+        # Blended: 0.0 * 0.7 + 0.5 * 0.3 = 0.15
+        assert result.outcome_score == 0.15
+        assert result.delta == 0.15 - 0.8
 
     def test_record_corrected(self, observer):
         cycle = self._make_cycle()
@@ -366,7 +368,8 @@ class TestOutcomeObserver:
         result = observer.record_outcome(
             "test_cycle_001", "CORRECTED", "should be PATENT"
         )
-        assert result.outcome_score == 0.3
+        # Blended: 0.3 * 0.7 + 0.5 * 0.3 = 0.36
+        assert result.outcome_score == 0.36
         assert result.user_correction == "should be PATENT"
 
     def test_record_ignored(self, observer):
@@ -374,6 +377,7 @@ class TestOutcomeObserver:
         observer.register_cycle(cycle)
 
         result = observer.record_outcome("test_cycle_001", "IGNORED")
+        # Blended: 0.5 * 0.7 + 0.5 * 0.3 = 0.5
         assert result.outcome_score == 0.5
 
     def test_record_unknown_cycle(self, observer):
