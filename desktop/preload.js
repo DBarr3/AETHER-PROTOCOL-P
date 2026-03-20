@@ -1,10 +1,10 @@
 /**
- * AetherCloud-L Desktop — Preload (context bridge)
- * Exposes a minimal, secure API to renderer pages.
+ * AetherCloud-L v0.8.5 — Preload (context bridge)
+ * Aether Systems LLC · Patent Pending
  *
  * Two bridges:
- *   window.aether    — Electron IPC (navigation, window controls, key management)
- *   window.aetherAPI — VPS backend HTTP API at 198.211.115.41:8743
+ *   window.aether    — Electron IPC (navigation, window controls, keys)
+ *   window.aetherAPI — VPS2 backend HTTP client
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -13,167 +13,98 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ELECTRON IPC BRIDGE
 // ═══════════════════════════════════════════════════
 contextBridge.exposeInMainWorld('aether', {
-  // ── Navigation ─────────────────────────────────────
-  navigate: (page) => ipcRenderer.send('navigate', page),
-
-  // ── Window controls ────────────────────────────────
-  minimize:   () => ipcRenderer.send('window:minimize'),
-  maximize:   () => ipcRenderer.send('window:maximize'),
-  close:      () => ipcRenderer.send('window:close'),
-
-  // ── Dialogs ────────────────────────────────────────
+  navigate:     (page) => ipcRenderer.send('navigate', page),
+  minimize:     () => ipcRenderer.send('window:minimize'),
+  maximize:     () => ipcRenderer.send('window:maximize'),
+  close:        () => ipcRenderer.send('window:close'),
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   browseFolder:  () => ipcRenderer.invoke('browse-folder'),
-
-  // ── App info ───────────────────────────────────────
   getVersion:    () => ipcRenderer.invoke('app:version'),
-  isInstalled:   () => ipcRenderer.invoke('app:isInstalled'),
-
-  // ── Shell ──────────────────────────────────────────
-  openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
-
-  // ── API ────────────────────────────────────────────
   getApiBase:    () => ipcRenderer.invoke('api:getBase'),
   isApiReady:    () => ipcRenderer.invoke('api:isReady'),
-
-  // ── Key Management ─────────────────────────────────
+  openExternal:  (url) => ipcRenderer.send('shell:openExternal', url),
+  openFile:      (p) => ipcRenderer.invoke('open-file', p),
+  showInExplorer:(p) => ipcRenderer.invoke('show-in-explorer', p),
+  requestFsPermission: () => ipcRenderer.invoke('request-fs-permission'),
   keys: {
     set:      (name, value) => ipcRenderer.invoke('keys:set', name, value),
     has:      (name)        => ipcRenderer.invoke('keys:has', name),
     delete:   (name)        => ipcRenderer.invoke('keys:delete', name),
     validate: ()            => ipcRenderer.invoke('keys:validate'),
   },
-
-  // ── Vault Access ──────────────────────────────────
   vault: {
     hasAccess:     () => ipcRenderer.invoke('vault:hasAccess'),
     getPath:       () => ipcRenderer.invoke('vault:getPath'),
     requestAccess: () => ipcRenderer.invoke('vault:requestAccess'),
   },
-
-  // ── Filesystem Permission ───────────────────────
-  requestFsPermission: () => ipcRenderer.invoke('request-fs-permission'),
-
-  // ── File Actions ────────────────────────────────
-  openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
-  showInExplorer: (filePath) => ipcRenderer.invoke('show-in-explorer', filePath),
 });
 
 // ═══════════════════════════════════════════════════
-// VPS BACKEND API CLIENT
+// VPS2 BACKEND API CLIENT
 // ═══════════════════════════════════════════════════
 const API_BASE = 'http://198.211.115.41:8743';
 
-/**
- * Internal fetch wrapper with error handling.
- */
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
+  const token = sessionStorage.getItem('session_token');
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+    const resp = await fetch(url, { ...options, headers });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      return { error: true, status: resp.status, message: body.detail || resp.statusText, ...body };
     }
-    return await response.json();
+    return await resp.json();
   } catch (err) {
-    // Return structured error so renderer can handle gracefully
-    return { error: true, message: err.message, endpoint };
+    return { error: true, message: err.message };
   }
 }
 
-/**
- * Build Authorization header from session token.
- */
-function authHeader(sessionToken) {
-  return { Authorization: `Bearer ${sessionToken}` };
-}
-
 contextBridge.exposeInMainWorld('aetherAPI', {
+  getStatus: () => apiFetch('/status'),
 
-  // ── Auth ───────────────────────────────────────────
-  async login(username, password) {
-    return apiFetch('/auth/login', {
+  login: (username, password) =>
+    apiFetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
-    });
-  },
+    }),
 
-  async logout(sessionToken) {
-    return apiFetch('/auth/logout', {
+  chat: (query, sessionToken) =>
+    apiFetch('/agent/chat', {
       method: 'POST',
-      body: JSON.stringify({ session_token: sessionToken }),
-    });
-  },
-
-  // ── Vault ──────────────────────────────────────────
-  async listVault(sessionToken) {
-    return apiFetch('/vault/list', {
-      headers: authHeader(sessionToken),
-    });
-  },
-
-  // ── Agent ──────────────────────────────────────────
-  async chat(query, sessionToken) {
-    return apiFetch('/agent/chat', {
-      method: 'POST',
-      headers: authHeader(sessionToken),
       body: JSON.stringify({ query }),
-    });
-  },
+      headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+    }),
 
-  async analyze(filename, extension, directory, sessionToken) {
-    return apiFetch('/agent/analyze', {
+  analyze: (filePath, sessionToken) =>
+    apiFetch('/agent/analyze', {
       method: 'POST',
-      headers: authHeader(sessionToken),
-      body: JSON.stringify({ filename, extension, directory }),
-    });
-  },
+      body: JSON.stringify({ file_path: filePath }),
+      headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+    }),
 
-  async scan(sessionToken) {
-    return apiFetch('/agent/scan', {
+  setContext: (context, sessionToken) =>
+    apiFetch('/agent/context', {
       method: 'POST',
-      headers: authHeader(sessionToken),
-    });
-  },
+      body: JSON.stringify({ context }),
+      headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+    }),
 
-  // ── Audit ──────────────────────────────────────────
-  async getAudit(sessionToken, limit = 50) {
-    return apiFetch(`/audit/trail?limit=${limit}`, {
-      headers: authHeader(sessionToken),
-    });
-  },
+  getContext: (sessionToken) =>
+    apiFetch('/agent/context', {
+      method: 'GET',
+      headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+    }),
 
-  // ── Status ─────────────────────────────────────────
-  async getStatus() {
-    return apiFetch('/status');
-  },
+  browseVault: (dirPath) =>
+    apiFetch(`/vault/browse?path=${encodeURIComponent(dirPath || '')}`),
 
-  // ── Vault Scan ──────────────────────────────────
-  async scanVault(vaultPath, sessionToken) {
-    try {
-      const response = await fetch(`${API_BASE}/vault/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`,
-        },
-        body: JSON.stringify({ vault_path: vaultPath }),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Scan failed');
-      }
-      return await response.json();
-    } catch (e) {
-      console.warn('vault scan failed:', e);
-      return null;
-    }
-  },
+  scanVault: (rootPath, sessionToken) =>
+    apiFetch('/vault/scan', {
+      method: 'POST',
+      body: JSON.stringify({ root_path: rootPath }),
+      headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+    }),
 });

@@ -20,9 +20,7 @@
     --text-muted: #444444;
     --accent: #00d4ff;
     --accent-dim: rgba(0,212,255,0.08);
-    --accent-glow: rgba(0,212,255,0.2);
     --green: #22c55e;
-    --green-dim: rgba(34,197,94,0.1);
     --amber: #f59e0b;
     --red: #ef4444;
   }
@@ -42,7 +40,6 @@
     position: relative;
   }
 
-  /* Subtle grid background */
   body::before {
     content: '';
     position: fixed;
@@ -56,7 +53,6 @@
     z-index: 0;
   }
 
-  /* Electron frameless title bar */
   .title-bar {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -71,91 +67,59 @@
   .title-bar-text {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    font-weight: 400;
     color: var(--text-muted);
     letter-spacing: 0.5px;
     padding-left: 12px;
     flex: 1;
   }
-  .title-bar-controls {
-    display: flex;
-    -webkit-app-region: no-drag;
-  }
+  .title-bar-controls { display: flex; -webkit-app-region: no-drag; }
   .title-bar-btn {
-    width: 40px;
-    height: 32px;
-    border: none;
-    background: none;
-    color: var(--text-muted);
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 40px; height: 32px;
+    border: none; background: none;
+    color: var(--text-muted); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
     transition: background 0.15s, color 0.15s;
   }
   .title-bar-btn:hover { background: var(--bg-4); color: var(--text-primary); }
   .title-bar-btn.close:hover { background: var(--red); color: white; }
 
-  /* Login wrapper */
   .login-wrap {
     position: relative;
     z-index: 10;
     width: 360px;
   }
 
-  /* Logo / header */
   .lock-center {
     display: flex;
     flex-direction: column;
     align-items: center;
     margin-bottom: 24px;
   }
-
   .lock-icon-wrap {
-    width: 40px;
-    height: 40px;
+    width: 40px; height: 40px;
     border: 1px solid var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     background: var(--accent-dim);
   }
-
   .app-title {
-    font-family: 'Inter', sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-top: 14px;
-    letter-spacing: 0;
+    font-size: 20px; font-weight: 600;
+    color: var(--text-primary); margin-top: 14px;
   }
   .app-tagline {
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--text-muted);
-    margin-top: 4px;
+    font-size: 12px; color: var(--text-muted); margin-top: 4px;
   }
 
-  /* Login form card */
   .login-form {
     background: var(--bg-2);
     border: 1px solid var(--border-2);
     padding: 28px;
   }
-
-  .field {
-    margin-bottom: 16px;
-  }
+  .field { margin-bottom: 16px; }
   .field label {
     display: block;
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 11px; font-weight: 500;
     color: var(--text-muted);
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
+    letter-spacing: 0.5px; text-transform: uppercase;
     margin-bottom: 6px;
   }
   .field input {
@@ -166,38 +130,27 @@
     color: var(--text-primary);
     font-family: 'Inter', sans-serif;
     font-size: 14px;
-    font-weight: 400;
     padding: 10px 12px;
     outline: none;
     transition: border-color 0.15s;
   }
-  .field input:focus {
-    border-color: var(--accent);
-  }
-  .field input::placeholder {
-    color: var(--text-muted);
-    font-size: 13px;
-  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-muted); font-size: 13px; }
 
   .field-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-family: 'Inter', sans-serif;
     font-size: 11px;
     margin-bottom: 20px;
   }
   .remember-check {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-secondary);
-    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    color: var(--text-secondary); cursor: pointer;
   }
   .remember-check input { accent-color: var(--accent); }
   .forgot-link {
-    color: var(--text-secondary);
-    cursor: pointer;
+    color: var(--text-secondary); cursor: pointer;
     transition: color 0.15s;
   }
   .forgot-link:hover { color: var(--text-primary); }
@@ -206,32 +159,24 @@
     width: 100%;
     background: var(--accent);
     color: var(--bg);
-    border: none;
-    border-radius: 0;
+    border: none; border-radius: 0;
     font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0;
-    padding: 12px;
-    cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    padding: 12px; cursor: pointer;
     transition: opacity 0.15s;
   }
-  .login-btn:hover {
-    opacity: 0.9;
-  }
+  .login-btn:hover { opacity: 0.9; }
   .login-btn.loading {
     background: var(--bg-3);
     color: var(--text-secondary);
     border: 1px solid var(--border-2);
     cursor: not-allowed;
-    opacity: 1;
   }
 
   .login-status {
     margin-top: 10px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    font-weight: 400;
     text-align: center;
     min-height: 16px;
     color: var(--text-muted);
@@ -240,7 +185,6 @@
   .login-status.ok { color: var(--green); }
   .login-status.info { color: var(--text-secondary); }
 
-  /* Protocol status bar */
   .protocol-bar {
     display: flex;
     align-items: center;
@@ -251,44 +195,22 @@
     border-top: 1px solid var(--border-2);
   }
   .protocol-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--text-muted);
-    letter-spacing: 0;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: var(--text-muted);
   }
   .protocol-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
+    width: 5px; height: 5px; border-radius: 50%;
     background: var(--border-2);
   }
   .protocol-dot.on { background: var(--green); }
   .protocol-dot.amber { background: var(--amber); }
   .protocol-dot.quantum { background: var(--accent); }
-
-  /* Loading dots */
-  .loading-dots::after {
-    content: '';
-    animation: dots 1.2s steps(4, end) infinite;
-  }
-  @keyframes dots {
-    0%   { content: ''; }
-    25%  { content: '.'; }
-    50%  { content: '..'; }
-    75%  { content: '...'; }
-    100% { content: ''; }
-  }
 </style>
 </head>
 <body>
 
-<!-- Electron title bar -->
-<div class="title-bar" id="title-bar">
-  <span class="title-bar-text">AetherCloud-L</span>
+<div class="title-bar">
+  <span class="title-bar-text">AetherCloud-L v0.8.5</span>
   <div class="title-bar-controls">
     <button class="title-bar-btn" onclick="window.aether?.minimize()">─</button>
     <button class="title-bar-btn close" onclick="window.aether?.close()">✕</button>
@@ -296,7 +218,6 @@
 </div>
 
 <div class="login-wrap">
-  <!-- Logo -->
   <div class="lock-center">
     <div class="lock-icon-wrap">
       <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
@@ -310,7 +231,6 @@
     <div class="app-tagline">Quantum-secured file intelligence</div>
   </div>
 
-  <!-- Form -->
   <div class="login-form">
     <div class="field">
       <label>Vault Identifier</label>
@@ -318,7 +238,8 @@
     </div>
     <div class="field">
       <label>Access Key</label>
-      <input type="password" id="password" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')handleLogin()">
+      <input type="password" id="password" placeholder="••••••••••••" autocomplete="off"
+             onkeydown="if(event.key==='Enter')handleLogin()">
     </div>
     <div class="field-row">
       <label class="remember-check">
@@ -327,31 +248,18 @@
       <span class="forgot-link">Reset key</span>
     </div>
 
-    <button class="login-btn" id="login-btn" onclick="handleLogin()">
-      Authenticate
-    </button>
-
+    <button class="login-btn" id="login-btn" onclick="handleLogin()">Authenticate</button>
     <div class="login-status" id="login-status"></div>
 
     <div class="protocol-bar">
-      <div class="protocol-item">
-        <div class="protocol-dot on"></div>
-        Protocol-L
-      </div>
-      <div class="protocol-item">
-        <div class="protocol-dot quantum"></div>
-        Quantum Seed
-      </div>
-      <div class="protocol-item">
-        <div class="protocol-dot amber"></div>
-        Vault Watcher
-      </div>
+      <div class="protocol-item"><div class="protocol-dot on"></div>Protocol-L</div>
+      <div class="protocol-item"><div class="protocol-dot quantum"></div>Quantum Seed</div>
+      <div class="protocol-item"><div class="protocol-dot amber" id="dot-vps"></div>VPS2</div>
     </div>
   </div>
 </div>
 
 <script>
-// Login handler — authenticates against VPS backend at 198.211.115.41:8743
 async function handleLogin() {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
@@ -365,12 +273,10 @@ async function handleLogin() {
   setLoading(true);
 
   try {
-    // Try API bridge first (Electron preload)
     let result;
-    if (window.aetherAPI && window.aetherAPI.login) {
+    if (window.aetherAPI?.login) {
       result = await window.aetherAPI.login(username, password);
     } else {
-      // Direct fetch fallback
       const r = await fetch('http://198.211.115.41:8743/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -380,47 +286,42 @@ async function handleLogin() {
     }
 
     if (result.error) {
-      showStatus('SERVER UNAVAILABLE — ' + result.message, 'error');
+      showStatus('SERVER UNAVAILABLE — ' + (result.message || 'connection failed'), 'error');
       setLoading(false);
       return;
     }
 
     if (result.authenticated || result.success || result.session_token || result.token) {
-      // Store session token
       const token = result.session_token || result.token || 'active';
       sessionStorage.setItem('session_token', token);
       sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
       sessionStorage.setItem('username', username);
 
-      showStatus('QUANTUM SESSION TOKEN GENERATED', 'info');
-      await sleep(200);
-
       showStatus('SESSION AUTHENTICATED — LOADING VAULT', 'ok');
-      await sleep(600);
+      await new Promise(r => setTimeout(r, 500));
 
-      // Navigate to app
-      if (window.aether && window.aether.navigate) {
-        window.aether.navigate('app');
+      if (window.aether?.navigate) {
+        window.aether.navigate('dashboard');
       } else {
-        window.location.href = 'app.html';
+        window.location.href = 'dashboard.html';
       }
     } else {
-      const msg = result.reason || result.error || result.detail || 'INVALID CREDENTIALS';
+      const msg = result.reason || result.detail || 'INVALID CREDENTIALS';
       showStatus('AUTHENTICATION FAILED — ' + msg, 'error');
       setLoading(false);
     }
   } catch (e) {
-    showStatus('CANNOT REACH SERVER — ' + e.message, 'error');
+    showStatus('CANNOT REACH VPS2 — ' + e.message, 'error');
     setLoading(false);
   }
 }
 
-function setLoading(loading) {
+function setLoading(on) {
   const btn = document.getElementById('login-btn');
   if (!btn) return;
-  btn.disabled = loading;
-  btn.className = loading ? 'login-btn loading' : 'login-btn';
-  btn.textContent = loading ? 'AUTHENTICATING...' : 'AUTHENTICATE';
+  btn.disabled = on;
+  btn.className = on ? 'login-btn loading' : 'login-btn';
+  btn.textContent = on ? 'AUTHENTICATING...' : 'Authenticate';
 }
 
 function showStatus(msg, type) {
@@ -430,38 +331,28 @@ function showStatus(msg, type) {
   el.textContent = (type === 'error' ? '⚠ ' : type === 'ok' ? '✓ ' : '') + msg;
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function updateStatusBar(data) {
-  const dots = document.querySelectorAll('.protocol-dot');
-  if (dots.length >= 1 && data.protocol_l === 'ACTIVE') {
-    dots[0].style.background = '#00ff88'; // Protocol-L green
-  }
-  if (dots.length >= 2 && data.ibm_status) {
-    dots[1].style.background = data.ibm_status !== 'OS_URANDOM' ? '#00d4ff' : '#f59e0b';
-  }
-  if (dots.length >= 3) {
-    dots[2].style.background = data.watcher === 'ACTIVE' ? '#22c55e' : '#f59e0b';
-  }
-}
-
 // Check VPS connectivity on load
 window.addEventListener('load', async () => {
+  const dot = document.getElementById('dot-vps');
   try {
-    let statusData;
-    if (window.aetherAPI && window.aetherAPI.getStatus) {
-      statusData = await window.aetherAPI.getStatus();
+    let data;
+    if (window.aetherAPI?.getStatus) {
+      data = await window.aetherAPI.getStatus();
     } else {
       const r = await fetch('http://198.211.115.41:8743/status', {
         signal: AbortSignal.timeout(5000),
       });
-      statusData = await r.json();
+      data = await r.json();
     }
-    if (statusData && !statusData.error) {
-      updateStatusBar(statusData);
+    if (data && !data.error) {
+      if (dot) dot.style.background = '#22c55e';
+    } else {
+      if (dot) dot.style.background = '#ef4444';
+      showStatus('VPS2 RETURNED ERROR — CHECK SERVER', 'error');
     }
-  } catch (e) {
-    showStatus('VPS UNREACHABLE — CHECK CONNECTION', 'error');
+  } catch {
+    if (dot) dot.style.background = '#ef4444';
+    showStatus('VPS2 UNREACHABLE — CHECK CONNECTION', 'error');
   }
 });
 </script>
