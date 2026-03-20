@@ -260,7 +260,26 @@
 </div>
 
 <script>
+// ── DEV MODE — set to true to bypass VPS auth ───
+const DEV_MODE = true;
+
 async function handleLogin() {
+  // Dev mode: skip VPS, store fake token, auto-navigate
+  if (DEV_MODE) {
+    const devUser = document.getElementById('username').value.trim() || 'dev';
+    sessionStorage.setItem('session_token', 'dev-token-' + Date.now());
+    sessionStorage.setItem('commitment_hash', 'dev-mode');
+    sessionStorage.setItem('username', devUser);
+    showStatus('DEV MODE — BYPASSING AUTH', 'ok');
+    await new Promise(r => setTimeout(r, 300));
+    if (window.aether?.navigate) {
+      window.aether.navigate('dashboard');
+    } else {
+      window.location.href = 'dashboard.html';
+    }
+    return;
+  }
+
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
 
@@ -331,8 +350,15 @@ function showStatus(msg, type) {
   el.textContent = (type === 'error' ? '⚠ ' : type === 'ok' ? '✓ ' : '') + msg;
 }
 
-// Check VPS connectivity on load
+// On load: dev mode auto-login or VPS connectivity check
 window.addEventListener('load', async () => {
+  if (DEV_MODE) {
+    showStatus('DEV MODE ACTIVE — AUTO-LOGIN', 'info');
+    await new Promise(r => setTimeout(r, 400));
+    handleLogin();
+    return;
+  }
+
   const dot = document.getElementById('dot-vps');
   try {
     let data;
