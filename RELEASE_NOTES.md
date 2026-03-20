@@ -4,6 +4,31 @@
 
 ---
 
+## v0.5.1 — Real Filesystem Wired to Vault Graph (2026-03-20)
+
+### Features
+- **`/vault/browse` endpoint** — Scans any directory path, returns folders/files with metadata (names, sizes, extensions only — no file contents leave the machine)
+- **CONNECT button** — Desktop app calls backend, populates vault graph with real files and folders from the selected directory
+- **Folder expand** — Clicking a folder fetches real subfolder contents via API
+- **Dynamic sidebar** — Working folders update with actual names and file counts
+- **Pan/zoom** — Left-click drag to pan background, click nodes to center + zoom
+- **Key manager** — Encrypted API key storage via `electron-store` (AES at rest, tied to machine profile)
+- **File access permission dialog** — One-time prompt after install for vault directory access
+- **Dev user `ZO`** — Registered on startup with bcrypt-hashed password (never stored in plaintext)
+- **IBM quantum key** — Stored at `~/.aether/ibm_credentials.json` (mode 600)
+
+### Helpers
+- `_get_category_by_name()` — Name-based keyword categorization with extension fallback
+- `_get_folder_icon()` — Contextual emoji icons for folder names (code, trading, security, etc.)
+- Folders sorted alphabetically, files sorted by size descending
+- Capped at 12 folders + 8 loose files for graph display performance
+
+### Tests
+- 43 new tests in `test_vault_browse.py` — endpoint, helpers, edge cases (permissions, hidden files, caps)
+- **453 tests passing**, zero regressions
+
+---
+
 ## v0.5.0 — Code Hardening & Investor-Ready Polish (2026-03-19)
 
 ### Improvements

@@ -76,6 +76,7 @@ cd desktop && npm install && npm start
 | `POST /agent/chat` | Agent | Protocol-L committed AI chat |
 | `POST /agent/analyze` | Agent | File analysis + rename suggestions |
 | `POST /agent/scan` | Agent | Security threat assessment |
+| `GET /vault/browse` | Vault | Scan any directory for graph display |
 | `GET /audit/trail` | Audit | Query signed audit entries |
 | `GET /status` | Health | System status (no auth required) |
 
@@ -109,7 +110,7 @@ Desktop (Electron)  ←→  FastAPI :8741  ←→  Agent Layer  ←→  Protocol
 
 ## Test Coverage
 
-**410 tests** across 16 test files. All passing.
+**453 tests** across 17 test files. All passing.
 
 ```bash
 pytest tests/ -v
