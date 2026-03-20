@@ -1829,7 +1829,7 @@ async function saveUserContext(contextText) {
   const token = sessionStorage.getItem('session_token');
   try {
     if (window.aetherAPI) {
-      await fetch('http://198.211.115.41:8743/agent/context', {
+      await fetch('http://198.211.115.41:8080/agent/context', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2172,7 +2172,7 @@ async function connectVault() {
 
   try {
     const resp = await fetch(
-      `http://198.211.115.41:8743/vault/browse?path=${encodeURIComponent(p)}`
+      `http://198.211.115.41:8080/vault/browse?path=${encodeURIComponent(p)}`
     );
     const data = await resp.json();
 
@@ -2388,7 +2388,7 @@ async function expandRealFolder(folder) {
   let files = [];
   try {
     const resp = await fetch(
-      `http://198.211.115.41:8743/vault/browse?path=${encodeURIComponent(folder.path)}`
+      `http://198.211.115.41:8080/vault/browse?path=${encodeURIComponent(folder.path)}`
     );
     const data = await resp.json();
     if (!data.error) {

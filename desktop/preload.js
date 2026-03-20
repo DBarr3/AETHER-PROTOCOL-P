@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('aether', {
 // ═══════════════════════════════════════════════════
 // VPS2 BACKEND API CLIENT
 // ═══════════════════════════════════════════════════
-const API_BASE = 'http://198.211.115.41:8743';
+const API_BASE = 'http://198.211.115.41:8080';
 
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;

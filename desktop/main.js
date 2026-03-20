@@ -1,9 +1,9 @@
 /**
- * AetherCloud-L v0.8.5 — Electron Main Process
+ * AetherCloud-L v0.8.6 — Electron Main Process
  * Aether Systems LLC · Patent Pending
  *
  * Fresh minimal launcher: login.html → dashboard.html
- * Backend: VPS2 at 198.211.115.41:8743
+ * Backend: VPS2 at 198.211.115.41:8080
  */
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
@@ -14,7 +14,7 @@ const keyManager = require('./key-manager');
 
 // ── Constants ────────────────────────────────────────
 const PAGES_DIR = path.join(__dirname, 'pages');
-const API_BASE  = 'http://198.211.115.41:8743';
+const API_BASE  = 'http://198.211.115.41:8080';
 
 let mainWindow = null;
 let appQuitting = false;
