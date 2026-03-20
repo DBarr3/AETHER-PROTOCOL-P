@@ -275,6 +275,73 @@ class AetherFileAgent:
         analysis = self.analyze_file(path)
         return analysis.get("suggested_name", Path(path).name)
 
+    # ─── Marketing skill routing ────────────────────────
+
+    def route_request(self, intent: str, **kwargs) -> dict:
+        """
+        Route an agent request by intent to the correct skill method.
+
+        Supported intents:
+          FILE_ANALYZE, SECURITY_SCAN, CHAT,
+          COMPETITIVE_CARD, CONTENT_DRAFT, EMAIL_SEQUENCE,
+          CONTENT_REVIEW, POSITIONING
+
+        Returns the skill output dict or a fallback error dict.
+        """
+        intent_upper = intent.upper().replace(" ", "_")
+
+        if not self._claude_available:
+            return {
+                "error": "Agent unavailable — Claude API not configured",
+                "intent": intent_upper,
+            }
+
+        routing = {
+            "FILE_ANALYZE": lambda: self.analyze_file(kwargs.get("path", "")),
+            "SECURITY_SCAN": lambda: self.security_scan(),
+            "CHAT": lambda: {"response": self.chat(kwargs.get("query", ""))},
+            "COMPETITIVE_CARD": lambda: self._claude_agent.create_competitive_card(
+                product=kwargs.get("product", "AetherCloud-L"),
+                competitors=kwargs.get("competitors", []),
+                features=kwargs.get("features"),
+            ),
+            "CONTENT_DRAFT": lambda: self._claude_agent.draft_content(
+                content_type=kwargs.get("content_type", "blog"),
+                topic=kwargs.get("topic", ""),
+                audience=kwargs.get("audience"),
+                tone=kwargs.get("tone"),
+            ),
+            "EMAIL_SEQUENCE": lambda: self._claude_agent.draft_email_sequence(
+                sequence_type=kwargs.get("sequence_type", "welcome"),
+                product=kwargs.get("product", "AetherCloud-L"),
+                num_emails=kwargs.get("num_emails", 5),
+                audience=kwargs.get("audience"),
+            ),
+            "CONTENT_REVIEW": lambda: self._claude_agent.review_content(
+                content=kwargs.get("content", ""),
+                content_type=kwargs.get("content_type"),
+                audience=kwargs.get("audience"),
+            ),
+            "POSITIONING": lambda: self._claude_agent.develop_positioning(
+                product=kwargs.get("product", "AetherCloud-L"),
+                market=kwargs.get("market", ""),
+                competitors=kwargs.get("competitors"),
+            ),
+        }
+
+        handler = routing.get(intent_upper)
+        if handler is None:
+            return {
+                "error": f"Unknown intent: {intent_upper}",
+                "supported": list(routing.keys()),
+            }
+
+        try:
+            return handler()
+        except Exception as e:
+            logger.warning("route_request(%s) failed: %s", intent_upper, e)
+            return {"error": str(e), "intent": intent_upper}
+
     def reset_conversation(self) -> None:
         """Reset the Claude agent's conversation history."""
         if self._claude_agent:

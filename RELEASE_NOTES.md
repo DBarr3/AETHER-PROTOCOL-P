@@ -4,6 +4,24 @@
 
 ---
 
+## v0.6.0 — Agent Marketing Skills Patch (2026-03-20)
+
+### Features
+- **5 new marketing agent methods** — `create_competitive_card()`, `draft_content()`, `draft_email_sequence()`, `review_content()`, `develop_positioning()`
+- **Hardened wrappers** — All 5 marketing methods get full Protocol-L commit+verify (SHA-256, ECDSA, RFC 3161)
+- **Intent router** — `route_request()` on AetherFileAgent dispatches to any skill by intent string
+- **Expanded system prompt** — 5 new competencies (8-12): Competitive Analysis, Content Drafting, Email Sequences, Content Review, Market Positioning
+- **5 new QOPC task suffixes** — Structured JSON schemas for each marketing output type
+- **5 new prompt optimizer variants** — Marketing tasks get independent accuracy tracking via QOPC feedback loop
+- **4 new QOPC outcome types** — PUBLISHED, REVISED, DISCARDED, A_B_TESTED for marketing content lifecycle
+- **Desktop offline fallback** — Agent chat recognizes competitive/content/email/positioning keywords
+
+### Tests
+- 44 new tests in `test_marketing_agent.py` — all 5 skills, QOPC outcomes, suffix registry, prompt variants
+- **497 tests passing**, zero regressions
+
+---
+
 ## v0.5.1 — Real Filesystem Wired to Vault Graph (2026-03-20)
 
 ### Features

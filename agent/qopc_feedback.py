@@ -208,6 +208,11 @@ class PromptOptimizer:
             ANALYSIS_SUFFIX,
             PLANNING_SUFFIX,
             SECURITY_SUFFIX,
+            COMPETITIVE_CARD_SUFFIX,
+            CONTENT_DRAFT_SUFFIX,
+            EMAIL_SEQUENCE_SUFFIX,
+            CONTENT_REVIEW_SUFFIX,
+            POSITIONING_SUFFIX,
         )
 
         self.variants: dict[str, list[PromptVariant]] = {
@@ -254,6 +259,66 @@ class PromptOptimizer:
                     system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
                     suffix=SECURITY_SUFFIX,
                     temperature_hint="PRECISE",
+                    accuracy_score=0.8,
+                    use_count=0,
+                    success_count=0,
+                ),
+            ],
+            "COMPETITIVE_CARD": [
+                PromptVariant(
+                    variant_id="competitive_v1",
+                    task_type="COMPETITIVE_CARD",
+                    system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
+                    suffix=COMPETITIVE_CARD_SUFFIX,
+                    temperature_hint="BALANCED",
+                    accuracy_score=0.8,
+                    use_count=0,
+                    success_count=0,
+                ),
+            ],
+            "CONTENT_DRAFT": [
+                PromptVariant(
+                    variant_id="content_v1",
+                    task_type="CONTENT_DRAFT",
+                    system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
+                    suffix=CONTENT_DRAFT_SUFFIX,
+                    temperature_hint="CREATIVE",
+                    accuracy_score=0.8,
+                    use_count=0,
+                    success_count=0,
+                ),
+            ],
+            "EMAIL_SEQUENCE": [
+                PromptVariant(
+                    variant_id="email_v1",
+                    task_type="EMAIL_SEQUENCE",
+                    system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
+                    suffix=EMAIL_SEQUENCE_SUFFIX,
+                    temperature_hint="BALANCED",
+                    accuracy_score=0.8,
+                    use_count=0,
+                    success_count=0,
+                ),
+            ],
+            "CONTENT_REVIEW": [
+                PromptVariant(
+                    variant_id="review_v1",
+                    task_type="CONTENT_REVIEW",
+                    system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
+                    suffix=CONTENT_REVIEW_SUFFIX,
+                    temperature_hint="PRECISE",
+                    accuracy_score=0.8,
+                    use_count=0,
+                    success_count=0,
+                ),
+            ],
+            "POSITIONING": [
+                PromptVariant(
+                    variant_id="positioning_v1",
+                    task_type="POSITIONING",
+                    system_prompt=AETHER_AGENT_SYSTEM_PROMPT,
+                    suffix=POSITIONING_SUFFIX,
+                    temperature_hint="BALANCED",
                     accuracy_score=0.8,
                     use_count=0,
                     success_count=0,
@@ -524,10 +589,14 @@ class OutcomeObserver:
     update variant accuracy scores.
 
     Outcome types:
-      ACCEPTED  — user took the suggestion → score 1.0
-      REJECTED  — user explicitly rejected  → score 0.0
-      CORRECTED — user modified suggestion  → score 0.3
-      IGNORED   — user did nothing          → score 0.5
+      ACCEPTED   — user took the suggestion      → score 1.0
+      REJECTED   — user explicitly rejected       → score 0.0
+      CORRECTED  — user modified suggestion       → score 0.3
+      IGNORED    — user did nothing               → score 0.5
+      PUBLISHED  — marketing content was published → score 1.0
+      REVISED    — content was edited then used    → score 0.6
+      DISCARDED  — content was thrown away         → score 0.0
+      A_B_TESTED — content entered A/B test        → score 0.8
     """
 
     OUTCOME_SCORES = {
@@ -535,6 +604,10 @@ class OutcomeObserver:
         "REJECTED": 0.0,
         "CORRECTED": 0.3,
         "IGNORED": 0.5,
+        "PUBLISHED": 1.0,
+        "REVISED": 0.6,
+        "DISCARDED": 0.0,
+        "A_B_TESTED": 0.8,
     }
 
     def __init__(self) -> None:

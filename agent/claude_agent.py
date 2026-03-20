@@ -20,6 +20,7 @@ from config.settings import (
     CLAUDE_MAX_TOKENS,
     AGENT_SYSTEM_PROMPT,
 )
+from config.agent_prompt import TASK_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +287,222 @@ class AetherClaudeAgent:
                 "threat_level": "UNKNOWN",
                 "findings": [f"Analysis failed: {e}"],
                 "recommended_action": "Manual review required",
+            }
+
+    # ─── Marketing & Content Methods ─────────────────────
+
+    def create_competitive_card(
+        self,
+        product: str,
+        competitors: list[str],
+        features: Optional[list[str]] = None,
+    ) -> dict:
+        """
+        Create a competitive comparison card.
+        Returns structured JSON with feature matrix and verdicts.
+        """
+        suffix = TASK_SUFFIXES.get("COMPETITIVE_CARD", "")
+        comp_list = ", ".join(competitors)
+        feat_hint = f"\nFocus on: {', '.join(features)}" if features else ""
+
+        prompt = (
+            f"Create a competitive comparison card.\n\n"
+            f"Our product: {product}\n"
+            f"Competitors: {comp_list}\n"
+            f"{feat_hint}\n\n"
+            f"{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning("Competitive card failed: %s", e)
+            return {
+                "product": product,
+                "competitors": competitors,
+                "differentiators": [],
+                "summary": f"Analysis unavailable: {e}",
+                "confidence": 0.0,
+            }
+
+    def draft_content(
+        self,
+        content_type: str,
+        topic: str,
+        audience: Optional[str] = None,
+        tone: Optional[str] = None,
+    ) -> dict:
+        """
+        Draft marketing content (blog, LinkedIn post, press release, etc.).
+        Returns structured JSON with body, CTA, and SEO keywords.
+        """
+        suffix = TASK_SUFFIXES.get("CONTENT_DRAFT", "")
+        aud = f"\nTarget audience: {audience}" if audience else ""
+        t = f"\nTone: {tone}" if tone else ""
+
+        prompt = (
+            f"Draft marketing content.\n\n"
+            f"Content type: {content_type}\n"
+            f"Topic: {topic}\n"
+            f"{aud}{t}\n\n"
+            f"{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning("Content draft failed: %s", e)
+            return {
+                "content_type": content_type,
+                "title": topic,
+                "body": f"Draft unavailable: {e}",
+                "cta": "",
+                "seo_keywords": [],
+                "tone": tone or "professional",
+                "word_count": 0,
+                "confidence": 0.0,
+            }
+
+    def draft_email_sequence(
+        self,
+        sequence_type: str,
+        product: str,
+        num_emails: int = 5,
+        audience: Optional[str] = None,
+    ) -> dict:
+        """
+        Design a drip email campaign sequence.
+        Returns structured JSON with emails, subjects, and timing.
+        """
+        suffix = TASK_SUFFIXES.get("EMAIL_SEQUENCE", "")
+        aud = f"\nTarget audience: {audience}" if audience else ""
+
+        prompt = (
+            f"Design a {num_emails}-email drip campaign.\n\n"
+            f"Sequence type: {sequence_type}\n"
+            f"Product: {product}\n"
+            f"{aud}\n\n"
+            f"{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning("Email sequence failed: %s", e)
+            return {
+                "sequence_name": sequence_type,
+                "emails": [],
+                "total_emails": 0,
+                "confidence": 0.0,
+            }
+
+    def review_content(
+        self,
+        content: str,
+        content_type: Optional[str] = None,
+        audience: Optional[str] = None,
+    ) -> dict:
+        """
+        Review and score existing marketing content.
+        Returns readability score, issues, and revised version.
+        """
+        suffix = TASK_SUFFIXES.get("CONTENT_REVIEW", "")
+        ct = f"\nContent type: {content_type}" if content_type else ""
+        aud = f"\nTarget audience: {audience}" if audience else ""
+
+        prompt = (
+            f"Review this marketing content.\n\n"
+            f"Content:\n{content}\n"
+            f"{ct}{aud}\n\n"
+            f"{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning("Content review failed: %s", e)
+            return {
+                "readability_score": 0.0,
+                "accuracy_issues": [str(e)],
+                "unsupported_claims": [],
+                "cta_suggestions": [],
+                "revised_content": content,
+                "overall_grade": "F",
+                "confidence": 0.0,
+            }
+
+    def develop_positioning(
+        self,
+        product: str,
+        market: str,
+        competitors: Optional[list[str]] = None,
+    ) -> dict:
+        """
+        Develop market positioning framework.
+        Returns value proposition, ICP, messaging hierarchy, and moat analysis.
+        """
+        suffix = TASK_SUFFIXES.get("POSITIONING", "")
+        comp = f"\nKey competitors: {', '.join(competitors)}" if competitors else ""
+
+        prompt = (
+            f"Develop a market positioning framework.\n\n"
+            f"Product: {product}\n"
+            f"Market: {market}\n"
+            f"{comp}\n\n"
+            f"{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            return json.loads(raw)
+        except Exception as e:
+            logger.warning("Positioning failed: %s", e)
+            return {
+                "category": market,
+                "value_proposition": f"Analysis unavailable: {e}",
+                "icp": {"title": "", "company_size": "", "pain_points": []},
+                "messaging_hierarchy": {"primary": "", "supporting": []},
+                "competitive_moat": [],
+                "confidence": 0.0,
             }
 
     def reset_conversation(self) -> None:

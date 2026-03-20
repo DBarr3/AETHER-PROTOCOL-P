@@ -82,6 +82,24 @@ cd desktop && npm install && npm start
 
 ---
 
+## Agent Skills
+
+| Skill | Method | Description |
+|---|---|---|
+| File Analysis | `analyze_file()` | Category detection, rename suggestions, security flags |
+| Batch Analysis | `batch_analyze()` | Multi-file organization in one API call |
+| Vault Chat | `chat()` | Natural language vault queries with conversation history |
+| Security Scan | `analyze_security_pattern()` | Audit trail threat detection (brute force, enumeration) |
+| Competitive Card | `create_competitive_card()` | Feature comparison matrix with WIN/LOSE/TIE verdicts |
+| Content Draft | `draft_content()` | Blog posts, LinkedIn, press releases with SEO keywords |
+| Email Sequence | `draft_email_sequence()` | Drip campaigns with subject lines, CTAs, and timing |
+| Content Review | `review_content()` | Readability scoring, claim verification, CTA optimization |
+| Market Positioning | `develop_positioning()` | ICP definition, messaging hierarchy, competitive moat |
+
+All agent responses are cryptographically committed via Protocol-L before the system acts on them.
+
+---
+
 ## Security Model
 
 | Property | Implementation |
@@ -110,7 +128,7 @@ Desktop (Electron)  ←→  FastAPI :8741  ←→  Agent Layer  ←→  Protocol
 
 ## Test Coverage
 
-**453 tests** across 17 test files. All passing.
+**497 tests** across 18 test files. All passing.
 
 ```bash
 pytest tests/ -v

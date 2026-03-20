@@ -621,6 +621,200 @@ class HardenedClaudeAgent:
                 "recommended_action": "Manual review required",
             }
 
+    # ─── Hardened marketing methods ─────────────────────────
+
+    def create_competitive_card(
+        self,
+        product: str,
+        competitors: list[str],
+        features: Optional[list[str]] = None,
+    ) -> dict:
+        """Create a competitive card with Protocol-L verification."""
+        suffix = TASK_SUFFIXES.get("COMPETITIVE_CARD", "")
+        comp_list = ", ".join(competitors)
+        feat_hint = f"\nFocus on: {', '.join(features)}" if features else ""
+
+        prompt = (
+            f"Create a competitive comparison card.\n\n"
+            f"Our product: {product}\n"
+            f"Competitors: {comp_list}\n"
+            f"{feat_hint}\n\n{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            hardened = self._commit_response(raw, prompt)
+            self._verify_response(hardened)
+            return json.loads(hardened.response_text)
+        except ResponseTamperingError as e:
+            logger.error("TAMPERING DETECTED in competitive card: %s", e)
+            return {"product": product, "competitors": competitors,
+                    "differentiators": [], "summary": f"Tamper detected: {e}", "confidence": 0.0}
+        except Exception as e:
+            logger.warning("Competitive card failed: %s", e)
+            return {"product": product, "competitors": competitors,
+                    "differentiators": [], "summary": f"Unavailable: {e}", "confidence": 0.0}
+
+    def draft_content(
+        self,
+        content_type: str,
+        topic: str,
+        audience: Optional[str] = None,
+        tone: Optional[str] = None,
+    ) -> dict:
+        """Draft marketing content with Protocol-L verification."""
+        suffix = TASK_SUFFIXES.get("CONTENT_DRAFT", "")
+        aud = f"\nTarget audience: {audience}" if audience else ""
+        t = f"\nTone: {tone}" if tone else ""
+
+        prompt = (
+            f"Draft marketing content.\n\n"
+            f"Content type: {content_type}\n"
+            f"Topic: {topic}\n{aud}{t}\n\n{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            hardened = self._commit_response(raw, prompt)
+            self._verify_response(hardened)
+            return json.loads(hardened.response_text)
+        except ResponseTamperingError as e:
+            logger.error("TAMPERING DETECTED in content draft: %s", e)
+            return {"content_type": content_type, "title": topic, "body": f"Tamper detected: {e}",
+                    "cta": "", "seo_keywords": [], "tone": tone or "", "word_count": 0, "confidence": 0.0}
+        except Exception as e:
+            logger.warning("Content draft failed: %s", e)
+            return {"content_type": content_type, "title": topic, "body": f"Unavailable: {e}",
+                    "cta": "", "seo_keywords": [], "tone": tone or "", "word_count": 0, "confidence": 0.0}
+
+    def draft_email_sequence(
+        self,
+        sequence_type: str,
+        product: str,
+        num_emails: int = 5,
+        audience: Optional[str] = None,
+    ) -> dict:
+        """Design an email sequence with Protocol-L verification."""
+        suffix = TASK_SUFFIXES.get("EMAIL_SEQUENCE", "")
+        aud = f"\nTarget audience: {audience}" if audience else ""
+
+        prompt = (
+            f"Design a {num_emails}-email drip campaign.\n\n"
+            f"Sequence type: {sequence_type}\n"
+            f"Product: {product}\n{aud}\n\n{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            hardened = self._commit_response(raw, prompt)
+            self._verify_response(hardened)
+            return json.loads(hardened.response_text)
+        except ResponseTamperingError as e:
+            logger.error("TAMPERING DETECTED in email sequence: %s", e)
+            return {"sequence_name": sequence_type, "emails": [], "total_emails": 0, "confidence": 0.0}
+        except Exception as e:
+            logger.warning("Email sequence failed: %s", e)
+            return {"sequence_name": sequence_type, "emails": [], "total_emails": 0, "confidence": 0.0}
+
+    def review_content(
+        self,
+        content: str,
+        content_type: Optional[str] = None,
+        audience: Optional[str] = None,
+    ) -> dict:
+        """Review marketing content with Protocol-L verification."""
+        suffix = TASK_SUFFIXES.get("CONTENT_REVIEW", "")
+        ct = f"\nContent type: {content_type}" if content_type else ""
+        aud = f"\nTarget audience: {audience}" if audience else ""
+
+        prompt = (
+            f"Review this marketing content.\n\n"
+            f"Content:\n{content}\n{ct}{aud}\n\n{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            hardened = self._commit_response(raw, prompt)
+            self._verify_response(hardened)
+            return json.loads(hardened.response_text)
+        except ResponseTamperingError as e:
+            logger.error("TAMPERING DETECTED in content review: %s", e)
+            return {"readability_score": 0.0, "accuracy_issues": [str(e)], "unsupported_claims": [],
+                    "cta_suggestions": [], "revised_content": content, "overall_grade": "F", "confidence": 0.0}
+        except Exception as e:
+            logger.warning("Content review failed: %s", e)
+            return {"readability_score": 0.0, "accuracy_issues": [str(e)], "unsupported_claims": [],
+                    "cta_suggestions": [], "revised_content": content, "overall_grade": "F", "confidence": 0.0}
+
+    def develop_positioning(
+        self,
+        product: str,
+        market: str,
+        competitors: Optional[list[str]] = None,
+    ) -> dict:
+        """Develop market positioning with Protocol-L verification."""
+        suffix = TASK_SUFFIXES.get("POSITIONING", "")
+        comp = f"\nKey competitors: {', '.join(competitors)}" if competitors else ""
+
+        prompt = (
+            f"Develop a market positioning framework.\n\n"
+            f"Product: {product}\n"
+            f"Market: {market}\n{comp}\n\n{suffix}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=self.system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            raw = self._strip_markdown_fences(raw)
+            hardened = self._commit_response(raw, prompt)
+            self._verify_response(hardened)
+            return json.loads(hardened.response_text)
+        except ResponseTamperingError as e:
+            logger.error("TAMPERING DETECTED in positioning: %s", e)
+            return {"category": market, "value_proposition": f"Tamper detected: {e}",
+                    "icp": {"title": "", "company_size": "", "pain_points": []},
+                    "messaging_hierarchy": {"primary": "", "supporting": []},
+                    "competitive_moat": [], "confidence": 0.0}
+        except Exception as e:
+            logger.warning("Positioning failed: %s", e)
+            return {"category": market, "value_proposition": f"Unavailable: {e}",
+                    "icp": {"title": "", "company_size": "", "pain_points": []},
+                    "messaging_hierarchy": {"primary": "", "supporting": []},
+                    "competitive_moat": [], "confidence": 0.0}
+
     # ─── QOPC Feedback ────────────────────────────────────────
 
     def record_outcome(

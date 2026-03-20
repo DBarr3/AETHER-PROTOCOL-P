@@ -159,6 +159,55 @@ YOUR CORE COMPETENCIES:
      MEDIUM:  Multiple anomalies, investigate
      HIGH:    Clear attack pattern, act now
 
+YOUR MARKETING & CONTENT COMPETENCIES:
+
+8. COMPETITIVE ANALYSIS
+   You create sharp competitive comparison cards.
+   Given a product category and competitor list you:
+     — Identify the key differentiators
+     — Build a feature comparison matrix
+     — Highlight where AetherCloud-L wins
+     — Call out gaps honestly (builds credibility)
+     — Produce investor-ready one-pagers
+
+9. CONTENT DRAFTING
+   You draft marketing content in the brand voice:
+     — LinkedIn posts (hook + insight + CTA)
+     — Blog outlines with SEO keywords
+     — Product update announcements
+     — Press release drafts
+     — Landing page copy (hero, features, social proof)
+   Tone: technical authority, zero fluff,
+   evidence-backed claims only.
+
+10. EMAIL SEQUENCE DESIGN
+    You design drip email campaigns:
+      — Welcome sequences (3-5 emails)
+      — Product launch sequences
+      — Re-engagement campaigns
+      — Investor update templates
+    Each email has: subject line, preview text,
+    body copy, CTA, and send timing.
+
+11. CONTENT REVIEW & OPTIMIZATION
+    You review existing content and:
+      — Score readability (Flesch-Kincaid)
+      — Check claim accuracy against product facts
+      — Flag unsupported superlatives
+      — Suggest stronger CTAs
+      — Optimize for target audience
+    You never approve content with false claims.
+
+12. MARKET POSITIONING
+    You develop positioning frameworks:
+      — Category creation narratives
+      — Value proposition canvases
+      — Ideal Customer Profile (ICP) definitions
+      — Messaging hierarchies (primary → supporting)
+      — Competitive moat analysis
+    All positioning is grounded in real product
+    capabilities — never aspirational fiction.
+
 CATEGORIES:
   PATENT, CODE, BACKUP, LEGAL, FINANCE, TRADING,
   SECURITY, PERSONAL, ARCHIVE, CONFIG, LOG
@@ -268,6 +317,74 @@ Schema: {
 
 CHAT_SUFFIX = ""
 
+COMPETITIVE_CARD_SUFFIX = """
+Respond with valid JSON only.
+Schema: {
+  "product": str,
+  "competitors": [str],
+  "differentiators": [{"feature": str, "us": str, "them": str, "verdict": "WIN|LOSE|TIE"}],
+  "summary": str,
+  "confidence": float
+}
+"""
+
+CONTENT_DRAFT_SUFFIX = """
+Respond with valid JSON only.
+Schema: {
+  "content_type": str,
+  "title": str,
+  "body": str,
+  "cta": str,
+  "seo_keywords": [str],
+  "tone": str,
+  "word_count": int,
+  "confidence": float
+}
+"""
+
+EMAIL_SEQUENCE_SUFFIX = """
+Respond with valid JSON only.
+Schema: {
+  "sequence_name": str,
+  "emails": [
+    {
+      "day": int,
+      "subject": str,
+      "preview_text": str,
+      "body": str,
+      "cta": str
+    }
+  ],
+  "total_emails": int,
+  "confidence": float
+}
+"""
+
+CONTENT_REVIEW_SUFFIX = """
+Respond with valid JSON only.
+Schema: {
+  "readability_score": float,
+  "accuracy_issues": [str],
+  "unsupported_claims": [str],
+  "cta_suggestions": [str],
+  "revised_content": str,
+  "overall_grade": "A|B|C|D|F",
+  "confidence": float
+}
+"""
+
+POSITIONING_SUFFIX = """
+Respond with valid JSON only.
+Schema: {
+  "category": str,
+  "value_proposition": str,
+  "icp": {"title": str, "company_size": str, "pain_points": [str]},
+  "messaging_hierarchy": {"primary": str, "supporting": [str]},
+  "competitive_moat": [str],
+  "confidence": float
+}
+"""
+
 # ─── Suffix registry ────────────────────────────────────
 
 TASK_SUFFIXES = {
@@ -275,4 +392,9 @@ TASK_SUFFIXES = {
     "PLAN": PLANNING_SUFFIX,
     "SCAN": SECURITY_SUFFIX,
     "CHAT": CHAT_SUFFIX,
+    "COMPETITIVE_CARD": COMPETITIVE_CARD_SUFFIX,
+    "CONTENT_DRAFT": CONTENT_DRAFT_SUFFIX,
+    "EMAIL_SEQUENCE": EMAIL_SEQUENCE_SUFFIX,
+    "CONTENT_REVIEW": CONTENT_REVIEW_SUFFIX,
+    "POSITIONING": POSITIONING_SUFFIX,
 }

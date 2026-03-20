@@ -1607,7 +1607,35 @@ const agentResponses = {
     · Filing2_UNIFIED.docx (1.1 MB) — working document<br>
     · Patent_Notes.txt (12 KB) — attorney notes<br><br>
     Application #64/010,131 · Patent pending.`,
-  default: `I can help you organize files, analyze vault structure, scan for threats, or answer questions about your files. All my reasoning is cryptographically committed via Protocol-L.`
+  competitive: `Generating competitive analysis card...<br><br>
+    <strong>AetherCloud-L vs. competitors:</strong><br>
+    · <span style="color:var(--green)">WIN</span> — Quantum-signed audit trail (no competitor offers this)<br>
+    · <span style="color:var(--green)">WIN</span> — Cryptographically verified AI reasoning<br>
+    · <span style="color:var(--green)">WIN</span> — Zero file leakage (contents never leave machine)<br>
+    · <span style="color:var(--amber)">TIE</span> — File organization (Dropbox has similar)<br><br>
+    Full card committed via Protocol-L.`,
+  content: `Drafting content...<br><br>
+    <strong>Draft ready for review</strong><br>
+    · Type: LinkedIn post<br>
+    · Word count: 142<br>
+    · SEO keywords: quantum security, file intelligence, audit trail<br>
+    · CTA: "Book a demo"<br><br>
+    Content committed + verified. Say <strong>review content</strong> to optimize.`,
+  email: `Email sequence designed...<br><br>
+    <strong>Welcome Sequence — 5 emails</strong><br>
+    · Day 0: Welcome + quick win<br>
+    · Day 2: Core feature deep-dive<br>
+    · Day 5: Security differentiator<br>
+    · Day 8: Case study / social proof<br>
+    · Day 12: CTA — schedule demo<br><br>
+    All copy committed via Protocol-L.`,
+  positioning: `Market positioning framework generated...<br><br>
+    <strong>Category:</strong> Quantum-Secured File Intelligence<br>
+    <strong>ICP:</strong> Security-conscious enterprises with IP-heavy workflows<br>
+    <strong>Primary message:</strong> "The first file system with dispute-proof chain of custody"<br>
+    <strong>Moat:</strong> Patent-pending Protocol-L + quantum entropy signing<br><br>
+    Framework committed + verified.`,
+  default: `I can help you organize files, analyze vault structure, scan for threats, draft marketing content, build competitive cards, design email sequences, or develop market positioning. All my reasoning is cryptographically committed via Protocol-L.`
 };
 
 async function sendMessage() {
@@ -1644,6 +1672,10 @@ async function sendMessage() {
     else if (q.includes('scan') || q.includes('threat')) response = agentResponses.scan;
     else if (q.includes('audit') || q.includes('log')) response = agentResponses.audit;
     else if (q.includes('patent') || q.includes('filing')) response = agentResponses.patent;
+    else if (q.includes('compet') || q.includes('vs') || q.includes('compare')) response = agentResponses.competitive;
+    else if (q.includes('draft') || q.includes('blog') || q.includes('linkedin') || q.includes('press')) response = agentResponses.content;
+    else if (q.includes('email') || q.includes('drip') || q.includes('sequence')) response = agentResponses.email;
+    else if (q.includes('position') || q.includes('icp') || q.includes('messaging')) response = agentResponses.positioning;
     addMessage('agent', response, true);
     addAuditEntry('AGENT_RESPONSE', 'committed+verified', 'ok');
   }, 600);
