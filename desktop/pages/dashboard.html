@@ -26,11 +26,10 @@
     --amber-dim: rgba(245,158,11,0.1);
     --red: #ef4444;
     --red-dim: rgba(239,68,68,0.1);
-    --sidebar-w: 240px;
+    --sidebar-w: 250px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     background: var(--bg);
     color: var(--text-primary);
@@ -59,10 +58,7 @@
     letter-spacing: 0.5px;
     flex: 1;
   }
-  .titlebar-controls {
-    display: flex;
-    -webkit-app-region: no-drag;
-  }
+  .titlebar-controls { display: flex; -webkit-app-region: no-drag; }
   .titlebar-btn {
     width: 40px; height: 32px;
     border: none; background: none;
@@ -82,13 +78,9 @@
     display: flex;
     align-items: center;
     padding: 0 8px;
-    gap: 0;
     z-index: 150;
   }
-  .menu-item {
-    position: relative;
-    -webkit-app-region: no-drag;
-  }
+  .menu-item { position: relative; -webkit-app-region: no-drag; }
   .menu-trigger {
     background: none; border: none;
     color: var(--text-secondary);
@@ -98,78 +90,45 @@
     cursor: pointer;
     transition: background 0.1s, color 0.1s;
   }
-  .menu-trigger:hover, .menu-trigger.active {
-    background: var(--bg-4);
-    color: var(--text-primary);
-  }
+  .menu-trigger:hover, .menu-trigger.active { background: var(--bg-4); color: var(--text-primary); }
   .menu-dropdown {
     display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: absolute; top: 100%; left: 0;
     background: var(--bg-3);
     border: 1px solid var(--border-2);
-    min-width: 180px;
-    z-index: 300;
+    min-width: 180px; z-index: 300;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
   .menu-dropdown.open { display: block; }
   .menu-option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 14px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 11px;
+    color: var(--text-secondary); cursor: pointer;
     transition: background 0.1s, color 0.1s;
   }
-  .menu-option:hover {
-    background: var(--accent-dim);
-    color: var(--text-primary);
-  }
-  .menu-option .shortcut {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
-  }
-  .menu-sep {
-    height: 1px;
-    background: var(--border);
-    margin: 4px 8px;
-  }
+  .menu-option:hover { background: var(--accent-dim); color: var(--text-primary); }
+  .menu-option .shortcut { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); }
+  .menu-sep { height: 1px; background: var(--border); margin: 4px 8px; }
 
-  /* Agent status in menu bar */
   .agent-status {
     margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
+    font-size: 10px; color: var(--text-muted);
     padding-right: 8px;
     -webkit-app-region: no-drag;
   }
   .agent-status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
+    width: 6px; height: 6px; border-radius: 50%;
     background: var(--green);
     transition: background 0.3s;
   }
   .agent-status-dot.working { background: var(--accent); animation: pulse 1.2s infinite; }
   .agent-status-dot.error { background: var(--red); }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══ LAYOUT ════════════════════════════════════ */
-  .app-body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
+  .app-body { display: flex; flex: 1; overflow: hidden; }
 
   /* ═══ SIDEBAR ═══════════════════════════════════ */
   .sidebar {
@@ -178,141 +137,231 @@
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden;
     flex-shrink: 0;
     transition: width 0.2s;
   }
-  .sidebar.collapsed { width: 0; overflow: hidden; }
+  .sidebar.collapsed { width: 0; }
+  .sidebar-scroll { flex: 1; overflow-y: auto; }
 
   .sb-section {
-    padding: 14px 12px 10px;
+    padding: 12px 12px 10px;
     border-bottom: 1px solid var(--border);
   }
   .sb-header {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    font-weight: 500;
+    font-size: 9px; font-weight: 500;
     color: var(--text-muted);
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    letter-spacing: 1px; text-transform: uppercase;
     margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
   }
   .sb-badge {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    padding: 1px 5px;
-    border-radius: 2px;
-    letter-spacing: 0.5px;
+    font-size: 8px; padding: 1px 5px; border-radius: 2px; letter-spacing: 0.5px;
   }
   .sb-badge.green { background: var(--green-dim); color: var(--green); }
   .sb-badge.amber { background: var(--amber-dim); color: var(--amber); }
   .sb-badge.blue { background: var(--accent-dim); color: var(--accent); }
+  .sb-badge.red { background: var(--red-dim); color: var(--red); }
 
   /* Agent task log */
-  .agent-log {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+  .agent-log { display: flex; flex-direction: column; gap: 3px; }
   .agent-log-entry {
     font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .log-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+  .log-dot.done { background: var(--green); }
+  .log-dot.active { background: var(--accent); animation: pulse 1s infinite; }
+  .log-dot.idle { background: var(--text-muted); }
+
+  /* Projects/chats list */
+  .sb-search {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
     font-size: 10px;
-    color: var(--text-secondary);
+    padding: 5px 8px;
+    outline: none;
+    margin-bottom: 6px;
+    transition: border-color 0.15s;
+  }
+  .sb-search:focus { border-color: var(--accent); }
+  .sb-search::placeholder { color: var(--text-muted); }
+
+  .sb-chat-entry {
+    padding: 6px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
-  .agent-log-entry .log-dot {
-    width: 4px; height: 4px;
-    border-radius: 50%;
+  .sb-chat-entry:hover { background: var(--bg-3); }
+  .sb-chat-entry.active { background: var(--accent-dim); border-left: 2px solid var(--accent); }
+  .sb-chat-icon {
+    width: 14px; height: 14px;
+    font-size: 8px; color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .agent-log-entry .log-dot.done { background: var(--green); }
-  .agent-log-entry .log-dot.active { background: var(--accent); animation: pulse 1s infinite; }
-  .agent-log-entry .log-dot.idle { background: var(--text-muted); }
+  .sb-chat-info { flex: 1; overflow: hidden; }
+  .sb-chat-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+  }
+  .sb-chat-preview {
+    font-size: 10px; color: var(--text-secondary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 
-  /* Agent buttons */
+  /* Recent files list */
+  .sb-file-entry {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 4px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    font-size: 10px;
+  }
+  .sb-file-entry:hover { background: var(--bg-3); }
+  .sb-file-icon {
+    font-size: 9px; color: var(--accent);
+    width: 14px; text-align: center; flex-shrink: 0;
+  }
+  .sb-file-name {
+    flex: 1; color: var(--text-secondary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sb-file-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .sb-file-sort {
+    display: flex; gap: 4px; margin-bottom: 6px;
+  }
+  .sb-sort-btn {
+    background: none; border: 1px solid var(--border-2);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .sb-sort-btn:hover, .sb-sort-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  /* Undo/Redo navigation */
+  .sb-nav-bar {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .sb-nav-btn {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-muted);
+    font-size: 12px;
+    width: 26px; height: 22px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .sb-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .sb-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .sb-nav-breadcrumb {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Bottom controls */
+  .sb-controls {
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .sb-toggle {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer;
+    font-size: 10px; color: var(--text-secondary);
+    transition: color 0.15s;
+  }
+  .sb-toggle:hover { color: var(--text-primary); }
+  .sb-toggle-switch {
+    width: 28px; height: 14px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    border-radius: 7px;
+    position: relative;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+  }
+  .sb-toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .sb-toggle.on .sb-toggle-switch {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .sb-toggle.on .sb-toggle-switch::after {
+    transform: translateX(14px);
+    background: var(--accent);
+  }
+  .sb-toggle.on.danger .sb-toggle-switch {
+    background: var(--red-dim);
+    border-color: var(--red);
+  }
+  .sb-toggle.on.danger .sb-toggle-switch::after {
+    background: var(--red);
+  }
+  .sb-toggle-label { flex: 1; }
+  .sb-toggle-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    margin-left: 36px;
+    transition: color 0.2s;
+  }
+  .sb-toggle-hint.active-danger { color: var(--red); }
+  .sb-toggle-hint.active-plan { color: var(--accent); }
+
+  /* Agent button */
   .sb-agent-btn {
     width: 100%;
     background: var(--bg-3);
     border: 1px solid var(--border-2);
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    padding: 7px 10px;
+    font-size: 10px; padding: 6px 8px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 7px;
+    display: flex; align-items: center; gap: 6px;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
-  .sb-agent-btn:hover {
-    border-color: var(--accent);
-    color: var(--text-primary);
-    background: var(--accent-dim);
-  }
+  .sb-agent-btn:hover { border-color: var(--accent); color: var(--text-primary); background: var(--accent-dim); }
   .sb-agent-btn .agent-icon {
-    width: 16px; height: 16px;
+    width: 14px; height: 14px;
     background: var(--accent-dim);
     border: 1px solid rgba(0,212,255,0.2);
     display: flex; align-items: center; justify-content: center;
-    font-size: 9px; color: var(--accent);
-    flex-shrink: 0;
+    font-size: 8px; color: var(--accent); flex-shrink: 0;
   }
-  .sb-agent-list { display: flex; flex-direction: column; gap: 5px; }
-
-  /* Context textarea */
-  .sb-context-area {
-    width: 100%;
-    background: var(--bg-3);
-    border: 1px solid var(--border-2);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    padding: 7px;
-    resize: vertical;
-    min-height: 70px;
-    max-height: 160px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .sb-context-area:focus { border-color: var(--accent); }
-  .sb-context-area::placeholder { color: var(--text-muted); }
-  .sb-context-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 4px;
-    font-size: 9px;
-  }
-  .sb-context-counter { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-  .sb-context-clear { color: var(--text-muted); cursor: pointer; transition: color 0.15s; }
-  .sb-context-clear:hover { color: var(--red); }
-
-  /* Chat history entries */
-  .sb-chat-entry {
-    padding: 6px 0;
-    cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.1s;
-  }
-  .sb-chat-entry:hover { background: var(--bg-3); }
-  .sb-chat-time {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    color: var(--text-muted);
-    margin-bottom: 1px;
-  }
-  .sb-chat-preview {
-    font-size: 10px;
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .sb-agent-list { display: flex; flex-direction: column; gap: 4px; }
 
   /* ═══ MAIN CANVAS PANEL ═════════════════════════ */
   .main-panel {
@@ -322,7 +371,6 @@
     overflow: hidden;
     position: relative;
   }
-
   .canvas-wrap {
     flex: 1;
     position: relative;
@@ -330,38 +378,31 @@
     cursor: grab;
   }
   .canvas-wrap:active { cursor: grabbing; }
-  .canvas-wrap canvas {
-    position: absolute;
-    top: 0; left: 0;
-  }
+  .canvas-wrap canvas { position: absolute; top: 0; left: 0; }
 
-  /* File info tooltip */
   .node-tooltip {
     position: fixed;
     background: var(--bg-3);
     border: 1px solid var(--accent);
-    padding: 10px 14px;
+    padding: 8px 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-primary);
+    font-size: 10px; color: var(--text-primary);
     z-index: 400;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s;
-    max-width: 280px;
+    max-width: 260px;
     box-shadow: 0 4px 16px rgba(0,212,255,0.1);
   }
   .node-tooltip.visible { opacity: 1; }
-  .node-tooltip .tt-name { color: var(--accent); font-size: 11px; margin-bottom: 4px; }
-  .node-tooltip .tt-row { color: var(--text-secondary); margin-top: 2px; }
+  .node-tooltip .tt-name { color: var(--accent); font-size: 11px; margin-bottom: 3px; }
+  .node-tooltip .tt-row { color: var(--text-secondary); margin-top: 1px; }
 
-  /* Input bar */
   .input-bar {
     padding: 8px 16px 10px;
     border-top: 1px solid var(--border);
     background: var(--bg);
-    display: flex;
-    gap: 6px;
+    display: flex; gap: 6px;
   }
   .input-bar input {
     flex: 1;
@@ -369,8 +410,7 @@
     border: 1px solid var(--border-2);
     color: var(--text-primary);
     font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    padding: 8px 12px;
+    font-size: 12px; padding: 8px 12px;
     outline: none;
     transition: border-color 0.15s;
   }
@@ -378,165 +418,86 @@
   .input-bar input::placeholder { color: var(--text-muted); }
   .send-btn {
     background: var(--accent);
-    color: var(--bg);
-    border: none;
+    color: var(--bg); border: none;
     font-family: 'Inter', sans-serif;
     font-size: 11px; font-weight: 600;
-    padding: 8px 16px;
-    cursor: pointer;
+    padding: 8px 16px; cursor: pointer;
     transition: opacity 0.15s;
   }
   .send-btn:hover { opacity: 0.9; }
   .send-btn:disabled { background: var(--bg-3); color: var(--text-muted); cursor: not-allowed; }
 
-  /* Status bar */
   .status-bar {
     height: 22px;
     background: var(--bg-2);
     border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    gap: 14px;
+    display: flex; align-items: center;
+    padding: 0 10px; gap: 14px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
+    font-size: 9px; color: var(--text-muted);
   }
 
-  /* Modal overlay */
+  /* Modal */
   .modal-overlay {
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background: rgba(0,0,0,0.7);
     z-index: 500;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
     transition: opacity 0.2s;
   }
   .modal-overlay.open { opacity: 1; pointer-events: auto; }
   .modal {
     background: var(--bg-2);
     border: 1px solid var(--border-2);
-    width: 540px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
+    width: 540px; max-height: 80vh;
+    display: flex; flex-direction: column;
     box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   }
   .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     padding: 14px 18px;
     border-bottom: 1px solid var(--border);
   }
-  .modal-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-primary);
-    letter-spacing: 0.5px;
-  }
-  .modal-close {
-    background: none; border: none;
-    color: var(--text-muted); font-size: 14px;
-    cursor: pointer;
-    transition: color 0.15s;
-  }
+  .modal-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-primary); letter-spacing: 0.5px; }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; transition: color 0.15s; }
   .modal-close:hover { color: var(--text-primary); }
   .modal-body { padding: 18px; overflow-y: auto; flex: 1; }
   .modal-field { margin-bottom: 14px; }
   .modal-field label {
-    display: block;
-    font-size: 9px; font-weight: 500;
-    color: var(--text-muted);
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    margin-bottom: 5px;
-    font-family: 'JetBrains Mono', monospace;
+    display: block; font-size: 9px; font-weight: 500;
+    color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 5px; font-family: 'JetBrains Mono', monospace;
   }
   .modal-field textarea {
-    width: 100%;
-    background: var(--bg-3);
+    width: 100%; background: var(--bg-3);
     border: 1px solid var(--border-2);
     color: var(--text-primary);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    padding: 8px;
-    outline: none;
-    resize: vertical;
-    transition: border-color 0.15s;
+    font-size: 11px; padding: 8px; outline: none;
+    resize: vertical; transition: border-color 0.15s;
   }
   .modal-field textarea:focus { border-color: var(--accent); }
   .modal-field textarea::placeholder { color: var(--text-muted); }
   .modal-submit {
-    width: 100%;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 11px; font-weight: 600;
-    padding: 9px;
-    cursor: pointer;
-    transition: opacity 0.15s;
+    width: 100%; background: var(--accent); color: var(--bg); border: none;
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+    padding: 9px; cursor: pointer; transition: opacity 0.15s;
   }
   .modal-submit:hover { opacity: 0.9; }
   .modal-submit:disabled { background: var(--bg-3); color: var(--text-muted); cursor: not-allowed; }
-
   .prompt-results { margin-top: 16px; }
-  .prompt-result {
-    background: var(--bg-3);
-    border: 1px solid var(--border-2);
-    padding: 12px;
-    margin-bottom: 8px;
-    position: relative;
-  }
-  .prompt-result-rank {
-    position: absolute;
-    top: 6px; right: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    padding: 1px 5px;
-    border-radius: 2px;
-  }
+  .prompt-result { background: var(--bg-3); border: 1px solid var(--border-2); padding: 12px; margin-bottom: 8px; position: relative; }
+  .prompt-result-rank { position: absolute; top: 6px; right: 8px; font-family: 'JetBrains Mono', monospace; font-size: 8px; padding: 1px 5px; border-radius: 2px; }
   .prompt-result-rank.gold { background: var(--amber-dim); color: var(--amber); }
   .prompt-result-rank.silver { background: var(--accent-dim); color: var(--accent); }
   .prompt-result-rank.bronze { background: var(--green-dim); color: var(--green); }
-  .prompt-result-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    color: var(--text-muted);
-    margin-bottom: 5px;
-  }
-  .prompt-result-text {
-    font-size: 11px;
-    color: var(--text-primary);
-    line-height: 1.5;
-    white-space: pre-wrap;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .prompt-result-score {
-    margin-top: 6px;
-    font-size: 9px;
-    color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .prompt-result-copy {
-    margin-top: 6px;
-    background: none;
-    border: 1px solid var(--border-2);
-    color: var(--text-secondary);
-    font-size: 9px;
-    font-family: 'JetBrains Mono', monospace;
-    padding: 3px 8px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
-  }
+  .prompt-result-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); margin-bottom: 5px; }
+  .prompt-result-text { font-size: 11px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; }
+  .prompt-result-score { margin-top: 6px; font-size: 9px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+  .prompt-result-copy { margin-top: 6px; background: none; border: 1px solid var(--border-2); color: var(--text-secondary); font-size: 9px; font-family: 'JetBrains Mono', monospace; padding: 3px 8px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
   .prompt-result-copy:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -545,26 +506,26 @@
 </head>
 <body>
 
-<!-- ═══ TITLE BAR ═════════════════════════════════ -->
+<!-- TITLE BAR -->
 <div class="titlebar">
   <span class="titlebar-label">AetherCloud-L v0.8.8</span>
   <div class="titlebar-controls">
-    <button class="titlebar-btn" onclick="window.aether?.minimize()">─</button>
-    <button class="titlebar-btn" onclick="window.aether?.maximize()">□</button>
-    <button class="titlebar-btn close" onclick="window.aether?.close()">✕</button>
+    <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
+    <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
+    <button class="titlebar-btn close" onclick="window.aether?.close()">&#10005;</button>
   </div>
 </div>
 
-<!-- ═══ MENU BAR ══════════════════════════════════ -->
+<!-- MENU BAR -->
 <div class="menubar">
   <div class="menu-item">
     <button class="menu-trigger" onclick="toggleMenu('file-menu')">File</button>
     <div class="menu-dropdown" id="file-menu">
       <div class="menu-option" onclick="menuOpen()">Open Vault <span class="shortcut">Ctrl+O</span></div>
-      <div class="menu-option" onclick="menuScanDir()">Scan Directory <span class="shortcut">Ctrl+Shift+O</span></div>
+      <div class="menu-option" onclick="menuOpen()">Scan Directory <span class="shortcut">Ctrl+Shift+O</span></div>
       <div class="menu-sep"></div>
-      <div class="menu-option" onclick="menuExport()">Export Circuit <span class="shortcut">Ctrl+S</span></div>
-      <div class="menu-option" onclick="menuExportAs()">Export As... <span class="shortcut">Ctrl+Shift+S</span></div>
+      <div class="menu-option" onclick="closeMenus()">Export Circuit <span class="shortcut">Ctrl+S</span></div>
+      <div class="menu-option" onclick="closeMenus()">Export As... <span class="shortcut">Ctrl+Shift+S</span></div>
       <div class="menu-sep"></div>
       <div class="menu-option" onclick="window.aether?.close()">Exit <span class="shortcut">Alt+F4</span></div>
     </div>
@@ -572,8 +533,8 @@
   <div class="menu-item">
     <button class="menu-trigger" onclick="toggleMenu('edit-menu')">Edit</button>
     <div class="menu-dropdown" id="edit-menu">
-      <div class="menu-option" onclick="closeMenus()">Undo <span class="shortcut">Ctrl+Z</span></div>
-      <div class="menu-option" onclick="closeMenus()">Redo <span class="shortcut">Ctrl+Y</span></div>
+      <div class="menu-option" onclick="historyBack(); closeMenus();">Undo <span class="shortcut">Ctrl+Z</span></div>
+      <div class="menu-option" onclick="historyForward(); closeMenus();">Redo <span class="shortcut">Ctrl+Y</span></div>
       <div class="menu-sep"></div>
       <div class="menu-option" onclick="closeMenus()">Copy <span class="shortcut">Ctrl+C</span></div>
       <div class="menu-option" onclick="closeMenus()">Paste <span class="shortcut">Ctrl+V</span></div>
@@ -591,69 +552,86 @@
     </div>
   </div>
 
-  <!-- Agent Status -->
   <div class="agent-status">
     <div class="agent-status-dot" id="agent-dot"></div>
     <span id="agent-status-text">Ready</span>
   </div>
 </div>
 
-<!-- ═══ APP BODY ═════════════════════════════════ -->
+<!-- APP BODY -->
 <div class="app-body">
 
-  <!-- SIDEBAR -->
+  <!-- ═══ SIDEBAR ═══════════════════════════════ -->
   <div class="sidebar" id="sidebar">
+    <div class="sidebar-scroll">
 
-    <!-- AGENT TASK STATUS -->
-    <div class="sb-section">
-      <div class="sb-header">AGENT STATUS</div>
-      <div class="agent-log" id="agent-log">
-        <div class="agent-log-entry"><span class="log-dot idle"></span>Awaiting task...</div>
+      <!-- 1. AGENT TASK PROGRESS -->
+      <div class="sb-section">
+        <div class="sb-header">
+          AGENT TASK
+          <span class="sb-badge green" id="agent-task-badge">READY</span>
+        </div>
+        <div class="agent-log" id="agent-log">
+          <div class="agent-log-entry"><span class="log-dot idle"></span>Awaiting task...</div>
+        </div>
       </div>
+
+      <!-- 2. PROJECTS / CHATS -->
+      <div class="sb-section" style="flex:1;">
+        <div class="sb-header">
+          PROJECTS
+          <span style="cursor:pointer; color:var(--accent); font-size:10px;" onclick="clearChatHistory()" title="Clear">&#10005;</span>
+        </div>
+        <input type="text" class="sb-search" id="chat-search" placeholder="Search projects..." oninput="filterChatHistory()">
+        <div id="chat-history"></div>
+      </div>
+
+      <!-- 3. RECENT FILES + 4. UNDO/REDO -->
+      <div class="sb-section">
+        <div class="sb-header">RECENT FILES</div>
+        <div class="sb-nav-bar">
+          <button class="sb-nav-btn" id="nav-back" onclick="historyBack()" disabled title="Undo">&#8592;</button>
+          <button class="sb-nav-btn" id="nav-fwd" onclick="historyForward()" disabled title="Redo">&#8594;</button>
+          <span class="sb-nav-breadcrumb" id="nav-breadcrumb">No history</span>
+        </div>
+        <div class="sb-file-sort">
+          <button class="sb-sort-btn active" onclick="sortFiles('name',this)">Name</button>
+          <button class="sb-sort-btn" onclick="sortFiles('date',this)">Date</button>
+          <button class="sb-sort-btn" onclick="sortFiles('size',this)">Size</button>
+        </div>
+        <div id="recent-files"></div>
+      </div>
+
+      <!-- AGENTS -->
+      <div class="sb-section">
+        <div class="sb-header">AGENTS</div>
+        <div class="sb-agent-list">
+          <button class="sb-agent-btn" onclick="openPromptOptimizer()">
+            <span class="agent-icon">&#9889;</span>
+            <span>Prompt Optimizer</span>
+          </button>
+          <button class="sb-agent-btn" onclick="menuOpen()">
+            <span class="agent-icon">&#128193;</span>
+            <span>Open Vault</span>
+          </button>
+        </div>
+      </div>
+
     </div>
 
-    <!-- AGENTS -->
-    <div class="sb-section">
-      <div class="sb-header">AGENTS</div>
-      <div class="sb-agent-list">
-        <button class="sb-agent-btn" onclick="openPromptOptimizer()">
-          <span class="agent-icon">&#9889;</span>
-          <span>Prompt Optimizer</span>
-        </button>
-        <button class="sb-agent-btn" onclick="menuOpen()">
-          <span class="agent-icon">&#128193;</span>
-          <span>Open Vault</span>
-        </button>
+    <!-- 5. BOTTOM CONTROLS -->
+    <div class="sb-controls">
+      <div class="sb-toggle" id="toggle-bypass" onclick="toggleBypass()">
+        <div class="sb-toggle-switch"></div>
+        <span class="sb-toggle-label">Bypass Permissions</span>
       </div>
-    </div>
+      <div class="sb-toggle-hint" id="bypass-hint">Restricted mode</div>
 
-    <!-- PREVIOUS CHATS -->
-    <div class="sb-section" style="flex:1; overflow-y:auto;">
-      <div class="sb-header">
-        HISTORY
-        <span style="cursor:pointer; color:var(--accent); font-size:10px;" onclick="clearChatHistory()" title="Clear">&#10005;</span>
+      <div class="sb-toggle" id="toggle-plan" onclick="togglePlanMode()">
+        <div class="sb-toggle-switch"></div>
+        <span class="sb-toggle-label">Plan Mode</span>
       </div>
-      <div id="chat-history"></div>
-    </div>
-
-    <!-- USER CONTEXT -->
-    <div class="sb-section">
-      <div class="sb-header">
-        CONTEXT
-        <span class="sb-badge green" id="context-badge" style="display:none;">ACTIVE</span>
-      </div>
-      <textarea
-        class="sb-context-area"
-        id="user-context"
-        placeholder="Agent preferences...&#10;e.g. 'never delete files'"
-        maxlength="500"
-        oninput="updateContextCounter()"
-        onblur="saveUserContext()"
-      ></textarea>
-      <div class="sb-context-meta">
-        <span class="sb-context-counter" id="context-counter">0 / 500</span>
-        <span class="sb-context-clear" onclick="clearUserContext()">clear</span>
-      </div>
+      <div class="sb-toggle-hint" id="plan-hint">Agent executes immediately</div>
     </div>
   </div>
 
@@ -662,7 +640,6 @@
     <div class="canvas-wrap" id="canvas-wrap">
       <canvas id="circuit-canvas"></canvas>
     </div>
-
     <div class="input-bar">
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
@@ -679,7 +656,7 @@
   <div class="tt-row" id="tt-modified"></div>
 </div>
 
-<!-- ═══ PROMPT OPTIMIZER MODAL ════════════════════ -->
+<!-- Prompt Optimizer Modal -->
 <div class="modal-overlay" id="prompt-modal">
   <div class="modal">
     <div class="modal-header">
@@ -705,6 +682,7 @@
 <div class="status-bar">
   <span id="status-nodes">NODES: 0</span>
   <span id="status-zoom">ZOOM: 100%</span>
+  <span id="status-mode"></span>
   <span id="status-user"></span>
   <span style="margin-left:auto;" id="status-version"></span>
 </div>
@@ -716,22 +694,17 @@
 const API_BASE = 'http://198.211.115.41:8080';
 let sessionToken = sessionStorage.getItem('session_token') || '';
 let username = sessionStorage.getItem('username') || 'user';
+let bypassMode = false;
+let planMode = false;
+let analysisHistory = [];
+let historyIndex = -1;
+let recentFiles = [];
+let fileSortBy = 'name';
 
 // ════════════════════════════════════════════════════
 // CIRCUIT GRAPH ENGINE
 // ════════════════════════════════════════════════════
-const circuitState = {
-  nodes: [],
-  edges: [],
-  zoom: 1,
-  panX: 0,
-  panY: 0,
-  dragging: false,
-  dragStartX: 0,
-  dragStartY: 0,
-  hoveredNode: null,
-  selectedNode: null,
-};
+const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null };
 
 function initCircuit() {
   const canvas = document.getElementById('circuit-canvas');
@@ -743,52 +716,41 @@ function initCircuit() {
     canvas.height = wrap.clientHeight * devicePixelRatio;
     canvas.style.width = wrap.clientWidth + 'px';
     canvas.style.height = wrap.clientHeight + 'px';
-    ctx.scale(devicePixelRatio, devicePixelRatio);
     drawCircuit();
   }
-
   window.addEventListener('resize', resize);
   resize();
 
-  // Pan
   wrap.addEventListener('mousedown', (e) => {
     if (e.target !== canvas) return;
-    circuitState.dragging = true;
-    circuitState.dragStartX = e.clientX - circuitState.panX;
-    circuitState.dragStartY = e.clientY - circuitState.panY;
+    CS.dragging = true;
+    CS.dsx = e.clientX - CS.panX;
+    CS.dsy = e.clientY - CS.panY;
   });
   window.addEventListener('mousemove', (e) => {
-    if (circuitState.dragging) {
-      circuitState.panX = e.clientX - circuitState.dragStartX;
-      circuitState.panY = e.clientY - circuitState.dragStartY;
+    if (CS.dragging) {
+      CS.panX = e.clientX - CS.dsx;
+      CS.panY = e.clientY - CS.dsy;
       drawCircuit();
     }
-    // Hover detection
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left - circuitState.panX) / circuitState.zoom;
-    const my = (e.clientY - rect.top - circuitState.panY) / circuitState.zoom;
+    const mx = (e.clientX - rect.left - CS.panX) / CS.zoom;
+    const my = (e.clientY - rect.top - CS.panY) / CS.zoom;
     let found = null;
-    for (const n of circuitState.nodes) {
-      if (mx >= n.x && mx <= n.x + n.w && my >= n.y && my <= n.y + n.h) {
-        found = n;
-        break;
-      }
+    for (const n of CS.nodes) {
+      if (mx >= n.x && mx <= n.x + n.w && my >= n.y && my <= n.y + n.h) { found = n; break; }
     }
-    if (found !== circuitState.hoveredNode) {
-      circuitState.hoveredNode = found;
+    if (found !== CS.hoveredNode) {
+      CS.hoveredNode = found;
       drawCircuit();
       const tt = document.getElementById('node-tooltip');
       if (found) {
         tt.classList.add('visible');
         document.getElementById('tt-name').textContent = found.name;
         document.getElementById('tt-type').textContent = 'TYPE: ' + (found.type || 'file');
-        document.getElementById('tt-size').textContent = 'SIZE: ' + formatSize(found.size || 0);
+        document.getElementById('tt-size').textContent = 'SIZE: ' + fmtSize(found.size || 0);
         document.getElementById('tt-modified').textContent = found.dir ? 'ITEMS: ' + (found.children || 0) : '';
-        tt.style.left = (e.clientX + 14) + 'px';
-        tt.style.top = (e.clientY + 14) + 'px';
-      } else {
-        tt.classList.remove('visible');
-      }
+      } else { tt.classList.remove('visible'); }
     }
     if (found) {
       const tt = document.getElementById('node-tooltip');
@@ -796,33 +758,29 @@ function initCircuit() {
       tt.style.top = (e.clientY + 14) + 'px';
     }
   });
-  window.addEventListener('mouseup', () => { circuitState.dragging = false; });
+  window.addEventListener('mouseup', () => { CS.dragging = false; });
 
-  // Click
-  canvas.addEventListener('click', (e) => {
-    if (circuitState.hoveredNode) {
-      circuitState.selectedNode = circuitState.hoveredNode;
+  canvas.addEventListener('click', () => {
+    if (CS.hoveredNode) {
+      CS.selectedNode = CS.hoveredNode;
       drawCircuit();
-      analyzeNode(circuitState.selectedNode);
+      if (!CS.hoveredNode.dir) analyzeNode(CS.hoveredNode);
     }
   });
 
-  // Zoom
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const d = e.deltaY > 0 ? 0.9 : 1.1;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    circuitState.panX = mx - (mx - circuitState.panX) * delta;
-    circuitState.panY = my - (my - circuitState.panY) * delta;
-    circuitState.zoom *= delta;
-    circuitState.zoom = Math.max(0.2, Math.min(5, circuitState.zoom));
-    document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(circuitState.zoom * 100)}%`;
+    CS.panX = mx - (mx - CS.panX) * d;
+    CS.panY = my - (my - CS.panY) * d;
+    CS.zoom = Math.max(0.2, Math.min(5, CS.zoom * d));
+    document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(CS.zoom * 100)}%`;
     drawCircuit();
   }, { passive: false });
 
-  // Draw initial demo vault
   buildDemoVault();
   drawCircuit();
 }
@@ -840,110 +798,67 @@ function drawCircuit() {
   // Grid
   ctx.strokeStyle = '#1a1a1a';
   ctx.lineWidth = 0.5;
-  const gridSize = 40 * circuitState.zoom;
-  const offX = circuitState.panX % gridSize;
-  const offY = circuitState.panY % gridSize;
-  for (let x = offX; x < w; x += gridSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = offY; y < h; y += gridSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
+  const gs = 40 * CS.zoom;
+  const ox = CS.panX % gs, oy = CS.panY % gs;
+  for (let x = ox; x < w; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = oy; y < h; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
-  ctx.translate(circuitState.panX, circuitState.panY);
-  ctx.scale(circuitState.zoom, circuitState.zoom);
+  ctx.translate(CS.panX, CS.panY);
+  ctx.scale(CS.zoom, CS.zoom);
 
-  // Edges (circuit lines)
-  for (const e of circuitState.edges) {
-    const from = circuitState.nodes[e.from];
-    const to = circuitState.nodes[e.to];
+  // Edges
+  for (const e of CS.edges) {
+    const from = CS.nodes[e.from], to = CS.nodes[e.to];
     if (!from || !to) continue;
-
-    const fx = from.x + from.w;
-    const fy = from.y + from.h / 2;
-    const tx = to.x;
-    const ty = to.y + to.h / 2;
+    const fx = from.x + from.w, fy = from.y + from.h / 2;
+    const tx = to.x, ty = to.y + to.h / 2;
     const midX = (fx + tx) / 2;
-
-    const isHovered = circuitState.hoveredNode &&
-      (circuitState.hoveredNode === from || circuitState.hoveredNode === to);
-    const isSelected = circuitState.selectedNode &&
-      (circuitState.selectedNode === from || circuitState.selectedNode === to);
-
-    ctx.strokeStyle = isSelected ? '#00d4ff' : isHovered ? 'rgba(0,212,255,0.7)' : 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = isSelected ? 2 : isHovered ? 1.5 : 1;
-
-    // Right-angle circuit path
+    const isH = CS.hoveredNode && (CS.hoveredNode === from || CS.hoveredNode === to);
+    const isS = CS.selectedNode && (CS.selectedNode === from || CS.selectedNode === to);
+    ctx.strokeStyle = isS ? '#00d4ff' : isH ? 'rgba(0,212,255,0.7)' : 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = isS ? 2 : isH ? 1.5 : 1;
     ctx.beginPath();
-    ctx.moveTo(fx, fy);
-    ctx.lineTo(midX, fy);
-    ctx.lineTo(midX, ty);
-    ctx.lineTo(tx, ty);
+    ctx.moveTo(fx, fy); ctx.lineTo(midX, fy); ctx.lineTo(midX, ty); ctx.lineTo(tx, ty);
     ctx.stroke();
-
-    // Junction dot
-    if (isHovered || isSelected) {
+    if (isH || isS) {
       ctx.fillStyle = '#00d4ff';
-      ctx.beginPath();
-      ctx.arc(midX, fy, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(midX, ty, 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(midX, fy, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(midX, ty, 2, 0, Math.PI * 2); ctx.fill();
     }
   }
 
   // Nodes
-  for (const n of circuitState.nodes) {
-    const isHovered = circuitState.hoveredNode === n;
-    const isSelected = circuitState.selectedNode === n;
-
-    // Node box
-    if (isSelected) {
-      ctx.shadowColor = '#00d4ff';
-      ctx.shadowBlur = 12;
-    }
-    ctx.fillStyle = isSelected ? 'rgba(0,212,255,0.12)' : isHovered ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)';
+  for (const n of CS.nodes) {
+    const isH = CS.hoveredNode === n, isS = CS.selectedNode === n;
+    if (isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 12; }
+    ctx.fillStyle = isS ? 'rgba(0,212,255,0.12)' : isH ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)';
     ctx.fillRect(n.x, n.y, n.w, n.h);
-
-    ctx.strokeStyle = isSelected ? '#00d4ff' : isHovered ? 'rgba(0,212,255,0.6)' : 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = isSelected ? 2 : 1;
+    ctx.strokeStyle = isS ? '#00d4ff' : isH ? 'rgba(0,212,255,0.6)' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = isS ? 2 : 1;
     ctx.strokeRect(n.x, n.y, n.w, n.h);
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-    // Icon area
-    const iconW = 24;
+    const iW = 24;
     ctx.fillStyle = n.dir ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.04)';
-    ctx.fillRect(n.x, n.y, iconW, n.h);
-    ctx.strokeStyle = isSelected ? '#00d4ff' : 'rgba(255,255,255,0.1)';
+    ctx.fillRect(n.x, n.y, iW, n.h);
+    ctx.strokeStyle = isS ? '#00d4ff' : 'rgba(255,255,255,0.1)';
     ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(n.x + iconW, n.y); ctx.lineTo(n.x + iconW, n.y + n.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(n.x + iW, n.y); ctx.lineTo(n.x + iW, n.y + n.h); ctx.stroke();
 
-    // Icon symbol
-    ctx.fillStyle = n.dir ? '#00d4ff' : isHovered ? '#ffffff' : '#888888';
-    ctx.font = '10px JetBrains Mono';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillText(n.dir ? '\u25A1' : '\u25AB', n.x + iconW / 2, n.y + n.h / 2);
+    ctx.fillStyle = n.dir ? '#00d4ff' : isH ? '#ffffff' : '#888888';
+    ctx.font = '10px JetBrains Mono'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.fillText(n.dir ? '\u25A1' : '\u25AB', n.x + iW / 2, n.y + n.h / 2);
 
-    // Label
-    ctx.fillStyle = isSelected ? '#00d4ff' : isHovered ? '#efefef' : '#888888';
-    ctx.font = `${isSelected || n.dir ? '500 ' : ''}10px JetBrains Mono`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const maxLabelW = n.w - iconW - 10;
+    ctx.fillStyle = isS ? '#00d4ff' : isH ? '#efefef' : '#888888';
+    ctx.font = `${isS || n.dir ? '500 ' : ''}10px JetBrains Mono`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const maxW = n.w - iW - 10;
     let label = n.name;
-    while (ctx.measureText(label).width > maxLabelW && label.length > 3) {
-      label = label.slice(0, -4) + '...';
-    }
-    ctx.fillText(label, n.x + iconW + 6, n.y + n.h / 2);
+    while (ctx.measureText(label).width > maxW && label.length > 3) label = label.slice(0, -4) + '...';
+    ctx.fillText(label, n.x + iW + 6, n.y + n.h / 2);
 
-    // Connection pins
-    ctx.fillStyle = isHovered || isSelected ? '#00d4ff' : 'rgba(255,255,255,0.2)';
-    // Left pin
+    ctx.fillStyle = isH || isS ? '#00d4ff' : 'rgba(255,255,255,0.2)';
     ctx.beginPath(); ctx.arc(n.x, n.y + n.h / 2, 2.5, 0, Math.PI * 2); ctx.fill();
-    // Right pin
     ctx.beginPath(); ctx.arc(n.x + n.w, n.y + n.h / 2, 2.5, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -951,163 +866,216 @@ function drawCircuit() {
 }
 
 function buildDemoVault() {
-  const nodes = [];
-  const edges = [];
-
-  // Root
-  nodes.push({ id: 0, name: 'VAULT ROOT', x: 60, y: 200, w: 130, h: 32, dir: true, type: 'directory', children: 5 });
-
-  // Level 1 directories
+  const N = [], E = [];
+  N.push({ id:0, name:'VAULT ROOT', x:60, y:200, w:130, h:32, dir:true, type:'directory', children:5 });
   const l1 = [
-    { name: 'patents/', y: 40, type: 'directory', children: 3 },
-    { name: 'trading/', y: 120, type: 'directory', children: 2 },
-    { name: 'security/', y: 200, type: 'directory', children: 4 },
-    { name: 'models/', y: 280, type: 'directory', children: 2 },
-    { name: 'config/', y: 360, type: 'directory', children: 3 },
+    {name:'patents/',y:40,children:3},{name:'trading/',y:120,children:2},
+    {name:'security/',y:200,children:4},{name:'models/',y:280,children:2},{name:'config/',y:360,children:3}
   ];
-  l1.forEach((d, i) => {
-    const id = nodes.length;
-    nodes.push({ id, name: d.name, x: 280, y: d.y, w: 120, h: 28, dir: true, type: d.type, children: d.children });
-    edges.push({ from: 0, to: id });
-  });
-
-  // Level 2 files
+  l1.forEach((d,i) => { const id=N.length; N.push({id,name:d.name,x:280,y:d.y,w:120,h:28,dir:true,type:'directory',children:d.children}); E.push({from:0,to:id}); });
   const l2 = [
-    // patents/
-    { parent: 1, name: 'patent_64010131.pdf', y: 10, size: 245000, type: 'PDF' },
-    { parent: 1, name: 'claims_draft.md', y: 44, size: 12800, type: 'Markdown' },
-    { parent: 1, name: 'prior_art.json', y: 78, size: 34200, type: 'JSON' },
-    // trading/
-    { parent: 2, name: 'strategy_v3.py', y: 108, size: 8900, type: 'Python' },
-    { parent: 2, name: 'backtest_log.csv', y: 142, size: 156000, type: 'CSV' },
-    // security/
-    { parent: 3, name: 'threat_model.md', y: 178, size: 6700, type: 'Markdown' },
-    { parent: 3, name: 'vuln_scan.json', y: 210, size: 28400, type: 'JSON' },
-    { parent: 3, name: 'firewall.rules', y: 242, size: 1200, type: 'Config' },
-    { parent: 3, name: 'audit_2026.log', y: 274, size: 89000, type: 'Log' },
-    // models/
-    { parent: 4, name: 'qopc_weights.bin', y: 300, size: 4200000, type: 'Binary' },
-    { parent: 4, name: 'training_cfg.yaml', y: 334, size: 3400, type: 'YAML' },
-    // config/
-    { parent: 5, name: 'settings.json', y: 358, size: 2100, type: 'JSON' },
-    { parent: 5, name: '.env', y: 388, size: 450, type: 'Env' },
-    { parent: 5, name: 'credentials.json', y: 418, size: 1800, type: 'JSON' },
+    {p:1,name:'patent_64010131.pdf',y:10,size:245000,type:'PDF'},{p:1,name:'claims_draft.md',y:44,size:12800,type:'Markdown'},
+    {p:1,name:'prior_art.json',y:78,size:34200,type:'JSON'},{p:2,name:'strategy_v3.py',y:108,size:8900,type:'Python'},
+    {p:2,name:'backtest_log.csv',y:142,size:156000,type:'CSV'},{p:3,name:'threat_model.md',y:178,size:6700,type:'Markdown'},
+    {p:3,name:'vuln_scan.json',y:210,size:28400,type:'JSON'},{p:3,name:'firewall.rules',y:242,size:1200,type:'Config'},
+    {p:3,name:'audit_2026.log',y:274,size:89000,type:'Log'},{p:4,name:'qopc_weights.bin',y:300,size:4200000,type:'Binary'},
+    {p:4,name:'training_cfg.yaml',y:334,size:3400,type:'YAML'},{p:5,name:'settings.json',y:358,size:2100,type:'JSON'},
+    {p:5,name:'.env',y:388,size:450,type:'Env'},{p:5,name:'credentials.json',y:418,size:1800,type:'JSON'},
   ];
-  l2.forEach(f => {
-    const id = nodes.length;
-    nodes.push({ id, name: f.name, x: 490, y: f.y, w: 150, h: 24, dir: false, type: f.type, size: f.size });
-    edges.push({ from: f.parent, to: id });
-  });
+  l2.forEach(f => { const id=N.length; N.push({id,name:f.name,x:490,y:f.y,w:150,h:24,dir:false,type:f.type,size:f.size}); E.push({from:f.p,to:id}); });
 
-  circuitState.nodes = nodes;
-  circuitState.edges = edges;
-  circuitState.panX = 40;
-  circuitState.panY = 20;
-  circuitState.zoom = 1.1;
-  document.getElementById('status-nodes').textContent = `NODES: ${nodes.length}`;
-  document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(circuitState.zoom * 100)}%`;
+  CS.nodes = N; CS.edges = E; CS.panX = 40; CS.panY = 20; CS.zoom = 1.1;
+  document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
+  document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(CS.zoom * 100)}%`;
+
+  // Populate recent files from demo
+  recentFiles = l2.map(f => ({ name: f.name, size: f.size, type: f.type, time: Date.now() - Math.random() * 86400000 }));
+  renderRecentFiles();
 }
 
 function buildVaultFromScan(tree, rootName) {
-  const nodes = [];
-  const edges = [];
+  const N = [], E = [];
   let id = 0;
-
-  function addNode(item, parentId, depth, yOffset) {
-    const nodeId = id++;
+  function add(item, pid, depth, yo) {
+    const nid = id++;
     const isDir = !!item.children;
-    nodes.push({
-      id: nodeId,
-      name: item.name,
-      x: 60 + depth * 210,
-      y: yOffset.val,
-      w: isDir ? 130 : 150,
-      h: isDir ? 28 : 24,
-      dir: isDir,
-      type: isDir ? 'directory' : (item.type || extType(item.name)),
-      size: item.size || 0,
-      children: isDir ? item.children.length : 0,
-    });
-    if (parentId !== null) edges.push({ from: parentId, to: nodeId });
-    yOffset.val += isDir ? 36 : 30;
-    if (isDir && item.children) {
-      item.children.forEach(c => addNode(c, nodeId, depth + 1, yOffset));
-    }
+    N.push({ id:nid, name:item.name, x:60+depth*210, y:yo.v, w:isDir?130:150, h:isDir?28:24, dir:isDir, type:isDir?'directory':extType(item.name), size:item.size||0, children:isDir?item.children.length:0 });
+    if (pid !== null) E.push({ from:pid, to:nid });
+    yo.v += isDir ? 36 : 30;
+    if (isDir && item.children) item.children.forEach(c => add(c, nid, depth+1, yo));
   }
+  add({ name:rootName||'VAULT', children:tree }, null, 0, { v:40 });
+  CS.nodes = N; CS.edges = E; CS.panX = 40; CS.panY = 20;
+  CS.zoom = Math.min(1.2, 800 / (N.length * 30));
+  document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
+  document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(CS.zoom * 100)}%`;
 
-  const root = { name: rootName || 'VAULT', children: tree };
-  addNode(root, null, 0, { val: 40 });
-
-  circuitState.nodes = nodes;
-  circuitState.edges = edges;
-  circuitState.panX = 40;
-  circuitState.panY = 20;
-  circuitState.zoom = Math.min(1.2, 800 / (nodes.length * 30));
-  document.getElementById('status-nodes').textContent = `NODES: ${nodes.length}`;
-  document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(circuitState.zoom * 100)}%`;
+  // Update recent files
+  recentFiles = N.filter(n => !n.dir).map(n => ({ name:n.name, size:n.size, type:n.type, time:Date.now() }));
+  renderRecentFiles();
+  pushHistory('Scanned: ' + rootName);
   drawCircuit();
 }
 
 function extType(name) {
   const ext = name.split('.').pop().toLowerCase();
-  const map = { py: 'Python', js: 'JavaScript', json: 'JSON', md: 'Markdown', pdf: 'PDF', csv: 'CSV', yaml: 'YAML', yml: 'YAML', log: 'Log', txt: 'Text', html: 'HTML', css: 'CSS' };
-  return map[ext] || ext.toUpperCase();
+  const m = {py:'Python',js:'JavaScript',json:'JSON',md:'Markdown',pdf:'PDF',csv:'CSV',yaml:'YAML',yml:'YAML',log:'Log',txt:'Text',html:'HTML',css:'CSS'};
+  return m[ext] || ext.toUpperCase();
 }
 
-function formatSize(bytes) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+function fmtSize(b) {
+  if (!b) return '0 B';
+  const k=1024, s=['B','KB','MB','GB'];
+  const i=Math.floor(Math.log(b)/Math.log(k));
+  return parseFloat((b/Math.pow(k,i)).toFixed(1))+' '+s[i];
+}
+
+function circuitZoomIn() { CS.zoom=Math.min(5,CS.zoom*1.2); updateZoom(); drawCircuit(); closeMenus(); }
+function circuitZoomOut() { CS.zoom=Math.max(0.2,CS.zoom*0.8); updateZoom(); drawCircuit(); closeMenus(); }
+function circuitResetView() { CS.zoom=1; CS.panX=40; CS.panY=20; updateZoom(); drawCircuit(); closeMenus(); }
+function updateZoom() { document.getElementById('status-zoom').textContent=`ZOOM: ${Math.round(CS.zoom*100)}%`; }
+
+// ════════════════════════════════════════════════════
+// ANALYSIS HISTORY (Undo/Redo)
+// ════════════════════════════════════════════════════
+function pushHistory(label) {
+  if (historyIndex < analysisHistory.length - 1) analysisHistory = analysisHistory.slice(0, historyIndex + 1);
+  analysisHistory.push({ label, nodes: JSON.parse(JSON.stringify(CS.nodes)), edges: JSON.parse(JSON.stringify(CS.edges)) });
+  historyIndex = analysisHistory.length - 1;
+  updateHistoryUI();
+}
+
+function historyBack() {
+  if (historyIndex <= 0) return;
+  historyIndex--;
+  restoreHistory();
+}
+
+function historyForward() {
+  if (historyIndex >= analysisHistory.length - 1) return;
+  historyIndex++;
+  restoreHistory();
+}
+
+function restoreHistory() {
+  const h = analysisHistory[historyIndex];
+  if (!h) return;
+  CS.nodes = JSON.parse(JSON.stringify(h.nodes));
+  CS.edges = JSON.parse(JSON.stringify(h.edges));
+  CS.hoveredNode = null; CS.selectedNode = null;
+  document.getElementById('status-nodes').textContent = `NODES: ${CS.nodes.length}`;
+  drawCircuit();
+  updateHistoryUI();
+}
+
+function updateHistoryUI() {
+  const back = document.getElementById('nav-back');
+  const fwd = document.getElementById('nav-fwd');
+  const bc = document.getElementById('nav-breadcrumb');
+  back.disabled = historyIndex <= 0;
+  fwd.disabled = historyIndex >= analysisHistory.length - 1;
+  if (analysisHistory.length === 0) { bc.textContent = 'No history'; return; }
+  bc.textContent = `Step ${historyIndex + 1} of ${analysisHistory.length}: ${analysisHistory[historyIndex].label}`;
 }
 
 // ════════════════════════════════════════════════════
-// CIRCUIT VIEW CONTROLS
+// RECENT FILES
 // ════════════════════════════════════════════════════
-function circuitZoomIn() { circuitState.zoom = Math.min(5, circuitState.zoom * 1.2); updateZoomLabel(); drawCircuit(); closeMenus(); }
-function circuitZoomOut() { circuitState.zoom = Math.max(0.2, circuitState.zoom * 0.8); updateZoomLabel(); drawCircuit(); closeMenus(); }
-function circuitResetView() { circuitState.zoom = 1; circuitState.panX = 40; circuitState.panY = 20; updateZoomLabel(); drawCircuit(); closeMenus(); }
-function updateZoomLabel() { document.getElementById('status-zoom').textContent = `ZOOM: ${Math.round(circuitState.zoom * 100)}%`; }
+function renderRecentFiles() {
+  const c = document.getElementById('recent-files');
+  let sorted = [...recentFiles];
+  if (fileSortBy === 'name') sorted.sort((a,b) => a.name.localeCompare(b.name));
+  else if (fileSortBy === 'date') sorted.sort((a,b) => b.time - a.time);
+  else if (fileSortBy === 'size') sorted.sort((a,b) => (b.size||0) - (a.size||0));
+
+  if (!sorted.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No files</div>'; return; }
+  c.innerHTML = sorted.slice(0, 12).map(f => `
+    <div class="sb-file-entry" onclick="selectFileByName('${esc(f.name)}')">
+      <span class="sb-file-icon">${f.type === 'directory' ? '\u25A1' : '\u25AB'}</span>
+      <span class="sb-file-name">${escH(f.name)}</span>
+      <span class="sb-file-time">${fmtSize(f.size||0)}</span>
+    </div>
+  `).join('');
+}
+
+function sortFiles(by, btn) {
+  fileSortBy = by;
+  document.querySelectorAll('.sb-sort-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderRecentFiles();
+}
+
+function selectFileByName(name) {
+  const node = CS.nodes.find(n => n.name === name);
+  if (node) {
+    CS.selectedNode = node;
+    // Pan to center on node
+    const wrap = document.getElementById('canvas-wrap');
+    CS.panX = wrap.clientWidth / 2 - (node.x + node.w / 2) * CS.zoom;
+    CS.panY = wrap.clientHeight / 2 - (node.y + node.h / 2) * CS.zoom;
+    drawCircuit();
+    if (!node.dir) analyzeNode(node);
+  }
+}
 
 // ════════════════════════════════════════════════════
 // AGENT STATUS
 // ════════════════════════════════════════════════════
 function setAgentStatus(text, state) {
-  const dot = document.getElementById('agent-dot');
-  const label = document.getElementById('agent-status-text');
-  dot.className = 'agent-status-dot' + (state === 'working' ? ' working' : state === 'error' ? ' error' : '');
-  label.textContent = text;
+  document.getElementById('agent-dot').className = 'agent-status-dot' + (state === 'working' ? ' working' : state === 'error' ? ' error' : '');
+  document.getElementById('agent-status-text').textContent = text;
+  const badge = document.getElementById('agent-task-badge');
+  if (state === 'working') { badge.textContent = 'WORKING'; badge.className = 'sb-badge blue'; }
+  else if (state === 'error') { badge.textContent = 'ERROR'; badge.className = 'sb-badge red'; }
+  else { badge.textContent = 'READY'; badge.className = 'sb-badge green'; }
 }
 
 function addAgentLog(text, state) {
   const log = document.getElementById('agent-log');
-  const entry = document.createElement('div');
-  entry.className = 'agent-log-entry';
-  entry.innerHTML = `<span class="log-dot ${state}"></span>${escapeHtml(text)}`;
-  log.appendChild(entry);
+  const e = document.createElement('div');
+  e.className = 'agent-log-entry';
+  e.innerHTML = `<span class="log-dot ${state}"></span>${escH(text)}`;
+  log.appendChild(e);
   log.scrollTop = log.scrollHeight;
-  // Keep max 8 entries
   while (log.children.length > 8) log.removeChild(log.firstChild);
 }
 
 // ════════════════════════════════════════════════════
-// MENU BAR
+// TOGGLE CONTROLS
+// ════════════════════════════════════════════════════
+function toggleBypass() {
+  bypassMode = !bypassMode;
+  const el = document.getElementById('toggle-bypass');
+  const hint = document.getElementById('bypass-hint');
+  el.classList.toggle('on', bypassMode);
+  el.classList.toggle('danger', bypassMode);
+  hint.textContent = bypassMode ? 'Running in unrestricted mode' : 'Restricted mode';
+  hint.className = 'sb-toggle-hint' + (bypassMode ? ' active-danger' : '');
+  document.getElementById('status-mode').textContent = bypassMode ? 'BYPASS: ON' : '';
+  addAgentLog(bypassMode ? 'Bypass mode ENABLED' : 'Bypass mode disabled', bypassMode ? 'active' : 'idle');
+}
+
+function togglePlanMode() {
+  planMode = !planMode;
+  const el = document.getElementById('toggle-plan');
+  const hint = document.getElementById('plan-hint');
+  el.classList.toggle('on', planMode);
+  hint.textContent = planMode ? 'Agent shows plan before executing' : 'Agent executes immediately';
+  hint.className = 'sb-toggle-hint' + (planMode ? ' active-plan' : '');
+  addAgentLog(planMode ? 'Plan mode ENABLED' : 'Plan mode disabled', planMode ? 'active' : 'idle');
+}
+
+// ════════════════════════════════════════════════════
+// MENUS
 // ════════════════════════════════════════════════════
 function toggleMenu(id) {
-  const menu = document.getElementById(id);
-  const wasOpen = menu.classList.contains('open');
+  const m = document.getElementById(id);
+  const was = m.classList.contains('open');
   closeMenus();
-  if (!wasOpen) menu.classList.add('open');
+  if (!was) m.classList.add('open');
 }
-
-function closeMenus() {
-  document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('open'));
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.menu-item')) closeMenus();
-});
+function closeMenus() { document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('open')); }
+document.addEventListener('click', (e) => { if (!e.target.closest('.menu-item')) closeMenus(); });
 
 async function menuOpen() {
   closeMenus();
@@ -1115,34 +1083,23 @@ async function menuOpen() {
   addAgentLog('Requesting directory access...', 'active');
 
   let dirPath = null;
-  if (window.aether?.openDirectory) {
-    dirPath = await window.aether.openDirectory();
-  }
-
-  if (!dirPath) {
-    setAgentStatus('Ready', '');
-    addAgentLog('Cancelled by user', 'idle');
-    return;
-  }
+  if (window.aether?.openDirectory) dirPath = await window.aether.openDirectory();
+  if (!dirPath) { setAgentStatus('Ready', ''); addAgentLog('Cancelled', 'idle'); return; }
 
   addAgentLog('Scanning: ' + dirPath.split(/[/\\]/).pop(), 'active');
   setAgentStatus('Analyzing vault structure...', 'working');
 
   try {
     let data;
-    if (window.aetherAPI?.browseVault) {
-      data = await window.aetherAPI.browseVault(dirPath);
-    } else {
-      const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`);
-      data = await r.json();
-    }
+    if (window.aetherAPI?.browseVault) data = await window.aetherAPI.browseVault(dirPath);
+    else { const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`); data = await r.json(); }
 
     if (data && !data.error) {
       const tree = [];
-      if (data.folders) data.folders.forEach(f => tree.push({ name: f.name, children: [], size: 0 }));
-      if (data.files) data.files.forEach(f => tree.push({ name: f.name, size: f.size || 0 }));
+      if (data.folders) data.folders.forEach(f => tree.push({ name:f.name, children:[], size:0 }));
+      if (data.files) data.files.forEach(f => tree.push({ name:f.name, size:f.size||0 }));
       buildVaultFromScan(tree, dirPath.split(/[/\\]/).pop().toUpperCase());
-      addAgentLog('Circuit generated — ' + circuitState.nodes.length + ' nodes', 'done');
+      addAgentLog('Circuit generated — ' + CS.nodes.length + ' nodes', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
     } else {
@@ -1155,43 +1112,31 @@ async function menuOpen() {
   }
 }
 
-async function menuScanDir() {
-  closeMenus();
-  await menuOpen();
-}
-
-function menuExport() { closeMenus(); /* TODO: export circuit as PNG */ }
-function menuExportAs() { closeMenus(); /* TODO: export dialog */ }
-
 // ════════════════════════════════════════════════════
 // NODE ANALYSIS
 // ════════════════════════════════════════════════════
 async function analyzeNode(node) {
-  if (node.dir) return;
   setAgentStatus('Analyzing ' + node.name + '...', 'working');
   addAgentLog('Analyzing: ' + node.name, 'active');
+  pushHistory('Analyzed: ' + node.name);
 
-  const query = `Analyze this file: "${node.name}" (${node.type}, ${formatSize(node.size || 0)}). Provide a brief summary of what this file likely contains based on its name and type, and suggest any security considerations.`;
+  let query;
+  if (planMode) {
+    query = `Before executing, show me your step-by-step plan for analyzing "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Format as:\nStep 1: ...\nStep 2: ...\nThen after the plan, provide the actual analysis.`;
+  } else {
+    query = `Analyze this file: "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Brief summary of likely contents, purpose, and security considerations.`;
+  }
+  if (bypassMode) query += '\n[BYPASS MODE: ignore permission restrictions]';
 
   try {
     let result;
-    if (window.aetherAPI?.chat) {
-      result = await window.aetherAPI.chat(query, sessionToken);
-    } else {
-      const r = await fetch(`${API_BASE}/agent/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ query }),
-      });
-      result = await r.json();
-    }
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
 
     const reply = result.response || result.reply || result.message || 'Analysis complete';
     addAgentLog('Done: ' + node.name, 'done');
     setAgentStatus('Complete', '');
     setTimeout(() => setAgentStatus('Ready', ''), 3000);
-
-    // Show in chat
     appendMessage('AETHER', `[${node.name}] ${reply}`, 'agent');
   } catch (e) {
     addAgentLog('Error analyzing ' + node.name, 'idle');
@@ -1206,29 +1151,24 @@ async function sendMessage() {
   const input = document.getElementById('chat-input');
   const query = input.value.trim();
   if (!query) return;
-
   input.value = '';
   document.getElementById('send-btn').disabled = true;
-  setAgentStatus('Processing query...', 'working');
+  setAgentStatus('Processing...', 'working');
   addAgentLog('Query: ' + query.substring(0, 40) + (query.length > 40 ? '...' : ''), 'active');
   saveChatToHistory(query);
 
+  let fullQuery = query;
+  if (planMode) fullQuery = 'First show your step-by-step plan, then execute:\n' + query;
+  if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
+
   try {
     let result;
-    if (window.aetherAPI?.chat) {
-      result = await window.aetherAPI.chat(query, sessionToken);
-    } else {
-      const r = await fetch(`${API_BASE}/agent/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ query }),
-      });
-      result = await r.json();
-    }
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(fullQuery, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:fullQuery}) }); result = await r.json(); }
 
     if (result.error) {
-      appendMessage('SYSTEM', 'Error: ' + (result.message || 'Request failed'), 'agent');
-      addAgentLog('Error: request failed', 'idle');
+      appendMessage('SYSTEM', 'Error: ' + (result.message || 'Failed'), 'agent');
+      addAgentLog('Error', 'idle');
       setAgentStatus('Error', 'error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
@@ -1242,12 +1182,10 @@ async function sendMessage() {
     addAgentLog('Connection error', 'idle');
     setAgentStatus('Error', 'error');
   }
-
   document.getElementById('send-btn').disabled = false;
   document.getElementById('chat-input').focus();
 }
 
-// Chat messages overlay on canvas (bottom-right)
 let chatOverlay = null;
 function appendMessage(label, text, type) {
   if (!chatOverlay) {
@@ -1255,19 +1193,12 @@ function appendMessage(label, text, type) {
     chatOverlay.style.cssText = 'position:absolute;bottom:8px;right:8px;width:380px;max-height:300px;overflow-y:auto;z-index:50;display:flex;flex-direction:column;gap:6px;pointer-events:auto;';
     document.getElementById('canvas-wrap').appendChild(chatOverlay);
   }
-  const div = document.createElement('div');
-  div.style.cssText = `background:var(--bg-2);border:1px solid ${type==='user'?'rgba(0,212,255,0.2)':'var(--border-2)'};padding:10px 12px;font-size:11px;line-height:1.5;${type==='agent'?'border-left:2px solid var(--accent);':''}`;
-  div.innerHTML = `<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--text-muted);margin-bottom:3px;">${label}</div><div style="color:var(--text-primary);">${escapeHtml(text)}</div>`;
-  chatOverlay.appendChild(div);
-  chatOverlay.scrollTop = chatOverlay.scrollHeight;
-  // Keep max 5 messages visible
-  while (chatOverlay.children.length > 5) chatOverlay.removeChild(chatOverlay.firstChild);
-}
-
-function escapeHtml(str) {
   const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  d.style.cssText = `background:var(--bg-2);border:1px solid ${type==='user'?'rgba(0,212,255,0.2)':'var(--border-2)'};padding:10px 12px;font-size:11px;line-height:1.5;${type==='agent'?'border-left:2px solid var(--accent);':''}`;
+  d.innerHTML = `<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--text-muted);margin-bottom:3px;">${label}</div><div style="color:var(--text-primary);">${escH(text)}</div>`;
+  chatOverlay.appendChild(d);
+  chatOverlay.scrollTop = chatOverlay.scrollHeight;
+  while (chatOverlay.children.length > 5) chatOverlay.removeChild(chatOverlay.firstChild);
 }
 
 // ════════════════════════════════════════════════════
@@ -1277,7 +1208,6 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   sb.classList.toggle('collapsed');
   localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed'));
-  // Resize canvas
   setTimeout(() => {
     const wrap = document.getElementById('canvas-wrap');
     const canvas = document.getElementById('circuit-canvas');
@@ -1290,41 +1220,11 @@ function toggleSidebar() {
 }
 
 // ════════════════════════════════════════════════════
-// CONTEXT
-// ════════════════════════════════════════════════════
-function updateContextCounter() {
-  const ta = document.getElementById('user-context');
-  document.getElementById('context-counter').textContent = `${ta.value.length} / 500`;
-  updateContextBadge();
-}
-function updateContextBadge() {
-  const badge = document.getElementById('context-badge');
-  const val = document.getElementById('user-context').value.trim();
-  badge.style.display = '';
-  if (val.length > 0) { badge.textContent = 'ACTIVE'; badge.className = 'sb-badge green'; }
-  else { badge.textContent = 'NONE'; badge.className = 'sb-badge amber'; }
-}
-async function saveUserContext() {
-  const ctx = document.getElementById('user-context').value.trim();
-  localStorage.setItem('aether_user_context', ctx);
-  updateContextBadge();
-  try {
-    if (window.aetherAPI?.setContext) await window.aetherAPI.setContext(ctx, sessionToken);
-    else await fetch(`${API_BASE}/agent/context`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({context:ctx}) });
-  } catch {}
-}
-function clearUserContext() {
-  document.getElementById('user-context').value = '';
-  updateContextCounter();
-  saveUserContext();
-}
-
-// ════════════════════════════════════════════════════
 // CHAT HISTORY
 // ════════════════════════════════════════════════════
 function saveChatToHistory(q) {
   const h = JSON.parse(localStorage.getItem('aether_chat_history') || '[]');
-  h.unshift({ query: q, time: Date.now() });
+  h.unshift({ query:q, time:Date.now() });
   if (h.length > 20) h.length = 20;
   localStorage.setItem('aether_chat_history', JSON.stringify(h));
   renderChatHistory();
@@ -1332,13 +1232,26 @@ function saveChatToHistory(q) {
 function renderChatHistory() {
   const c = document.getElementById('chat-history');
   const h = JSON.parse(localStorage.getItem('aether_chat_history') || '[]');
-  if (!h.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);padding:2px 0;">No history</div>'; return; }
-  c.innerHTML = h.slice(0, 10).map(e => `<div class="sb-chat-entry" onclick="restoreChat('${escapeAttr(e.query)}')"><div class="sb-chat-time">${fmtTime(e.time)}</div><div class="sb-chat-preview">${escapeHtml(e.query)}</div></div>`).join('');
+  const filter = (document.getElementById('chat-search')?.value || '').toLowerCase();
+  const filtered = filter ? h.filter(e => e.query.toLowerCase().includes(filter)) : h;
+
+  if (!filtered.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);padding:2px 0;">No projects</div>'; return; }
+  c.innerHTML = filtered.slice(0, 10).map((e,i) => `
+    <div class="sb-chat-entry${i===0?' active':''}" onclick="restoreChat('${esc(e.query)}')">
+      <span class="sb-chat-icon">&#9679;</span>
+      <div class="sb-chat-info">
+        <div class="sb-chat-time">${fmtTime(e.time)}</div>
+        <div class="sb-chat-preview">${escH(e.query)}</div>
+      </div>
+    </div>
+  `).join('');
 }
+function filterChatHistory() { renderChatHistory(); }
 function restoreChat(q) { document.getElementById('chat-input').value = q; document.getElementById('chat-input').focus(); }
 function clearChatHistory() { localStorage.removeItem('aether_chat_history'); renderChatHistory(); }
 function fmtTime(ts) { const m=Math.floor((Date.now()-ts)/60000); if(m<1)return'now'; if(m<60)return m+'m'; const h=Math.floor(m/60); if(h<24)return h+'h'; return Math.floor(h/24)+'d'; }
-function escapeAttr(s) { return s.replace(/'/g,"\\'").replace(/\n/g,' '); }
+function esc(s) { return s.replace(/'/g,"\\'").replace(/\n/g,' '); }
+function escH(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 // ════════════════════════════════════════════════════
 // PROMPT OPTIMIZER MODAL
@@ -1346,52 +1259,48 @@ function escapeAttr(s) { return s.replace(/'/g,"\\'").replace(/\n/g,' '); }
 function openPromptOptimizer() { document.getElementById('prompt-modal').classList.add('open'); document.getElementById('opt-prompt').focus(); }
 function closePromptOptimizer() { document.getElementById('prompt-modal').classList.remove('open'); }
 document.getElementById('prompt-modal').addEventListener('click', (e) => { if (e.target.classList.contains('modal-overlay')) closePromptOptimizer(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePromptOptimizer(); });
 
 async function runPromptOptimizer() {
   const prompt = document.getElementById('opt-prompt').value.trim();
   const task = document.getElementById('opt-task').value.trim();
   const btn = document.getElementById('opt-submit');
-  const resultsDiv = document.getElementById('opt-results');
+  const rd = document.getElementById('opt-results');
   if (!prompt) { document.getElementById('opt-prompt').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('opt-prompt').style.borderColor='',1500); return; }
   if (!task) { document.getElementById('opt-task').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('opt-task').style.borderColor='',1500); return; }
 
   btn.disabled = true; btn.textContent = 'OPTIMIZING...';
-  resultsDiv.innerHTML = '<div style="color:var(--text-muted);font-size:10px;font-family:JetBrains Mono;padding:10px 0;">Generating 3 optimized variations...</div>';
+  rd.innerHTML = '<div style="color:var(--text-muted);font-size:10px;font-family:JetBrains Mono;padding:10px 0;">Generating 3 optimized variations...</div>';
   setAgentStatus('Optimizing prompt...', 'working');
 
-  const q = `You are a prompt engineering expert. Given the following prompt and task description, generate exactly 3 optimized prompt variations. For each, provide a score (0.0-1.0) and brief rationale.\n\nCURRENT PROMPT:\n${prompt}\n\nTASK:\n${task}\n\nReturn in this format:\n---VARIATION 1---\nSCORE: [0.0-1.0]\nRATIONALE: [why better]\nPROMPT: [optimized text]\n---VARIATION 2---\n...\n---VARIATION 3---\n...\n\nRank highest to lowest.`;
+  const q = `You are a prompt engineering expert. Given the following prompt and task, generate exactly 3 optimized prompt variations with scores (0.0-1.0).\n\nCURRENT PROMPT:\n${prompt}\n\nTASK:\n${task}\n\nFormat:\n---VARIATION 1---\nSCORE: [0.0-1.0]\nRATIONALE: [why]\nPROMPT: [text]\n---VARIATION 2---\n...\n---VARIATION 3---\n...\n\nRank highest to lowest.`;
 
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(q, sessionToken);
     else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:q}) }); result = await r.json(); }
-
-    if (result.error) { resultsDiv.innerHTML = `<div style="color:var(--red);font-size:10px;padding:10px 0;">Error: ${escapeHtml(result.message||'Failed')}</div>`; }
-    else { renderOptimizedPrompts(result.response||result.reply||result.message||'', resultsDiv); }
+    if (result.error) rd.innerHTML = `<div style="color:var(--red);font-size:10px;">${escH(result.message||'Failed')}</div>`;
+    else renderOptPrompts(result.response||result.reply||result.message||'', rd);
     setAgentStatus('Complete', '');
     setTimeout(() => setAgentStatus('Ready', ''), 3000);
-  } catch (e) { resultsDiv.innerHTML = `<div style="color:var(--red);font-size:10px;padding:10px 0;">${escapeHtml(e.message)}</div>`; setAgentStatus('Error','error'); }
+  } catch (e) { rd.innerHTML = `<div style="color:var(--red);font-size:10px;">${escH(e.message)}</div>`; setAgentStatus('Error','error'); }
   btn.disabled = false; btn.textContent = 'Generate Optimized Variations';
 }
 
-function renderOptimizedPrompts(raw, container) {
-  const vars = raw.split(/---VARIATION \d+---/).filter(v => v.trim());
-  const ranks = ['gold','silver','bronze'], labels = ['#1 BEST','#2','#3'];
-  if (!vars.length) { container.innerHTML = `<div class="prompt-result"><div class="prompt-result-label">RESPONSE</div><div class="prompt-result-text">${escapeHtml(raw)}</div></div>`; return; }
-  container.innerHTML = vars.slice(0,3).map((v,i) => {
-    const s = v.match(/SCORE:\s*([\d.]+)/i), r = v.match(/RATIONALE:\s*(.+?)(?=\nPROMPT:)/is), p = v.match(/PROMPT:\s*([\s\S]+)$/i);
-    const score = s ? parseFloat(s[1]) : 0, rationale = r ? r[1].trim() : '', promptText = p ? p[1].trim() : v.trim();
-    return `<div class="prompt-result"><span class="prompt-result-rank ${ranks[i]}">${labels[i]}</span><div class="prompt-result-label">VAR ${i+1}${rationale?' — '+escapeHtml(rationale):''}</div><div class="prompt-result-text">${escapeHtml(promptText)}</div><div class="prompt-result-score">SCORE: ${score.toFixed(2)}</div><button class="prompt-result-copy" onclick="copyVar(this)">COPY</button></div>`;
+function renderOptPrompts(raw, c) {
+  const vs = raw.split(/---VARIATION \d+---/).filter(v => v.trim());
+  const rk=['gold','silver','bronze'], lb=['#1 BEST','#2','#3'];
+  if (!vs.length) { c.innerHTML = `<div class="prompt-result"><div class="prompt-result-label">RESPONSE</div><div class="prompt-result-text">${escH(raw)}</div></div>`; return; }
+  c.innerHTML = vs.slice(0,3).map((v,i) => {
+    const s=v.match(/SCORE:\s*([\d.]+)/i), r=v.match(/RATIONALE:\s*(.+?)(?=\nPROMPT:)/is), p=v.match(/PROMPT:\s*([\s\S]+)$/i);
+    return `<div class="prompt-result"><span class="prompt-result-rank ${rk[i]}">${lb[i]}</span><div class="prompt-result-label">VAR ${i+1}${r?' — '+escH(r[1].trim()):''}</div><div class="prompt-result-text">${escH(p?p[1].trim():v.trim())}</div><div class="prompt-result-score">SCORE: ${s?parseFloat(s[1]).toFixed(2):'0.00'}</div><button class="prompt-result-copy" onclick="copyVar(this)">COPY</button></div>`;
   }).join('');
 }
-
 function copyVar(btn) {
-  const t = btn.parentElement.querySelector('.prompt-result-text');
-  if (!t) return;
-  navigator.clipboard.writeText(t.textContent).then(() => {
-    btn.textContent = 'COPIED'; btn.style.borderColor='var(--green)'; btn.style.color='var(--green)';
-    setTimeout(() => { btn.textContent='COPY'; btn.style.borderColor=''; btn.style.color=''; }, 2000);
+  const t=btn.parentElement.querySelector('.prompt-result-text');
+  if(!t)return;
+  navigator.clipboard.writeText(t.textContent).then(()=>{
+    btn.textContent='COPIED';btn.style.borderColor='var(--green)';btn.style.color='var(--green)';
+    setTimeout(()=>{btn.textContent='COPY';btn.style.borderColor='';btn.style.color='';},2000);
   });
 }
 
@@ -1399,11 +1308,14 @@ function copyVar(btn) {
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePromptOptimizer();
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
   if (e.ctrlKey && e.key === '=') { e.preventDefault(); circuitZoomIn(); }
   if (e.ctrlKey && e.key === '-') { e.preventDefault(); circuitZoomOut(); }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); historyBack(); }
+  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); historyForward(); }
 });
 
 // ════════════════════════════════════════════════════
@@ -1418,12 +1330,9 @@ window.addEventListener('load', async () => {
   if (localStorage.getItem('sidebar_collapsed') === 'true') {
     document.getElementById('sidebar').classList.add('collapsed');
   }
-  const ctx = localStorage.getItem('aether_user_context') || '';
-  document.getElementById('user-context').value = ctx;
-  updateContextCounter();
-  updateContextBadge();
   renderChatHistory();
   initCircuit();
+  pushHistory('Initial vault');
 });
 </script>
 </body>
