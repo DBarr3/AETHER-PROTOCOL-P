@@ -351,7 +351,7 @@
 </div>
 
 <script>
-// Login handler — authenticates against VPS backend at 198.211.115.41:8742
+// Login handler — authenticates against VPS backend at 198.211.115.41:8743
 async function handleLogin() {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
@@ -371,7 +371,7 @@ async function handleLogin() {
       result = await window.aetherAPI.login(username, password);
     } else {
       // Direct fetch fallback
-      const r = await fetch('http://198.211.115.41:8742/auth/login', {
+      const r = await fetch('http://198.211.115.41:8743/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -452,7 +452,7 @@ window.addEventListener('load', async () => {
     if (window.aetherAPI && window.aetherAPI.getStatus) {
       statusData = await window.aetherAPI.getStatus();
     } else {
-      const r = await fetch('http://198.211.115.41:8742/status', {
+      const r = await fetch('http://198.211.115.41:8743/status', {
         signal: AbortSignal.timeout(5000),
       });
       statusData = await r.json();

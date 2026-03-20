@@ -4,7 +4,7 @@
  *
  * Two bridges:
  *   window.aether    — Electron IPC (navigation, window controls, key management)
- *   window.aetherAPI — VPS backend HTTP API at 198.211.115.41:8742
+ *   window.aetherAPI — VPS backend HTTP API at 198.211.115.41:8743
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -62,7 +62,7 @@ contextBridge.exposeInMainWorld('aether', {
 // ═══════════════════════════════════════════════════
 // VPS BACKEND API CLIENT
 // ═══════════════════════════════════════════════════
-const API_BASE = 'http://198.211.115.41:8742';
+const API_BASE = 'http://198.211.115.41:8743';
 
 /**
  * Internal fetch wrapper with error handling.

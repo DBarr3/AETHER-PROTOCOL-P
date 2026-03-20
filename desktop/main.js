@@ -3,7 +3,7 @@
  * Aether Systems LLC · Patent Pending
  *
  * Flow: installer.html → login.html → app.html
- * Backend runs on VPS2 at 198.211.115.41:8742 — no local Python spawn.
+ * Backend runs on VPS2 at 198.211.115.41:8743 — no local Python spawn.
  * Each page transition uses IPC so the main process controls window
  * geometry, frameless chrome, and secure context isolation.
  */
@@ -19,7 +19,7 @@ const PAGES_DIR    = path.join(__dirname, 'pages');
 const PROJECT_ROOT = path.join(__dirname, '..');
 const INSTALL_FLAG = path.join(app.getPath('userData'), '.installed');
 const isDev        = process.argv.includes('--dev');
-const API_BASE     = 'http://198.211.115.41:8742';
+const API_BASE     = 'http://198.211.115.41:8743';
 
 let mainWindow     = null;
 let appQuitting    = false;
