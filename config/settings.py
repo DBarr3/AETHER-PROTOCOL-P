@@ -8,7 +8,7 @@ from pathlib import Path
 
 # ─── Paths ──────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_VAULT_ROOT = PROJECT_ROOT / "vault_data"
+DEFAULT_VAULT_ROOT = Path(os.getenv("AETHER_VAULT_ROOT", str(PROJECT_ROOT / "vault_data")))
 DEFAULT_AUDIT_DIR = PROJECT_ROOT / "data" / "audit"
 DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 CREDENTIALS_FILE = DEFAULT_CONFIG_DIR / "credentials.json"

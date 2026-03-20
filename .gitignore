@@ -35,6 +35,12 @@ ibm_credentials.json
 *.pem
 *.key
 
+# PyInstaller backend build output
+desktop/backend/
+
+# Electron release builds
+desktop/release/
+
 # OS
 .DS_Store
 Thumbs.db

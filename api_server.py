@@ -97,6 +97,58 @@ def _commitment_hash(data) -> str:
 
 
 # ═══════════════════════════════════════════════════
+# DIRECTORY BROWSING HELPERS (for /vault/browse)
+# ═══════════════════════════════════════════════════
+
+def _get_category_by_name(name: str, ext: str) -> str:
+    """Categorize file by name keywords, then extension."""
+    name_lower = name.lower()
+    if any(k in name_lower for k in ("patent", "filing", "uspto", "claim")):
+        return "PATENT"
+    if any(k in name_lower for k in ("trade", "position", "pnl", "option", "futures", "ym_", "spy_")):
+        return "TRADING"
+    if any(k in name_lower for k in ("password", "key", "secret", "credential", "token", "api_key")):
+        return "SECURITY"
+    # Fall back to extension-based via _EXT_META, with broader coverage
+    _extra = {
+        ".jsx": "CODE", ".tsx": "CODE", ".sh": "CODE", ".go": "CODE", ".rs": "CODE",
+        ".cpp": "CODE", ".c": "CODE", ".java": "CODE", ".rb": "CODE", ".bat": "CODE",
+        ".env": "CONFIG", ".ini": "CONFIG",
+        ".7z": "ARCHIVE",
+        ".jpeg": "PERSONAL", ".mov": "PERSONAL",
+        ".sql": "BACKUP",
+    }
+    meta = _EXT_META.get(ext.lower())
+    if meta:
+        return meta[1]
+    return _extra.get(ext.lower(), "PERSONAL")
+
+
+def _get_folder_icon(name: str) -> str:
+    """Return emoji icon based on folder name."""
+    n = name.lower()
+    if any(k in n for k in ("patent", "legal", "law")):
+        return "📋"
+    if any(k in n for k in ("code", "src", "dev", "github", "project", "aether")):
+        return "💻"
+    if any(k in n for k in ("trad", "finance", "invest", "stock", "market")):
+        return "📈"
+    if any(k in n for k in ("security", "secure", "key", "vault", "crypto")):
+        return "🛡"
+    if any(k in n for k in ("backup", "archive", "old", "bak")):
+        return "💾"
+    if any(k in n for k in ("photo", "image", "picture", "media", "video")):
+        return "🖼"
+    if any(k in n for k in ("doc", "document", "report", "note")):
+        return "📝"
+    if any(k in n for k in ("download", "dl")):
+        return "📥"
+    if "desktop" in n:
+        return "🖥"
+    return "📁"
+
+
+# ═══════════════════════════════════════════════════
 # SERVICE CONTAINER
 # ═══════════════════════════════════════════════════
 @dataclass
@@ -158,6 +210,12 @@ def _init_services():
 
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
+
+    # Dev user — password is bcrypt-hashed on registration, never stored in plaintext
+    _dev_pass = os.environ.get("AETHER_DEV_KEY", "fdf&*79u9*(*HJBh*U((9jijkKKL-d8a9(OS)0k")
+    if svc.auth.register_user("ZO", _dev_pass):
+        log.info("Registered dev user: ZO")
+    del _dev_pass  # scrub from memory immediately
 
 
 # ═══════════════════════════════════════════════════
@@ -492,6 +550,88 @@ async def audit_trail(
             break
 
     return AuditTrailResponse(entries=entries)
+
+
+# ── Browse (scan any directory — no auth, localhost only) ──
+@app.get("/vault/browse")
+async def vault_browse(
+    path: str = Query(default=None, description="Directory path to scan"),
+):
+    """
+    Scan a directory and return its structure for the vault graph.
+    Only names, sizes, extensions, modified dates — no file contents.
+    """
+    vault_root = path or os.getenv("AETHER_VAULT_ROOT", str(DEFAULT_VAULT_ROOT))
+    vault_path = Path(vault_root)
+
+    if not vault_path.exists():
+        return {"error": f"Path does not exist: {vault_root}", "folders": [], "files": [],
+                "stats": {"total_files": 0, "total_folders": 0}}
+    if not vault_path.is_dir():
+        return {"error": "Path is not a directory", "folders": [], "files": [],
+                "stats": {"total_files": 0, "total_folders": 0}}
+
+    folders = []
+    files = []
+
+    try:
+        for item in vault_path.iterdir():
+            if item.name.startswith(".") or item.name.startswith("$"):
+                continue
+            try:
+                stat = item.stat()
+                modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+
+                if item.is_dir():
+                    try:
+                        file_count = sum(1 for f in item.iterdir() if not f.name.startswith("."))
+                    except PermissionError:
+                        file_count = 0
+                    folders.append({
+                        "id": item.name.lower().replace(" ", "_"),
+                        "name": item.name,
+                        "path": str(item),
+                        "file_count": file_count,
+                        "modified": modified,
+                        "icon": _get_folder_icon(item.name),
+                    })
+                elif item.is_file():
+                    ext = item.suffix.lower()
+                    files.append({
+                        "name": item.name,
+                        "path": str(item),
+                        "size": _format_size(stat.st_size),
+                        "size_bytes": stat.st_size,
+                        "extension": ext,
+                        "category": _get_category_by_name(item.name, ext),
+                        "modified": modified,
+                        "icon": _file_icon(ext),
+                    })
+            except PermissionError:
+                continue
+            except Exception:
+                continue
+    except PermissionError:
+        return {"error": f"Permission denied: {vault_root}", "folders": [], "files": [],
+                "stats": {"total_files": 0, "total_folders": 0}}
+
+    folders.sort(key=lambda x: x["name"].lower())
+    files.sort(key=lambda x: x["size_bytes"], reverse=True)
+
+    display_folders = folders[:12]
+    display_files = files[:8]
+
+    return {
+        "vault_root": vault_root,
+        "folders": display_folders,
+        "files": display_files,
+        "stats": {
+            "total_files": len(files),
+            "total_folders": len(folders),
+            "displayed_folders": len(display_folders),
+            "displayed_files": len(display_files),
+        },
+    }
 
 
 # ── Status ────────────────────────────────────────

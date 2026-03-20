@@ -122,6 +122,26 @@
   .topbar-btn.alert { border-color: var(--red); color: var(--red); }
   .topbar-btn.active { border-color: var(--quantum); color: var(--quantum); background: var(--quantum-dim); }
 
+  .connect-btn {
+    border-color: var(--quantum);
+    color: var(--quantum);
+    background: var(--quantum-dim);
+    letter-spacing: 2px;
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    -webkit-app-region: no-drag;
+  }
+  .connect-btn:hover {
+    background: var(--quantum);
+    color: var(--void);
+    box-shadow: 0 0 20px var(--quantum-glow);
+  }
+  .connect-btn.connected {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-dim);
+  }
+
   .session-badge {
     font-size: 9px;
     color: var(--green);
@@ -170,14 +190,16 @@
     flex: 1;
     position: relative;
     overflow: hidden;
-    cursor: default;
+    cursor: grab;
   }
+  .vault-viewport.panning { cursor: grabbing; }
+  .folder-node, .file-node { cursor: pointer; }
 
   /* Zoom/pan container */
   .vault-world {
     position: absolute;
     transform-origin: center center;
-    transition: transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+    transition: none;
     will-change: transform;
   }
 
@@ -715,9 +737,186 @@
   }
   .win-btn:hover { background: var(--panel); color: var(--text-bright); }
   .win-btn.close:hover { background: var(--red); color: white; }
+
+  /* ═══ FILE ACCESS PERMISSION MODAL ═══════════════ */
+  .perm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(1,4,9,0.92);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+  .perm-overlay.visible { display: flex; }
+
+  .perm-dialog {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    width: 480px;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.7), 0 0 1px var(--quantum-glow);
+  }
+
+  .perm-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .perm-shield {
+    width: 44px; height: 44px;
+    border: 2px solid var(--quantum);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 20px var(--quantum-glow);
+    flex-shrink: 0;
+  }
+  .perm-header-text h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--text-bright);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .perm-header-text p {
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .perm-body {
+    padding: 20px 24px;
+  }
+  .perm-info {
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .perm-info strong { color: var(--text-bright); }
+
+  .perm-features {
+    list-style: none;
+    margin-bottom: 20px;
+  }
+  .perm-features li {
+    font-size: 11px;
+    color: var(--text);
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .perm-features li::before {
+    content: '◈';
+    color: var(--quantum);
+    font-size: 10px;
+  }
+
+  .perm-path-display {
+    background: var(--deep);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .perm-path-display .path-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .perm-path-display.selected .path-text { color: var(--green); }
+
+  .perm-note {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .perm-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+  }
+  .perm-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .perm-btn:hover { border-color: var(--text); color: var(--text-bright); }
+  .perm-btn.primary {
+    border-color: var(--quantum);
+    color: var(--quantum);
+    background: var(--quantum-dim);
+  }
+  .perm-btn.primary:hover {
+    background: rgba(0,212,255,0.15);
+    box-shadow: 0 0 12px var(--quantum-glow);
+  }
+  .perm-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
 </style>
 </head>
 <body>
+
+<!-- FILE ACCESS PERMISSION DIALOG -->
+<div class="perm-overlay" id="perm-overlay">
+  <div class="perm-dialog">
+    <div class="perm-header">
+      <div class="perm-shield">🛡</div>
+      <div class="perm-header-text">
+        <h3>FILE ACCESS REQUIRED</h3>
+        <p>AetherCloud-L needs access to a folder to monitor, protect, and organize your files.</p>
+      </div>
+    </div>
+    <div class="perm-body">
+      <p class="perm-info">
+        Select the folder you want AetherCloud to manage. This grants <strong>one-time read/write access</strong> so the vault can:
+      </p>
+      <ul class="perm-features">
+        <li>Monitor files for unauthorized changes</li>
+        <li>Generate quantum-signed audit commitments</li>
+        <li>Organize and categorize your documents</li>
+        <li>Run AI-powered threat scans</li>
+      </ul>
+      <div class="perm-path-display" id="perm-path-box">
+        <span style="color:var(--quantum)">📂</span>
+        <span class="path-text" id="perm-path-text">No folder selected</span>
+      </div>
+      <button class="perm-btn" id="perm-browse-btn" onclick="browseVaultFolder()" style="width:100%;margin-bottom:14px;">
+        BROWSE FOLDER
+      </button>
+      <p class="perm-note">
+        Your files never leave your machine. AetherCloud processes everything locally.
+        You can change this folder later in Settings. This prompt only appears once.
+      </p>
+    </div>
+    <div class="perm-footer">
+      <button class="perm-btn" onclick="skipFileAccess()">SKIP FOR NOW</button>
+      <button class="perm-btn primary" id="perm-grant-btn" onclick="grantFileAccess()" disabled>ALLOW ACCESS</button>
+    </div>
+  </div>
+</div>
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -731,7 +930,8 @@
     <span class="topbar-name">AETHERCLOUD-L</span>
   </div>
 
-  <div class="topbar-path">
+  <button class="topbar-btn connect-btn" id="connect-btn" onclick="openConnectDialog()">⊕ CONNECT</button>
+  <div class="topbar-path" id="topbar-path" style="display:none">
     <span>VAULT</span>
     <span class="path-sep">›</span>
     <span id="current-path" class="path-cur">ROOT</span>
@@ -780,7 +980,7 @@
         </svg>
 
         <!-- Root lock node -->
-        <div class="vault-root" id="vault-root" style="position:absolute;top:calc(50% - 40px);left:calc(50% - 40px);">
+        <div class="vault-root" id="vault-root" style="position:absolute;top:calc(50% - 40px);left:calc(50% - 40px);cursor:pointer;" onclick="resetZoom()">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
             <rect x="4" y="12" width="20" height="13" rx="1" stroke="#00d4ff" stroke-width="1.5"/>
             <path d="M8 12V9a6 6 0 0112 0v3" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
@@ -900,33 +1100,6 @@
       </div>
     </div>
 
-    <!-- CONTEXT / SKILLS -->
-    <div class="sb-section">
-      <div class="sb-header open" onclick="toggleSection(this)">
-        <span class="sb-caret">▶</span>
-        <span class="sb-title">CONTEXT</span>
-      </div>
-      <div class="sb-body open" id="sb-context">
-        <div style="padding:6px 12px 2px; font-size:9px; color:var(--text-dim); letter-spacing:1px;">SKILLS</div>
-        <div class="sb-skill">
-          <div class="sb-skill-icon">🔒</div>
-          <span class="sb-skill-name">Protocol-L</span>
-          <span class="sb-skill-tag">ACTIVE</span>
-        </div>
-        <div class="sb-skill">
-          <div class="sb-skill-icon">🤖</div>
-          <span class="sb-skill-name">Claude Agent</span>
-          <span class="sb-skill-tag">HARDENED</span>
-        </div>
-        <div class="sb-skill">
-          <div class="sb-skill-icon">⚡</div>
-          <span class="sb-skill-name">Vault Watcher</span>
-          <span class="sb-skill-tag">LIVE</span>
-        </div>
-        <button class="sb-add-btn" onclick="addContext()">+ ADD CONTEXT</button>
-      </div>
-    </div>
-
     <!-- AUDIT TRAIL -->
     <div class="sb-section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
       <div class="sb-header open" onclick="toggleSection(this)">
@@ -942,6 +1115,24 @@
   </div><!-- /sidebar -->
 
 </div><!-- /main -->
+
+<!-- CONNECT VAULT DIALOG -->
+<div id="connect-overlay" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center;">
+  <div style="width:520px;border:1px solid var(--quantum);background:var(--panel);padding:28px;position:relative;box-shadow:0 0 60px var(--quantum-glow);">
+    <div onclick="closeConnectDialog()" style="position:absolute;top:12px;right:16px;cursor:pointer;color:var(--text-dim);font-size:16px;">✕</div>
+    <div style="font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--quantum);letter-spacing:3px;margin-bottom:20px;">CONNECT FILEBASE</div>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">CURRENT VAULT ROOT</div>
+    <div id="current-vault-display" style="background:var(--deep);border:1px solid var(--border);padding:10px 14px;font-size:11px;color:var(--text-bright);margin-bottom:20px;font-family:'Share Tech Mono',monospace;">Not connected</div>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">SELECT NEW VAULT ROOT</div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <input id="vault-path-input" type="text" placeholder="C:\Users\you\MyVault" style="flex:1;background:var(--deep);border:1px solid var(--border);color:var(--text-bright);font-family:'Share Tech Mono',monospace;font-size:11px;padding:10px 14px;outline:none;" onfocus="this.style.borderColor='var(--quantum)'" onblur="this.style.borderColor='var(--border)'">
+      <button onclick="browseVaultPath()" style="background:var(--quantum-dim);border:1px solid var(--quantum);color:var(--quantum);font-family:'Share Tech Mono',monospace;font-size:10px;padding:10px 16px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">BROWSE</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;">RECENT VAULTS</div>
+    <div id="recent-vaults" style="display:flex;flex-direction:column;gap:4px;margin-bottom:24px;max-height:140px;overflow-y:auto;"></div>
+    <button onclick="connectVault()" style="width:100%;background:var(--quantum);color:var(--void);border:none;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:3px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 24px var(--quantum-glow)'" onmouseout="this.style.boxShadow='none'">CONNECT VAULT</button>
+  </div>
+</div>
 
 <!-- Tooltip -->
 <div class="tooltip" id="tooltip"></div>
@@ -1116,7 +1307,7 @@ function buildVaultNodes() {
       <div class="folder-name">${folder.name.toUpperCase()}</div>
       <div class="folder-count">${folder.count} files</div>
     `;
-    node.addEventListener('click', () => toggleFolderExpand(folder, fx, fy));
+    node.addEventListener('click', () => { centerOnNode(node); toggleFolderExpand(folder, fx, fy); });
     node.addEventListener('mouseenter', (e) => showTooltip(e, `${folder.name} — ${folder.count} files`));
     node.addEventListener('mouseleave', hideTooltip);
     container.appendChild(node);
@@ -1150,7 +1341,7 @@ function buildVaultNodes() {
         <div class="file-icon">${file.icon}</div>
         <div class="file-name">${file.name}</div>
       `;
-      fNode.addEventListener('click', () => selectFile(file, folder));
+      fNode.addEventListener('click', () => { centerOnNode(fNode); selectFile(file, folder); });
       fNode.addEventListener('mouseenter', (e) => showTooltip(e, `${file.name}\n${file.size} · ${file.type}`));
       fNode.addEventListener('mouseleave', hideTooltip);
       container.appendChild(fNode);
@@ -1248,9 +1439,37 @@ function zoom(delta) {
 }
 
 function resetZoom() {
+  world.style.transition = 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)';
   scale = 1; panX = 0; panY = 0;
   applyTransform();
   closeExpanded();
+  setTimeout(() => { world.style.transition = 'none'; }, 420);
+}
+
+function centerOnNode(el) {
+  const nodeLeft = parseFloat(el.style.left);
+  const nodeTop  = parseFloat(el.style.top);
+  const nodeW    = el.offsetWidth;
+  const nodeH    = el.offsetHeight;
+
+  // Center of the node in world coordinates
+  const nodeCX = nodeLeft + nodeW / 2;
+  const nodeCY = nodeTop  + nodeH / 2;
+
+  // Target zoom
+  const targetScale = el.classList.contains('file-node') ? 1.6 : 1.4;
+
+  // Pan so node center appears at viewport center
+  panX = -nodeCX * targetScale;
+  panY = -nodeCY * targetScale;
+  scale = targetScale;
+
+  // Enable smooth transition temporarily
+  world.style.transition = 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)';
+  applyTransform();
+
+  // Remove transition after animation so drag panning stays instant
+  setTimeout(() => { world.style.transition = 'none'; }, 420);
 }
 
 function handleWheel(e) {
@@ -1260,10 +1479,14 @@ function handleWheel(e) {
 }
 
 function startPan(e) {
-  if (e.button === 1 || e.altKey) {
+  // Start pan on any left click that is NOT on a folder-node or file-node
+  const isNode = e.target.closest(
+    '.folder-node, .file-node, .vault-root, .folder-expanded, .agent-area, .vault-toolbar'
+  );
+  if (e.button === 0 && !isNode) {
     isPanning = true;
     panStart = { x: e.clientX - panX, y: e.clientY - panY };
-    viewport.style.cursor = 'grabbing';
+    viewport.classList.add('panning');
   }
 }
 
@@ -1276,7 +1499,7 @@ function doPan(e) {
 
 function endPan() {
   isPanning = false;
-  viewport.style.cursor = 'default';
+  viewport.classList.remove('panning');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1478,11 +1701,6 @@ async function runOrganize() {
   setTimeout(() => addMessage('agent', agentResponses.organize, true), 900);
 }
 
-function addContext() {
-  const ctx = prompt('Add context (e.g. skill name):');
-  if (ctx) addMessage('system', `Context added: ${ctx}`);
-}
-
 // ═══════════════════════════════════════════════════
 // TOOLTIP
 // ═══════════════════════════════════════════════════
@@ -1608,10 +1826,362 @@ window.addEventListener('beforeunload', () => {
 // ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// CONNECT VAULT DIALOG
+// ═══════════════════════════════════════════════════
+const RECENT_KEY = 'aether_recent_vaults';
+
+function openConnectDialog() {
+  document.getElementById('connect-overlay').style.display = 'flex';
+  loadRecentVaults();
+}
+
+function closeConnectDialog() {
+  document.getElementById('connect-overlay').style.display = 'none';
+}
+
+function loadRecentVaults() {
+  const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  const container = document.getElementById('recent-vaults');
+
+  if (recent.length === 0) {
+    container.innerHTML = '<div style="font-size:10px;color:var(--text-dim);padding:8px;">No recent vaults</div>';
+    return;
+  }
+
+  container.innerHTML = recent.map(p => `
+    <div onclick="selectRecentVault('${p.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')"
+      style="padding:8px 12px;border:1px solid var(--border);font-size:11px;color:var(--text);cursor:pointer;font-family:'Share Tech Mono',monospace;transition:all 0.15s;display:flex;align-items:center;gap:8px;"
+      onmouseover="this.style.borderColor='var(--quantum)';this.style.color='var(--quantum)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'"
+    ><span style="color:var(--quantum)">📁</span>${p}</div>
+  `).join('');
+}
+
+function selectRecentVault(p) {
+  document.getElementById('vault-path-input').value = p;
+}
+
+async function browseVaultPath() {
+  if (window.aether && window.aether.browseFolder) {
+    const p = await window.aether.browseFolder();
+    if (p) document.getElementById('vault-path-input').value = p;
+  } else if (window.aether && window.aether.openDirectory) {
+    const p = await window.aether.openDirectory();
+    if (p) document.getElementById('vault-path-input').value = p;
+  }
+}
+
+async function connectVault() {
+  const p = document.getElementById('vault-path-input').value.trim();
+  if (!p) return;
+
+  // Save to recent vaults
+  const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  const updated = [p, ...recent.filter(x => x !== p)].slice(0, 5);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+
+  // Show loading state
+  const btn = document.getElementById('connect-btn');
+  btn.textContent = '◈ SCANNING...';
+  btn.disabled = true;
+
+  closeConnectDialog();
+  addMessage('system', `Connecting to: ${p}`);
+
+  try {
+    const resp = await fetch(
+      `http://127.0.0.1:8741/vault/browse?path=${encodeURIComponent(p)}`
+    );
+    const data = await resp.json();
+
+    if (data.error) {
+      addMessage('agent', `⚠ Could not connect: ${data.error}`);
+      btn.textContent = '⊕ CONNECT';
+      btn.disabled = false;
+      return;
+    }
+
+    // Rebuild the vault graph with real data
+    rebuildVaultGraph(data);
+
+    // Update connect button
+    btn.className = 'topbar-btn connect-btn connected';
+    const folderName = p.split('\\').pop().split('/').pop();
+    btn.textContent = '✓ ' + (folderName || 'VAULT');
+    btn.disabled = false;
+
+    // Show path in topbar
+    const pathEl = document.getElementById('topbar-path');
+    if (pathEl) pathEl.style.display = '';
+    document.getElementById('current-path').textContent = (folderName || p).toUpperCase();
+    document.getElementById('current-vault-display').textContent = p;
+
+    // Update stats
+    document.getElementById('stat-files').textContent = data.stats.total_files;
+    document.getElementById('stat-folders').textContent = data.stats.total_folders;
+
+    // Update sidebar
+    updateSidebarFolders(data.folders);
+
+    addAuditEntry('VAULT_CONNECTED', p, 'ok');
+    addMessage('agent',
+      `Vault connected. Found <strong>${data.stats.total_folders}</strong> folders and ` +
+      `<strong>${data.stats.total_files}</strong> files. ` +
+      (data.stats.total_folders > 12 ? 'Showing top 12 folders. ' : '') +
+      'Click any folder to explore.');
+
+  } catch (err) {
+    addMessage('agent', '⚠ Backend offline — showing demo vault. Start the Python backend to use real files.');
+    btn.textContent = '⊕ CONNECT';
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// REAL FILESYSTEM GRAPH BUILDERS
+// ═══════════════════════════════════════════════════
+function rebuildVaultGraph(data) {
+  const container = document.getElementById('nodes-container');
+  container.innerHTML = '';
+  const svg = document.getElementById('connector-svg');
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+  openFolder = null;
+
+  // Clear old vaultData and populate with real data
+  vaultData.folders = [];
+
+  const folders = data.folders;
+  const files = data.files;
+  const totalNodes = folders.length || 1;
+
+  folders.forEach((folder, i) => {
+    const angle = (i / totalNodes) * 360 - 90;
+    const dist = totalNodes > 8 ? 240 : 200;
+    folder.angle = angle;
+    folder.dist = dist;
+    folder.id = folder.id || folder.name.toLowerCase().replace(/\s/g, '_');
+    folder.count = folder.file_count || 0;
+    folder.files = folder.files || [];
+    vaultData.folders.push(folder);
+    buildRealFolderNode(folder, svg, container);
+  });
+
+  // Loose files near center
+  files.forEach((file, i) => {
+    const angle = ((i / Math.max(files.length, 1)) * 360 + 22.5) * Math.PI / 180;
+    const dist = 120;
+    const fx = Math.cos(angle) * dist;
+    const fy = Math.sin(angle) * dist;
+    buildRealFileNode(file, fx, fy, null, svg, container);
+  });
+
+  resetZoom();
+}
+
+function buildRealFolderNode(folder, svg, container) {
+  const rad = folder.angle * Math.PI / 180;
+  const fx = Math.cos(rad) * folder.dist;
+  const fy = Math.sin(rad) * folder.dist;
+  const cx = 1000, cy = 1000;
+
+  // Connector line
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points',
+    `${cx},${cy} ${cx + Math.cos(rad) * folder.dist * 0.4},${cy} ${cx + fx},${cy + fy}`);
+  line.setAttribute('stroke', '#00d4ff');
+  line.setAttribute('stroke-width', '1');
+  line.setAttribute('fill', 'none');
+  line.setAttribute('opacity', '0.3');
+  line.setAttribute('marker-end', 'url(#dot)');
+  svg.appendChild(line);
+
+  const node = document.createElement('div');
+  node.className = 'folder-node';
+  node.id = `folder-${folder.id}`;
+  node.style.left = `${fx - 50}px`;
+  node.style.top = `${fy - 32}px`;
+  node.innerHTML = `
+    <div class="folder-icon">${folder.icon || '📁'}</div>
+    <div class="folder-name">${folder.name.toUpperCase().slice(0, 12)}</div>
+    <div class="folder-count">${folder.file_count || 0} files</div>
+  `;
+  node.addEventListener('click', () => {
+    centerOnNode(node);
+    expandRealFolder(folder);
+  });
+  node.addEventListener('mouseenter', e => showTooltip(e, `${folder.name} — ${folder.file_count || 0} files`));
+  node.addEventListener('mouseleave', hideTooltip);
+  container.appendChild(node);
+}
+
+function buildRealFileNode(file, fx, fy, parentFolder, svg, container) {
+  if (parentFolder && svg) {
+    const cx = 1000, cy = 1000;
+    const pRad = parentFolder.angle * Math.PI / 180;
+    const px = Math.cos(pRad) * parentFolder.dist;
+    const py = Math.sin(pRad) * parentFolder.dist;
+    const fLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    fLine.setAttribute('x1', cx + px);
+    fLine.setAttribute('y1', cy + py);
+    fLine.setAttribute('x2', cx + fx);
+    fLine.setAttribute('y2', cy + fy);
+    fLine.setAttribute('stroke', '#1e2738');
+    fLine.setAttribute('stroke-width', '0.8');
+    fLine.setAttribute('opacity', '0.5');
+    svg.appendChild(fLine);
+  }
+
+  const fNode = document.createElement('div');
+  fNode.className = 'file-node';
+  fNode.style.left = `${fx - 36}px`;
+  fNode.style.top = `${fy - 22}px`;
+  fNode.innerHTML = `
+    <div class="file-icon">${file.icon || '📄'}</div>
+    <div class="file-name">${file.name}</div>
+  `;
+  fNode.addEventListener('click', () => {
+    centerOnNode(fNode);
+    selectFile(file, parentFolder);
+  });
+  fNode.addEventListener('mouseenter', e => showTooltip(e, `${file.name}\n${file.size} · ${file.category}`));
+  fNode.addEventListener('mouseleave', hideTooltip);
+  container.appendChild(fNode);
+}
+
+async function expandRealFolder(folder) {
+  const existing = document.getElementById('folder-expanded-panel');
+  if (existing) existing.remove();
+  if (openFolder === folder.id) { openFolder = null; return; }
+  openFolder = folder.id;
+
+  document.querySelectorAll('.folder-node').forEach(n => n.classList.remove('focused'));
+  document.getElementById(`folder-${folder.id}`)?.classList.add('focused');
+
+  // Fetch real subfolder contents from backend
+  let files = [];
+  try {
+    const resp = await fetch(
+      `http://127.0.0.1:8741/vault/browse?path=${encodeURIComponent(folder.path)}`
+    );
+    const data = await resp.json();
+    if (!data.error) {
+      files = [
+        ...data.folders.map(f => ({ ...f, icon: f.icon || '📁', size: `${f.file_count} files`, isFolder: true })),
+        ...data.files,
+      ];
+    }
+  } catch (e) {
+    // Use empty if backend unavailable
+  }
+
+  const node = document.getElementById(`folder-${folder.id}`);
+  const fx = parseFloat(node.style.left) + 50;
+  const fy = parseFloat(node.style.top) + 32;
+
+  const panel = document.createElement('div');
+  panel.className = 'folder-expanded';
+  panel.id = 'folder-expanded-panel';
+  panel.setAttribute('data-title', folder.name.toUpperCase());
+  panel.style.left = `${fx + 60}px`;
+  panel.style.top = `${fy - 40}px`;
+
+  panel.innerHTML = `
+    <span class="expanded-close" onclick="closeExpanded()">✕</span>
+    <div class="expanded-file-list">
+      ${files.length === 0
+        ? '<div style="font-size:10px;color:var(--text-dim);padding:8px;">Empty folder</div>'
+        : files.map(f => `
+          <div class="expanded-file" onclick="selectFile(${JSON.stringify(f).replace(/"/g, '&quot;')}, ${JSON.stringify({id: folder.id, name: folder.name}).replace(/"/g, '&quot;')})">
+            <span class="expanded-file-icon">${f.icon || '📄'}</span>
+            <span>${f.name}</span>
+            <span class="expanded-file-meta">${f.size || ''}</span>
+          </div>
+        `).join('')}
+    </div>
+  `;
+  document.getElementById('nodes-container').appendChild(panel);
+  addAuditEntry('FOLDER_ACCESS', folder.name, 'ok');
+  document.getElementById('current-path').textContent = folder.name.toUpperCase();
+}
+
+function updateSidebarFolders(folders) {
+  const container = document.getElementById('sb-folders');
+  if (!container) return;
+  container.innerHTML = folders.map(f => `
+    <div class="sb-folder" onclick="navigateToRealFolder('${f.id}')">
+      <span>${f.icon || '📁'}</span>
+      <span class="sb-folder-name">${f.name}</span>
+      <span class="sb-folder-count">${f.file_count}</span>
+    </div>
+  `).join('');
+  document.getElementById('folders-badge').textContent = folders.length;
+}
+
+function navigateToRealFolder(folderId) {
+  const node = document.getElementById(`folder-${folderId}`);
+  if (!node) return;
+  centerOnNode(node);
+  const folder = vaultData.folders.find(f => f.id === folderId);
+  if (folder) expandRealFolder(folder);
+  addAuditEntry('NAVIGATE', folderId, 'ok');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeConnectDialog();
+});
+
+// ═══════════════════════════════════════════════════
+// FILE ACCESS PERMISSION
+// ═══════════════════════════════════════════════════
+let selectedVaultPath = null;
+
+async function checkFileAccess() {
+  if (!window.aether?.vault) return true; // no bridge = skip
+  const hasAccess = await window.aether.vault.hasAccess();
+  if (hasAccess) {
+    selectedVaultPath = await window.aether.vault.getPath();
+    return true;
+  }
+  // Show permission dialog
+  document.getElementById('perm-overlay').classList.add('visible');
+  return false;
+}
+
+async function browseVaultFolder() {
+  if (!window.aether?.vault) return;
+  const folderPath = await window.aether.vault.requestAccess();
+  if (folderPath) {
+    selectedVaultPath = folderPath;
+    const pathText = document.getElementById('perm-path-text');
+    const pathBox = document.getElementById('perm-path-box');
+    pathText.textContent = folderPath;
+    pathBox.classList.add('selected');
+    document.getElementById('perm-grant-btn').disabled = false;
+  }
+}
+
+function grantFileAccess() {
+  // Path already stored by requestAccess IPC call
+  document.getElementById('perm-overlay').classList.remove('visible');
+  addMessage('system', `◈ Vault access granted — monitoring: ${selectedVaultPath}`);
+  addAuditEntry('VAULT_ACCESS', `granted · ${selectedVaultPath}`, 'ok');
+  // Reload vault with new path
+  loadLiveVault();
+}
+
+function skipFileAccess() {
+  document.getElementById('perm-overlay').classList.remove('visible');
+  addMessage('system', '◈ File access skipped — running in demo mode. Grant access anytime via Settings.');
+}
+
 window.addEventListener('load', async () => {
   initCircuitCanvas();
   buildVaultNodes();
   applyTransform();
+
+  // Check file access permission (one-time after install)
+  await checkFileAccess();
 
   // Boot messages
   const username = sessionStorage.getItem('username') || 'operator';

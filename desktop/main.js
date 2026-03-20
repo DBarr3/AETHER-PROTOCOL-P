@@ -14,6 +14,8 @@ const path  = require('path');
 const fs    = require('fs');
 const http  = require('http');
 
+const keyManager = require('./key-manager');
+
 // ── State ────────────────────────────────────────────
 const PAGES_DIR    = path.join(__dirname, 'pages');
 const PROJECT_ROOT = path.join(__dirname, '..');
@@ -54,25 +56,94 @@ function markInstalled() {
 // ═══════════════════════════════════════════════════
 // PYTHON PROCESS MANAGEMENT
 // ═══════════════════════════════════════════════════
+
+/**
+ * findBackend() — checks for bundled PyInstaller binary first,
+ * then falls back to `python main.py --serve`.
+ * Returns { cmd, args } for spawn().
+ */
+function findBackend() {
+  // Check for bundled PyInstaller binary (production builds)
+  const exeName = process.platform === 'win32' ? 'aethercloud-backend.exe' : 'aethercloud-backend';
+
+  // In production: look in resources/ (electron-builder extraResources)
+  const resourcePaths = [
+    path.join(process.resourcesPath || '', exeName),
+    path.join(__dirname, 'backend', exeName),
+    path.join(PROJECT_ROOT, 'desktop', 'backend', exeName),
+  ];
+
+  for (const binPath of resourcePaths) {
+    if (fs.existsSync(binPath)) {
+      console.log(`[Backend] Found bundled binary: ${binPath}`);
+      return { cmd: binPath, args: ['--serve'], cwd: PROJECT_ROOT };
+    }
+  }
+
+  // Fallback: use Python interpreter
+  const pythonCmd = findPython();
+  const scriptPath = path.join(PROJECT_ROOT, 'main.py');
+  console.log(`[Backend] Using Python fallback: ${pythonCmd} ${scriptPath} --serve`);
+  return { cmd: pythonCmd, args: [scriptPath, '--serve'], cwd: PROJECT_ROOT };
+}
+
 function findPython() {
-  // Try common Python executables
+  const { execFileSync } = require('child_process');
+
+  // Try common Python executables — test each one
   const candidates = process.platform === 'win32'
-    ? ['python', 'python3', 'py']
+    ? ['python', 'python3', 'py', 'python.exe', 'python3.exe']
     : ['python3', 'python'];
-  return candidates[0]; // spawn will search PATH
+
+  for (const cmd of candidates) {
+    try {
+      execFileSync(cmd, ['--version'], { stdio: 'pipe', timeout: 5000 });
+      console.log(`[Python] Found interpreter: ${cmd}`);
+      return cmd;
+    } catch (e) {
+      // Not found, try next
+    }
+  }
+
+  // Last resort: check common Windows install paths
+  if (process.platform === 'win32') {
+    const homeDrive = process.env.LOCALAPPDATA || 'C:\\Users\\' + (process.env.USERNAME || 'user');
+    const commonPaths = [
+      path.join(homeDrive, 'Programs', 'Python', 'Python313', 'python.exe'),
+      path.join(homeDrive, 'Programs', 'Python', 'Python312', 'python.exe'),
+      path.join(homeDrive, 'Programs', 'Python', 'Python311', 'python.exe'),
+      path.join(homeDrive, 'Programs', 'Python', 'Python310', 'python.exe'),
+      'C:\\Python313\\python.exe',
+      'C:\\Python312\\python.exe',
+      'C:\\Python311\\python.exe',
+      'C:\\Python310\\python.exe',
+    ];
+    for (const p of commonPaths) {
+      if (fs.existsSync(p)) {
+        console.log(`[Python] Found at absolute path: ${p}`);
+        return p;
+      }
+    }
+  }
+
+  console.warn('[Python] No Python interpreter found on system');
+  return 'python'; // will fail with ENOENT, but backend is optional (offline mode)
 }
 
 function startPython() {
   if (pythonProcess) return;
 
-  const pythonPath = findPython();
-  const scriptPath = path.join(PROJECT_ROOT, 'main.py');
+  const backend = findBackend();
+  console.log(`[Python] Starting: ${backend.cmd} ${backend.args.join(' ')}`);
 
-  console.log(`[Python] Starting: ${pythonPath} ${scriptPath} --serve`);
+  // Inject API keys and vault path from secure store into the Python process env
+  const pythonEnv = keyManager.getEnvForPython();
+  const storedVault = getStoredVaultPath();
+  if (storedVault) pythonEnv.AETHER_VAULT_ROOT = storedVault;
 
-  pythonProcess = spawn(pythonPath, [scriptPath, '--serve'], {
-    cwd: PROJECT_ROOT,
-    env: { ...process.env },
+  pythonProcess = spawn(backend.cmd, backend.args, {
+    cwd: backend.cwd,
+    env: pythonEnv,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -258,6 +329,58 @@ ipcMain.handle('app:version', () => app.getVersion());
 // Get install status
 ipcMain.handle('app:isInstalled', () => isInstalled());
 
+// ── File access permission (one-time after install) ──
+const VAULT_PATH_FLAG = path.join(app.getPath('userData'), '.vault_path');
+
+function getStoredVaultPath() {
+  try {
+    if (fs.existsSync(VAULT_PATH_FLAG)) {
+      return JSON.parse(fs.readFileSync(VAULT_PATH_FLAG, 'utf-8')).path;
+    }
+  } catch { /* not set yet */ }
+  return null;
+}
+
+function storeVaultPath(vaultPath) {
+  fs.writeFileSync(VAULT_PATH_FLAG, JSON.stringify({
+    path: vaultPath,
+    granted_at: new Date().toISOString(),
+  }));
+}
+
+ipcMain.handle('vault:hasAccess', () => {
+  return !!getStoredVaultPath();
+});
+
+ipcMain.handle('vault:getPath', () => {
+  return getStoredVaultPath();
+});
+
+ipcMain.handle('vault:requestAccess', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'AetherCloud-L — Select Vault Folder',
+    message: 'Choose the folder AetherCloud will monitor and protect.',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Grant Access',
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const selectedPath = result.filePaths[0];
+  storeVaultPath(selectedPath);
+  // Set env var so Python backend picks it up
+  process.env.AETHER_VAULT_ROOT = selectedPath;
+  return selectedPath;
+});
+
+// Browse folder dialog (connect vault)
+ipcMain.handle('browse-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Vault Root',
+    properties: ['openDirectory'],
+    buttonLabel: 'Connect Vault',
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 // Get API base URL
 ipcMain.handle('api:getBase', () => API_BASE);
 
@@ -272,9 +395,36 @@ ipcMain.handle('api:isReady', async () => {
 });
 
 // ═══════════════════════════════════════════════════
+// KEY MANAGEMENT IPC HANDLERS
+// ═══════════════════════════════════════════════════
+
+// Store a key securely
+ipcMain.handle('keys:set', (_event, name, value) => {
+  return keyManager.setKey(name, value);
+});
+
+// Check if a key exists
+ipcMain.handle('keys:has', (_event, name) => {
+  return keyManager.hasKey(name);
+});
+
+// Remove a key
+ipcMain.handle('keys:delete', (_event, name) => {
+  return keyManager.deleteKey(name);
+});
+
+// Validate which keys are configured
+ipcMain.handle('keys:validate', () => {
+  return keyManager.validate();
+});
+
+// ═══════════════════════════════════════════════════
 // APP LIFECYCLE
 // ═══════════════════════════════════════════════════
 app.whenReady().then(async () => {
+  // Hydrate keys from secure store into env and filesystem
+  keyManager.hydrate();
+
   // Start Python backend server
   startPython();
 

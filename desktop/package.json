@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "dist:win": "electron-builder --win --x64",
+    "prebuild": "cd .. && pyinstaller --onefile --name aethercloud-backend --distpath desktop/backend main.py",
+    "dist:win": "npm run prebuild && electron-builder --win --x64",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux"
   },
@@ -30,8 +31,15 @@
     "files": [
       "main.js",
       "preload.js",
+      "key-manager.js",
       "pages/**/*",
       "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/aethercloud-backend.exe",
+        "to": "aethercloud-backend.exe"
+      }
     ],
     "win": {
       "target": ["nsis"],

@@ -3,7 +3,7 @@
  * Exposes a minimal, secure API to renderer pages.
  *
  * Two bridges:
- *   window.aether    — Electron IPC (navigation, window controls)
+ *   window.aether    — Electron IPC (navigation, window controls, key management)
  *   window.aetherAPI — Python backend HTTP API on localhost:8741
  */
 
@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('aether', {
 
   // ── Dialogs ────────────────────────────────────────
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
+  browseFolder:  () => ipcRenderer.invoke('browse-folder'),
 
   // ── App info ───────────────────────────────────────
   getVersion:    () => ipcRenderer.invoke('app:version'),
@@ -34,6 +35,21 @@ contextBridge.exposeInMainWorld('aether', {
   // ── API ────────────────────────────────────────────
   getApiBase:    () => ipcRenderer.invoke('api:getBase'),
   isApiReady:    () => ipcRenderer.invoke('api:isReady'),
+
+  // ── Key Management ─────────────────────────────────
+  keys: {
+    set:      (name, value) => ipcRenderer.invoke('keys:set', name, value),
+    has:      (name)        => ipcRenderer.invoke('keys:has', name),
+    delete:   (name)        => ipcRenderer.invoke('keys:delete', name),
+    validate: ()            => ipcRenderer.invoke('keys:validate'),
+  },
+
+  // ── Vault Access ──────────────────────────────────
+  vault: {
+    hasAccess:     () => ipcRenderer.invoke('vault:hasAccess'),
+    getPath:       () => ipcRenderer.invoke('vault:getPath'),
+    requestAccess: () => ipcRenderer.invoke('vault:requestAccess'),
+  },
 });
 
 // ═══════════════════════════════════════════════════
