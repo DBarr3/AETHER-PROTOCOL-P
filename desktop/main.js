@@ -1,5 +1,5 @@
 /**
- * AetherCloud-L v0.8.6 — Electron Main Process
+ * AetherCloud-L v0.8.7 — Electron Main Process
  * Aether Systems LLC · Patent Pending
  *
  * Fresh minimal launcher: login.html → dashboard.html

@@ -197,6 +197,185 @@
   }
   .sb-context-clear:hover { color: var(--red); }
 
+  /* Agent spawn button */
+  .sb-agent-btn {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .sb-agent-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: var(--accent-dim);
+  }
+  .sb-agent-btn .agent-icon {
+    width: 18px; height: 18px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,212,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--accent);
+    flex-shrink: 0;
+  }
+  .sb-agent-list { display: flex; flex-direction: column; gap: 6px; }
+
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+  }
+  .modal-close {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 16px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text-primary); }
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-field { margin-bottom: 16px; }
+  .modal-field label {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .modal-field textarea {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 10px;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.15s;
+  }
+  .modal-field textarea:focus { border-color: var(--accent); }
+  .modal-field textarea::placeholder { color: var(--text-muted); }
+  .modal-submit {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .modal-submit:hover { opacity: 0.9; }
+  .modal-submit:disabled {
+    background: var(--bg-3);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  /* Prompt results */
+  .prompt-results { margin-top: 20px; }
+  .prompt-result {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .prompt-result-rank {
+    position: absolute;
+    top: 8px; right: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .prompt-result-rank.gold { background: var(--amber-dim); color: var(--amber); }
+  .prompt-result-rank.silver { background: var(--accent-dim); color: var(--accent); }
+  .prompt-result-rank.bronze { background: var(--green-dim); color: var(--green); }
+  .prompt-result-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .prompt-result-text {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .prompt-result-score {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .prompt-result-copy {
+    margin-top: 8px;
+    background: none;
+    border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .prompt-result-copy:hover { border-color: var(--accent); color: var(--accent); }
+
   /* ═══ MAIN PANEL ════════════════════════════════ */
   .main-panel {
     flex: 1;
@@ -328,7 +507,7 @@
 
 <!-- ═══ TOPBAR ═══════════════════════════════════ -->
 <div class="topbar">
-  <span class="topbar-title">AetherCloud-L v0.8.6</span>
+  <span class="topbar-title">AetherCloud-L v0.8.7</span>
   <span class="topbar-user" id="topbar-user"></span>
   <div class="topbar-controls">
     <button class="topbar-btn" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
@@ -372,6 +551,17 @@
       <div id="chat-history"></div>
     </div>
 
+    <!-- AGENTS -->
+    <div class="sb-section">
+      <div class="sb-header">AGENTS</div>
+      <div class="sb-agent-list">
+        <button class="sb-agent-btn" onclick="openPromptOptimizer()">
+          <span class="agent-icon">⚡</span>
+          <span>Prompt Optimizer</span>
+        </button>
+      </div>
+    </div>
+
     <!-- USER CONTEXT -->
     <div class="sb-section">
       <div class="sb-header">
@@ -406,6 +596,30 @@
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
       <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PROMPT OPTIMIZER MODAL ════════════════════ -->
+<div class="modal-overlay" id="prompt-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">⚡ PROMPT OPTIMIZER</span>
+      <button class="modal-close" onclick="closePromptOptimizer()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Current Prompt</label>
+        <textarea id="opt-prompt" rows="5" placeholder="Paste your current prompt here..."></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Task Description</label>
+        <textarea id="opt-task" rows="3" placeholder="What should this prompt achieve? e.g. 'Analyze security vulnerabilities in uploaded files'"></textarea>
+      </div>
+      <button class="modal-submit" id="opt-submit" onclick="runPromptOptimizer()">
+        Generate Optimized Variations
+      </button>
+      <div class="prompt-results" id="opt-results"></div>
     </div>
   </div>
 </div>
@@ -653,6 +867,151 @@ function formatRelativeTime(ts) {
 
 function escapeAttr(str) {
   return str.replace(/'/g, "\\'").replace(/\n/g, ' ');
+}
+
+// ── Prompt Optimizer Modal ───────────────────────
+function openPromptOptimizer() {
+  document.getElementById('prompt-modal').classList.add('open');
+  document.getElementById('opt-prompt').focus();
+}
+
+function closePromptOptimizer() {
+  document.getElementById('prompt-modal').classList.remove('open');
+}
+
+// Close on overlay click
+document.getElementById('prompt-modal').addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) closePromptOptimizer();
+});
+
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePromptOptimizer();
+});
+
+async function runPromptOptimizer() {
+  const prompt = document.getElementById('opt-prompt').value.trim();
+  const task = document.getElementById('opt-task').value.trim();
+  const btn = document.getElementById('opt-submit');
+  const resultsDiv = document.getElementById('opt-results');
+
+  if (!prompt) {
+    document.getElementById('opt-prompt').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('opt-prompt').style.borderColor = '', 1500);
+    return;
+  }
+  if (!task) {
+    document.getElementById('opt-task').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('opt-task').style.borderColor = '', 1500);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'OPTIMIZING...';
+  resultsDiv.innerHTML = '<div style="color:var(--text-muted); font-size:11px; font-family:JetBrains Mono,monospace; padding:12px 0;">Generating 3 optimized prompt variations...</div>';
+
+  const optimizerQuery = `You are a prompt engineering expert. Given the following prompt and task description, generate exactly 3 optimized prompt variations. For each variation, provide a score (0.0 to 1.0) and brief rationale.
+
+CURRENT PROMPT:
+${prompt}
+
+TASK DESCRIPTION:
+${task}
+
+Return your response in this exact format for each variation:
+---VARIATION 1---
+SCORE: [0.0-1.0]
+RATIONALE: [why this variation is better]
+PROMPT: [the optimized prompt text]
+---VARIATION 2---
+SCORE: [0.0-1.0]
+RATIONALE: [why this variation is better]
+PROMPT: [the optimized prompt text]
+---VARIATION 3---
+SCORE: [0.0-1.0]
+RATIONALE: [why this variation is better]
+PROMPT: [the optimized prompt text]
+
+Rank them from highest to lowest score. Focus on: clarity, specificity, output format control, edge case handling, and task alignment.`;
+
+  try {
+    let result;
+    if (window.aetherAPI?.chat) {
+      result = await window.aetherAPI.chat(optimizerQuery, sessionToken);
+    } else {
+      const r = await fetch(`${API_BASE}/agent/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ query: optimizerQuery }),
+      });
+      result = await r.json();
+    }
+
+    if (result.error) {
+      resultsDiv.innerHTML = `<div style="color:var(--red); font-size:11px; padding:12px 0;">Error: ${escapeHtml(result.message || 'Request failed')}</div>`;
+    } else {
+      const raw = result.response || result.reply || result.message || '';
+      renderOptimizedPrompts(raw, resultsDiv);
+    }
+  } catch (e) {
+    resultsDiv.innerHTML = `<div style="color:var(--red); font-size:11px; padding:12px 0;">Connection error: ${escapeHtml(e.message)}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Generate Optimized Variations';
+}
+
+function renderOptimizedPrompts(raw, container) {
+  const variations = raw.split(/---VARIATION \d+---/).filter(v => v.trim());
+  const rankClasses = ['gold', 'silver', 'bronze'];
+  const rankLabels = ['#1 BEST', '#2', '#3'];
+
+  if (variations.length === 0) {
+    // Fallback: show raw response if parsing fails
+    container.innerHTML = `
+      <div class="prompt-result">
+        <div class="prompt-result-label">AGENT RESPONSE</div>
+        <div class="prompt-result-text">${escapeHtml(raw)}</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = variations.slice(0, 3).map((v, i) => {
+    const scoreMatch = v.match(/SCORE:\s*([\d.]+)/i);
+    const rationaleMatch = v.match(/RATIONALE:\s*(.+?)(?=\nPROMPT:)/is);
+    const promptMatch = v.match(/PROMPT:\s*([\s\S]+)$/i);
+
+    const score = scoreMatch ? parseFloat(scoreMatch[1]) : 0;
+    const rationale = rationaleMatch ? rationaleMatch[1].trim() : '';
+    const promptText = promptMatch ? promptMatch[1].trim() : v.trim();
+
+    return `
+      <div class="prompt-result">
+        <span class="prompt-result-rank ${rankClasses[i]}">${rankLabels[i]}</span>
+        <div class="prompt-result-label">VARIATION ${i + 1}${rationale ? ' — ' + escapeHtml(rationale) : ''}</div>
+        <div class="prompt-result-text">${escapeHtml(promptText)}</div>
+        <div class="prompt-result-score">SCORE: ${score.toFixed(2)} / 1.00</div>
+        <button class="prompt-result-copy" onclick="copyPromptVariation(this, ${i})">COPY TO CLIPBOARD</button>
+      </div>`;
+  }).join('');
+}
+
+function copyPromptVariation(btn, index) {
+  const textEl = btn.parentElement.querySelector('.prompt-result-text');
+  if (!textEl) return;
+  navigator.clipboard.writeText(textEl.textContent).then(() => {
+    btn.textContent = 'COPIED';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = 'COPY TO CLIPBOARD';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 2000);
+  });
 }
 </script>
 </body>
