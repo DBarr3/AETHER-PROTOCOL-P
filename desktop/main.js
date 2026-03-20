@@ -329,6 +329,33 @@ ipcMain.handle('app:version', () => app.getVersion());
 // Get install status
 ipcMain.handle('app:isInstalled', () => isInstalled());
 
+// ── Filesystem permission dialog (installer) ──
+ipcMain.handle('request-fs-permission', async () => {
+  const Store = require('electron-store');
+  const store = new Store();
+
+  // Skip if already granted
+  if (store.get('fs_permission_granted')) return true;
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'AetherCloud-L — File Access',
+    message: 'Allow AetherCloud-L to access your files?',
+    detail: 'AetherCloud-L needs permission to view and organize files in your selected vault folder. Your files never leave your machine.\n\nAll file access is logged to a tamper-proof audit trail secured by Protocol-L.',
+    buttons: ['Allow Access', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true
+  });
+
+  const granted = result.response === 0;
+  if (granted) {
+    store.set('fs_permission_granted', true);
+    store.set('fs_permission_date', new Date().toISOString());
+  }
+  return granted;
+});
+
 // ── File access permission (one-time after install) ──
 const VAULT_PATH_FLAG = path.join(app.getPath('userData'), '.vault_path');
 
@@ -379,6 +406,22 @@ ipcMain.handle('browse-folder', async () => {
     buttonLabel: 'Connect Vault',
   });
   return result.canceled ? null : result.filePaths[0];
+});
+
+// Open a real file
+ipcMain.handle('open-file', async (_event, filePath) => {
+  try {
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Show file in Windows Explorer
+ipcMain.handle('show-in-explorer', async (_event, filePath) => {
+  shell.showItemInFolder(filePath);
+  return { success: true };
 });
 
 // Get API base URL

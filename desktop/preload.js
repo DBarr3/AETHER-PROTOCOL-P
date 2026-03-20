@@ -50,6 +50,13 @@ contextBridge.exposeInMainWorld('aether', {
     getPath:       () => ipcRenderer.invoke('vault:getPath'),
     requestAccess: () => ipcRenderer.invoke('vault:requestAccess'),
   },
+
+  // ── Filesystem Permission ───────────────────────
+  requestFsPermission: () => ipcRenderer.invoke('request-fs-permission'),
+
+  // ── File Actions ────────────────────────────────
+  openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+  showInExplorer: (filePath) => ipcRenderer.invoke('show-in-explorer', filePath),
 });
 
 // ═══════════════════════════════════════════════════
@@ -146,5 +153,27 @@ contextBridge.exposeInMainWorld('aetherAPI', {
   // ── Status ─────────────────────────────────────────
   async getStatus() {
     return apiFetch('/status');
+  },
+
+  // ── Vault Scan ──────────────────────────────────
+  async scanVault(vaultPath, sessionToken) {
+    try {
+      const response = await fetch(`${API_BASE}/vault/scan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ vault_path: vaultPath }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Scan failed');
+      }
+      return await response.json();
+    } catch (e) {
+      console.warn('vault scan failed:', e);
+      return null;
+    }
   },
 });

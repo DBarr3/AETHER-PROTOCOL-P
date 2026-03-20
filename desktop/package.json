@@ -1,6 +1,6 @@
 {
   "name": "aethercloud-l",
-  "version": "0.5.1",
+  "version": "0.7.0",
   "description": "Quantum-secured AI file intelligence",
   "main": "main.js",
   "author": "Aether Systems LLC",
@@ -14,7 +14,7 @@
     "dist": "electron-builder --win --publish never"
   },
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.2.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -39,7 +39,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",

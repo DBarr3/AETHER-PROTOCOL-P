@@ -334,6 +334,10 @@ class VaultListResponse(BaseModel):
     stats: dict
 
 
+class VaultScanRequest(BaseModel):
+    vault_path: str
+
+
 class StatusResponse(BaseModel):
     protocol_l: str
     watcher: str
@@ -550,6 +554,110 @@ async def audit_trail(
             break
 
     return AuditTrailResponse(entries=entries)
+
+
+# ── Scan (POST — structured vault scan, no auth) ──
+@app.post("/vault/scan")
+async def scan_vault(request: VaultScanRequest):
+    """
+    Scan a real filesystem path and return structured vault data.
+    No auth required (same as /vault/browse) so it works during initial setup.
+    """
+    vault_path = request.vault_path
+    path = Path(vault_path)
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Vault path does not exist")
+    if not path.is_dir():
+        raise HTTPException(status_code=400, detail="Vault path must be a directory")
+
+    folders = []
+    root_files = []
+    total_files = 0
+
+    try:
+        for item in sorted(path.iterdir()):
+            if item.name.startswith('.') or item.name.startswith('$'):
+                continue
+
+            if item.is_dir():
+                folder_files = []
+                try:
+                    for f in sorted(item.iterdir()):
+                        if f.name.startswith('.') or f.name.startswith('$'):
+                            continue
+                        if f.is_file():
+                            try:
+                                st = f.stat()
+                                folder_files.append({
+                                    "name": f.name,
+                                    "extension": f.suffix,
+                                    "size": _format_size(st.st_size),
+                                    "size_bytes": st.st_size,
+                                    "modified": st.st_mtime,
+                                    "icon": _file_icon(f.suffix),
+                                    "category": _get_category_by_name(f.name, f.suffix),
+                                    "path": str(f),
+                                })
+                                total_files += 1
+                            except (PermissionError, OSError):
+                                pass
+                except PermissionError:
+                    pass
+
+                folders.append({
+                    "id": item.name.lower().replace(' ', '_'),
+                    "name": item.name,
+                    "path": str(item),
+                    "count": len(folder_files),
+                    "file_count": len(folder_files),
+                    "files": folder_files[:8],
+                    "icon": _get_folder_icon(item.name),
+                    "modified": item.stat().st_mtime,
+                })
+
+            elif item.is_file():
+                try:
+                    st = item.stat()
+                    root_files.append({
+                        "name": item.name,
+                        "extension": item.suffix,
+                        "size": _format_size(st.st_size),
+                        "size_bytes": st.st_size,
+                        "icon": _file_icon(item.suffix),
+                        "category": _get_category_by_name(item.name, item.suffix),
+                        "path": str(item),
+                    })
+                    total_files += 1
+                except (PermissionError, OSError):
+                    pass
+
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {e}")
+
+    # Cap folders at 12 for visual clarity
+    folders = sorted(folders, key=lambda f: f["name"])[:12]
+
+    if root_files:
+        folders.insert(0, {
+            "id": "_root_files",
+            "name": "root files",
+            "path": str(path),
+            "count": len(root_files),
+            "file_count": len(root_files),
+            "files": root_files[:8],
+            "icon": "📄",
+            "modified": path.stat().st_mtime,
+        })
+
+    return {
+        "vault_path": str(path),
+        "vault_name": path.name,
+        "folder_count": len(folders),
+        "file_count": total_files,
+        "folders": folders,
+        "scanned_at": datetime.now().isoformat(),
+    }
 
 
 # ── Browse (scan any directory — no auth, localhost only) ──

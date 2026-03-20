@@ -495,7 +495,7 @@
   <div class="header">
     <div class="logo-mark"></div>
     <span class="app-name">AetherCloud-L</span>
-    <span class="app-version">v0.5.0</span>
+    <span class="app-version">v0.7.0</span>
   </div>
 
   <!-- Steps -->
@@ -593,13 +593,13 @@
           <div class="req-item done">
             <span class="req-icon">&#x2713;</span>
             <span class="req-name">Core Application</span>
-            <span class="req-version">v0.5.0</span>
+            <span class="req-version">v0.7.0</span>
             <span class="req-size">12 MB</span>
           </div>
           <div class="req-item done">
             <span class="req-icon">&#x2713;</span>
             <span class="req-name">Protocol-L Engine</span>
-            <span class="req-version">v0.5.0</span>
+            <span class="req-version">v0.7.0</span>
             <span class="req-size">8 MB</span>
           </div>
           <div class="req-item pending">
@@ -682,7 +682,7 @@
         <div class="complete-center">
           <div class="complete-checkmark">&#x2713;</div>
           <div class="complete-title">Installation Complete</div>
-          <div class="complete-sub">AetherCloud-L v0.5.0 installed successfully.</div>
+          <div class="complete-sub">AetherCloud-L v0.7.0 installed successfully.</div>
           <div class="complete-checks">
             <div><span>&#x2713;</span> Protocol-L engine active</div>
             <div><span>&#x2713;</span> 410 tests verified</div>
@@ -794,13 +794,42 @@ function showPage(n) {
   }
 }
 
-function handleNext() {
+async function handleNext() {
   if (currentPage === 4) {
     addLog('Launching AetherCloud-L...', 'info');
     if (window.aether) { window.aether.navigate('login'); } else { window.location.href = 'login.html'; }
     return;
   }
+
+  // Permission gate: Step 2 → Step 3
+  if (currentPage === 2) {
+    let permitted = true;
+    if (window.aether && window.aether.requestFsPermission) {
+      permitted = await window.aether.requestFsPermission();
+    }
+    if (!permitted) {
+      showPermissionDenied();
+      return;
+    }
+  }
+
   showPage(currentPage + 1);
+}
+
+function showPermissionDenied() {
+  var status = document.getElementById('install-status');
+  if (status) {
+    status.textContent = 'File access required to install';
+    status.style.color = 'var(--red)';
+  }
+  var existing = document.getElementById('permission-msg');
+  if (!existing) {
+    var msg = document.createElement('div');
+    msg.id = 'permission-msg';
+    msg.style.cssText = 'font-size:11px;color:var(--red);text-align:center;margin-top:8px;font-family:Inter,sans-serif;';
+    msg.textContent = 'AetherCloud-L requires file access to function. Click Install and allow access.';
+    document.getElementById('btn-next').parentNode.appendChild(msg);
+  }
 }
 
 function handleBack() {

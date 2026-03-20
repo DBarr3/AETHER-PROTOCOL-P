@@ -1542,8 +1542,27 @@ async function selectFile(file, folder) {
   }
   // Fallback
   setTimeout(() => {
-    addMessage('agent', `<strong>${file.name}</strong> — ${file.size} · Category: <span style="color:var(--quantum)">${file.type}</span><br>Suggested: <span style="color:var(--green)">20260319_${file.type}_${file.name.replace(/\s/g,'_')}</span> · Confidence: 94% <span class="msg-commit">✓ committed</span>`);
-  }, 800);
+    const filePath = file.path || '';
+    const fileActions = filePath ? `<br><br><span style="cursor:pointer;color:var(--accent);text-decoration:underline;" onclick="openRealFile('${filePath.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">Open file</span> · <span style="cursor:pointer;color:var(--text-secondary);text-decoration:underline;" onclick="showInExplorer('${filePath.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">Show in Explorer</span>` : '';
+    addMessage('agent', `<strong>${file.name}</strong> — ${file.size || '?'} · Category: <span style="color:var(--accent)">${file.type || file.category || 'FILE'}</span><br>Path: <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-secondary);">${filePath || 'demo file'}</span>${fileActions}`);
+  }, 400);
+}
+
+async function openRealFile(filePath) {
+  if (window.aether && window.aether.openFile) {
+    const result = await window.aether.openFile(filePath);
+    if (!result.success) {
+      addMessage('system', `Could not open file: ${result.error}`);
+    }
+    addAuditEntry('FILE_OPEN', filePath.split('\\').pop().split('/').pop(), 'ok');
+  }
+}
+
+async function showInExplorer(filePath) {
+  if (window.aether && window.aether.showInExplorer) {
+    await window.aether.showInExplorer(filePath);
+    addAuditEntry('SHOW_EXPLORER', filePath.split('\\').pop().split('/').pop(), 'ok');
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1975,6 +1994,7 @@ async function connectVault() {
     updateSidebarFolders(data.folders);
 
     addAuditEntry('VAULT_CONNECTED', p, 'ok');
+    localStorage.setItem('aether_last_vault', p);
     addMessage('agent',
       `Vault connected. Found <strong>${data.stats.total_folders}</strong> folders and ` +
       `<strong>${data.stats.total_files}</strong> files. ` +
@@ -1983,6 +2003,50 @@ async function connectVault() {
 
   } catch (err) {
     addMessage('agent', '⚠ Backend offline — showing demo vault. Start the Python backend to use real files.');
+    btn.textContent = '⊕ CONNECT';
+    btn.disabled = false;
+  }
+}
+
+async function loadRealVault(vaultPath) {
+  const btn = document.getElementById('connect-btn');
+  btn.textContent = '⟳ SCANNING...';
+  btn.disabled = true;
+
+  try {
+    let data = null;
+    if (window.aetherAPI && window.aetherAPI.scanVault) {
+      const token = sessionStorage.getItem('session_token') || 'demo';
+      data = await window.aetherAPI.scanVault(vaultPath, token);
+    }
+
+    if (data && data.folders) {
+      rebuildVaultGraph({
+        folders: data.folders,
+        files: [],
+        stats: { total_files: data.file_count, total_folders: data.folder_count }
+      });
+      updateSidebarFolders(data.folders);
+      document.getElementById('stat-files').textContent = data.file_count;
+      document.getElementById('stat-folders').textContent = data.folder_count;
+
+      const folderName = vaultPath.split('\\').pop().split('/').pop();
+      btn.className = 'topbar-btn connect-btn connected';
+      btn.textContent = '✓ ' + folderName;
+      btn.disabled = false;
+      document.getElementById('current-path').textContent = folderName.toUpperCase();
+
+      const pathEl = document.getElementById('topbar-path');
+      if (pathEl) pathEl.style.display = '';
+
+      addMessage('agent', `Reconnected to <strong>${data.vault_name}</strong> — ${data.folder_count} folders, ${data.file_count} files.`);
+      addAuditEntry('VAULT_RECONNECTED', vaultPath, 'ok');
+    } else {
+      btn.textContent = '⊕ CONNECT';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    console.warn('loadRealVault failed:', e);
     btn.textContent = '⊕ CONNECT';
     btn.disabled = false;
   }
@@ -2158,14 +2222,16 @@ async function expandRealFolder(folder) {
 function updateSidebarFolders(folders) {
   const container = document.getElementById('sb-folders');
   if (!container) return;
-  container.innerHTML = folders.map(f => `
-    <div class="sb-folder" onclick="navigateToRealFolder('${f.id}')">
+  const badge = document.getElementById('folders-badge');
+  if (badge) badge.textContent = folders.length;
+
+  container.innerHTML = folders.slice(0, 10).map(f => `
+    <div class="sb-folder" onclick="navigateToFolder('${f.id || f.name.toLowerCase().replace(/\\s/g,'_')}')">
       <span>${f.icon || '📁'}</span>
       <span class="sb-folder-name">${f.name}</span>
-      <span class="sb-folder-count">${f.file_count}</span>
+      <span class="sb-folder-count">${f.file_count || f.count || 0}</span>
     </div>
   `).join('');
-  document.getElementById('folders-badge').textContent = folders.length;
 }
 
 function navigateToRealFolder(folderId) {
@@ -2227,6 +2293,11 @@ function skipFileAccess() {
 
 window.addEventListener('load', async () => {
   initCircuitCanvas();
+  // Auto-reconnect to last vault
+  const lastVault = localStorage.getItem('aether_last_vault');
+  if (lastVault) {
+    setTimeout(() => loadRealVault(lastVault), 500);
+  }
   buildVaultNodes();
   applyTransform();
 
