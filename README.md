@@ -124,6 +124,19 @@ Eight outcome types drive the feedback:
 
 Every outcome adjusts the prompt variant accuracy score via exponential moving average. High-performing variants get selected more often. Low-performing variants get deprioritized. The system gets smarter without retraining the model.
 
+### User Context Scoring
+
+Users can set persistent context preferences (e.g., "never delete files without asking", "always use date prefix YYYYMMDD"). The **UserContextScorer** parses these into intent signals and scores every agent response for alignment:
+
+| Signal | Triggered By | Checks |
+|---|---|---|
+| `never_delete` | "never delete", "don't remove" | Penalizes responses containing deletion language |
+| `ask_before_action` | "always ask", "confirm before" | Rewards questions, penalizes unilateral action language |
+| `prefer_clean` | "keep organized", "clean format" | Rewards organized/sorted language |
+| `date_prefix` | "date prefix YYYYMMDD" | Rewards responses containing YYYYMMDD-formatted dates |
+
+Scores are blended into the QOPC outcome: **`final = outcome_score × 0.7 + context_score × 0.3`**. This means an ACCEPTED result with poor context alignment scores lower than one that respected user preferences.
+
 ---
 
 ## Try It Right Now
@@ -163,15 +176,15 @@ Every output is Protocol-L signed. Every output improves the next one.
 
 | Component | Description |
 |---|---|
-| **Desktop App** | Electron-based GUI with visual vault graph, AI chat panel, real-time audit sidebar, and installer flow |
+| **Desktop App** | Electron-based GUI with visual vault graph, AI chat panel, Claude-style sidebar (progress, projects, chat history, user context), and installer flow |
 | **AI Agent** | Claude-powered with 12 competencies across file intelligence and marketing. Hardened mode wraps every call in Protocol-L commit-verify. |
-| **QOPC Feedback Loop** | 5-node recursive truth loop that captures vault state, optimizes prompts, validates responses, and learns from outcomes |
+| **QOPC Feedback Loop** | 5-node recursive truth loop that captures vault state, optimizes prompts, validates responses, learns from outcomes, and blends user context alignment (70% outcome + 30% context) |
 | **Protocol-L Engine** | 16-module quantum cryptographic layer — pure Python secp256k1, ephemeral key management, SHA-256 hashing, ECDSA signing, RFC 3161 timestamping |
-| **REST API** | FastAPI on localhost:8741 — 9 endpoints for auth, vault browsing, agent chat, file analysis, security scans, audit queries, and system status |
+| **REST API** | FastAPI on VPS (143.198.162.111) — 12 endpoints for auth, vault browsing, agent chat, file analysis, security scans, audit queries, user context, and system status |
 | **CLI Terminal** | Rich retro terminal with 13 commands for power users who prefer the command line |
 
 ```
-Desktop (Electron)  <-->  FastAPI :8741  <-->  Agent Layer  <-->  Protocol-L Engine
+Desktop (Electron)  <-->  VPS API (143.198.162.111)  <-->  Agent Layer  <-->  Protocol-L Engine
      |                        |                    |                      |
   Installer               Auth/Session       Claude AI (Hardened)    Quantum Seeds
   Login                   Vault CRUD         QOPC Feedback Loop     ECDSA Signing
@@ -193,7 +206,10 @@ Desktop (Electron)  <-->  FastAPI :8741  <-->  Agent Layer  <-->  Protocol-L Eng
 | `POST /agent/analyze` | POST | Yes | File analysis with rename suggestions and security flags |
 | `POST /agent/scan` | POST | Yes | Security threat assessment on audit trail |
 | `GET /audit/trail` | GET | Yes | Query signed, timestamped audit entries |
-| `GET /status` | GET | No | System health check |
+| `POST /auth/setup` | POST | No | First-run admin user creation (disabled after first user exists) |
+| `POST /agent/context` | POST | Yes | Set user context preferences — returns detected intent signals |
+| `GET /agent/context` | GET | Yes | Retrieve current user context for session |
+| `GET /status` | GET | No | System health check (includes `needs_setup` flag) |
 
 ---
 
@@ -265,10 +281,10 @@ pip install -r requirements.txt
 # Terminal mode (CLI)
 python main.py
 
-# API server mode (for desktop app)
-python main.py --serve
+# API server mode (VPS deployment)
+python main.py --serve   # Binds to 0.0.0.0:8741 by default
 
-# Desktop app (Electron)
+# Desktop app (Electron — connects to VPS at 143.198.162.111)
 cd desktop && npm install && npm start
 
 # Build Windows installer (.exe)
@@ -279,7 +295,7 @@ cd desktop && npm run dist
 
 ## Test Coverage
 
-**497 tests** across 18 test files. All passing. Zero external service dependencies in tests — every API call is mocked.
+**576 tests** across 19 test files. All passing. Zero external service dependencies in tests — every API call is mocked.
 
 ```bash
 pytest tests/ -v
@@ -291,8 +307,9 @@ pytest tests/ -v
 | Vault operations | 80+ | File CRUD, audit trail, watcher, permissions |
 | AI agent (file intelligence) | 23 | Analysis, batch, chat, security scan, fallbacks |
 | AI agent (marketing skills) | 44 | Competitive cards, content, email, review, positioning |
-| QOPC feedback loop | 50+ | Prompt optimizer, response validator, outcome observer |
-| API server | 43+ | Auth, vault browse, endpoints, error handling |
+| QOPC feedback loop | 50+ | Prompt optimizer, response validator, outcome observer, blended scoring |
+| User context scorer | 31 | Intent signal parsing, alignment scoring, blended QOPC, context injection, API endpoints |
+| API server | 43+ | Auth, vault browse, endpoints, context, error handling |
 | CLI terminal | 30+ | All 13 commands, edge cases |
 
 ---

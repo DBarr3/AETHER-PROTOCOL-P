@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import random
+import re as _re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -40,7 +41,6 @@ _CYCLES_PATH = _DATA_DIR / "qopc_cycles.jsonl"
 
 
 # ─── User Context Scorer ────────────────────────────────
-import re as _re
 
 class UserContextScorer:
     """

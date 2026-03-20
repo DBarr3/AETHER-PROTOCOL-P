@@ -5,11 +5,7 @@ Powered by Claude API sub-agent with rule-based fallback.
 Aether Systems LLC — Patent Pending
 """
 
-import hashlib
-import json
 import logging
-import os
-import time
 from pathlib import Path
 from typing import Optional
 

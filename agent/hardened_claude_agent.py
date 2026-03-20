@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from anthropic import Anthropic
@@ -486,7 +486,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -609,7 +609,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=512,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -659,7 +659,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -698,7 +698,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -736,7 +736,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -771,7 +771,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()
@@ -808,7 +808,7 @@ class HardenedClaudeAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = response.content[0].text.strip()

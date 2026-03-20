@@ -950,7 +950,7 @@
         <li>Run AI-powered threat scans</li>
       </ul>
       <div class="perm-path-display" id="perm-path-box">
-        <span style="color:var(--quantum)">📂</span>
+        <span style="color:var(--accent)">📂</span>
         <span class="path-text" id="perm-path-text">No folder selected</span>
       </div>
       <button class="perm-btn" id="perm-browse-btn" onclick="browseVaultFolder()" style="width:100%;margin-bottom:14px;">
@@ -1160,6 +1160,16 @@
       </div>
     </div>
 
+    <!-- AUDIT TRAIL -->
+    <div class="sb-section">
+      <div class="sb-header">
+        <span class="sb-title">AUDIT TRAIL</span>
+        <span class="sb-badge" id="audit-badge">0</span>
+      </div>
+      <div class="sb-body open" id="sb-audit" style="max-height:160px;overflow-y:auto;">
+      </div>
+    </div>
+
     <!-- CONTEXT -->
     <div class="sb-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
       <div class="sb-header">
@@ -1212,19 +1222,19 @@
 
 <!-- CONNECT VAULT DIALOG -->
 <div id="connect-overlay" style="display:none;position:fixed;inset:0;background:rgba(1,4,9,0.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center;">
-  <div style="width:520px;border:1px solid var(--quantum);background:var(--panel);padding:28px;position:relative;box-shadow:0 0 60px var(--quantum-glow);">
-    <div onclick="closeConnectDialog()" style="position:absolute;top:12px;right:16px;cursor:pointer;color:var(--text-dim);font-size:16px;">✕</div>
-    <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--quantum);letter-spacing:3px;margin-bottom:20px;">CONNECT FILEBASE</div>
-    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">CURRENT VAULT ROOT</div>
-    <div id="current-vault-display" style="background:var(--deep);border:1px solid var(--border);padding:10px 14px;font-size:11px;color:var(--text-bright);margin-bottom:20px;font-family:'Share Tech Mono',monospace;">Not connected</div>
-    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:6px;">SELECT NEW VAULT ROOT</div>
+  <div style="width:520px;border:1px solid var(--accent);background:var(--bg-2);padding:28px;position:relative;box-shadow:0 0 60px var(--accent-glow);">
+    <div onclick="closeConnectDialog()" style="position:absolute;top:12px;right:16px;cursor:pointer;color:var(--text-muted);font-size:16px;">✕</div>
+    <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:3px;margin-bottom:20px;">CONNECT FILEBASE</div>
+    <div style="font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-bottom:6px;">CURRENT VAULT ROOT</div>
+    <div id="current-vault-display" style="background:var(--bg-3);border:1px solid var(--border);padding:10px 14px;font-size:11px;color:var(--text-primary);margin-bottom:20px;font-family:'JetBrains Mono',monospace;">Not connected</div>
+    <div style="font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-bottom:6px;">SELECT NEW VAULT ROOT</div>
     <div style="display:flex;gap:8px;margin-bottom:20px;">
-      <input id="vault-path-input" type="text" placeholder="C:\Users\you\MyVault" style="flex:1;background:var(--deep);border:1px solid var(--border);color:var(--text-bright);font-family:'Share Tech Mono',monospace;font-size:11px;padding:10px 14px;outline:none;" onfocus="this.style.borderColor='var(--quantum)'" onblur="this.style.borderColor='var(--border)'">
-      <button onclick="browseVaultPath()" style="background:var(--quantum-dim);border:1px solid var(--quantum);color:var(--quantum);font-family:'Share Tech Mono',monospace;font-size:10px;padding:10px 16px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">BROWSE</button>
+      <input id="vault-path-input" type="text" placeholder="C:\Users\you\MyVault" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px 14px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <button onclick="browseVaultPath()" style="background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:10px;padding:10px 16px;cursor:pointer;letter-spacing:1px;white-space:nowrap;">BROWSE</button>
     </div>
-    <div style="font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;">RECENT VAULTS</div>
+    <div style="font-size:10px;color:var(--text-muted);letter-spacing:2px;margin-bottom:8px;">RECENT VAULTS</div>
     <div id="recent-vaults" style="display:flex;flex-direction:column;gap:4px;margin-bottom:24px;max-height:140px;overflow-y:auto;"></div>
-    <button onclick="connectVault()" style="width:100%;background:var(--quantum);color:var(--bg);border:none;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 24px var(--quantum-glow)'" onmouseout="this.style.boxShadow='none'">CONNECT VAULT</button>
+    <button onclick="connectVault()" style="width:100%;background:var(--accent);color:var(--bg);border:none;font-family:'Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 24px var(--accent-glow)'" onmouseout="this.style.boxShadow='none'">CONNECT VAULT</button>
   </div>
 </div>
 
@@ -1610,7 +1620,7 @@ async function selectFile(file, folder) {
     if (!result.error) {
       const conf = (result.confidence * 100).toFixed(0);
       addMessage('agent',
-        `<strong>${file.name}</strong> — ${file.size || file.size_display} · Category: <span style="color:var(--quantum)">${result.category}</span><br>` +
+        `<strong>${file.name}</strong> — ${file.size || file.size_display} · Category: <span style="color:var(--accent)">${result.category}</span><br>` +
         `Suggested: <span style="color:var(--green)">${result.suggested_name}</span> · Confidence: ${conf}% ` +
         `<span class="msg-commit">✓ ${result.commitment_hash}</span>`, true);
       return;
@@ -1695,8 +1705,8 @@ const agentResponses = {
     ✓ All file hashes verified against commitments<br>
     ✓ Session token valid · 6.2h remaining<br>
     ✓ Protocol-L audit chain intact`,
-  audit: `Showing last 10 audit entries. All entries carry valid ECDSA signatures and RFC 3161 timestamps. <span style="color:var(--quantum)">Audit chain: VERIFIED</span>`,
-  patent: `Found 4 files in the <span style="color:var(--quantum)">patents</span> folder:<br>
+  audit: `Showing last 10 audit entries. All entries carry valid ECDSA signatures and RFC 3161 timestamps. <span style="color:var(--accent)">Audit chain: VERIFIED</span>`,
+  patent: `Found 4 files in the <span style="color:var(--accent)">patents</span> folder:<br>
     · USPTO_Filing2_FINAL.pdf (592 KB) — filed 03/19/2026<br>
     · QOPC_Filing1.pdf (340 KB) — filed 03/16/2026<br>
     · Filing2_UNIFIED.docx (1.1 MB) — working document<br>
@@ -2116,16 +2126,16 @@ function loadRecentVaults() {
   const container = document.getElementById('recent-vaults');
 
   if (recent.length === 0) {
-    container.innerHTML = '<div style="font-size:10px;color:var(--text-dim);padding:8px;">No recent vaults</div>';
+    container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);padding:8px;">No recent vaults</div>';
     return;
   }
 
   container.innerHTML = recent.map(p => `
     <div onclick="selectRecentVault('${p.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')"
-      style="padding:8px 12px;border:1px solid var(--border);font-size:11px;color:var(--text);cursor:pointer;font-family:'Share Tech Mono',monospace;transition:all 0.15s;display:flex;align-items:center;gap:8px;"
-      onmouseover="this.style.borderColor='var(--quantum)';this.style.color='var(--quantum)'"
-      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'"
-    ><span style="color:var(--quantum)">📁</span>${p}</div>
+      style="padding:8px 12px;border:1px solid var(--border);font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all 0.15s;display:flex;align-items:center;gap:8px;"
+      onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'"
+    ><span style="color:var(--accent)">📁</span>${p}</div>
   `).join('');
 }
 
@@ -2162,7 +2172,7 @@ async function connectVault() {
 
   try {
     const resp = await fetch(
-      `http://127.0.0.1:8741/vault/browse?path=${encodeURIComponent(p)}`
+      `http://143.198.162.111/vault/browse?path=${encodeURIComponent(p)}`
     );
     const data = await resp.json();
 
@@ -2378,7 +2388,7 @@ async function expandRealFolder(folder) {
   let files = [];
   try {
     const resp = await fetch(
-      `http://127.0.0.1:8741/vault/browse?path=${encodeURIComponent(folder.path)}`
+      `http://143.198.162.111/vault/browse?path=${encodeURIComponent(folder.path)}`
     );
     const data = await resp.json();
     if (!data.error) {
@@ -2406,7 +2416,7 @@ async function expandRealFolder(folder) {
     <span class="expanded-close" onclick="closeExpanded()">✕</span>
     <div class="expanded-file-list">
       ${files.length === 0
-        ? '<div style="font-size:10px;color:var(--text-dim);padding:8px;">Empty folder</div>'
+        ? '<div style="font-size:10px;color:var(--text-muted);padding:8px;">Empty folder</div>'
         : files.map(f => `
           <div class="expanded-file" onclick="selectFile(${JSON.stringify(f).replace(/"/g, '&quot;')}, ${JSON.stringify({id: folder.id, name: folder.name}).replace(/"/g, '&quot;')})">
             <span class="expanded-file-icon">${f.icon || '📄'}</span>
