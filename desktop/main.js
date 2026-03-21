@@ -71,41 +71,111 @@ function createWindow(page) {
   });
 }
 
-// ── Wait for VPS backend ─────────────────────────────
-function waitForBackend(retries = 10) {
-  return new Promise((resolve) => {
-    let attempt = 0;
-    function check() {
-      attempt++;
-      const req = http.get(`${API_BASE}/status`, (res) => {
+// ── Wait for VPS backend (hardened) ──────────────────
+async function waitForBackend(maxRetries = 15, delayMs = 2000) {
+  const statusUrl = `${API_BASE}/status`;
+  console.log(`[AetherCloud] Connecting to backend: ${statusUrl}`);
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const req = http.get(statusUrl, (res) => {
+          let body = '';
+          res.on('data', (d) => (body += d));
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              resolve({ ready: true });
+            }
+          });
+        });
+        req.on('error', (err) => reject(err));
+        req.setTimeout(5000, () => {
+          req.destroy();
+          reject(new Error('timeout'));
+        });
+      });
+
+      console.log(`[AetherCloud] Backend connected — Protocol-L: ${data.protocol_l}, Agent: ${data.agent}`);
+
+      if (data.needs_setup) {
+        console.warn('[AetherCloud] First-time setup required');
+      }
+
+      return { ready: true, ...data };
+    } catch (err) {
+      const reason = err.message || 'unknown';
+      console.log(`[AetherCloud] Attempt ${attempt}/${maxRetries} failed: ${reason}`);
+    }
+
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+
+  // Show user-friendly error dialog
+  const { response } = await dialog.showMessageBox({
+    type: 'error',
+    title: 'AetherCloud Connection Failed',
+    message: 'Cannot reach AetherCloud backend.',
+    detail: `Tried ${maxRetries} times to reach ${API_BASE}/status\n\nCheck:\n• VPS1 is running (143.198.162.111)\n• VPS2 backend is active (198.211.115.41:8080)\n• Your internet connection`,
+    buttons: ['Retry', 'Quit'],
+  });
+
+  if (response === 0) {
+    app.relaunch();
+    app.exit(0);
+  } else {
+    app.quit();
+  }
+
+  return { ready: false, error: `VPS unreachable after ${maxRetries} attempts` };
+}
+
+// ── Verify routing ──────────────────────────────────
+async function verifyRouting() {
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const req = http.get(`${API_BASE}/routing-check`, (res) => {
         let body = '';
         res.on('data', (d) => (body += d));
         res.on('end', () => {
-          try {
-            const data = JSON.parse(body);
-            resolve({ ready: true, ...data });
-          } catch {
-            resolve({ ready: true });
-          }
+          try { resolve(JSON.parse(body)); }
+          catch { resolve(null); }
         });
       });
-      req.on('error', () => {
-        if (attempt < retries) setTimeout(check, 1500);
-        else resolve({ ready: false, error: 'VPS unreachable after ' + retries + ' attempts' });
-      });
-      req.setTimeout(4000, () => {
-        req.destroy();
-        if (attempt < retries) setTimeout(check, 1500);
-        else resolve({ ready: false, error: 'VPS timeout' });
-      });
+      req.on('error', () => resolve(null));
+      req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+    });
+
+    if (data) {
+      console.log('[AetherCloud] Routing verified:', JSON.stringify(data));
+      if (!data.anthropic_key_set) {
+        console.error('[AetherCloud] WARNING: ANTHROPIC_API_KEY not set on VPS2');
+      }
+      if (!data.ibm_token_set) {
+        console.warn('[AetherCloud] IBM token not set — quantum fallback active');
+      }
     }
-    check();
-  });
+    return data;
+  } catch (err) {
+    console.error('[AetherCloud] Routing check failed:', err.message);
+    return null;
+  }
 }
 
 // ── App lifecycle ────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   keyManager.hydrate();
+
+  // Test backend connectivity before showing login
+  const status = await waitForBackend();
+  if (!status.ready) return;
+
+  // Verify routing path
+  await verifyRouting();
+
   createWindow('login');
 });
 
@@ -133,7 +203,7 @@ ipcMain.on('window:close', () => {
 
 // ── IPC: API ─────────────────────────────────────────
 ipcMain.handle('api:getBase', () => API_BASE);
-ipcMain.handle('api:isReady', async () => waitForBackend());
+ipcMain.handle('api:isReady', async () => waitForBackend(5, 1500));
 ipcMain.handle('app:version', () => app.getVersion());
 
 // ── IPC: Dialogs ─────────────────────────────────────
@@ -213,7 +283,6 @@ ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
       try {
         if (entry.isDirectory()) {
           let childCount = 0;
-          let totalSize = 0;
           try {
             const children = fs.readdirSync(fullPath);
             childCount = children.filter(c => !c.startsWith('.')).length;

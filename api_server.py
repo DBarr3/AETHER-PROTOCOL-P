@@ -1503,6 +1503,55 @@ async def status():
     )
 
 
+# ── Routing Diagnostics ──────────────────────────
+@app.get("/routing-check")
+async def routing_check():
+    """
+    No auth required. Returns routing info so Electron can verify
+    it's hitting the right server (VPS1 proxy → VPS2 backend).
+    """
+    return {
+        "server": "VPS2",
+        "ip": "198.211.115.41",
+        "port": int(os.environ.get("AETHER_BIND_PORT", 8080)),
+        "protocol_l": "ACTIVE",
+        "anthropic_key_set": bool(get_anthropic_key()),
+        "ibm_token_set": bool(get_ibm_token()),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@app.get("/auth/health")
+async def auth_health():
+    """
+    No auth required. Returns auth system status.
+    Used by Electron login screen to verify backend is auth-ready.
+    """
+    if not svc.auth or not svc.session_mgr:
+        return {
+            "ready": False,
+            "reason": "Auth service not initialized",
+        }
+
+    # Check credentials file exists and has users
+    has_users = False
+    if STORAGE_CREDENTIALS_FILE.exists():
+        try:
+            creds = json.loads(STORAGE_CREDENTIALS_FILE.read_text())
+            non_dev = [u for u in creds if u != "ZO"]
+            has_users = len(non_dev) > 0
+        except Exception:
+            pass
+
+    return {
+        "ready": True,
+        "has_users": has_users,
+        "needs_setup": not has_users,
+        "active_sessions": svc.session_mgr.active_count,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 # ═══════════════════════════════════════════════════
 # ENTRY POINT
 # ═══════════════════════════════════════════════════

@@ -4,7 +4,7 @@
  *
  * Two bridges:
  *   window.aether    — Electron IPC (navigation, window controls, keys)
- *   window.aetherAPI — VPS2 backend HTTP client
+ *   window.aetherAPI — VPS HTTP client (routes through VPS1 Ghost Proxy)
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -13,6 +13,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ELECTRON IPC BRIDGE
 // ═══════════════════════════════════════════════════
 contextBridge.exposeInMainWorld('aether', {
+  apiBase: 'http://198.211.115.41:8080',
   navigate:     (page) => ipcRenderer.send('navigate', page),
   minimize:     () => ipcRenderer.send('window:minimize'),
   maximize:     () => ipcRenderer.send('window:maximize'),

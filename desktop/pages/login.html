@@ -210,10 +210,10 @@
 <body>
 
 <div class="title-bar">
-  <span class="title-bar-text">AetherCloud-L v0.8.8</span>
+  <span class="title-bar-text">AetherCloud-L v0.8.9</span>
   <div class="title-bar-controls">
-    <button class="title-bar-btn" onclick="window.aether?.minimize()">─</button>
-    <button class="title-bar-btn close" onclick="window.aether?.close()">✕</button>
+    <button class="title-bar-btn" onclick="window.aether?.minimize()">&#8212;</button>
+    <button class="title-bar-btn close" onclick="window.aether?.close()">&#10005;</button>
   </div>
 </div>
 
@@ -238,7 +238,7 @@
     </div>
     <div class="field">
       <label>Access Key</label>
-      <input type="password" id="password" placeholder="••••••••••••" autocomplete="off"
+      <input type="password" id="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="off"
              onkeydown="if(event.key==='Enter')handleLogin()">
     </div>
     <div class="field-row">
@@ -255,13 +255,37 @@
       <div class="protocol-item"><div class="protocol-dot on"></div>Protocol-L</div>
       <div class="protocol-item"><div class="protocol-dot quantum"></div>Quantum Seed</div>
       <div class="protocol-item"><div class="protocol-dot amber" id="dot-vps"></div>VPS2</div>
+      <div class="protocol-item"><div class="protocol-dot" id="dot-auth"></div>Auth</div>
     </div>
   </div>
 </div>
 
 <script>
-// ── DEV MODE — set to true to bypass VPS auth ───
-const DEV_MODE = true;
+// ── DEV MODE — set to false for production ───────
+const DEV_MODE = false;
+
+// Helper: fetch with explicit timeout
+async function fetchWithTimeout(url, timeoutMs, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    return res;
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+}
+
+// Resolve API base — try IPC first, fallback to direct VPS2
+async function getApiBase() {
+  if (window.aether?.apiBase) return window.aether.apiBase;
+  return 'http://198.211.115.41:8080';
+}
 
 async function handleLogin() {
   // Dev mode: skip VPS, store fake token, auto-navigate
@@ -291,12 +315,14 @@ async function handleLogin() {
   showStatus('AUTHENTICATING...', 'info');
   setLoading(true);
 
+  const API_BASE = await getApiBase();
+
   try {
     let result;
     if (window.aetherAPI?.login) {
       result = await window.aetherAPI.login(username, password);
     } else {
-      const r = await fetch('http://198.211.115.41:8080/auth/login', {
+      const r = await fetchWithTimeout(`${API_BASE}/auth/login`, 10000, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -310,9 +336,8 @@ async function handleLogin() {
       return;
     }
 
-    if (result.authenticated || result.success || result.session_token || result.token) {
-      const token = result.session_token || result.token || 'active';
-      sessionStorage.setItem('session_token', token);
+    if (result.authenticated && result.session_token) {
+      sessionStorage.setItem('session_token', result.session_token);
       sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
       sessionStorage.setItem('username', username);
 
@@ -325,12 +350,17 @@ async function handleLogin() {
         window.location.href = 'dashboard.html';
       }
     } else {
-      const msg = result.reason || result.detail || 'INVALID CREDENTIALS';
-      showStatus('AUTHENTICATION FAILED — ' + msg, 'error');
+      const reason = result.reason || result.detail || 'INVALID CREDENTIALS';
+      let msg = 'AUTHENTICATION FAILED';
+      if (reason === 'USER_NOT_FOUND') msg = 'USER NOT FOUND — CHECK VAULT IDENTIFIER';
+      else if (reason === 'INVALID_PASSWORD') msg = 'INVALID ACCESS KEY';
+      else if (reason === 'ACCOUNT_LOCKED') msg = 'ACCOUNT LOCKED — TOO MANY ATTEMPTS';
+      else msg += ' — ' + reason;
+      showStatus(msg, 'error');
       setLoading(false);
     }
   } catch (e) {
-    showStatus('CANNOT REACH VPS2 — ' + e.message, 'error');
+    showStatus('CANNOT REACH BACKEND — ' + e.message, 'error');
     setLoading(false);
   }
 }
@@ -347,11 +377,16 @@ function showStatus(msg, type) {
   const el = document.getElementById('login-status');
   if (!el) return;
   el.className = 'login-status ' + (type || '');
-  el.textContent = (type === 'error' ? '⚠ ' : type === 'ok' ? '✓ ' : '') + msg;
+  el.textContent = msg;
 }
 
-// On load: dev mode auto-login or VPS connectivity check
-window.addEventListener('load', async () => {
+// ── Init: auth health check ─────────────────────
+async function initLoginScreen() {
+  const API_BASE = await getApiBase();
+  const dot = document.getElementById('dot-vps');
+  const dotAuth = document.getElementById('dot-auth');
+
+  // Dev mode auto-login
   if (DEV_MODE) {
     showStatus('DEV MODE ACTIVE — AUTO-LOGIN', 'info');
     await new Promise(r => setTimeout(r, 400));
@@ -359,28 +394,50 @@ window.addEventListener('load', async () => {
     return;
   }
 
-  const dot = document.getElementById('dot-vps');
+  showStatus('Connecting to AetherCloud...', 'info');
+
+  // Step 1: Check auth health endpoint
   try {
-    let data;
-    if (window.aetherAPI?.getStatus) {
-      data = await window.aetherAPI.getStatus();
-    } else {
-      const r = await fetch('http://198.211.115.41:8080/status', {
-        signal: AbortSignal.timeout(5000),
-      });
-      data = await r.json();
+    const healthRes = await fetchWithTimeout(`${API_BASE}/auth/health`, 8000);
+    const health = await healthRes.json();
+
+    if (dot) dot.style.background = '#22c55e';
+
+    if (!health.ready) {
+      showStatus('Backend not ready: ' + (health.reason || 'unknown'), 'error');
+      if (dotAuth) dotAuth.style.background = '#ef4444';
+      return;
     }
-    if (data && !data.error) {
-      if (dot) dot.style.background = '#22c55e';
-    } else {
-      if (dot) dot.style.background = '#ef4444';
-      showStatus('VPS2 RETURNED ERROR — CHECK SERVER', 'error');
+
+    if (dotAuth) dotAuth.style.background = '#22c55e';
+
+    if (health.needs_setup) {
+      showStatus('FIRST-TIME SETUP — CREATE AN ACCOUNT', 'info');
+      return;
     }
-  } catch {
+
+    showStatus('Connected — enter credentials', '');
+
+  } catch (err) {
     if (dot) dot.style.background = '#ef4444';
-    showStatus('VPS2 UNREACHABLE — CHECK CONNECTION', 'error');
+    if (dotAuth) dotAuth.style.background = '#ef4444';
+
+    // Fallback: try /status endpoint
+    try {
+      const statusRes = await fetchWithTimeout(`${API_BASE}/status`, 5000);
+      const status = await statusRes.json();
+      if (status && !status.error) {
+        if (dot) dot.style.background = '#22c55e';
+        showStatus('Connected — enter credentials', '');
+        return;
+      }
+    } catch {}
+
+    showStatus('CANNOT REACH BACKEND — CHECK CONNECTION', 'error');
   }
-});
+}
+
+window.addEventListener('load', initLoginScreen);
 </script>
 </body>
 </html>
