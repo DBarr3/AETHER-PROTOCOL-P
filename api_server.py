@@ -32,6 +32,12 @@ import uvicorn
 from config.settings import (
     APP_NAME, APP_VERSION, DEFAULT_VAULT_ROOT, DEFAULT_AUDIT_DIR,
 )
+from config.storage import (
+    ensure_system_dirs, ensure_user_dirs,
+    CREDENTIALS_FILE as STORAGE_CREDENTIALS_FILE,
+    AUDIT_LOG as STORAGE_AUDIT_LOG,
+    user_tasks_file, user_task_history, user_task_qopc,
+)
 from auth.login import AetherCloudAuth
 from auth.session import SessionManager
 from vault.filebase import AetherVault
@@ -176,9 +182,42 @@ class Services:
 
 svc = Services()
 session_context: dict[str, str] = {}
-_task_store: dict[str, dict] = {}
-_task_qopc: Optional[TaskQOPC] = None
+_task_stores: dict[str, dict[str, dict]] = {}  # username → {task_id → task_dict}
+_task_qopcs: dict[str, TaskQOPC] = {}  # username → TaskQOPC instance
 _start_time = time.time()
+
+
+def _get_task_store(username: str) -> dict[str, dict]:
+    """Get or lazily load a user's task store."""
+    if username not in _task_stores:
+        tasks_path = user_tasks_file(username)
+        if tasks_path.exists():
+            try:
+                tasks = json.loads(tasks_path.read_text())
+                _task_stores[username] = {t["task_id"]: t for t in tasks}
+            except Exception:
+                _task_stores[username] = {}
+        else:
+            _task_stores[username] = {}
+    return _task_stores[username]
+
+
+def _save_task_store(username: str):
+    """Persist a user's task store to their data directory."""
+    store = _task_stores.get(username, {})
+    path = user_tasks_file(username)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(list(store.values()), indent=2))
+    except Exception as e:
+        log.error("Failed to save task store for %s: %s", username, e)
+
+
+def _get_task_qopc(username: str) -> TaskQOPC:
+    """Get or lazily create a user's TaskQOPC instance."""
+    if username not in _task_qopcs:
+        _task_qopcs[username] = TaskQOPC(username)
+    return _task_qopcs[username]
 _ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
 
 security = HTTPBearer(auto_error=False)
@@ -186,10 +225,13 @@ security = HTTPBearer(auto_error=False)
 
 def _init_services():
     """Initialize all backend services into the container."""
-    # Audit log
-    audit_dir = DEFAULT_AUDIT_DIR
+    # Bootstrap all system directories via storage.py
+    ensure_system_dirs()
+
+    # Audit log — resolves via storage.py crypto/ path
+    audit_dir = STORAGE_AUDIT_LOG.parent
     audit_dir.mkdir(parents=True, exist_ok=True)
-    svc.audit_log = AuditLog(audit_dir / "aether_audit.jsonl")
+    svc.audit_log = AuditLog(str(STORAGE_AUDIT_LOG))
 
     # Session manager
     svc.session_mgr = SessionManager()
@@ -222,16 +264,31 @@ def _init_services():
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
 
-    # Task scheduler + QOPC
-    global _task_store, _task_qopc
-    _task_store = load_task_store()
-    _task_qopc = TaskQOPC(Path("config"))
+    # Task scheduler
     svc.scheduler = TaskScheduler()
     svc.scheduler.start()
-    for task in _task_store.values():
-        if task.get("enabled", True):
-            svc.scheduler.add_task(task)
-    log.info("Loaded %d scheduled tasks", len(_task_store))
+
+    # Migrate any legacy config/scheduled_tasks.json into dev user's store
+    legacy_tasks = load_task_store()
+    if legacy_tasks:
+        dev_store = _get_task_store("ZO")
+        dev_store.update(legacy_tasks)
+        _save_task_store("ZO")
+        log.info("Migrated %d legacy tasks to user ZO", len(legacy_tasks))
+
+    # Load all user task stores and schedule enabled tasks
+    total_tasks = 0
+    users_dir = Path("data") / "users"
+    if users_dir.exists():
+        for user_dir in users_dir.iterdir():
+            if user_dir.is_dir():
+                uname = user_dir.name
+                store = _get_task_store(uname)
+                for task in store.values():
+                    if task.get("enabled", True):
+                        svc.scheduler.add_task(task)
+                total_tasks += len(store)
+    log.info("Loaded %d scheduled tasks across all users", total_tasks)
 
     # Dev user — password is bcrypt-hashed on registration, never stored in plaintext
     _dev_pass = os.environ.get("AETHER_DEV_KEY", "fdf&*79u9*(*HJBh*U((9jijkKKL-d8a9(OS)0k")
@@ -279,6 +336,14 @@ def get_session_token(
     if not svc.session_mgr or not svc.session_mgr.is_valid(token):
         raise HTTPException(status_code=401, detail="Invalid or expired session token")
     return token
+
+
+def get_username_from_token(token: str) -> str:
+    """Resolve username from active session token."""
+    username = svc.session_mgr.get_username(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Cannot resolve user from token")
+    return username
 
 
 # ═══════════════════════════════════════════════════
@@ -470,7 +535,7 @@ async def setup_first_user(request: SetupRequest):
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
     # Check if non-dev users already exist
-    creds_file = Path("config") / "credentials.json"
+    creds_file = STORAGE_CREDENTIALS_FILE
     if creds_file.exists():
         try:
             existing = json.loads(creds_file.read_text())
@@ -896,6 +961,7 @@ async def vault_browse(
 @app.post("/tasks/create", response_model=TaskResponse)
 async def create_task(req: TaskCreateRequest, token: str = Depends(get_session_token)):
     """Create a new scheduled task."""
+    username = get_username_from_token(token)
     task_id = str(uuid.uuid4())
 
     # Auto-parse schedule from natural language if not provided
@@ -920,6 +986,7 @@ async def create_task(req: TaskCreateRequest, token: str = Depends(get_session_t
         "last_status": None,
         "last_output_preview": None,
         "run_count": 0,
+        "_owner": username,
     }
 
     # Inject user context if available
@@ -927,8 +994,9 @@ async def create_task(req: TaskCreateRequest, token: str = Depends(get_session_t
     if ctx:
         task["_user_context"] = ctx
 
-    _task_store[task_id] = task
-    save_task_store(_task_store)
+    store = _get_task_store(username)
+    store[task_id] = task
+    _save_task_store(username)
 
     # Schedule it
     if svc.scheduler and req.enabled:
@@ -955,14 +1023,18 @@ async def create_task(req: TaskCreateRequest, token: str = Depends(get_session_t
 @app.get("/tasks/list")
 async def list_tasks(token: str = Depends(get_session_token)):
     """List all scheduled tasks with current status."""
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+    qopc = _get_task_qopc(username)
+
     tasks = []
-    for task in _task_store.values():
+    for task in store.values():
         tid = task["task_id"]
         next_run = None
         if svc.scheduler:
             next_run = svc.scheduler.get_next_run(tid)
 
-        qscore = _task_qopc.get_score(tid) if _task_qopc else 0.0
+        qscore = qopc.get_score(tid)
 
         tasks.append(TaskResponse(
             task_id=tid,
@@ -987,14 +1059,17 @@ async def list_tasks(token: str = Depends(get_session_token)):
 @app.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, token: str = Depends(get_session_token)):
     """Delete a scheduled task."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
     if svc.scheduler:
         svc.scheduler.remove_task(task_id)
 
-    del _task_store[task_id]
-    save_task_store(_task_store)
+    del store[task_id]
+    _save_task_store(username)
 
     return {"deleted": True, "task_id": task_id}
 
@@ -1002,10 +1077,13 @@ async def delete_task(task_id: str, token: str = Depends(get_session_token)):
 @app.patch("/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(task_id: str, req: TaskUpdateRequest, token: str = Depends(get_session_token)):
     """Update task enabled state or schedule."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    task = _task_store[task_id]
+    task = store[task_id]
 
     if req.enabled is not None:
         old_enabled = task.get("enabled", True)
@@ -1025,7 +1103,7 @@ async def update_task(task_id: str, req: TaskUpdateRequest, token: str = Depends
             svc.scheduler.remove_task(task_id)
             svc.scheduler.add_task(task)
 
-    save_task_store(_task_store)
+    _save_task_store(username)
 
     next_run = None
     if svc.scheduler:
@@ -1051,10 +1129,14 @@ async def update_task(task_id: str, req: TaskUpdateRequest, token: str = Depends
 @app.post("/tasks/{task_id}/run", response_model=TaskRunResult)
 async def run_task(task_id: str, token: str = Depends(get_session_token)):
     """Manually trigger a task immediately."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+    qopc = _get_task_qopc(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    task = _task_store[task_id]
+    task = store[task_id]
 
     # Inject user context from session
     ctx = session_context.get(token, "")
@@ -1062,10 +1144,9 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
         task["_user_context"] = ctx
 
     # QOPC prompt injection — prepend learned context to natural_language
-    if _task_qopc:
-        prompt_injection = _task_qopc.get_prompt_injection(task_id)
-        if prompt_injection:
-            task["_qopc_injection"] = prompt_injection
+    prompt_injection = qopc.get_prompt_injection(task_id)
+    if prompt_injection:
+        task["_qopc_injection"] = prompt_injection
 
     result = execute_task(task)
 
@@ -1074,19 +1155,18 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
     task["last_status"] = result["status"]
     task["last_output_preview"] = result["output_preview"]
     task["run_count"] = task.get("run_count", 0) + 1
-    save_task_store(_task_store)
+    _save_task_store(username)
 
     # Record MANUAL_RUN signal
-    if _task_qopc:
-        _task_qopc.record_signal(TaskSignal(
-            task_id=task_id,
-            signal_type="MANUAL_RUN",
-            timestamp=datetime.utcnow().isoformat() + "Z",
-            metadata={
-                "duration_ms": result.get("duration_ms", 0),
-                "output_length": len(result.get("output_preview", "")),
-            },
-        ))
+    qopc.record_signal(TaskSignal(
+        task_id=task_id,
+        signal_type="MANUAL_RUN",
+        timestamp=datetime.utcnow().isoformat() + "Z",
+        metadata={
+            "duration_ms": result.get("duration_ms", 0),
+            "output_length": len(result.get("output_preview", "")),
+        },
+    ))
 
     return TaskRunResult(**result)
 
@@ -1094,31 +1174,40 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
 @app.get("/tasks/{task_id}/history")
 async def task_history(task_id: str, token: str = Depends(get_session_token)):
     """Get last 20 run results for a task."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    history = get_task_history(task_id)
-    return history
+    history_path = user_task_history(username, task_id)
+    if history_path.exists():
+        try:
+            return json.loads(history_path.read_text())
+        except Exception:
+            return []
+    return []
 
 
 @app.post("/tasks/{task_id}/signal")
 async def record_task_signal(task_id: str, req: TaskSignalRequest, token: str = Depends(get_session_token)):
     """Record a QOPC signal for a task and return updated score + recommendations."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+    qopc = _get_task_qopc(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if not _task_qopc:
-        raise HTTPException(status_code=503, detail="QOPC engine not initialized")
-
-    _task_qopc.record_signal(TaskSignal(
+    qopc.record_signal(TaskSignal(
         task_id=task_id,
         signal_type=req.signal_type,
         timestamp=datetime.utcnow().isoformat() + "Z",
         metadata=req.metadata or {},
     ))
 
-    score = _task_qopc.get_score(task_id)
-    recs = _task_qopc.get_recommendations(task_id)
+    score = qopc.get_score(task_id)
+    recs = qopc.get_recommendations(task_id)
 
     return {
         "recorded": True,
@@ -1131,17 +1220,18 @@ async def record_task_signal(task_id: str, req: TaskSignalRequest, token: str = 
 @app.get("/tasks/{task_id}/qopc")
 async def get_task_qopc(task_id: str, token: str = Depends(get_session_token)):
     """Return full QOPC state for a task."""
-    if task_id not in _task_store:
+    username = get_username_from_token(token)
+    store = _get_task_store(username)
+    qopc = _get_task_qopc(username)
+
+    if task_id not in store:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if not _task_qopc:
-        raise HTTPException(status_code=503, detail="QOPC engine not initialized")
-
-    score = _task_qopc.get_score(task_id)
-    count = _task_qopc.get_signal_count(task_id)
-    recs = _task_qopc.get_recommendations(task_id)
-    injection = _task_qopc.get_prompt_injection(task_id)
-    history = _task_qopc.get_last_signals(task_id, 20)
+    score = qopc.get_score(task_id)
+    count = qopc.get_signal_count(task_id)
+    recs = qopc.get_recommendations(task_id)
+    injection = qopc.get_prompt_injection(task_id)
+    history = qopc.get_last_signals(task_id, 20)
 
     return {
         "task_id": task_id,
@@ -1185,7 +1275,7 @@ async def status():
         _ibm_status_cache["expires"] = now + 30.0
 
     # Check if setup is needed (no credentials file or only dev user)
-    creds_path = Path("config") / "credentials.json"
+    creds_path = STORAGE_CREDENTIALS_FILE
     needs_setup = True
     if creds_path.exists():
         try:

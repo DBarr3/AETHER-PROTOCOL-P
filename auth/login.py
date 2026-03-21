@@ -65,6 +65,12 @@ class AetherCloudAuth:
         hashed = bcrypt.hashpw(password.encode(), salt).decode()
         self._credentials[username] = {"password_hash": hashed}
         self._save_credentials()
+        # Create per-user directory structure
+        try:
+            from config.storage import ensure_user_dirs
+            ensure_user_dirs(username)
+        except Exception:
+            pass  # Directory creation failure should not block registration
         return True
 
     def _save_credentials(self) -> None:

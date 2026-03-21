@@ -49,14 +49,17 @@ class TaskQOPC:
     Per-task QOPC feedback engine.
     Records user interaction signals and derives quality scores,
     timing recommendations, tone adjustments, and prompt injections.
+
+    Paths resolved via config.storage per-user resolvers.
     """
 
-    def __init__(self, history_dir: Path):
-        self._dir = history_dir
+    def __init__(self, username: str):
+        self._username = username
         self._cache: dict[str, list[dict]] = {}
 
     def _signal_file(self, task_id: str) -> Path:
-        return self._dir / f"task_qopc_{task_id}.json"
+        from config.storage import user_task_qopc
+        return user_task_qopc(self._username, task_id)
 
     def _load_signals(self, task_id: str) -> list[dict]:
         if task_id in self._cache:
@@ -77,7 +80,7 @@ class TaskQOPC:
     def _save_signals(self, task_id: str, signals: list[dict]):
         path = self._signal_file(task_id)
         try:
-            self._dir.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)
             # Keep last 200 signals per task
             trimmed = signals[-200:]
             path.write_text(json.dumps(trimmed, indent=2))

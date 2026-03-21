@@ -24,8 +24,14 @@ except ImportError:
 
 logger = logging.getLogger("aethercloud.scheduler")
 
+# Legacy paths — used only for migration from pre-storage.py codebase
 CONFIG_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent / "config"
 TASKS_FILE = CONFIG_DIR / "scheduled_tasks.json"
+
+# Per-user path resolution via storage.py
+def _user_history_path(username: str, task_id: str) -> Path:
+    from config.storage import user_task_history
+    return user_task_history(username, task_id)
 
 
 # ================================================================
@@ -135,7 +141,7 @@ def parse_schedule(natural_language: str) -> tuple[str, str]:
 # TASK EXECUTION
 # ================================================================
 
-def execute_task(task: dict) -> dict:
+def execute_task(task: dict, username: str = None) -> dict:
     """
     Execute a scheduled task by calling the Claude API.
 
@@ -143,6 +149,7 @@ def execute_task(task: dict) -> dict:
     """
     start = time.time()
     task_id = task.get("task_id", "unknown")
+    owner = username or task.get("_owner")
 
     try:
         from config.settings import CLAUDE_API_KEY
@@ -226,7 +233,7 @@ def execute_task(task: dict) -> dict:
             "duration_ms": duration,
         }
 
-        _store_task_history(task_id, result)
+        _store_task_history(task_id, result, username=owner)
 
         return result
 
@@ -240,13 +247,18 @@ def execute_task(task: dict) -> dict:
             "ran_at": datetime.utcnow().isoformat() + "Z",
             "duration_ms": duration,
         }
-        _store_task_history(task_id, result)
+        _store_task_history(task_id, result, username=owner)
         return result
 
 
-def _store_task_history(task_id: str, result: dict):
+def _store_task_history(task_id: str, result: dict, username: str = None):
     """Append a run result to the task's history file. Keep last 20."""
-    history_file = CONFIG_DIR / f"task_history_{task_id}.json"
+    if username:
+        history_file = _user_history_path(username, task_id)
+    else:
+        # Legacy fallback for scheduler-triggered runs without username context
+        history_file = CONFIG_DIR / f"task_history_{task_id}.json"
+
     history = []
     if history_file.exists():
         try:
@@ -258,15 +270,19 @@ def _store_task_history(task_id: str, result: dict):
     history = history[-20:]  # keep last 20
 
     try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        history_file.parent.mkdir(parents=True, exist_ok=True)
         history_file.write_text(json.dumps(history, indent=2))
     except Exception as e:
         logger.error("Failed to write task history for %s: %s", task_id, e)
 
 
-def get_task_history(task_id: str) -> list:
+def get_task_history(task_id: str, username: str = None) -> list:
     """Get last 20 run results for a task."""
-    history_file = CONFIG_DIR / f"task_history_{task_id}.json"
+    if username:
+        history_file = _user_history_path(username, task_id)
+    else:
+        history_file = CONFIG_DIR / f"task_history_{task_id}.json"
+
     if history_file.exists():
         try:
             return json.loads(history_file.read_text())
@@ -449,71 +465,94 @@ class TaskScheduler:
         QOPC auto-optimizer: runs at midnight.
         For tasks with high QOPC score and enough signals,
         automatically adjusts schedule to optimal time.
+        Iterates all user directories via storage.py.
         """
         try:
             from agent.task_qopc import TaskQOPC
-            qopc = TaskQOPC(CONFIG_DIR)
-            store = load_task_store()
+            from config.storage import DATA_ROOT, user_tasks_file
+            import json as _json
 
-            for task_id, task in store.items():
-                if not task.get("enabled", True):
+            users_dir = DATA_ROOT / "users"
+            if not users_dir.exists():
+                return
+
+            for user_dir in users_dir.iterdir():
+                if not user_dir.is_dir():
                     continue
-
-                score = qopc.get_score(task_id)
-                count = qopc.get_signal_count(task_id)
-
-                # Only optimize well-understood tasks
-                if score < 0.7 or count < 10:
-                    continue
-
-                recs = qopc.get_recommendations(task_id)
-                optimal_time = recs.get("optimal_time")
-                if not optimal_time:
-                    continue
-
-                # Parse optimal time "HH:MM" → compare with current cron
-                try:
-                    opt_h, opt_m = [int(x) for x in optimal_time.split(":")]
-                except (ValueError, AttributeError):
-                    continue
-
-                current_cron = task.get("schedule_cron", "")
-                parts = current_cron.split()
-                if len(parts) < 5:
+                uname = user_dir.name
+                tasks_path = user_tasks_file(uname)
+                if not tasks_path.exists():
                     continue
 
                 try:
-                    cur_m = int(parts[0]) if parts[0] != "*" else 0
-                    cur_h = int(parts[1]) if parts[1] != "*" else 0
-                except ValueError:
+                    tasks = _json.loads(tasks_path.read_text())
+                    store = {t["task_id"]: t for t in tasks}
+                except Exception:
                     continue
 
-                # Only reschedule if difference > 30 minutes
-                cur_total = cur_h * 60 + cur_m
-                opt_total = opt_h * 60 + opt_m
-                if abs(cur_total - opt_total) <= 30:
-                    continue
+                qopc = TaskQOPC(uname)
+                changed = False
 
-                # Build new cron (preserve day/month/dow from original)
-                new_cron = f"{opt_m} {opt_h} {parts[2]} {parts[3]} {parts[4]}"
-                old_label = task.get("schedule_label", current_cron)
-                label_h = opt_h % 12 or 12
-                label_ampm = "AM" if opt_h < 12 else "PM"
-                new_label = f"Daily {label_h}:{opt_m:02d} {label_ampm} (QOPC)"
+                for task_id, task in store.items():
+                    if not task.get("enabled", True):
+                        continue
 
-                task["schedule_cron"] = new_cron
-                task["schedule_label"] = new_label
-                store[task_id] = task
+                    score = qopc.get_score(task_id)
+                    count = qopc.get_signal_count(task_id)
 
-                # Reschedule in APScheduler
-                self.remove_task(task_id)
-                self.add_task(task)
+                    if score < 0.7 or count < 10:
+                        continue
 
-                logger.info(
-                    "QOPC auto-optimized task %s: %s → %s",
-                    task.get("name", task_id), old_label, new_label,
-                )
+                    recs = qopc.get_recommendations(task_id)
+                    optimal_time = recs.get("optimal_time")
+                    if not optimal_time:
+                        continue
 
-            save_task_store(store)
+                    try:
+                        opt_h, opt_m = [int(x) for x in optimal_time.split(":")]
+                    except (ValueError, AttributeError):
+                        continue
+
+                    current_cron = task.get("schedule_cron", "")
+                    parts = current_cron.split()
+                    if len(parts) < 5:
+                        continue
+
+                    try:
+                        cur_m = int(parts[0]) if parts[0] != "*" else 0
+                        cur_h = int(parts[1]) if parts[1] != "*" else 0
+                    except ValueError:
+                        continue
+
+                    cur_total = cur_h * 60 + cur_m
+                    opt_total = opt_h * 60 + opt_m
+                    if abs(cur_total - opt_total) <= 30:
+                        continue
+
+                    new_cron = f"{opt_m} {opt_h} {parts[2]} {parts[3]} {parts[4]}"
+                    old_label = task.get("schedule_label", current_cron)
+                    label_h = opt_h % 12 or 12
+                    label_ampm = "AM" if opt_h < 12 else "PM"
+                    new_label = f"Daily {label_h}:{opt_m:02d} {label_ampm} (QOPC)"
+
+                    task["schedule_cron"] = new_cron
+                    task["schedule_label"] = new_label
+                    store[task_id] = task
+                    changed = True
+
+                    self.remove_task(task_id)
+                    self.add_task(task)
+
+                    logger.info(
+                        "QOPC auto-optimized task %s/%s: %s -> %s",
+                        uname, task.get("name", task_id), old_label, new_label,
+                    )
+
+                if changed:
+                    try:
+                        tasks_path.write_text(_json.dumps(list(store.values()), indent=2))
+                    except Exception:
+                        pass
+
         except Exception as e:
             logger.error("QOPC auto-optimize failed: %s", e)
