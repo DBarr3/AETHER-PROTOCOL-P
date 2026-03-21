@@ -684,6 +684,144 @@
   .prompt-result-copy { margin-top: 6px; background: none; border: 1px solid var(--border-2); color: var(--text-secondary); font-size: 9px; font-family: 'JetBrains Mono', monospace; padding: 3px 8px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
   .prompt-result-copy:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* ═══ VIEW MODE SELECTOR ═══════════════════════════ */
+  .view-mode-bar {
+    display: flex; align-items: center; gap: 2px;
+    margin-left: 12px;
+    -webkit-app-region: no-drag;
+  }
+  .view-mode-btn {
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.5px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .view-mode-btn:first-child { border-radius: 3px 0 0 3px; }
+  .view-mode-btn:last-child { border-radius: 0 3px 3px 0; }
+  .view-mode-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .view-mode-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ═══ PROJECT MODE ACTION PANEL ═══════════════════ */
+  .project-actions {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    flex-direction: column; gap: 8px;
+    z-index: 60;
+    background: var(--bg-2);
+    border: 1px solid var(--accent);
+    padding: 18px;
+    min-width: 280px;
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+  }
+  .project-actions.visible { display: flex; }
+  .project-actions-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent);
+    letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .project-action-btn {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; padding: 8px 12px;
+    cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 8px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .project-action-btn:hover { border-color: var(--accent); color: var(--text-primary); background: var(--accent-dim); }
+  .project-action-icon { font-size: 14px; width: 20px; text-align: center; }
+
+  /* ═══ AGENT MODE ══════════════════════════════════ */
+  .agent-orbit-panel {
+    position: absolute;
+    top: 12px; right: 12px;
+    display: none;
+    flex-direction: column; gap: 6px;
+    z-index: 55;
+    max-width: 240px;
+  }
+  .agent-orbit-panel.visible { display: flex; }
+  .agent-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: border-color 0.2s;
+  }
+  .agent-card:hover { border-color: var(--accent); }
+  .agent-card-header { display: flex; align-items: center; justify-content: space-between; }
+  .agent-card-name { color: var(--text-primary); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .agent-card-status { font-size: 8px; padding: 1px 5px; border-radius: 2px; }
+  .agent-card-status.active { background: var(--green-dim); color: var(--green); }
+  .agent-card-status.idle { background: var(--accent-dim); color: var(--accent); }
+  .agent-card-status.error { background: var(--red-dim); color: var(--red); }
+  .agent-card-status.processing { background: var(--amber-dim); color: var(--amber); }
+  .agent-card-task { color: var(--text-muted); font-size: 9px; }
+  .agent-card-actions { display: flex; gap: 4px; margin-top: 4px; }
+  .agent-card-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-muted); font-size: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 6px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .agent-card-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .agent-card-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* ═══ SPAWN AGENT MODAL ══════════════════════════ */
+  .spawn-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .spawn-modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .spawn-modal {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    width: 480px; max-height: 80vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .spawn-presets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .spawn-preset {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    padding: 10px 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    transition: all 0.15s;
+  }
+  .spawn-preset:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .spawn-preset-icon { font-size: 18px; width: 28px; text-align: center; }
+  .spawn-preset-info { flex: 1; }
+  .spawn-preset-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-primary); font-weight: 500; }
+  .spawn-preset-desc { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+
+  .modal-field input[type="text"], .modal-field select {
+    width: 100%; background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; padding: 7px 8px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .modal-field input[type="text"]:focus, .modal-field select:focus { border-color: var(--accent); }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -694,7 +832,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.3</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.5</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -736,6 +874,12 @@
       <div class="menu-option" onclick="circuitZoomOut()">Zoom Out <span class="shortcut">Ctrl+-</span></div>
       <div class="menu-option" onclick="circuitResetView()">Fit to Screen <span class="shortcut">Ctrl+0</span></div>
     </div>
+  </div>
+
+  <div class="view-mode-bar">
+    <button class="view-mode-btn active" id="vm-vault" onclick="switchViewMode('vault')">VAULT</button>
+    <button class="view-mode-btn" id="vm-project" onclick="switchViewMode('project')">PROJECT</button>
+    <button class="view-mode-btn" id="vm-agent" onclick="switchViewMode('agent')">AGENTS</button>
   </div>
 
   <div class="breadcrumb-bar" id="breadcrumb-bar">
@@ -798,8 +942,11 @@
 
       <!-- AGENTS -->
       <div class="sb-section">
-        <div class="sb-header">AGENTS</div>
-        <div class="sb-agent-list">
+        <div class="sb-header">
+          AGENTS
+          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openSpawnModal()" title="Spawn Agent">+</span>
+        </div>
+        <div class="sb-agent-list" id="sb-agent-list">
           <button class="sb-agent-btn" onclick="openPromptOptimizer()">
             <span class="agent-icon">&#9889;</span>
             <span>Prompt Optimizer</span>
@@ -809,6 +956,7 @@
             <span>Open Vault</span>
           </button>
         </div>
+        <div id="spawned-agents-list" style="margin-top:6px;"></div>
       </div>
     </div>
 
@@ -836,6 +984,16 @@
         <div class="loading-text" id="loading-text">Analyzing vault structure...</div>
         <div class="loading-progress"><div class="loading-progress-fill" id="loading-progress-fill"></div></div>
       </div>
+      <!-- Project Mode Actions -->
+      <div class="project-actions" id="project-actions">
+        <div class="project-actions-title">PROJECT MODE</div>
+        <button class="project-action-btn" onclick="projectAction('structure')"><span class="project-action-icon">&#128736;</span>Structure New Project</button>
+        <button class="project-action-btn" onclick="projectAction('analyze')"><span class="project-action-icon">&#128269;</span>Analyze Current Project</button>
+        <button class="project-action-btn" onclick="projectAction('organize')"><span class="project-action-icon">&#128451;</span>Organize &amp; Improve</button>
+        <button class="project-action-btn" onclick="projectAction('recommend')"><span class="project-action-icon">&#11088;</span>Get Recommendations</button>
+      </div>
+      <!-- Agent Mode Orbit Panel -->
+      <div class="agent-orbit-panel" id="agent-orbit-panel"></div>
     </div>
     <!-- AI Response Panel -->
     <div id="ai-response-panel">
@@ -913,10 +1071,74 @@
   </div>
 </div>
 
+<!-- Spawn Agent Modal -->
+<div class="spawn-modal-overlay" id="spawn-modal">
+  <div class="spawn-modal">
+    <div class="modal-header">
+      <span class="modal-title">&#9881; SPAWN AGENT</span>
+      <button class="modal-close" onclick="closeSpawnModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">PRESETS</div>
+      <div class="spawn-presets">
+        <div class="spawn-preset" onclick="spawnPreset('email')">
+          <span class="spawn-preset-icon">&#9993;</span>
+          <div class="spawn-preset-info">
+            <div class="spawn-preset-name">Email Responder</div>
+            <div class="spawn-preset-desc">Scan inbox, draft responses, schedule sends</div>
+          </div>
+        </div>
+        <div class="spawn-preset" onclick="spawnPreset('analyzer')">
+          <span class="spawn-preset-icon">&#128202;</span>
+          <div class="spawn-preset-info">
+            <div class="spawn-preset-name">Project Analyzer</div>
+            <div class="spawn-preset-desc">Scan codebase, detect issues, generate reports</div>
+          </div>
+        </div>
+        <div class="spawn-preset" onclick="spawnPreset('adgen')">
+          <span class="spawn-preset-icon">&#128227;</span>
+          <div class="spawn-preset-info">
+            <div class="spawn-preset-name">Ad Generator</div>
+            <div class="spawn-preset-desc">Create marketing copy and ad variations</div>
+          </div>
+        </div>
+        <div class="spawn-preset" onclick="spawnPreset('cards')">
+          <span class="spawn-preset-icon">&#127183;</span>
+          <div class="spawn-preset-info">
+            <div class="spawn-preset-name">Card Creator</div>
+            <div class="spawn-preset-desc">Generate system design cards and flashcards</div>
+          </div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin:10px 0;"></div>
+      <div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">CUSTOM AGENT</div>
+      <div class="modal-field">
+        <label>Agent Name</label>
+        <input type="text" id="spawn-name" placeholder="e.g. Code Reviewer">
+      </div>
+      <div class="modal-field">
+        <label>Task Description</label>
+        <textarea id="spawn-task" rows="3" placeholder="What should this agent do?"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Schedule</label>
+        <select id="spawn-schedule">
+          <option value="manual">Manual (on-demand)</option>
+          <option value="hourly">Hourly</option>
+          <option value="daily">Daily (6 AM)</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <button class="modal-submit" onclick="spawnCustomAgent()">Create Agent</button>
+    </div>
+  </div>
+</div>
+
 <!-- STATUS BAR -->
 <div class="status-bar">
   <span id="status-nodes">NODES: 0</span>
   <span id="status-zoom">ZOOM: 100%</span>
+  <span id="status-view">VIEW: VAULT</span>
   <span id="status-mode"></span>
   <span id="status-user"></span>
   <span style="margin-left:auto;" id="status-version"></span>
@@ -938,6 +1160,18 @@ let fileSortBy = 'name';
 let fileTypeFilter = null;
 let currentVaultPath = '';
 let ctxNode = null;
+let currentViewMode = 'vault'; // 'vault' | 'project' | 'agent'
+
+// ════════════════════════════════════════════════════
+// SPAWNED AGENTS SYSTEM
+// ════════════════════════════════════════════════════
+const AGENT_PRESETS = {
+  email: { name:'Email Responder', icon:'\u2709', task:'Scan inbox, draft responses, schedule sends', schedule:'daily', status:'idle' },
+  analyzer: { name:'Project Analyzer', icon:'\u{1F4CA}', task:'Scan codebase, detect issues, generate reports', schedule:'weekly', status:'idle' },
+  adgen: { name:'Ad Generator', icon:'\u{1F4E3}', task:'Create marketing copy and ad variations', schedule:'manual', status:'idle' },
+  cards: { name:'Card Creator', icon:'\u{1F0CF}', task:'Generate system design cards and flashcards', schedule:'manual', status:'idle' },
+};
+let spawnedAgents = JSON.parse(localStorage.getItem('aether_agents') || '[]');
 
 // File type icons
 const FILE_ICONS = { Python:'\u{1F40D}', JavaScript:'JS', JSON:'{}', Markdown:'\u{1F4DD}', PDF:'\u{1F4C4}', CSV:'\u{1F4CA}', YAML:'\u2699', Log:'\u{1F4CB}', Text:'\u{1F4C3}', HTML:'\u{1F310}', CSS:'\u{1F3A8}', Binary:'\u{1F4E6}', Config:'\u2699', Env:'\u{1F510}', Image:'\u{1F5BC}', default:'\u{25AB}' };
@@ -972,17 +1206,39 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{} };
 
-// File type → color mapping
+// Hardened color system — bright, always visible, extension-based
 const TYPE_COLORS = {
-  Python:'#00ff88', JavaScript:'#00ff88', TypeScript:'#00ff88',
-  JSON:'#0088ff', CSV:'#0088ff', SQL:'#0088ff', YAML:'#0088ff',
-  Markdown:'#ff9900', PDF:'#ff9900', Text:'#ff9900',
-  Config:'#888888', Env:'#888888', TOML:'#888888',
-  Binary:'#cc44ff', Image:'#cc44ff', EXE:'#cc44ff',
-  HTML:'#00ff88', CSS:'#00ff88', Log:'#888888',
-  directory:'#00d4ff'
+  Python:'#00FF00', JavaScript:'#00DD00', TypeScript:'#00CC00', JSX:'#00FF00', CPP:'#00BB00',
+  HTML:'#00EE44', CSS:'#00EE44', Go:'#00BB44', Rust:'#00AA33', Ruby:'#00CC55', Java:'#00BB33',
+  JSON:'#FFA500', CSV:'#FFA500', SQL:'#FFA500', YAML:'#FFA500', XML:'#FF8800',
+  Markdown:'#0088FF', PDF:'#0088FF', Text:'#FFFF00', DOCX:'#0088FF',
+  Config:'#CCCCCC', Env:'#CCCCCC', TOML:'#CCCCCC', INI:'#CCCCCC',
+  Binary:'#FF00FF', Image:'#FF00FF', EXE:'#FF00FF', DLL:'#FF00FF',
+  Log:'#AAAAAA', Shell:'#00DD00',
+  directory:'#00FFFF'
 };
-function typeColor(type) { return TYPE_COLORS[type] || '#666666'; }
+// Extension-based color lookup (fallback to TYPE_COLORS)
+const EXT_COLORS = {
+  '.py':'#00FF00','.js':'#00DD00','.ts':'#00CC00','.jsx':'#00FF00','.tsx':'#00CC00',
+  '.cpp':'#00BB00','.c':'#00BB00','.h':'#00BB00','.rs':'#00AA33','.go':'#00BB44',
+  '.rb':'#00CC55','.java':'#00BB33','.sh':'#00DD00','.bash':'#00DD00',
+  '.html':'#00EE44','.css':'#00EE44','.scss':'#00EE44',
+  '.json':'#FFA500','.csv':'#FFA500','.sql':'#FFA500','.yaml':'#FFA500','.yml':'#FFA500','.xml':'#FF8800',
+  '.md':'#0088FF','.pdf':'#0088FF','.txt':'#FFFF00','.docx':'#0088FF','.doc':'#0088FF',
+  '.env':'#CCCCCC','.conf':'#CCCCCC','.cfg':'#CCCCCC','.ini':'#CCCCCC','.toml':'#CCCCCC','.rules':'#CCCCCC',
+  '.png':'#FF00FF','.jpg':'#FF00FF','.jpeg':'#FF00FF','.gif':'#FF00FF','.svg':'#FF00FF','.ico':'#FF00FF',
+  '.bin':'#FF00FF','.exe':'#FF00FF','.dll':'#FF00FF','.so':'#FF00FF',
+  '.log':'#AAAAAA','.lock':'#888888',
+};
+function typeColor(type) { return TYPE_COLORS[type] || '#888888'; }
+function extColor(name) {
+  const ext = '.' + (name.split('.').pop() || '').toLowerCase();
+  return EXT_COLORS[ext] || null;
+}
+function nodeColor(n) {
+  if (n.dir) return '#00FFFF';
+  return extColor(n.name) || typeColor(n.type) || '#888888';
+}
 
 function initCircuit() {
   const canvas = document.getElementById('circuit-canvas');
@@ -1011,13 +1267,23 @@ function initCircuit() {
   });
   window.addEventListener('mouseup', () => { CS.dragging = false; });
 
-  // Click
+  // Click — view-mode aware
   canvas.addEventListener('click', (e) => {
-    if (CS.hoveredNode) {
-      CS.selectedNode = CS.hoveredNode;
-      CS.highlightPath = getPathToRoot(CS.hoveredNode);
-      drawCircuit();
-      updateBreadcrumb(CS.hoveredNode);
+    // Close project actions if clicking elsewhere
+    if (!CS.hoveredNode) { document.getElementById('project-actions').classList.remove('visible'); return; }
+
+    CS.selectedNode = CS.hoveredNode;
+    CS.highlightPath = getPathToRoot(CS.hoveredNode);
+    drawCircuit();
+    updateBreadcrumb(CS.hoveredNode);
+
+    if (currentViewMode === 'project' && CS.hoveredNode.isRoot) {
+      // Show project action panel
+      document.getElementById('project-actions').classList.add('visible');
+    } else if (currentViewMode === 'agent' && CS.hoveredNode.isRoot) {
+      openSpawnModal();
+    } else {
+      document.getElementById('project-actions').classList.remove('visible');
       if (!CS.hoveredNode.dir) analyzeNode(CS.hoveredNode);
       else showToast(`${CS.hoveredNode.name} — ${CS.hoveredNode.children||0} items`, 'info');
     }
@@ -1416,7 +1682,7 @@ function drawCircuit() {
     const isConnected = CS.connectedSet.has(n.id);
     const isRoot = n.isRoot;
 
-    const color = n.dir ? '#00d4ff' : typeColor(n.type);
+    const color = nodeColor(n);
 
     if (isRoot) {
       // ── VAULT ROOT: Square with lock icon ──────────
@@ -1463,17 +1729,19 @@ function drawCircuit() {
       else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
       else if (isConnected && CS.hoveredNode) { ctx.shadowColor = color; ctx.shadowBlur = 6; }
 
-      // Fill — brighten connected nodes on hover
-      const alpha = isS ? 0.18 : isH ? 0.15 : isConnected && CS.hoveredNode ? 0.12 : isOnPath ? 0.08 : 0.04;
+      // Fill — hardened colors always visible
+      const alpha = isS ? 0.35 : isH ? 0.3 : isConnected && CS.hoveredNode ? 0.25 : isOnPath ? 0.18 : 0.12;
       ctx.fillStyle = n.dir
-        ? `rgba(0,212,255,${alpha})`
+        ? `rgba(0,255,255,${alpha})`
         : hexToRGBA(color, alpha);
       ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
 
-      // Border — brighten connected
-      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isConnected && CS.hoveredNode ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = isS ? 2 : isH ? 1.5 : isConnected && CS.hoveredNode ? 1.3 : 1;
+      // Border — always colored, 2px stroke
+      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isConnected && CS.hoveredNode ? color : isOnPath ? 'rgba(0,212,255,0.6)' : color;
+      ctx.lineWidth = isS ? 2.5 : isH ? 2 : isConnected && CS.hoveredNode ? 1.8 : 1.5;
+      ctx.globalAlpha = isS || isH || isConnected || isOnPath ? 1 : 0.7;
       ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
       // Inner dot for small nodes
@@ -2279,10 +2547,243 @@ function resizeCanvas() {
 }
 
 // ════════════════════════════════════════════════════
+// VIEW MODE SWITCHING
+// ════════════════════════════════════════════════════
+function switchViewMode(mode) {
+  currentViewMode = mode;
+  document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('vm-' + mode).classList.add('active');
+  document.getElementById('status-view').textContent = 'VIEW: ' + mode.toUpperCase();
+  document.getElementById('project-actions').classList.remove('visible');
+  document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
+
+  // Update chat placeholder
+  const input = document.getElementById('chat-input');
+  if (mode === 'vault') input.placeholder = 'Ask AetherCloud anything...';
+  else if (mode === 'project') input.placeholder = 'Describe your project or ask for analysis...';
+  else input.placeholder = 'Command your agents...';
+
+  // Rebuild agent orbit panel if in agent mode
+  if (mode === 'agent') {
+    renderAgentOrbitPanel();
+    // Change root label for agent mode
+    const root = CS.nodes.find(n => n.isRoot);
+    if (root) root.name = 'AETHER MAIN';
+  } else {
+    const root = CS.nodes.find(n => n.isRoot);
+    if (root && root.name === 'AETHER MAIN') root.name = 'VAULT ROOT';
+  }
+  drawCircuit();
+  showToast(mode.charAt(0).toUpperCase() + mode.slice(1) + ' Mode', 'info');
+}
+
+// ════════════════════════════════════════════════════
+// PROJECT MODE ACTIONS
+// ════════════════════════════════════════════════════
+function projectAction(action) {
+  document.getElementById('project-actions').classList.remove('visible');
+  setAgentStatus('Processing...', 'working');
+
+  const queries = {
+    structure: 'I want to structure a new project. Ask me what kind of project I\'m building, then create a recommended folder hierarchy with files.',
+    analyze: 'Analyze my current project structure. Scan all files and directories, detect patterns, find issues like circular dependencies, unused files, and misplaced code. Show optimization opportunities.',
+    organize: 'Review my project organization. Detect circular dependencies, unused imports, duplicate helper functions, and misplaced files. Suggest specific refactoring moves with before/after paths.',
+    recommend: 'Give me recommendations for my project: code review suggestions, performance optimizations, security improvements, testing gaps, and documentation needs. Be specific and actionable.',
+  };
+
+  const query = queries[action] || queries.analyze;
+
+  // If we have a vault loaded, include context
+  const context = currentVaultPath ? `\nProject path: ${currentVaultPath}\nNodes: ${CS.nodes.length}\nDirectories: ${CS.nodes.filter(n=>n.dir).length}\nFiles: ${CS.nodes.filter(n=>!n.dir).length}` : '';
+
+  document.getElementById('chat-input').value = query + context;
+  sendMessage();
+}
+
+// ════════════════════════════════════════════════════
+// AGENT SPAWN SYSTEM
+// ════════════════════════════════════════════════════
+function openSpawnModal() { document.getElementById('spawn-modal').classList.add('open'); }
+function closeSpawnModal() { document.getElementById('spawn-modal').classList.remove('open'); }
+document.getElementById('spawn-modal').addEventListener('click', (e) => { if(e.target.classList.contains('spawn-modal-overlay'))closeSpawnModal(); });
+
+function spawnPreset(presetId) {
+  const preset = AGENT_PRESETS[presetId];
+  if (!preset) return;
+  spawnAgent(preset.name, preset.icon, preset.task, preset.schedule);
+  closeSpawnModal();
+}
+
+function spawnCustomAgent() {
+  const name = document.getElementById('spawn-name').value.trim();
+  const task = document.getElementById('spawn-task').value.trim();
+  const schedule = document.getElementById('spawn-schedule').value;
+  if (!name) { document.getElementById('spawn-name').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('spawn-name').style.borderColor='',1500); return; }
+  if (!task) { document.getElementById('spawn-task').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('spawn-task').style.borderColor='',1500); return; }
+  spawnAgent(name, '\u2699', task, schedule);
+  document.getElementById('spawn-name').value = '';
+  document.getElementById('spawn-task').value = '';
+  closeSpawnModal();
+}
+
+function spawnAgent(name, icon, task, schedule) {
+  const agent = {
+    id: Date.now(),
+    name, icon, task, schedule,
+    status: 'idle',
+    created: Date.now(),
+    lastRun: null,
+    runCount: 0,
+  };
+  spawnedAgents.push(agent);
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  addAgentLog(`Spawned: ${name}`, 'done');
+  showToast(`Agent spawned: ${name}`, 'success');
+
+  // If in agent mode, rebuild circuit with agent orbit nodes
+  if (currentViewMode === 'agent') buildAgentOrbitVault();
+}
+
+function removeAgent(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  spawnedAgents = spawnedAgents.filter(a => a.id !== agentId);
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  if (agent) showToast(`Removed: ${agent.name}`, 'info');
+  if (currentViewMode === 'agent') buildAgentOrbitVault();
+}
+
+function toggleAgentStatus(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  agent.status = agent.status === 'active' ? 'idle' : 'active';
+  if (agent.status === 'active') { agent.lastRun = Date.now(); agent.runCount++; }
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  addAgentLog(`${agent.name}: ${agent.status}`, agent.status === 'active' ? 'active' : 'idle');
+}
+
+function runAgentTask(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  agent.status = 'processing';
+  agent.lastRun = Date.now();
+  agent.runCount++;
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  setAgentStatus(`Running: ${agent.name}`, 'working');
+  addAgentLog(`Running: ${agent.name}`, 'active');
+  displayAIResponse(`Running agent: ${agent.name}\nTask: ${agent.task}`, true);
+
+  // Simulate agent task via chat
+  const query = `You are the "${agent.name}" agent. Your task: ${agent.task}. Execute this task now and report results.`;
+  (async () => {
+    try {
+      let result;
+      if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+      const reply = result.response || result.reply || result.message || 'Task complete';
+      agent.status = 'active';
+      localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      renderSpawnedAgentsSidebar();
+      renderAgentOrbitPanel();
+      displayAIResponse(`[${agent.name}] ${reply}`, false);
+      addAgentLog(`${agent.name}: done`, 'done');
+      setAgentStatus('Complete', '');
+      setTimeout(() => setAgentStatus('Ready', ''), 3000);
+    } catch (e) {
+      agent.status = 'error';
+      localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      renderSpawnedAgentsSidebar();
+      renderAgentOrbitPanel();
+      displayAIResponse(`[${agent.name}] Error: ${e.message}`, false);
+      setAgentStatus('Error', 'error');
+    }
+  })();
+}
+
+function renderSpawnedAgentsSidebar() {
+  const c = document.getElementById('spawned-agents-list');
+  if (!spawnedAgents.length) { c.innerHTML = ''; return; }
+  c.innerHTML = spawnedAgents.map(a => `
+    <div class="sb-file-entry" style="gap:4px;" title="${escH(a.task)}">
+      <span class="sb-file-icon" style="font-size:11px;">${a.icon}</span>
+      <span class="sb-file-name" style="font-size:9px;">${escH(a.name)}</span>
+      <span class="sb-badge ${a.status==='active'?'green':a.status==='error'?'red':a.status==='processing'?'amber':'blue'}" style="font-size:7px;">${a.status.toUpperCase()}</span>
+    </div>
+  `).join('');
+}
+
+function renderAgentOrbitPanel() {
+  const panel = document.getElementById('agent-orbit-panel');
+  if (!spawnedAgents.length) {
+    panel.innerHTML = '<div style="background:var(--bg-2);border:1px solid var(--border-2);padding:12px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-align:center;">No agents spawned<br><span style="color:var(--accent);cursor:pointer;" onclick="openSpawnModal()">+ Spawn Agent</span></div>';
+    return;
+  }
+  panel.innerHTML = spawnedAgents.map(a => `
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-card-name">${a.icon} ${escH(a.name)}</span>
+        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
+      </div>
+      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
+      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | Schedule: ${a.schedule}</div>
+      <div class="agent-card-actions">
+        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
+        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
+        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Build agent-mode circuit: AETHER MAIN at center, spawned agents in orbit
+function buildAgentOrbitVault() {
+  const N = [], E = [];
+  let id = 0;
+
+  N.push({ id:id++, name:'AETHER MAIN', dir:true, type:'directory', children:spawnedAgents.length, isRoot:true, totalSize:0, cx:0, cy:0, r:32 });
+
+  // Main capabilities as first ring
+  const caps = [
+    { name:'Frontend Dev', icon:'HTML' },
+    { name:'Code Writer', icon:'Python' },
+    { name:'Content Creator', icon:'Markdown' },
+    { name:'File Manager', icon:'Config' },
+  ];
+  caps.forEach(c => {
+    const cid = id++;
+    N.push({ id:cid, name:c.name, dir:true, type:c.icon, children:0, totalSize:0, cx:0, cy:0, r:14 });
+    E.push({ from:0, to:cid });
+  });
+
+  // Spawned agents as second ring
+  spawnedAgents.forEach(a => {
+    const aid = id++;
+    const statusColor = a.status === 'active' ? 'Python' : a.status === 'error' ? 'Binary' : 'Config';
+    N.push({ id:aid, name:a.name, dir:false, type:statusColor, size:0, path:'agent://'+a.name, cx:0, cy:0, r:12 });
+    E.push({ from:0, to:aid });
+  });
+
+  CS.nodes = N; CS.edges = E;
+  CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+  radialLayout(N, E);
+  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
+  document.getElementById('status-nodes').textContent = `AGENTS: ${spawnedAgents.length}`;
+  updateZoom();
+  drawCircuit();
+}
+
+// ════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); document.getElementById('context-menu').classList.remove('open'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
@@ -2305,6 +2806,7 @@ window.addEventListener('load', async () => {
     document.getElementById('sidebar').classList.add('collapsed');
   }
   renderChatHistory();
+  renderSpawnedAgentsSidebar();
   initCircuit();
   pushHistory('Initial vault');
   showToast('AetherCloud-L ready', 'success');
