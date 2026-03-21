@@ -13,7 +13,7 @@ import time
 import hashlib
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -332,10 +332,10 @@ app = FastAPI(
 # CORS: allow Electron renderer (file://), localhost, and VPS origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|http://198\.211\.115\.41(:\d+)?|null)$",
+    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|http://198\.211\.115\.41(:\d+)?)$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -1085,7 +1085,7 @@ async def vault_browse(
     vault_path = Path(vault_root)
 
     if not vault_path.exists():
-        return {"error": f"Path does not exist: {vault_root}", "folders": [], "files": [],
+        return {"error": "Path does not exist", "folders": [], "files": [],
                 "stats": {"total_files": 0, "total_folders": 0}}
     if not vault_path.is_dir():
         return {"error": "Path is not a directory", "folders": [], "files": [],
@@ -1132,7 +1132,7 @@ async def vault_browse(
             except Exception:
                 continue
     except PermissionError:
-        return {"error": f"Permission denied: {vault_root}", "folders": [], "files": [],
+        return {"error": "Permission denied", "folders": [], "files": [],
                 "stats": {"total_files": 0, "total_folders": 0}}
 
     folders.sort(key=lambda x: x["name"].lower())

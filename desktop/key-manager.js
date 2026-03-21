@@ -145,22 +145,6 @@ function writeIBMCredentials(apiKey) {
 }
 
 /**
- * getEnvForPython() — returns a copy of process.env with stored keys injected.
- * Used when spawning the Python backend process.
- */
-function getEnvForPython() {
-  const env = { ...process.env };
-
-  const anthropicKey = getKey('ANTHROPIC_API_KEY');
-  if (anthropicKey) env.ANTHROPIC_API_KEY = anthropicKey;
-
-  const ibmKey = getKey('IBM_QUANTUM_API_KEY');
-  if (ibmKey) env.IBM_QUANTUM_API_KEY = ibmKey;
-
-  return env;
-}
-
-/**
  * validate() — check which keys are usable.
  * Returns { anthropic: bool, ibm: bool }.
  */
@@ -189,6 +173,5 @@ module.exports = {
   deleteKey,
   getAllKeyNames,
   hydrate,
-  getEnvForPython,
   validate,
 };

@@ -106,11 +106,11 @@ def get_ibm_token() -> Optional[str]:
 
 
 def get_dev_key() -> str:
-    """Return dev user key with secure fallback."""
-    return os.environ.get(
-        "AETHER_DEV_KEY",
-        "fdf&*79u9*(*HJBh*U((9jijkKKL-d8a9(OS)0k"
-    )
+    """Return dev user key. Must be set via environment variable."""
+    key = os.environ.get("AETHER_DEV_KEY", "")
+    if not key:
+        log.warning("AETHER_DEV_KEY not set — dev account disabled")
+    return key
 
 
 def mask(key: str) -> str:

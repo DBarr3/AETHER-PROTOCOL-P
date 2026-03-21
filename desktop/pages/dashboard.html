@@ -451,14 +451,14 @@
     display: none;
   }
   .context-menu.open { display: block; }
-  .ctx-option {
+  .ctxmenu-option {
     display: flex; align-items: center; gap: 8px;
     padding: 7px 14px; font-size: 11px;
     color: var(--text-secondary); cursor: pointer;
     transition: background 0.1s, color 0.1s;
   }
-  .ctx-option:hover { background: var(--accent-dim); color: var(--text-primary); }
-  .ctx-option .ctx-icon { width: 14px; text-align: center; font-size: 10px; color: var(--accent); }
+  .ctxmenu-option:hover { background: var(--accent-dim); color: var(--text-primary); }
+  .ctxmenu-option .ctx-icon { width: 14px; text-align: center; font-size: 10px; color: var(--accent); }
   .ctx-sep { height: 1px; background: var(--border); margin: 3px 8px; }
 
   /* Toast notifications */
@@ -2043,13 +2043,13 @@
 
 <!-- Right-click context menu -->
 <div class="context-menu" id="context-menu">
-  <div class="ctx-option" onclick="ctxOpenExplorer()"><span class="ctx-icon">&#128194;</span>Open in Explorer</div>
-  <div class="ctx-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze this file</div>
+  <div class="ctxmenu-option" onclick="ctxOpenExplorer()"><span class="ctx-icon">&#128194;</span>Open in Explorer</div>
+  <div class="ctxmenu-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze this file</div>
   <div class="ctx-sep"></div>
-  <div class="ctx-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
-  <div class="ctx-option" onclick="ctxMoveTo()"><span class="ctx-icon">&#10132;</span>Move to...</div>
+  <div class="ctxmenu-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
+  <div class="ctxmenu-option" onclick="ctxMoveTo()"><span class="ctx-icon">&#10132;</span>Move to...</div>
   <div class="ctx-sep"></div>
-  <div class="ctx-option" onclick="ctxCopyPath()"><span class="ctx-icon">&#128203;</span>Copy path</div>
+  <div class="ctxmenu-option" onclick="ctxCopyPath()"><span class="ctx-icon">&#128203;</span>Copy path</div>
 </div>
 
 <!-- Toast container -->
@@ -3557,9 +3557,7 @@ function displayAIResponse(text, isThinking) {
   panel.scrollTop = panel.scrollHeight;
 }
 
-// FIX 1 — Overlay removed. appendMessage is now a no-op.
-// All responses display in the single #ai-response-panel only.
-function appendMessage(label, text, type) { /* removed — single response panel only */ }
+// appendMessage removed — all responses display in single #ai-response-panel
 
 // ════════════════════════════════════════════════════
 // SIDEBAR
