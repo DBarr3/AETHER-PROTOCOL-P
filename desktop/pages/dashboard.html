@@ -1371,6 +1371,44 @@
     animation: spin 0.6s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .sched-qopc-bar {
+    display: flex; align-items: center; gap: 4px; margin-top: 2px;
+    font-size: 7px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.3px; color: var(--text-secondary);
+  }
+  .sched-qopc-track {
+    flex: 1; height: 4px; background: var(--bg-4); border-radius: 2px; overflow: hidden;
+    max-width: 80px;
+  }
+  .sched-qopc-fill {
+    height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s;
+  }
+  .sched-qopc-label { color: var(--accent); font-weight: 500; }
+  .sched-qopc-learning { color: var(--amber); font-style: italic; }
+  .sched-qopc-insights {
+    margin-top: 4px; padding: 4px 6px; background: var(--bg-3);
+    border: 1px solid var(--border); border-radius: 3px;
+    font-size: 8px; max-height: 0; overflow: hidden; transition: max-height 0.2s;
+  }
+  .sched-task-card.expanded .sched-qopc-insights { max-height: 300px; }
+  .sched-qopc-insights-header {
+    font-size: 7px; color: var(--accent); letter-spacing: 0.5px;
+    text-transform: uppercase; cursor: pointer; margin-bottom: 3px;
+  }
+  .sched-qopc-insight-row {
+    color: var(--text-secondary); padding: 1px 0; font-size: 8px;
+  }
+  .sched-qopc-suggest {
+    margin-top: 4px; padding: 3px 6px; background: var(--accent-dim);
+    border: 1px solid var(--accent); border-radius: 2px;
+    font-size: 8px; color: var(--accent); display: flex; align-items: center; gap: 6px;
+  }
+  .sched-qopc-suggest button {
+    background: var(--accent); color: var(--bg); border: none;
+    padding: 2px 8px; font-size: 7px; font-weight: 600; cursor: pointer;
+    border-radius: 2px; letter-spacing: 0.3px;
+  }
+  .sched-qopc-suggest button:hover { opacity: 0.8; }
 
   /* ═══ CONTEXT GATHERING SYSTEM ═══════════════════ */
   .ctx-gather-modal {
@@ -1506,7 +1544,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.11</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.12</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -5450,6 +5488,45 @@ async function createScheduledTask() {
   }
 }
 
+let schedQopcCache = {}; // taskId → { score, signal_count, insights, recommendations }
+let schedIgnoreTimers = {}; // taskId → timeout for IGNORED signal
+
+// ── QOPC Signal Firing ──────────────────────────
+function fireTaskSignal(taskId, signalType, metadata = {}) {
+  fetch(`${API_BASE}/tasks/${taskId}/signal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+    body: JSON.stringify({ signal_type: signalType, metadata }),
+  }).then(r => r.json()).then(data => {
+    if (data.qopc_score !== undefined) {
+      schedQopcCache[taskId] = {
+        score: data.qopc_score,
+        signal_count: (schedQopcCache[taskId]?.signal_count || 0) + 1,
+        insights: data.insights || [],
+        recommendations: data.recommendations || {},
+      };
+      renderScheduledTasks();
+    }
+  }).catch(() => { /* offline — skip signal */ });
+}
+
+async function fetchTaskQopc(taskId) {
+  try {
+    const r = await fetch(`${API_BASE}/tasks/${taskId}/qopc`, {
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    });
+    if (r.ok) {
+      const data = await r.json();
+      schedQopcCache[taskId] = {
+        score: data.qopc_score,
+        signal_count: data.signal_count,
+        insights: data.insights || [],
+        recommendations: data.recommendations || {},
+      };
+    }
+  } catch (e) { /* offline */ }
+}
+
 function renderScheduledTasks() {
   const list = document.getElementById('scheduled-tasks-list');
   if (!scheduledTasks.length) {
@@ -5467,6 +5544,46 @@ function renderScheduledTasks() {
     const typeIcons = { email: '\u2709', file: '\u{1F4C4}', code: '\u{1F4BB}', custom: '\u2699' };
     const icon = typeIcons[t.agent_type] || '\u2699';
 
+    // QOPC score bar
+    const qc = schedQopcCache[t.task_id] || { score: t.qopc_score || 0, signal_count: 0, insights: [], recommendations: {} };
+    const hasEnoughSignals = qc.signal_count >= 3;
+    const scorePct = Math.round((qc.score || 0) * 100);
+    const qopcBarHTML = hasEnoughSignals
+      ? `<div class="sched-qopc-bar" title="QOPC score \u2014 system learns your preferences over time. Higher = better calibrated.">
+          <span>QOPC</span>
+          <div class="sched-qopc-track"><div class="sched-qopc-fill" style="width:${scorePct}%"></div></div>
+          <span class="sched-qopc-label">${(qc.score || 0).toFixed(2)}</span>
+        </div>`
+      : qc.signal_count > 0
+        ? `<div class="sched-qopc-bar"><span class="sched-qopc-learning">QOPC LEARNING...</span></div>`
+        : '';
+
+    // QOPC insights (visible when expanded)
+    let insightsHTML = '';
+    if (qc.insights && qc.insights.length > 0) {
+      const insightRows = qc.insights.map(i => `<div class="sched-qopc-insight-row">\u2726 ${escH(i)}</div>`).join('');
+      const optTime = qc.recommendations?.optimal_time;
+      const currentCron = t.schedule_cron || '';
+      const cronParts = currentCron.split(' ');
+      let suggestHTML = '';
+      if (optTime && cronParts.length >= 5) {
+        const [optH, optM] = optTime.split(':').map(Number);
+        const curH = parseInt(cronParts[1]) || 0;
+        const curM = parseInt(cronParts[0]) || 0;
+        if (Math.abs((curH * 60 + curM) - (optH * 60 + optM)) > 30) {
+          suggestHTML = `<div class="sched-qopc-suggest" onclick="event.stopPropagation()">
+            <span>\u26A1 QOPC suggests rescheduling to ${optTime}</span>
+            <button onclick="applyQopcSchedule('${t.task_id}', '${optTime}')">APPLY</button>
+          </div>`;
+        }
+      }
+      insightsHTML = `<div class="sched-qopc-insights">
+        <div class="sched-qopc-insights-header">\u25BC QOPC INSIGHTS</div>
+        ${insightRows}
+        ${suggestHTML}
+      </div>`;
+    }
+
     return `<div class="sched-task-card" id="sched-card-${t.task_id}" onclick="toggleSchedTaskExpand('${t.task_id}')">
       <div class="sched-task-header">
         <div class="sched-task-dot ${statusClass}"></div>
@@ -5481,22 +5598,92 @@ function renderScheduledTasks() {
         <span>${escH(t.schedule_label || t.schedule_cron)}</span>
         <span>Last: ${lastRunText}</span>
         ${nextRunText ? `<span>Next: ${nextRunText}</span>` : ''}
+        ${qopcBarHTML}
       </div>
-      ${previewText ? `<div class="sched-task-output">${escH(previewText)}</div>` : ''}
+      ${previewText ? `<div class="sched-task-output" onclick="event.stopPropagation(); copyTaskOutput('${t.task_id}')">${escH(previewText)}</div>` : ''}
+      ${insightsHTML}
     </div>`;
   }).join('');
+
+  // Start ignore timers for tasks with recent runs that haven't been opened
+  scheduledTasks.forEach(t => {
+    if (t.last_run && t.last_status === 'SUCCESS' && !schedIgnoreTimers[t.task_id]) {
+      const hoursSinceRun = (Date.now() - new Date(t.last_run).getTime()) / 3600000;
+      if (hoursSinceRun < 2) {
+        // Set a timer: if not opened within 2 hours of run, fire IGNORED
+        const remainMs = Math.max(0, (2 - hoursSinceRun) * 3600000);
+        schedIgnoreTimers[t.task_id] = setTimeout(() => {
+          fireTaskSignal(t.task_id, 'IGNORED', { hours_ignored: 2 });
+          delete schedIgnoreTimers[t.task_id];
+        }, remainMs);
+      }
+    }
+  });
 }
 
 function toggleSchedTaskExpand(taskId) {
   const card = document.getElementById('sched-card-' + taskId);
-  if (card) card.classList.toggle('expanded');
+  if (!card) return;
+  const wasExpanded = card.classList.contains('expanded');
+  card.classList.toggle('expanded');
+
+  // Fire OPENED signal when expanding (not collapsing)
+  if (!wasExpanded) {
+    const task = scheduledTasks.find(t => t.task_id === taskId);
+    const hoursSinceRun = task?.last_run ? (Date.now() - new Date(task.last_run).getTime()) / 3600000 : 0;
+    fireTaskSignal(taskId, 'OPENED', { time_to_open_hours: parseFloat(hoursSinceRun.toFixed(2)) });
+
+    // Cancel ignore timer since user opened it
+    if (schedIgnoreTimers[taskId]) {
+      clearTimeout(schedIgnoreTimers[taskId]);
+      delete schedIgnoreTimers[taskId];
+    }
+
+    // Fetch full QOPC data for insights
+    fetchTaskQopc(taskId);
+  }
+}
+
+function copyTaskOutput(taskId) {
+  const task = scheduledTasks.find(t => t.task_id === taskId);
+  if (!task || !task.last_output_preview) return;
+  navigator.clipboard.writeText(task.last_output_preview).then(() => {
+    showToast('Output copied', 'success');
+    fireTaskSignal(taskId, 'USED', { output_length: task.last_output_preview.length });
+  }).catch(() => {});
+}
+
+async function applyQopcSchedule(taskId, optimalTime) {
+  const [h, m] = optimalTime.split(':').map(Number);
+  const task = scheduledTasks.find(t => t.task_id === taskId);
+  if (!task) return;
+  const oldCron = task.schedule_cron;
+  const parts = oldCron.split(' ');
+  if (parts.length < 5) return;
+  const newCron = `${m} ${h} ${parts[2]} ${parts[3]} ${parts[4]}`;
+  const labelH = h % 12 || 12;
+  const labelAmpm = h < 12 ? 'AM' : 'PM';
+  const newLabel = `Daily ${labelH}:${String(m).padStart(2, '0')} ${labelAmpm} (QOPC)`;
+
+  try {
+    await fetch(`${API_BASE}/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({ schedule_cron: newCron, schedule_label: newLabel }),
+    });
+    fireTaskSignal(taskId, 'RESCHEDULED', { old_cron: oldCron, new_cron: newCron });
+  } catch (e) { /* offline */ }
+
+  task.schedule_cron = newCron;
+  task.schedule_label = newLabel;
+  renderScheduledTasks();
+  showToast(`Schedule optimized to ${optimalTime}`, 'success');
 }
 
 async function runScheduledTask(taskId) {
   const btn = document.getElementById('sched-run-' + taskId);
   if (btn) btn.innerHTML = '<div class="sched-task-spinner"></div>';
 
-  // Update dot to running
   const task = scheduledTasks.find(t => t.task_id === taskId);
   if (task) task.last_status = 'RUNNING';
   renderScheduledTasks();
@@ -5541,12 +5728,20 @@ async function toggleScheduledTask(taskId) {
 }
 
 async function deleteScheduledTask(taskId) {
+  fireTaskSignal(taskId, 'DELETED', {});
+
   try {
     await fetch(`${API_BASE}/tasks/${taskId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
   } catch (e) { /* offline — just remove locally */ }
+
+  // Clear ignore timer
+  if (schedIgnoreTimers[taskId]) {
+    clearTimeout(schedIgnoreTimers[taskId]);
+    delete schedIgnoreTimers[taskId];
+  }
 
   scheduledTasks = scheduledTasks.filter(t => t.task_id !== taskId);
   renderScheduledTasks();
@@ -5580,6 +5775,11 @@ async function pollScheduledTasks() {
     if (r.ok) {
       const data = await r.json();
       scheduledTasks = data;
+      // Update QOPC cache with scores from server
+      data.forEach(t => {
+        if (!schedQopcCache[t.task_id]) schedQopcCache[t.task_id] = { score: 0, signal_count: 0, insights: [], recommendations: {} };
+        schedQopcCache[t.task_id].score = t.qopc_score || 0;
+      });
       renderScheduledTasks();
     }
   } catch (e) { /* offline — keep local state */ }

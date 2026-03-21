@@ -158,14 +158,24 @@ def execute_task(task: dict) -> dict:
 
         import httpx
 
-        # Build prompt from natural_language + agent context
+        # Build prompt from natural_language + agent context + QOPC injection
         nl = task.get("natural_language", task.get("name", ""))
         agent_type = task.get("agent_type", "custom")
         user_context = task.get("_user_context", "")
+        qopc_injection = task.get("_qopc_injection", "")
 
         system_prompt = f"You are an AetherCloud-L {agent_type} agent. Execute the following task thoroughly and return a concise result summary."
 
-        messages = [{"role": "user", "content": f"{nl}\n\nContext: {user_context}" if user_context else nl}]
+        # Prepend QOPC prompt injection if available
+        prompt_parts = []
+        if qopc_injection:
+            prompt_parts.append(qopc_injection)
+        prompt_parts.append(nl)
+        if user_context:
+            prompt_parts.append(f"Context: {user_context}")
+        full_prompt = "\n\n".join(prompt_parts)
+
+        messages = [{"role": "user", "content": full_prompt}]
 
         # Build MCP servers list
         mcp_servers = task.get("mcp_servers", [])
@@ -317,6 +327,16 @@ class TaskScheduler:
             self._scheduler.start()
             self._running = True
             logger.info("Task scheduler started")
+
+            # Add midnight auto-optimize job
+            self._scheduler.add_job(
+                self._auto_optimize_schedules,
+                CronTrigger(hour=0, minute=0),
+                id="__qopc_auto_optimize",
+                replace_existing=True,
+                name="QOPC Auto-Optimize Schedules",
+            )
+            logger.info("QOPC auto-optimize job scheduled at midnight")
         except Exception as e:
             logger.error("Failed to start scheduler: %s", e)
 
@@ -423,3 +443,77 @@ class TaskScheduler:
             store[task_id]["last_output_preview"] = result["output_preview"]
             store[task_id]["run_count"] = store[task_id].get("run_count", 0) + 1
             save_task_store(store)
+
+    def _auto_optimize_schedules(self):
+        """
+        QOPC auto-optimizer: runs at midnight.
+        For tasks with high QOPC score and enough signals,
+        automatically adjusts schedule to optimal time.
+        """
+        try:
+            from agent.task_qopc import TaskQOPC
+            qopc = TaskQOPC(CONFIG_DIR)
+            store = load_task_store()
+
+            for task_id, task in store.items():
+                if not task.get("enabled", True):
+                    continue
+
+                score = qopc.get_score(task_id)
+                count = qopc.get_signal_count(task_id)
+
+                # Only optimize well-understood tasks
+                if score < 0.7 or count < 10:
+                    continue
+
+                recs = qopc.get_recommendations(task_id)
+                optimal_time = recs.get("optimal_time")
+                if not optimal_time:
+                    continue
+
+                # Parse optimal time "HH:MM" → compare with current cron
+                try:
+                    opt_h, opt_m = [int(x) for x in optimal_time.split(":")]
+                except (ValueError, AttributeError):
+                    continue
+
+                current_cron = task.get("schedule_cron", "")
+                parts = current_cron.split()
+                if len(parts) < 5:
+                    continue
+
+                try:
+                    cur_m = int(parts[0]) if parts[0] != "*" else 0
+                    cur_h = int(parts[1]) if parts[1] != "*" else 0
+                except ValueError:
+                    continue
+
+                # Only reschedule if difference > 30 minutes
+                cur_total = cur_h * 60 + cur_m
+                opt_total = opt_h * 60 + opt_m
+                if abs(cur_total - opt_total) <= 30:
+                    continue
+
+                # Build new cron (preserve day/month/dow from original)
+                new_cron = f"{opt_m} {opt_h} {parts[2]} {parts[3]} {parts[4]}"
+                old_label = task.get("schedule_label", current_cron)
+                label_h = opt_h % 12 or 12
+                label_ampm = "AM" if opt_h < 12 else "PM"
+                new_label = f"Daily {label_h}:{opt_m:02d} {label_ampm} (QOPC)"
+
+                task["schedule_cron"] = new_cron
+                task["schedule_label"] = new_label
+                store[task_id] = task
+
+                # Reschedule in APScheduler
+                self.remove_task(task_id)
+                self.add_task(task)
+
+                logger.info(
+                    "QOPC auto-optimized task %s: %s → %s",
+                    task.get("name", task_id), old_label, new_label,
+                )
+
+            save_task_store(store)
+        except Exception as e:
+            logger.error("QOPC auto-optimize failed: %s", e)

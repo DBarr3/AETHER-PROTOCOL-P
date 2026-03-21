@@ -41,6 +41,7 @@ from agent.task_scheduler import (
     TaskScheduler, execute_task, load_task_store, save_task_store,
     get_task_history, parse_schedule,
 )
+from agent.task_qopc import TaskQOPC, TaskSignal
 from aether_protocol.audit import AuditLog
 
 log = logging.getLogger("aethercloud.api")
@@ -176,6 +177,7 @@ class Services:
 svc = Services()
 session_context: dict[str, str] = {}
 _task_store: dict[str, dict] = {}
+_task_qopc: Optional[TaskQOPC] = None
 _start_time = time.time()
 _ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
 
@@ -220,9 +222,10 @@ def _init_services():
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
 
-    # Task scheduler
-    global _task_store
+    # Task scheduler + QOPC
+    global _task_store, _task_qopc
     _task_store = load_task_store()
+    _task_qopc = TaskQOPC(Path("config"))
     svc.scheduler = TaskScheduler()
     svc.scheduler.start()
     for task in _task_store.values():
@@ -403,6 +406,7 @@ class TaskResponse(BaseModel):
     last_output_preview: Optional[str] = None
     next_run: Optional[str] = None
     run_count: int = 0
+    qopc_score: float = 0.0
 
 
 class TaskUpdateRequest(BaseModel):
@@ -417,6 +421,11 @@ class TaskRunResult(BaseModel):
     output_preview: str
     ran_at: str
     duration_ms: int
+
+
+class TaskSignalRequest(BaseModel):
+    signal_type: str        # "OPENED" | "USED" | "EDITED" | "IGNORED" | "DELETED"
+    metadata: Optional[dict] = {}
 
 
 # ═══════════════════════════════════════════════════
@@ -948,12 +957,15 @@ async def list_tasks(token: str = Depends(get_session_token)):
     """List all scheduled tasks with current status."""
     tasks = []
     for task in _task_store.values():
+        tid = task["task_id"]
         next_run = None
         if svc.scheduler:
-            next_run = svc.scheduler.get_next_run(task["task_id"])
+            next_run = svc.scheduler.get_next_run(tid)
+
+        qscore = _task_qopc.get_score(tid) if _task_qopc else 0.0
 
         tasks.append(TaskResponse(
-            task_id=task["task_id"],
+            task_id=tid,
             name=task["name"],
             natural_language=task.get("natural_language", ""),
             schedule_cron=task.get("schedule_cron", "0 9 * * *"),
@@ -966,6 +978,7 @@ async def list_tasks(token: str = Depends(get_session_token)):
             last_output_preview=task.get("last_output_preview"),
             next_run=next_run,
             run_count=task.get("run_count", 0),
+            qopc_score=qscore,
         ))
 
     return tasks
@@ -1048,6 +1061,12 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
     if ctx:
         task["_user_context"] = ctx
 
+    # QOPC prompt injection — prepend learned context to natural_language
+    if _task_qopc:
+        prompt_injection = _task_qopc.get_prompt_injection(task_id)
+        if prompt_injection:
+            task["_qopc_injection"] = prompt_injection
+
     result = execute_task(task)
 
     # Update store
@@ -1056,6 +1075,18 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
     task["last_output_preview"] = result["output_preview"]
     task["run_count"] = task.get("run_count", 0) + 1
     save_task_store(_task_store)
+
+    # Record MANUAL_RUN signal
+    if _task_qopc:
+        _task_qopc.record_signal(TaskSignal(
+            task_id=task_id,
+            signal_type="MANUAL_RUN",
+            timestamp=datetime.utcnow().isoformat() + "Z",
+            metadata={
+                "duration_ms": result.get("duration_ms", 0),
+                "output_length": len(result.get("output_preview", "")),
+            },
+        ))
 
     return TaskRunResult(**result)
 
@@ -1068,6 +1099,59 @@ async def task_history(task_id: str, token: str = Depends(get_session_token)):
 
     history = get_task_history(task_id)
     return history
+
+
+@app.post("/tasks/{task_id}/signal")
+async def record_task_signal(task_id: str, req: TaskSignalRequest, token: str = Depends(get_session_token)):
+    """Record a QOPC signal for a task and return updated score + recommendations."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not _task_qopc:
+        raise HTTPException(status_code=503, detail="QOPC engine not initialized")
+
+    _task_qopc.record_signal(TaskSignal(
+        task_id=task_id,
+        signal_type=req.signal_type,
+        timestamp=datetime.utcnow().isoformat() + "Z",
+        metadata=req.metadata or {},
+    ))
+
+    score = _task_qopc.get_score(task_id)
+    recs = _task_qopc.get_recommendations(task_id)
+
+    return {
+        "recorded": True,
+        "qopc_score": score,
+        "recommendations": recs,
+        "insights": recs.get("insights", []),
+    }
+
+
+@app.get("/tasks/{task_id}/qopc")
+async def get_task_qopc(task_id: str, token: str = Depends(get_session_token)):
+    """Return full QOPC state for a task."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not _task_qopc:
+        raise HTTPException(status_code=503, detail="QOPC engine not initialized")
+
+    score = _task_qopc.get_score(task_id)
+    count = _task_qopc.get_signal_count(task_id)
+    recs = _task_qopc.get_recommendations(task_id)
+    injection = _task_qopc.get_prompt_injection(task_id)
+    history = _task_qopc.get_last_signals(task_id, 20)
+
+    return {
+        "task_id": task_id,
+        "qopc_score": score,
+        "signal_count": count,
+        "recommendations": recs,
+        "insights": recs.get("insights", []),
+        "prompt_injection": injection,
+        "signal_history": history,
+    }
 
 
 # ── Status ────────────────────────────────────────
