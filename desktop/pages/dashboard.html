@@ -871,6 +871,189 @@
   }
   .modal-field input[type="text"]:focus, .modal-field select:focus { border-color: var(--accent); }
 
+  /* ═══ PATCH PROMPT GENERATOR ═══════════════════════ */
+  .patch-panel {
+    position: absolute;
+    top: 12px; left: 12px; right: 12px; bottom: 12px;
+    display: none;
+    flex-direction: column;
+    z-index: 65;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+    overflow: hidden;
+  }
+  .patch-panel.visible { display: flex; }
+  .patch-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .patch-panel-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent);
+    letter-spacing: 0.5px; font-weight: 600;
+  }
+  .patch-panel-close {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 14px;
+    cursor: pointer; transition: color 0.15s;
+  }
+  .patch-panel-close:hover { color: var(--text-primary); }
+  .patch-panel-body {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .patch-analysis-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-2);
+  }
+  .patch-analysis-btn {
+    background: var(--accent); color: var(--bg); border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    padding: 6px 14px; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .patch-analysis-btn:hover { opacity: 0.9; }
+  .patch-analysis-btn:disabled { background: var(--bg-3); color: var(--text-muted); cursor: not-allowed; }
+  .patch-analysis-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+    flex: 1;
+  }
+  .patch-filter-bar {
+    display: flex; gap: 4px; align-items: center;
+    padding: 0 16px 8px;
+    flex-shrink: 0;
+  }
+  .patch-filter-chip {
+    background: none; border: 1px solid var(--border-2);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .patch-filter-chip:hover, .patch-filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .patch-filter-chip.sev-critical.active { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+  .patch-filter-chip.sev-high.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+  .patch-filter-chip.sev-medium.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .patch-filter-chip.sev-low.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+  .patch-issue {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    padding: 14px 16px;
+    transition: border-color 0.2s;
+  }
+  .patch-issue:hover { border-color: var(--accent); }
+  .patch-issue-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .patch-issue-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-primary);
+    font-weight: 500; flex: 1;
+  }
+  .patch-issue-severity {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 6px; border-radius: 2px;
+    letter-spacing: 0.5px;
+  }
+  .patch-issue-severity.critical { background: var(--red-dim); color: var(--red); }
+  .patch-issue-severity.high { background: var(--amber-dim); color: var(--amber); }
+  .patch-issue-severity.medium { background: var(--accent-dim); color: var(--accent); }
+  .patch-issue-severity.low { background: var(--green-dim); color: var(--green); }
+  .patch-issue-desc {
+    font-size: 10px; color: var(--text-secondary);
+    line-height: 1.5; margin-bottom: 8px;
+  }
+  .patch-issue-meta {
+    display: flex; gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .patch-issue-files {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .patch-issue-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .patch-issue-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; padding: 4px 10px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .patch-issue-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .patch-issue-btn.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .patch-issue-btn.primary:hover { background: var(--accent); color: var(--bg); }
+  .patch-issue-btn.success { border-color: var(--green); color: var(--green); }
+  .patch-issue-btn.success:hover { background: var(--green-dim); }
+
+  /* Generated prompt display */
+  .patch-prompt-display {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    padding: 14px 16px; margin-top: 8px;
+    display: none;
+  }
+  .patch-prompt-display.visible { display: block; }
+  .patch-prompt-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .patch-prompt-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-primary);
+    line-height: 1.6; white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px; overflow-y: auto;
+    background: var(--bg); padding: 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .patch-prompt-actions { display: flex; gap: 6px; }
+
+  /* Offer bar (inline prompt suggestion) */
+  .patch-offer {
+    background: var(--bg-2);
+    border: 1px solid var(--accent);
+    padding: 12px 16px;
+    display: none;
+    align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    box-shadow: 0 4px 16px rgba(0,212,255,0.1);
+  }
+  .patch-offer.visible { display: flex; }
+  .patch-offer-text { flex: 1; color: var(--text-secondary); line-height: 1.4; }
+  .patch-offer-btn {
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; padding: 5px 12px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .patch-offer-btn:hover { background: var(--accent); color: var(--bg); }
+  .patch-offer-dismiss {
+    background: none; border: 1px solid var(--border-2);
+    color: var(--text-muted); font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 5px 10px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .patch-offer-dismiss:hover { border-color: var(--text-muted); color: var(--text-secondary); }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -881,7 +1064,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.6</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.7</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1040,6 +1223,8 @@
         <button class="project-action-btn" onclick="projectAction('analyze')"><span class="project-action-icon">&#128269;</span>Analyze Current Project</button>
         <button class="project-action-btn" onclick="projectAction('organize')"><span class="project-action-icon">&#128451;</span>Organize &amp; Improve</button>
         <button class="project-action-btn" onclick="projectAction('recommend')"><span class="project-action-icon">&#11088;</span>Get Recommendations</button>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button class="project-action-btn" onclick="openPatchPanel()" style="border-color:var(--accent);"><span class="project-action-icon">&#9889;</span>Generate Patch Prompts</button>
       </div>
       <!-- Task Tracker (Agent Mode) -->
       <div class="task-tracker" id="task-tracker"></div>
@@ -1047,6 +1232,38 @@
       <div class="agent-detail" id="agent-detail"></div>
       <!-- Agent Mode Orbit Panel -->
       <div class="agent-orbit-panel" id="agent-orbit-panel"></div>
+      <!-- Patch Prompt Generator Panel -->
+      <div class="patch-panel" id="patch-panel">
+        <div class="patch-panel-header">
+          <span class="patch-panel-title">INTELLIGENT PATCH PROMPT GENERATOR</span>
+          <button class="patch-panel-close" onclick="closePatchPanel()">&#10005;</button>
+        </div>
+        <div class="patch-analysis-bar">
+          <button class="patch-analysis-btn" id="patch-analyze-btn" onclick="runPatchAnalysis()">Analyze Project</button>
+          <button class="patch-analysis-btn" style="background:var(--bg-3);color:var(--text-secondary);border:1px solid var(--border-2);" onclick="reanalyzePatchProject()">Re-Analyze</button>
+          <span class="patch-analysis-status" id="patch-status">Ready to analyze</span>
+        </div>
+        <div class="patch-filter-bar" id="patch-filters">
+          <button class="patch-filter-chip active" onclick="filterPatches('all',this)">ALL</button>
+          <button class="patch-filter-chip sev-critical" onclick="filterPatches('critical',this)">CRITICAL</button>
+          <button class="patch-filter-chip sev-high" onclick="filterPatches('high',this)">HIGH</button>
+          <button class="patch-filter-chip sev-medium" onclick="filterPatches('medium',this)">MEDIUM</button>
+          <button class="patch-filter-chip sev-low" onclick="filterPatches('low',this)">LOW</button>
+        </div>
+        <div class="patch-panel-body" id="patch-issues-list">
+          <div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">
+            Click <span style="color:var(--accent);">Analyze Project</span> to scan your codebase<br>
+            <span style="font-size:9px;margin-top:6px;display:block;">AETHER will identify issues and generate structured Claude Code prompts</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Patch Offer Bar (contextual prompt suggestion) -->
+    <div class="patch-offer" id="patch-offer">
+      <span class="patch-offer-text" id="patch-offer-text">AETHER detected potential improvements. Would you like to generate patch prompts?</span>
+      <button class="patch-offer-btn" id="patch-offer-gen" onclick="acceptPatchOffer()">Generate Prompt</button>
+      <button class="patch-offer-btn" style="background:none;border-color:var(--border-2);color:var(--text-secondary);" onclick="askPatchQuestions()">Ask Questions</button>
+      <button class="patch-offer-dismiss" onclick="dismissPatchOffer()">Dismiss</button>
     </div>
     <!-- AI Response Panel -->
     <div id="ai-response-panel">
@@ -2419,6 +2636,13 @@ async function sendMessage() {
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
+
+      // In project mode, offer patch prompts if analysis detected issues
+      if (currentViewMode === 'project' && /issue|problem|missing|improve|bug|vuln|secur|optim|refactor/i.test(reply)) {
+        setTimeout(() => {
+          showPatchOffer('AETHER_MAIN detected potential improvements. Would you like me to draft detailed Claude Code prompts to fix these?', { title: 'project analysis results' });
+        }, 1500);
+      }
     }
   } catch (e) {
     displayAIResponse('Connection error: ' + e.message, false);
@@ -2617,6 +2841,8 @@ function switchViewMode(mode) {
   document.getElementById('status-view').textContent = 'VIEW: ' + mode.toUpperCase();
   document.getElementById('project-actions').classList.remove('visible');
   document.getElementById('agent-detail').classList.remove('visible');
+  closePatchPanel();
+  dismissPatchOffer();
 
   // Show/hide mode-specific UI
   document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
@@ -3062,10 +3288,391 @@ function viewAgentLogs(agentId) {
 }
 
 // ════════════════════════════════════════════════════
+// INTELLIGENT PATCH PROMPT GENERATOR
+// ════════════════════════════════════════════════════
+let patchIssues = [];
+let patchFilter = 'all';
+let currentPatchOffer = null;
+
+function openPatchPanel() {
+  document.getElementById('project-actions').classList.remove('visible');
+  document.getElementById('patch-panel').classList.add('visible');
+  if (patchIssues.length) renderPatchIssues();
+}
+
+function closePatchPanel() {
+  document.getElementById('patch-panel').classList.remove('visible');
+}
+
+function filterPatches(filter, btn) {
+  patchFilter = filter;
+  document.querySelectorAll('.patch-filter-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderPatchIssues();
+}
+
+async function runPatchAnalysis() {
+  const btn = document.getElementById('patch-analyze-btn');
+  const status = document.getElementById('patch-status');
+  btn.disabled = true;
+  status.textContent = 'Scanning codebase...';
+  setAgentStatus('Analyzing project...', 'working');
+
+  // Build file context from vault
+  const vaultNodes = savedVaultState ? savedVaultState.nodes : CS.nodes;
+  const dirs = vaultNodes.filter(n => n.dir && !n.isRoot);
+  const files = vaultNodes.filter(n => !n.dir);
+
+  const fileList = files.slice(0, 80).map(f => {
+    const ext = '.' + (f.name.split('.').pop() || '');
+    return `${f.name} (${f.type || ext}, ${fmtSize(f.size || 0)})${f.path ? ' — ' + f.path : ''}`;
+  }).join('\n');
+
+  const dirList = dirs.map(d => `${d.name}/ (${d.children || 0} items)`).join('\n');
+
+  const contextStr = currentVaultPath ? `Project: ${currentVaultPath}\n` : '';
+  const query = `You are a senior software architect performing a codebase audit. Analyze the following project structure and identify issues, improvements, and optimizations.
+
+${contextStr}DIRECTORIES (${dirs.length}):
+${dirList || '(none loaded)'}
+
+FILES (${files.length} total, showing first 80):
+${fileList || '(none loaded)'}
+
+For each issue found, respond in this EXACT format (one per section):
+---ISSUE---
+TITLE: [concise title]
+SEVERITY: [critical|high|medium|low]
+CATEGORY: [security|performance|architecture|quality|testing|documentation|dependency]
+EFFORT: [quick|moderate|significant]
+FILES: [comma-separated file paths affected]
+DESCRIPTION: [2-3 sentence description of the problem]
+FIX: [1-2 sentence description of the recommended fix]
+---END---
+
+Find 4-8 issues. Focus on: missing security measures, architectural problems, performance bottlenecks, missing tests, dependency issues, and code quality concerns. Be specific and actionable.`;
+
+  try {
+    let result;
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+
+    if (result.error) {
+      status.textContent = 'Analysis failed: ' + (result.message || 'Unknown error');
+      setAgentStatus('Error', 'error');
+    } else {
+      const raw = result.response || result.reply || result.message || '';
+      patchIssues = parsePatchIssues(raw);
+      if (!patchIssues.length) {
+        // Fallback: generate demo issues from structure analysis
+        patchIssues = generateStructureIssues(dirs, files);
+      }
+      status.textContent = `Found ${patchIssues.length} issues`;
+      renderPatchIssues();
+      setAgentStatus('Analysis complete', '');
+      setTimeout(() => setAgentStatus('Ready', ''), 3000);
+      showToast(`Found ${patchIssues.length} patch opportunities`, 'success');
+    }
+  } catch (e) {
+    status.textContent = 'Connection error: ' + e.message;
+    // Fallback to structure-based analysis
+    patchIssues = generateStructureIssues(dirs, files);
+    if (patchIssues.length) {
+      status.textContent = `Offline analysis: ${patchIssues.length} issues`;
+      renderPatchIssues();
+    }
+    setAgentStatus('Error', 'error');
+  }
+  btn.disabled = false;
+}
+
+function reanalyzePatchProject() {
+  patchIssues = [];
+  document.getElementById('patch-issues-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">Re-analyzing...</div>';
+  runPatchAnalysis();
+}
+
+function parsePatchIssues(raw) {
+  const sections = raw.split(/---ISSUE---/).filter(s => s.trim());
+  return sections.map((s, i) => {
+    const title = (s.match(/TITLE:\s*(.+)/i) || ['', 'Issue ' + (i+1)])[1].trim();
+    const severity = (s.match(/SEVERITY:\s*(\w+)/i) || ['', 'medium'])[1].toLowerCase();
+    const category = (s.match(/CATEGORY:\s*(\w+)/i) || ['', 'quality'])[1].toLowerCase();
+    const effort = (s.match(/EFFORT:\s*(\w+)/i) || ['', 'moderate'])[1].toLowerCase();
+    const files = (s.match(/FILES:\s*(.+)/i) || ['', ''])[1].trim();
+    const desc = (s.match(/DESCRIPTION:\s*([\s\S]*?)(?=\nFIX:|---END---|$)/i) || ['', ''])[1].trim();
+    const fix = (s.match(/FIX:\s*([\s\S]*?)(?=---END---|$)/i) || ['', ''])[1].trim();
+    return { id: Date.now() + i, title, severity, category, effort, files, description: desc, fix, promptGenerated: false, prompt: '' };
+  }).filter(i => i.title && i.title !== 'Issue 0');
+}
+
+function generateStructureIssues(dirs, files) {
+  const issues = [];
+  const id = Date.now();
+  const dirNames = dirs.map(d => d.name.toLowerCase());
+  const fileNames = files.map(f => f.name.toLowerCase());
+
+  // Check for missing .env protection
+  if (fileNames.some(f => f === '.env' || f.endsWith('.env'))) {
+    const hasGitignore = fileNames.includes('.gitignore');
+    if (!hasGitignore) {
+      issues.push({ id: id+1, title: 'Environment files exposed — no .gitignore detected', severity: 'critical', category: 'security', effort: 'quick', files: '.env, .gitignore', description: 'Environment files containing secrets are present but no .gitignore was found to prevent them from being committed to version control.', fix: 'Create a .gitignore file that excludes .env, node_modules, __pycache__, and other sensitive/generated files.', promptGenerated: false, prompt: '' });
+    }
+  }
+
+  // Check for missing tests
+  if (!dirNames.some(d => /test|spec|__test|cypress/.test(d))) {
+    issues.push({ id: id+2, title: 'No test directory found', severity: 'high', category: 'testing', effort: 'significant', files: 'project root', description: 'The project has no dedicated test directory. Without automated tests, regressions can go undetected and code quality degrades over time.', fix: 'Create a tests/ directory with unit tests for critical modules. Set up a test runner (pytest, jest, etc.) and add CI configuration.', promptGenerated: false, prompt: '' });
+  }
+
+  // Check for missing docs
+  if (!fileNames.includes('readme.md') && !fileNames.includes('readme')) {
+    issues.push({ id: id+3, title: 'Missing README documentation', severity: 'medium', category: 'documentation', effort: 'moderate', files: 'README.md', description: 'No README.md found at the project root. This makes it difficult for new contributors to understand the project setup and architecture.', fix: 'Create a comprehensive README.md with project description, setup instructions, architecture overview, and contribution guidelines.', promptGenerated: false, prompt: '' });
+  }
+
+  // Check for large number of root files (poor organization)
+  const rootFiles = files.filter(f => !f.path || (f.path.split(/[/\\]/).length <= 2));
+  if (rootFiles.length > 15) {
+    issues.push({ id: id+4, title: 'Too many files at project root (' + rootFiles.length + ')', severity: 'medium', category: 'architecture', effort: 'moderate', files: 'project root', description: `${rootFiles.length} files sit at the project root. This makes navigation difficult and suggests the project needs better modular organization.`, fix: 'Group related files into subdirectories (src/, config/, scripts/, docs/). Move implementation files into logical modules.', promptGenerated: false, prompt: '' });
+  }
+
+  // Check for missing dependency lock file
+  const hasPackageJson = fileNames.includes('package.json');
+  const hasLock = fileNames.some(f => f === 'package-lock.json' || f === 'yarn.lock' || f === 'pnpm-lock.yaml');
+  if (hasPackageJson && !hasLock) {
+    issues.push({ id: id+5, title: 'Missing dependency lock file', severity: 'high', category: 'dependency', effort: 'quick', files: 'package.json', description: 'package.json exists but no lock file (package-lock.json, yarn.lock) was found. This means builds are not reproducible and dependency versions may drift.', fix: 'Run npm install or yarn install to generate a lock file. Commit it to version control.', promptGenerated: false, prompt: '' });
+  }
+
+  // Check Python projects for requirements.txt
+  const hasPyFiles = fileNames.some(f => f.endsWith('.py'));
+  const hasReqs = fileNames.includes('requirements.txt') || fileNames.includes('pyproject.toml');
+  if (hasPyFiles && !hasReqs) {
+    issues.push({ id: id+6, title: 'Python project missing dependency manifest', severity: 'high', category: 'dependency', effort: 'quick', files: 'requirements.txt or pyproject.toml', description: 'Python files exist but no requirements.txt or pyproject.toml was found. Dependencies are not tracked, making environment setup unreliable.', fix: 'Create a requirements.txt with pinned versions (pip freeze > requirements.txt) or set up pyproject.toml with dependencies.', promptGenerated: false, prompt: '' });
+  }
+
+  // Generic code quality
+  if (files.length > 30) {
+    issues.push({ id: id+7, title: 'Consider adding linting configuration', severity: 'low', category: 'quality', effort: 'quick', files: '.eslintrc.json or setup.cfg', description: 'With ' + files.length + ' files, enforcing consistent code style through a linter would improve maintainability and catch common bugs early.', fix: 'Add ESLint/Prettier for JS/TS projects, or flake8/black for Python projects. Configure rules and add to CI pipeline.', promptGenerated: false, prompt: '' });
+  }
+
+  return issues;
+}
+
+function renderPatchIssues() {
+  const list = document.getElementById('patch-issues-list');
+  const filtered = patchFilter === 'all' ? patchIssues : patchIssues.filter(i => i.severity === patchFilter);
+
+  if (!filtered.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">No ${patchFilter === 'all' ? '' : patchFilter + ' '}issues found</div>`;
+    return;
+  }
+
+  const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  const sorted = [...filtered].sort((a, b) => (sevOrder[a.severity] || 4) - (sevOrder[b.severity] || 4));
+
+  list.innerHTML = sorted.map(issue => {
+    const catIcons = { security: '\u{1F512}', performance: '\u26A1', architecture: '\u{1F3D7}', quality: '\u2728', testing: '\u{1F9EA}', documentation: '\u{1F4DD}', dependency: '\u{1F4E6}' };
+    const icon = catIcons[issue.category] || '\u{1F527}';
+    const promptHTML = issue.promptGenerated ? `
+      <div class="patch-prompt-display visible" id="prompt-display-${issue.id}">
+        <div class="patch-prompt-label">GENERATED CLAUDE CODE PROMPT</div>
+        <div class="patch-prompt-text" id="prompt-text-${issue.id}">${escH(issue.prompt)}</div>
+        <div class="patch-prompt-actions">
+          <button class="patch-issue-btn primary" onclick="copyPatchPrompt(${issue.id})">Copy to Clipboard</button>
+          <button class="patch-issue-btn success" onclick="sendToClaudeCode(${issue.id})">Send to Claude Code</button>
+          <button class="patch-issue-btn" onclick="editPatchPrompt(${issue.id})">Edit</button>
+          <button class="patch-issue-btn" onclick="discardPatchPrompt(${issue.id})">Discard</button>
+        </div>
+      </div>` : '';
+
+    return `<div class="patch-issue" id="patch-issue-${issue.id}">
+      <div class="patch-issue-header">
+        <span class="patch-issue-title">${icon} ${escH(issue.title)}</span>
+        <span class="patch-issue-severity ${issue.severity}">${issue.severity.toUpperCase()}</span>
+      </div>
+      <div class="patch-issue-desc">${escH(issue.description)}</div>
+      <div class="patch-issue-meta">
+        <span>Category: ${issue.category}</span>
+        <span>Effort: ${issue.effort}</span>
+      </div>
+      ${issue.files ? `<div class="patch-issue-files">Files: ${escH(issue.files)}</div>` : ''}
+      <div class="patch-issue-actions">
+        <button class="patch-issue-btn primary" onclick="generatePatchPrompt(${issue.id})">${issue.promptGenerated ? 'Regenerate Prompt' : 'Generate Prompt'}</button>
+        <button class="patch-issue-btn" onclick="askAboutIssue(${issue.id})">Ask Questions</button>
+        <button class="patch-issue-btn" onclick="dismissIssue(${issue.id})">Dismiss</button>
+      </div>
+      ${promptHTML}
+    </div>`;
+  }).join('');
+}
+
+async function generatePatchPrompt(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue) return;
+
+  setAgentStatus('Generating prompt...', 'working');
+  document.getElementById('patch-status').textContent = 'Generating prompt for: ' + issue.title;
+
+  const projectPath = currentVaultPath || 'the project';
+  const query = `Generate a detailed, copy-paste-ready Claude Code prompt to fix this issue. The prompt should be self-contained and include all context needed.
+
+ISSUE: ${issue.title}
+SEVERITY: ${issue.severity}
+CATEGORY: ${issue.category}
+DESCRIPTION: ${issue.description}
+AFFECTED FILES: ${issue.files}
+RECOMMENDED FIX: ${issue.fix}
+PROJECT PATH: ${projectPath}
+
+Generate the prompt in this format:
+---PROMPT---
+[The complete Claude Code prompt text - include specific file paths, what to change, why, and acceptance criteria. Make it actionable and specific. Start with a clear instruction like "In the project at [path], ..." Include section headers like ## Context, ## Task, ## Files to Modify, ## Acceptance Criteria]
+---END---`;
+
+  try {
+    let result;
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+
+    if (result.error) {
+      showToast('Failed to generate prompt', 'error');
+    } else {
+      const raw = result.response || result.reply || result.message || '';
+      const promptMatch = raw.match(/---PROMPT---([\s\S]*?)---END---/);
+      issue.prompt = promptMatch ? promptMatch[1].trim() : buildFallbackPrompt(issue);
+      issue.promptGenerated = true;
+      renderPatchIssues();
+      showToast('Prompt generated', 'success');
+    }
+  } catch (e) {
+    // Fallback: generate prompt locally
+    issue.prompt = buildFallbackPrompt(issue);
+    issue.promptGenerated = true;
+    renderPatchIssues();
+    showToast('Prompt generated (offline)', 'info');
+  }
+
+  setAgentStatus('Ready', '');
+  document.getElementById('patch-status').textContent = `${patchIssues.length} issues | Prompt ready`;
+}
+
+function buildFallbackPrompt(issue) {
+  const projectPath = currentVaultPath || '[project path]';
+  return `## Context
+In the project at ${projectPath}, there is a ${issue.severity}-severity ${issue.category} issue:
+${issue.title}
+
+## Problem
+${issue.description}
+
+## Files to Modify
+${issue.files || 'See project structure'}
+
+## Task
+${issue.fix}
+
+## Acceptance Criteria
+- The ${issue.category} issue described above is resolved
+- No existing functionality is broken
+- Changes follow the project's existing code style
+- Add comments explaining any non-obvious changes
+${issue.category === 'testing' ? '- All new tests pass\n- Test coverage is improved' : ''}
+${issue.category === 'security' ? '- No secrets are exposed in version control\n- Input validation is in place' : ''}
+${issue.category === 'documentation' ? '- Documentation is clear and complete\n- Examples are provided where helpful' : ''}`;
+}
+
+function copyPatchPrompt(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue || !issue.prompt) return;
+  navigator.clipboard.writeText(issue.prompt).then(() => {
+    showToast('Prompt copied to clipboard', 'success');
+    displayAIResponse('Prompt copied! Paste it into Claude Code on your desktop to apply the fix.', false);
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
+}
+
+function sendToClaudeCode(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue || !issue.prompt) return;
+  navigator.clipboard.writeText(issue.prompt).then(() => {
+    showToast('Prompt copied — paste into Claude Code terminal', 'success');
+    displayAIResponse(`[PATCH PROMPT READY]\nThe prompt for "${issue.title}" has been copied to your clipboard.\n\nTo apply:\n1. Open Claude Code in your terminal\n2. Paste the prompt (Ctrl+V)\n3. Review Claude's proposed changes\n4. Accept or iterate\n\nAfter applying, click "Re-Analyze" in the Patch Panel to verify the fix.`, false);
+  }).catch(() => {
+    // Fallback: show prompt in response panel for manual copy
+    displayAIResponse(`[COPY THIS PROMPT TO CLAUDE CODE]\n\n${issue.prompt}`, false);
+    showToast('Clipboard unavailable — prompt shown in response panel', 'info');
+  });
+}
+
+function editPatchPrompt(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue) return;
+  closePatchPanel();
+  document.getElementById('chat-input').value = `Refine this patch prompt for "${issue.title}":\n\n${issue.prompt.substring(0, 200)}...\n\nI want to change: `;
+  document.getElementById('chat-input').focus();
+  displayAIResponse(`Editing prompt for: ${issue.title}\n\nDescribe what you'd like to change about the prompt. For example:\n- "Make it more specific about the error handling"\n- "Add instructions for writing tests"\n- "Focus on the API routes only"`, true);
+}
+
+function discardPatchPrompt(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue) return;
+  issue.promptGenerated = false;
+  issue.prompt = '';
+  renderPatchIssues();
+  showToast('Prompt discarded', 'info');
+}
+
+function dismissIssue(issueId) {
+  patchIssues = patchIssues.filter(i => i.id !== issueId);
+  renderPatchIssues();
+  document.getElementById('patch-status').textContent = `${patchIssues.length} issues remaining`;
+  showToast('Issue dismissed', 'info');
+}
+
+function askAboutIssue(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue) return;
+  closePatchPanel();
+  document.getElementById('chat-input').value = `Tell me more about this issue: "${issue.title}" — ${issue.description} What are the risks if I don't fix it?`;
+  document.getElementById('chat-input').focus();
+}
+
+// Patch offer system — shown after project analysis
+function showPatchOffer(text, issueContext) {
+  currentPatchOffer = issueContext;
+  document.getElementById('patch-offer-text').textContent = text;
+  document.getElementById('patch-offer').classList.add('visible');
+}
+
+function acceptPatchOffer() {
+  document.getElementById('patch-offer').classList.remove('visible');
+  if (currentPatchOffer && currentPatchOffer.id) {
+    generatePatchPrompt(currentPatchOffer.id);
+  } else {
+    openPatchPanel();
+    runPatchAnalysis();
+  }
+}
+
+function askPatchQuestions() {
+  document.getElementById('patch-offer').classList.remove('visible');
+  if (currentPatchOffer) {
+    document.getElementById('chat-input').value = `Tell me more about: ${currentPatchOffer.title || 'the detected issues'}`;
+    document.getElementById('chat-input').focus();
+  }
+}
+
+function dismissPatchOffer() {
+  document.getElementById('patch-offer').classList.remove('visible');
+  currentPatchOffer = null;
+}
+
+// ════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
