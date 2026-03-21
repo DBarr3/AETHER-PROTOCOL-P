@@ -970,7 +970,7 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 // CIRCUIT GRAPH ENGINE — Radial Quantum Layout
 // ════════════════════════════════════════════════════
-const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[], cx:0, cy:0 };
+const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{} };
 
 // File type → color mapping
 const TYPE_COLORS = {
@@ -1058,6 +1058,35 @@ function initCircuit() {
   drawCircuit();
 }
 
+// ── Build edge lookup maps for O(1) neighbor queries ──
+function buildEdgeMaps() {
+  CS.edgeFromMap = {}; CS.edgeToMap = {}; CS.nodeById = {};
+  CS.nodes.forEach(n => { CS.nodeById[n.id] = n; });
+  CS.edges.forEach(e => {
+    if (!CS.edgeFromMap[e.from]) CS.edgeFromMap[e.from] = [];
+    CS.edgeFromMap[e.from].push(e.to);
+    CS.edgeToMap[e.to] = e.from;
+  });
+}
+
+// ── Get connected node IDs (immediate neighbors) ─────
+function getConnected(node) {
+  const s = new Set();
+  if (!node) return s;
+  // Children
+  (CS.edgeFromMap[node.id] || []).forEach(id => s.add(id));
+  // Parent
+  if (CS.edgeToMap[node.id] !== undefined) s.add(CS.edgeToMap[node.id]);
+  return s;
+}
+
+// ── Viewport culling: check if node is visible ───────
+function isInViewport(n, w, h, margin) {
+  const sx = n.cx * CS.zoom + CS.panX;
+  const sy = n.cy * CS.zoom + CS.panY;
+  return sx > -margin && sx < w + margin && sy > -margin && sy < h + margin;
+}
+
 // ── Hit detection for radial nodes ───────────────────
 function handleHover(e) {
   const canvas = document.getElementById('circuit-canvas');
@@ -1079,6 +1108,7 @@ function handleHover(e) {
 
   if (found !== CS.hoveredNode) {
     CS.hoveredNode = found;
+    CS.connectedSet = getConnected(found);
     drawCircuit();
     const tt = document.getElementById('node-tooltip');
     if (found) {
@@ -1099,19 +1129,18 @@ function handleHover(e) {
 
 function getPathToRoot(node) {
   const path = [node.id];
-  let current = node;
-  while (true) {
-    const edge = CS.edges.find(e => e.to === current.id);
-    if (!edge) break;
-    path.unshift(edge.from);
-    current = CS.nodes.find(n => n.id === edge.from);
-    if (!current) break;
+  let cid = node.id;
+  while (CS.edgeToMap[cid] !== undefined) {
+    const pid = CS.edgeToMap[cid];
+    path.unshift(pid);
+    cid = pid;
   }
   return path;
 }
 
-// ── Radial Layout Engine ─────────────────────────────
-// Places nodes in concentric rings: root at center, dirs at tier 1, files at tier 2+
+// ── Radial Layout Engine + Force Simulation ──────────
+// Phase 1: Radial placement in concentric rings
+// Phase 2: Force simulation (300 ticks) for zero-overlap guarantee
 function radialLayout(nodes, edges) {
   if (!nodes.length) return;
 
@@ -1139,45 +1168,58 @@ function radialLayout(nodes, edges) {
       }
     });
   }
+  const maxDepth = Math.max(...Object.values(depthMap), 1);
 
-  // Radial distances per depth (increased for label readability)
-  const ringRadius = [0, 160, 310, 440, 560];
-  // Node sizes per depth
-  const nodeSizes = [32, 20, 13, 10, 8];
+  // Ring radii scale with node count for 600+ node graphs
+  const nodeCount = nodes.length;
+  const scaleFactor = nodeCount > 200 ? 1 + (nodeCount - 200) / 800 : 1;
+  const baseRadii = [0, 160, 310, 440, 560, 670, 770];
+  const ringRadius = baseRadii.map(r => r * scaleFactor);
 
-  // Count children per parent to compute angular spans
+  // Node sizes per depth (slightly smaller for dense graphs)
+  const densityScale = nodeCount > 300 ? Math.max(0.6, 1 - (nodeCount - 300) / 1500) : 1;
+  const baseNodeSizes = [32, 20, 13, 10, 8, 7, 6];
+  const nodeSizes = baseNodeSizes.map(s => Math.max(4, Math.round(s * densityScale)));
+
+  // Subtree weight for angular allocation
+  const stCache = {};
   function subtreeSize(nid) {
+    if (stCache[nid] !== undefined) return stCache[nid];
     const kids = childMap[nid] || [];
-    if (kids.length === 0) return 1;
+    if (kids.length === 0) { stCache[nid] = 1; return 1; }
     let s = 0;
     kids.forEach(k => { s += subtreeSize(k); });
-    return Math.max(s, 1);
+    stCache[nid] = Math.max(s, 1);
+    return stCache[nid];
   }
 
-  // Recursive radial placement
+  // ── Phase 1: Radial angular placement ──────────────
   function place(nid, angleStart, angleEnd, depth) {
     const node = nodes.find(n => n.id === nid);
     if (!node) return;
 
     const angle = (angleStart + angleEnd) / 2;
-    const radius = ringRadius[Math.min(depth, ringRadius.length - 1)] || (depth * 110);
-    const r = nodeSizes[Math.min(depth, nodeSizes.length - 1)] || 6;
+    const rIdx = Math.min(depth, ringRadius.length - 1);
+    const radius = ringRadius[rIdx] || (depth * 120 * scaleFactor);
+    const r = nodeSizes[Math.min(depth, nodeSizes.length - 1)] || 4;
 
     node.cx = centerX + Math.cos(angle) * radius;
     node.cy = centerY + Math.sin(angle) * radius;
     node.r = r;
     node.depth = depth;
 
-    // Place children spread evenly within angular span
     const kids = childMap[nid] || [];
     if (kids.length === 0) return;
 
+    // Ensure minimum angular span per child so small clusters don't collapse
     const totalWeight = kids.reduce((s, kid) => s + subtreeSize(kid), 0);
+    const availableSpan = angleEnd - angleStart;
+    const minChildSpan = Math.min(0.15, availableSpan / kids.length);
     let curAngle = angleStart;
 
     kids.forEach(kid => {
       const weight = subtreeSize(kid) / totalWeight;
-      const span = (angleEnd - angleStart) * weight;
+      const span = Math.max(minChildSpan, availableSpan * weight);
       place(kid, curAngle, curAngle + span, depth + 1);
       curAngle += span;
     });
@@ -1190,7 +1232,7 @@ function radialLayout(nodes, edges) {
   // Place tier 1+ with full 360° spread
   const rootKids = childMap[root.id] || [];
   const totalWeight = rootKids.reduce((s, kid) => s + subtreeSize(kid), 0);
-  let curAngle = -Math.PI * 0.6; // Start from upper-left
+  let curAngle = -Math.PI * 0.6;
   const fullSpan = Math.PI * 2;
 
   rootKids.forEach(kid => {
@@ -1200,27 +1242,66 @@ function radialLayout(nodes, edges) {
     curAngle += span;
   });
 
-  // Simple collision resolution: push overlapping nodes apart
-  for (let iter = 0; iter < 6; iter++) {
+  // ── Phase 2: Force simulation — 300 ticks ─────────
+  // Collision repulsion + edge tension + radial constraint
+  const TICKS = Math.min(300, Math.max(100, 400 - nodes.length * 0.3));
+  const alpha0 = 0.3;
+
+  for (let tick = 0; tick < TICKS; tick++) {
+    const alpha = alpha0 * (1 - tick / TICKS);
+    if (alpha < 0.001) break;
+
+    // ─ Collision force: push overlapping nodes apart
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j];
         const dx = b.cx - a.cx, dy = b.cy - a.cy;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        const minDist = a.r + b.r + 14;
-        if (dist < minDist && dist > 0) {
-          const push = (minDist - dist) / 2;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
+        const minDist = a.r + b.r + 16;
+        if (dist < minDist) {
+          const push = (minDist - dist) * 0.5 * alpha;
           const nx = dx/dist, ny = dy/dist;
-          // Don't move root
           if (!a.isRoot) { a.cx -= nx * push; a.cy -= ny * push; }
           if (!b.isRoot) { b.cx += nx * push; b.cy += ny * push; }
         }
       }
     }
+
+    // ─ Edge tension: pull connected nodes toward ideal distance
+    for (const e of edges) {
+      const from = nodes.find(n => n.id === e.from);
+      const to = nodes.find(n => n.id === e.to);
+      if (!from || !to) continue;
+      const dx = to.cx - from.cx, dy = to.cy - from.cy;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
+      const idealDist = ringRadius[Math.min((to.depth||1), ringRadius.length-1)] - ringRadius[Math.min((from.depth||0), ringRadius.length-1)];
+      if (idealDist <= 0) continue;
+      const delta = (dist - idealDist) * 0.02 * alpha;
+      const nx = dx/dist, ny = dy/dist;
+      if (!to.isRoot) { to.cx -= nx * delta; to.cy -= ny * delta; }
+      if (!from.isRoot) { from.cx += nx * delta * 0.3; from.cy += ny * delta * 0.3; }
+    }
+
+    // ─ Radial constraint: nudge nodes back toward their ring
+    for (const n of nodes) {
+      if (n.isRoot) continue;
+      const dx = n.cx - centerX, dy = n.cy - centerY;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
+      const targetR = ringRadius[Math.min(n.depth || 1, ringRadius.length - 1)] || dist;
+      const drift = (dist - targetR) * 0.03 * alpha;
+      n.cx -= (dx/dist) * drift;
+      n.cy -= (dy/dist) * drift;
+    }
   }
+
+  // Pin root
+  root.cx = centerX; root.cy = centerY;
+
+  // Build lookup maps
+  buildEdgeMaps();
 }
 
-// ── Draw Engine ──────────────────────────────────────
+// ── Draw Engine (viewport-culled, 600+ node ready) ───
 function drawCircuit() {
   const canvas = document.getElementById('circuit-canvas');
   const ctx = canvas.getContext('2d');
@@ -1237,34 +1318,56 @@ function drawCircuit() {
   const gx = CS.cx || w/2, gy = CS.cy || h/2;
   ctx.strokeStyle = 'rgba(0,212,255,0.04)';
   ctx.lineWidth = 0.5;
-  [160, 310, 440, 560].forEach(r => {
+  [160, 310, 440, 560, 670].forEach(r => {
     ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.stroke();
   });
   // Crosshair at center
   ctx.strokeStyle = 'rgba(0,212,255,0.06)';
-  ctx.beginPath(); ctx.moveTo(gx - 500, gy); ctx.lineTo(gx + 500, gy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(gx, gy - 500); ctx.lineTo(gx, gy + 500); ctx.stroke();
+  const crossLen = 700;
+  ctx.beginPath(); ctx.moveTo(gx - crossLen, gy); ctx.lineTo(gx + crossLen, gy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(gx, gy - crossLen); ctx.lineTo(gx, gy + crossLen); ctx.stroke();
 
-  // Zoom-level visibility: hide labels for tiny nodes when zoomed out
-  const showLabels = CS.zoom >= 0.6;
-  const showFileLabels = CS.zoom >= 0.85;
+  // Zoom-tier label visibility:
+  // <0.5: no labels at all (full structure view)
+  // 0.5-0.8: root + directories only
+  // 0.8-1.2: dirs + path-highlighted files
+  // 1.2+: all files get labels
+  const zoomTier = CS.zoom < 0.5 ? 0 : CS.zoom < 0.8 ? 1 : CS.zoom < 1.2 ? 2 : 3;
 
-  // ── Draw edges ──────────────────────────────────
+  // Viewport margin for culling (in screen pixels, converted to world)
+  const cullMargin = 120 / CS.zoom;
+  const vpLeft = -CS.panX / CS.zoom - cullMargin;
+  const vpRight = (w - CS.panX) / CS.zoom + cullMargin;
+  const vpTop = -CS.panY / CS.zoom - cullMargin;
+  const vpBottom = (h - CS.panY) / CS.zoom + cullMargin;
+
+  function inView(n) {
+    return n.cx >= vpLeft && n.cx <= vpRight && n.cy >= vpTop && n.cy <= vpBottom;
+  }
+
+  // ── Draw edges (cull both endpoints) ───────────
   for (const e of CS.edges) {
-    const from = CS.nodes.find(n => n.id === e.from);
-    const to = CS.nodes.find(n => n.id === e.to);
+    const from = CS.nodeById[e.from];
+    const to = CS.nodeById[e.to];
     if (!from || !to) continue;
+    // Cull if both endpoints offscreen
+    if (!inView(from) && !inView(to)) continue;
 
     const isPath = CS.highlightPath.includes(e.from) && CS.highlightPath.includes(e.to);
+    const isConnected = CS.hoveredNode && (CS.connectedSet.has(e.from) || CS.connectedSet.has(e.to)) && (CS.hoveredNode.id === e.from || CS.hoveredNode.id === e.to);
     const isH = CS.hoveredNode && (CS.hoveredNode === from || CS.hoveredNode === to);
     const isS = CS.selectedNode && (CS.selectedNode === from || CS.selectedNode === to);
 
-    // Line style based on depth
     const depth = to.depth || 1;
     if (isPath) {
       ctx.strokeStyle = '#00d4ff';
       ctx.lineWidth = 2.5;
       ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
+      ctx.setLineDash([]);
+    } else if (isConnected) {
+      ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 4;
       ctx.setLineDash([]);
     } else if (isS || isH) {
       ctx.strokeStyle = 'rgba(0,212,255,0.6)';
@@ -1303,11 +1406,14 @@ function drawCircuit() {
     }
   }
 
-  // ── Draw nodes ──────────────────────────────────
+  // ── Draw nodes (viewport-culled) ───────────────
   for (const n of CS.nodes) {
+    if (!inView(n)) continue; // VIEWPORT CULL
+
     const isH = CS.hoveredNode === n;
     const isS = CS.selectedNode === n;
     const isOnPath = CS.highlightPath.includes(n.id);
+    const isConnected = CS.connectedSet.has(n.id);
     const isRoot = n.isRoot;
 
     const color = n.dir ? '#00d4ff' : typeColor(n.type);
@@ -1317,9 +1423,8 @@ function drawCircuit() {
       const halfW = n.r * 1.4;
       ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 24;
 
-      // Square fill
       ctx.fillStyle = 'rgba(0,212,255,0.15)';
-      const rx = 4; // corner radius
+      const rx = 4;
       ctx.beginPath();
       ctx.moveTo(n.cx - halfW + rx, n.cy - halfW);
       ctx.lineTo(n.cx + halfW - rx, n.cy - halfW);
@@ -1333,13 +1438,12 @@ function drawCircuit() {
       ctx.closePath();
       ctx.fill();
 
-      // Square border
       ctx.strokeStyle = '#00d4ff';
       ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-      // Lock icon (🔒) inside
+      // Lock icon inside
       const lockSize = Math.max(16, n.r * 0.9);
       ctx.font = `${lockSize}px sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1354,59 +1458,63 @@ function drawCircuit() {
 
     } else {
       // ── Regular nodes: circles ─────────────────────
-      // Glow
+      // Glow for interactive states
       if (isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14; }
       else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
+      else if (isConnected && CS.hoveredNode) { ctx.shadowColor = color; ctx.shadowBlur = 6; }
 
-      // Fill
-      const alpha = isS ? 0.18 : isH ? 0.15 : isOnPath ? 0.08 : 0.04;
+      // Fill — brighten connected nodes on hover
+      const alpha = isS ? 0.18 : isH ? 0.15 : isConnected && CS.hoveredNode ? 0.12 : isOnPath ? 0.08 : 0.04;
       ctx.fillStyle = n.dir
         ? `rgba(0,212,255,${alpha})`
         : hexToRGBA(color, alpha);
       ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
 
-      // Border
-      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = isS ? 2 : isH ? 1.5 : 1;
+      // Border — brighten connected
+      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isConnected && CS.hoveredNode ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = isS ? 2 : isH ? 1.5 : isConnected && CS.hoveredNode ? 1.3 : 1;
       ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
       // Inner dot for small nodes
       if (n.r <= 10) {
-        ctx.fillStyle = isH || isS || isOnPath ? color : 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = isH || isS || isOnPath || isConnected ? color : 'rgba(255,255,255,0.2)';
         ctx.beginPath(); ctx.arc(n.cx, n.cy, 2, 0, Math.PI * 2); ctx.fill();
       }
 
-      // ── Labels: always visible, zoom-aware sizing ──
-      // Compute effective pixel size of node on screen
-      const effectiveSize = n.r * 2 * CS.zoom;
+      // ── Labels: zoom-tier aware ────────────────────
+      // zoomTier 0 (<0.5x): no labels
+      // zoomTier 1 (0.5-0.8x): directories only
+      // zoomTier 2 (0.8-1.2x): dirs + path/hovered/selected files
+      // zoomTier 3 (1.2x+): ALL nodes labeled
+      const shouldLabel =
+        isH || isS ||
+        (zoomTier >= 1 && n.dir) ||
+        (zoomTier >= 2 && (isOnPath || isConnected)) ||
+        (zoomTier >= 3);
 
-      // Determine if label should show
-      const shouldLabel = isH || isS || isOnPath || (n.dir && showLabels) || (!n.dir && effectiveSize > 14);
       if (shouldLabel) {
         const fontSize = n.dir ? Math.max(8, Math.min(10, 7 + n.r * 0.15)) : Math.max(7, Math.min(9, 6 + n.r * 0.15));
         ctx.font = `${n.dir ? '500 ' : ''}${fontSize}px JetBrains Mono`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
 
-        // Label opacity: brighter for hovered/selected, faded for distant
         if (isS) ctx.fillStyle = '#00d4ff';
         else if (isH) ctx.fillStyle = '#efefef';
+        else if (isConnected && CS.hoveredNode) ctx.fillStyle = 'rgba(255,255,255,0.8)';
         else if (isOnPath) ctx.fillStyle = 'rgba(0,212,255,0.9)';
         else if (n.dir) ctx.fillStyle = 'rgba(0,212,255,0.7)';
         else ctx.fillStyle = 'rgba(255,255,255,0.55)';
 
-        // Truncate long names
         const maxLen = isH || isS ? 22 : 16;
         const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
 
-        // Text shadow for readability
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
         ctx.fillText(label, n.cx, n.cy + n.r + 4);
         ctx.restore();
       }
 
-      // Always show full label on hover (even when zoomed out)
+      // Always show label on hover even when zoomed out
       if (isH && !shouldLabel) {
         ctx.save();
         ctx.font = '8px JetBrains Mono';
@@ -1474,7 +1582,7 @@ function buildDemoVault() {
   });
 
   CS.nodes = N; CS.edges = E;
-  radialLayout(N, E);
+  radialLayout(N, E); // includes buildEdgeMaps()
 
   // Center view on root
   const wrap = document.getElementById('canvas-wrap');
