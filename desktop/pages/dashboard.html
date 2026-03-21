@@ -1203,6 +1203,124 @@
     line-height: 1.5;
   }
 
+  /* ═══ TONE TRAINING SYSTEM ═══════════════════════ */
+  .tone-wizard {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    width: 520px; max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .tone-wizard-step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 0.5px; margin-bottom: 12px;
+  }
+  .tone-wizard-desc {
+    font-size: 11px; color: var(--text-secondary);
+    line-height: 1.6; margin-bottom: 14px;
+  }
+  .tone-paste-area {
+    width: 100%; min-height: 120px; max-height: 200px;
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; padding: 10px; outline: none;
+    resize: vertical; transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+  .tone-paste-area:focus { border-color: var(--accent); }
+  .tone-paste-area::placeholder { color: var(--text-muted); }
+  .tone-sample-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .tone-sample-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    padding: 6px 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-secondary);
+  }
+  .tone-sample-item .tone-sample-check { color: var(--green); }
+  .tone-sample-remove {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 12px; cursor: pointer; margin-left: auto;
+    transition: color 0.15s;
+  }
+  .tone-sample-remove:hover { color: var(--red); }
+  .tone-profile-card {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    padding: 14px; margin-top: 12px;
+  }
+  .tone-profile-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .tone-meter {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tone-meter-label { width: 80px; color: var(--text-muted); }
+  .tone-meter-bar {
+    flex: 1; height: 6px; background: var(--bg);
+    border-radius: 3px; overflow: hidden;
+  }
+  .tone-meter-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .tone-meter-value { width: 30px; text-align: right; color: var(--text-secondary); }
+  .tone-phrases {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+  }
+  .tone-phrase {
+    background: var(--accent-dim); border: 1px solid rgba(0,212,255,0.2);
+    color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 8px; border-radius: 2px;
+  }
+
+  /* Draft email modal */
+  .draft-panel {
+    position: absolute;
+    top: 12px; left: 12px; right: 12px; bottom: 12px;
+    display: none; flex-direction: column;
+    z-index: 66; background: var(--bg);
+    border: 1px solid var(--accent);
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+    overflow: hidden;
+  }
+  .draft-panel.visible { display: flex; }
+  .draft-output {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    padding: 16px; margin: 12px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px; color: var(--text-primary);
+    line-height: 1.7; white-space: pre-wrap;
+    max-height: 300px; overflow-y: auto;
+  }
+  .draft-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .draft-action-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; padding: 6px 14px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .draft-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .draft-action-btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .draft-action-btn.primary:hover { opacity: 0.9; }
+
+  /* Training status in sidebar */
+  .tone-trained-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px; padding: 1px 5px; border-radius: 2px;
+    background: var(--green-dim); color: var(--green);
+    letter-spacing: 0.5px;
+  }
+  .tone-untrained-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px; padding: 1px 5px; border-radius: 2px;
+    background: var(--amber-dim); color: var(--amber);
+    letter-spacing: 0.5px; cursor: pointer;
+  }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -1213,7 +1331,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.8</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.9</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1574,6 +1692,73 @@
         </select>
       </div>
       <button class="modal-submit" onclick="spawnCustomAgent()">Create Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tone Training Wizard Modal -->
+<div class="spawn-modal-overlay" id="tone-wizard-modal">
+  <div class="tone-wizard">
+    <div class="modal-header">
+      <span class="modal-title">&#127911; TRAIN YOUR VOICE</span>
+      <button class="modal-close" onclick="closeToneWizard()">&#10005;</button>
+    </div>
+    <div class="modal-body" id="tone-wizard-body">
+      <div class="tone-wizard-step" id="tone-step-label">STEP 1 OF 2</div>
+      <div class="tone-wizard-desc" id="tone-wizard-desc">
+        Share writing samples so this agent can learn your voice.<br>
+        Paste 2-5 examples of text YOU'VE WRITTEN.
+      </div>
+      <div id="tone-wizard-content">
+        <!-- Step 1: Paste samples -->
+        <div class="modal-field">
+          <label id="tone-sample-label">Paste Sample Text</label>
+          <textarea class="tone-paste-area" id="tone-paste" rows="6" placeholder="Paste an email, message, or code snippet you've written..."></textarea>
+        </div>
+        <button class="modal-submit" style="width:auto;margin-bottom:8px;" onclick="addToneSample()">+ Add Sample</button>
+        <div class="tone-sample-list" id="tone-samples-list"></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button class="modal-submit" id="tone-train-btn" onclick="runToneTraining()" disabled>Train Agent</button>
+        <button class="modal-submit" style="background:var(--bg-3);color:var(--text-secondary);border:1px solid var(--border-2);" onclick="skipToneTraining()">Skip Training</button>
+      </div>
+      <!-- Step 2: Profile review (injected by JS) -->
+      <div id="tone-profile-result" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Draft Content Modal (Email/Code/Content) -->
+<div class="spawn-modal-overlay" id="draft-modal">
+  <div class="tone-wizard" style="width:560px;">
+    <div class="modal-header">
+      <span class="modal-title" id="draft-modal-title">&#9993; DRAFT EMAIL</span>
+      <button class="modal-close" onclick="closeDraftModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>To / Recipient</label>
+        <input type="text" id="draft-to" placeholder="e.g. customer@example.com or Team">
+      </div>
+      <div class="modal-field">
+        <label>Subject / Topic</label>
+        <input type="text" id="draft-subject" placeholder="e.g. Re: Rate limit issue">
+      </div>
+      <div class="modal-field">
+        <label>Context / Notes</label>
+        <textarea id="draft-context" rows="3" placeholder="What should this be about? Any key points?"></textarea>
+      </div>
+      <button class="modal-submit" id="draft-generate-btn" onclick="generateDraft()">Generate Draft</button>
+      <div id="draft-output-area" style="display:none;">
+        <div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 6px;">GENERATED DRAFT</div>
+        <div class="draft-output" id="draft-output-text"></div>
+        <div class="draft-actions">
+          <button class="draft-action-btn primary" onclick="acceptDraft()">Accept &amp; Copy</button>
+          <button class="draft-action-btn" onclick="refineDraft()">Refine</button>
+          <button class="draft-action-btn" onclick="regenerateDraft()">Regenerate</button>
+        </div>
+        <div id="draft-tone-info" style="margin-top:10px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -4218,10 +4403,694 @@ function dismissPatchOffer() {
 }
 
 // ════════════════════════════════════════════════════
+// QOPC TONE LEARNING SYSTEM
+// ════════════════════════════════════════════════════
+let toneProfiles = JSON.parse(localStorage.getItem('aether_tone_profiles') || '{}');
+let toneSamples = [];
+let toneTrainingAgentId = null;
+let toneTrainingAgentType = null;
+let currentDraftAgentId = null;
+let currentDraftText = '';
+
+// Agent type metadata for tone training
+const AGENT_TYPE_META = {
+  email: { label: 'Email Samples', placeholder: 'Paste an email you\'ve written...', sampleLabel: 'emails', icon: '\u2709', draftTitle: 'DRAFT EMAIL' },
+  analyzer: { label: 'Analysis Reports', placeholder: 'Paste a code review or analysis you\'ve written...', sampleLabel: 'reports', icon: '\u{1F4CA}', draftTitle: 'GENERATE ANALYSIS' },
+  adgen: { label: 'Marketing Copy', placeholder: 'Paste ad copy, marketing text, or social posts...', sampleLabel: 'copy samples', icon: '\u{1F4E3}', draftTitle: 'DRAFT AD COPY' },
+  cards: { label: 'Card Content', placeholder: 'Paste system design notes or flashcard content...', sampleLabel: 'card samples', icon: '\u{1F0CF}', draftTitle: 'GENERATE CARDS' },
+  custom: { label: 'Writing Samples', placeholder: 'Paste examples of text you\'ve written in this style...', sampleLabel: 'samples', icon: '\u2699', draftTitle: 'GENERATE CONTENT' },
+};
+
+function getAgentTypeKey(agentName) {
+  const name = agentName.toLowerCase();
+  if (/email|mail|respond|reply/.test(name)) return 'email';
+  if (/analy|review|scan|report/.test(name)) return 'analyzer';
+  if (/ad|market|copy|content|creator|write|blog/.test(name)) return 'adgen';
+  if (/card|flash|design/.test(name)) return 'cards';
+  return 'custom';
+}
+
+function saveToneProfiles() { localStorage.setItem('aether_tone_profiles', JSON.stringify(toneProfiles)); }
+
+// ── Tone Training Wizard ────────────────────────────
+function openToneWizard(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  toneTrainingAgentId = agentId;
+  toneTrainingAgentType = getAgentTypeKey(agent.name);
+  toneSamples = [];
+
+  const meta = AGENT_TYPE_META[toneTrainingAgentType] || AGENT_TYPE_META.custom;
+  document.getElementById('tone-step-label').textContent = 'STEP 1 OF 2';
+  document.getElementById('tone-wizard-desc').innerHTML = `Share writing samples so <span style="color:var(--accent);">${escH(agent.name)}</span> can learn your voice.<br>Paste 2-5 ${meta.sampleLabel} YOU'VE WRITTEN.`;
+  document.getElementById('tone-sample-label').textContent = meta.label;
+  document.getElementById('tone-paste').placeholder = meta.placeholder;
+  document.getElementById('tone-paste').value = '';
+  document.getElementById('tone-samples-list').innerHTML = '';
+  document.getElementById('tone-profile-result').style.display = 'none';
+  document.getElementById('tone-train-btn').disabled = true;
+  document.getElementById('tone-wizard-modal').classList.add('open');
+}
+
+function closeToneWizard() {
+  document.getElementById('tone-wizard-modal').classList.remove('open');
+  toneTrainingAgentId = null;
+  toneSamples = [];
+}
+
+document.getElementById('tone-wizard-modal').addEventListener('click', (e) => { if(e.target.classList.contains('spawn-modal-overlay'))closeToneWizard(); });
+document.getElementById('draft-modal').addEventListener('click', (e) => { if(e.target.classList.contains('spawn-modal-overlay'))closeDraftModal(); });
+
+function addToneSample() {
+  const text = document.getElementById('tone-paste').value.trim();
+  if (!text || text.length < 20) {
+    document.getElementById('tone-paste').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('tone-paste').style.borderColor = '', 1500);
+    return;
+  }
+  toneSamples.push({ text, added: Date.now() });
+  document.getElementById('tone-paste').value = '';
+  renderToneSamples();
+  document.getElementById('tone-train-btn').disabled = toneSamples.length < 2;
+}
+
+function removeToneSample(idx) {
+  toneSamples.splice(idx, 1);
+  renderToneSamples();
+  document.getElementById('tone-train-btn').disabled = toneSamples.length < 2;
+}
+
+function renderToneSamples() {
+  const list = document.getElementById('tone-samples-list');
+  list.innerHTML = toneSamples.map((s, i) => `
+    <div class="tone-sample-item">
+      <span class="tone-sample-check">\u2713</span>
+      <span>Sample ${i+1} (${s.text.length} chars)</span>
+      <button class="tone-sample-remove" onclick="removeToneSample(${i})">\u00D7</button>
+    </div>
+  `).join('');
+}
+
+async function runToneTraining() {
+  if (toneSamples.length < 2) return;
+  const btn = document.getElementById('tone-train-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing voice...';
+  setAgentStatus('Training tone profile...', 'working');
+  document.getElementById('tone-step-label').textContent = 'ANALYZING...';
+
+  const samplesText = toneSamples.map((s, i) => `--- SAMPLE ${i+1} ---\n${s.text}`).join('\n\n');
+  const agentType = toneTrainingAgentType;
+  const typeLabel = agentType === 'email' ? 'emails' : agentType === 'adgen' ? 'marketing copy' : agentType === 'analyzer' ? 'analysis reports' : 'text';
+
+  const query = `Analyze these ${typeLabel} written by a user. Extract their writing voice/tone profile.
+
+${samplesText}
+
+Respond with ONLY this JSON format (no other text):
+{
+  "formalityLevel": 0.0-1.0,
+  "directness": 0.0-1.0,
+  "warmth": 0.0-1.0,
+  "humor": 0.0-1.0,
+  "technicalDepth": 0.0-1.0,
+  "explicitness": 0.0-1.0,
+  "commonPhrases": ["phrase1", "phrase2", "phrase3", "phrase4"],
+  "signatures": ["sig1"],
+  "toneDescription": "1-2 sentence summary of their writing voice"
+}`;
+
+  let toneMetrics = null;
+  try {
+    let result;
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+
+    const raw = result.response || result.reply || result.message || '';
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      toneMetrics = JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) { /* fallback below */ }
+
+  // Fallback: analyze locally
+  if (!toneMetrics) {
+    toneMetrics = analyzeLocally(toneSamples);
+  }
+
+  // Store tone profile
+  const profile = {
+    agentId: toneTrainingAgentId,
+    agentType,
+    trainingDate: Date.now(),
+    sampleSize: toneSamples.length,
+    learnedPatterns: {
+      formalityLevel: clamp01(toneMetrics.formalityLevel || 0.5),
+      directness: clamp01(toneMetrics.directness || 0.5),
+      warmth: clamp01(toneMetrics.warmth || 0.5),
+      humor: clamp01(toneMetrics.humor || 0.3),
+      technicalDepth: clamp01(toneMetrics.technicalDepth || 0.5),
+      explicitness: clamp01(toneMetrics.explicitness || 0.5),
+    },
+    commonPhrases: (toneMetrics.commonPhrases || []).slice(0, 6),
+    signatures: (toneMetrics.signatures || []).slice(0, 3),
+    toneDescription: toneMetrics.toneDescription || 'Analyzed voice profile',
+    adjustmentHistory: [],
+    outcomes: [],
+    avgRating: 0,
+    acceptRate: 0,
+    draftsGenerated: 0,
+    draftsAccepted: 0,
+  };
+
+  toneProfiles[toneTrainingAgentId] = profile;
+  saveToneProfiles();
+
+  // Update the agent object
+  const agent = spawnedAgents.find(a => a.id === toneTrainingAgentId);
+  if (agent) {
+    agent.trained = true;
+    agent.toneProfileId = toneTrainingAgentId;
+    localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  }
+
+  // Show profile result
+  showToneProfileResult(profile);
+  setAgentStatus('Training complete', '');
+  setTimeout(() => setAgentStatus('Ready', ''), 3000);
+  showToast('Voice profile trained!', 'success');
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+
+  btn.textContent = 'Train Agent';
+  btn.disabled = false;
+}
+
+function clamp01(v) { return Math.max(0, Math.min(1, parseFloat(v) || 0.5)); }
+
+function analyzeLocally(samples) {
+  const allText = samples.map(s => s.text).join(' ');
+  const words = allText.split(/\s+/).length;
+  const sentences = allText.split(/[.!?]+/).filter(s => s.trim()).length;
+  const avgSentLen = sentences > 0 ? words / sentences : 15;
+  const exclamations = (allText.match(/!/g) || []).length;
+  const questions = (allText.match(/\?/g) || []).length;
+  const formalWords = (allText.match(/\b(furthermore|additionally|consequently|therefore|regarding|pursuant)\b/gi) || []).length;
+  const casualWords = (allText.match(/\b(hey|cool|awesome|yeah|gonna|wanna|lol|btw)\b/gi) || []).length;
+  const techWords = (allText.match(/\b(api|database|server|function|module|deploy|config|endpoint|middleware)\b/gi) || []).length;
+
+  const formality = Math.min(1, Math.max(0, 0.5 + formalWords * 0.08 - casualWords * 0.06));
+  const directness = Math.min(1, avgSentLen < 12 ? 0.8 : avgSentLen < 20 ? 0.6 : 0.4);
+  const warmth = Math.min(1, 0.4 + exclamations * 0.05 + casualWords * 0.04);
+  const humor = Math.min(1, casualWords * 0.06);
+  const technicalDepth = Math.min(1, techWords * 0.04);
+
+  // Extract common phrases (2-3 word groups that repeat)
+  const twoGrams = [];
+  const wordList = allText.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/);
+  for (let i = 0; i < wordList.length - 1; i++) {
+    twoGrams.push(wordList[i] + ' ' + wordList[i+1]);
+  }
+  const freq = {};
+  twoGrams.forEach(g => { freq[g] = (freq[g] || 0) + 1; });
+  const commonPhrases = Object.entries(freq).filter(e => e[1] >= 2 && e[0].length > 5).sort((a,b) => b[1]-a[1]).slice(0,4).map(e => e[0]);
+
+  return {
+    formalityLevel: formality,
+    directness,
+    warmth,
+    humor,
+    technicalDepth,
+    explicitness: directness * 0.8 + 0.2,
+    commonPhrases: commonPhrases.length ? commonPhrases : ['let me know', 'looks good'],
+    signatures: [],
+    toneDescription: `${formality > 0.6 ? 'Formal' : 'Casual'}, ${directness > 0.6 ? 'direct' : 'measured'} communication style with ${technicalDepth > 0.5 ? 'high' : 'moderate'} technical depth.`,
+  };
+}
+
+function showToneProfileResult(profile) {
+  document.getElementById('tone-step-label').textContent = 'STEP 2 OF 2 — PROFILE TRAINED';
+  const p = profile.learnedPatterns;
+  const colors = { high: 'var(--green)', medium: 'var(--accent)', low: 'var(--amber)' };
+
+  const mkMeter = (label, val) => {
+    const pct = Math.round(val * 100);
+    const color = pct > 65 ? colors.high : pct > 35 ? colors.medium : colors.low;
+    return `<div class="tone-meter">
+      <span class="tone-meter-label">${label}</span>
+      <div class="tone-meter-bar"><div class="tone-meter-fill" style="width:${pct}%;background:${color};"></div></div>
+      <span class="tone-meter-value">${pct}%</span>
+    </div>`;
+  };
+
+  const result = document.getElementById('tone-profile-result');
+  result.style.display = 'block';
+  result.innerHTML = `
+    <div class="tone-profile-card">
+      <div class="tone-profile-title">YOUR VOICE PROFILE</div>
+      ${mkMeter('Formality', p.formalityLevel)}
+      ${mkMeter('Directness', p.directness)}
+      ${mkMeter('Warmth', p.warmth)}
+      ${mkMeter('Humor', p.humor)}
+      ${mkMeter('Technical', p.technicalDepth)}
+      ${mkMeter('Explicit', p.explicitness)}
+      ${profile.commonPhrases.length ? `
+        <div style="font-size:8px;color:var(--text-muted);margin-top:10px;">YOUR PHRASES:</div>
+        <div class="tone-phrases">${profile.commonPhrases.map(p => `<span class="tone-phrase">${escH(p)}</span>`).join('')}</div>` : ''}
+      <div style="font-size:9px;color:var(--text-secondary);margin-top:10px;line-height:1.5;">${escH(profile.toneDescription)}</div>
+    </div>
+    <button class="modal-submit" style="margin-top:12px;" onclick="closeToneWizard()">Done — Agent Ready</button>
+  `;
+}
+
+function skipToneTraining() {
+  // Create a default neutral profile
+  if (toneTrainingAgentId) {
+    toneProfiles[toneTrainingAgentId] = {
+      agentId: toneTrainingAgentId,
+      agentType: toneTrainingAgentType || 'custom',
+      trainingDate: Date.now(),
+      sampleSize: 0,
+      learnedPatterns: { formalityLevel:0.5, directness:0.5, warmth:0.5, humor:0.3, technicalDepth:0.5, explicitness:0.5 },
+      commonPhrases: [],
+      signatures: [],
+      toneDescription: 'Default neutral profile (not trained)',
+      adjustmentHistory: [],
+      outcomes: [],
+      avgRating: 0, acceptRate: 0, draftsGenerated: 0, draftsAccepted: 0,
+    };
+    saveToneProfiles();
+  }
+  closeToneWizard();
+  showToast('Agent created with default voice. Train anytime.', 'info');
+}
+
+// ── Draft Generation ────────────────────────────────
+function openDraftModal(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  currentDraftAgentId = agentId;
+  const typeKey = getAgentTypeKey(agent.name);
+  const meta = AGENT_TYPE_META[typeKey] || AGENT_TYPE_META.custom;
+  document.getElementById('draft-modal-title').innerHTML = `${meta.icon} ${meta.draftTitle}`;
+  document.getElementById('draft-to').value = '';
+  document.getElementById('draft-subject').value = '';
+  document.getElementById('draft-context').value = '';
+  document.getElementById('draft-output-area').style.display = 'none';
+  document.getElementById('draft-output-text').textContent = '';
+  document.getElementById('draft-tone-info').innerHTML = '';
+  document.getElementById('draft-modal').classList.add('open');
+}
+
+function closeDraftModal() {
+  document.getElementById('draft-modal').classList.remove('open');
+  currentDraftAgentId = null;
+}
+
+async function generateDraft() {
+  const agent = spawnedAgents.find(a => a.id === currentDraftAgentId);
+  if (!agent) return;
+  const to = document.getElementById('draft-to').value.trim();
+  const subject = document.getElementById('draft-subject').value.trim();
+  const context = document.getElementById('draft-context').value.trim();
+  if (!context) { document.getElementById('draft-context').style.borderColor='var(--red)'; setTimeout(()=>document.getElementById('draft-context').style.borderColor='',1500); return; }
+
+  const btn = document.getElementById('draft-generate-btn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  setAgentStatus(`Drafting: ${agent.name}`, 'working');
+
+  const profile = toneProfiles[currentDraftAgentId];
+  const p = profile ? profile.learnedPatterns : { formalityLevel:0.5, directness:0.5, warmth:0.5, humor:0.3, technicalDepth:0.5, explicitness:0.5 };
+  const phrases = profile ? profile.commonPhrases.join(', ') : '';
+  const sigs = profile ? profile.signatures.join(', ') : '';
+  const toneDesc = profile ? profile.toneDescription : '';
+
+  const typeKey = getAgentTypeKey(agent.name);
+  const contentType = typeKey === 'email' ? 'email' : typeKey === 'adgen' ? 'marketing copy' : typeKey === 'analyzer' ? 'analysis report' : 'content';
+
+  const query = `You are drafting ${contentType} in the voice of the user.
+
+VOICE PROFILE:
+- Formality: ${Math.round(p.formalityLevel*100)}% (0=casual, 100=formal)
+- Directness: ${Math.round(p.directness*100)}% (0=indirect, 100=very direct)
+- Warmth: ${Math.round(p.warmth*100)}% (0=cold, 100=very warm)
+- Humor: ${Math.round(p.humor*100)}% (0=none, 100=lots)
+- Technical Depth: ${Math.round(p.technicalDepth*100)}%
+${phrases ? `COMMON PHRASES: ${phrases}` : ''}
+${sigs ? `SIGNATURES: ${sigs}` : ''}
+${toneDesc ? `TONE: ${toneDesc}` : ''}
+
+REQUEST:
+${to ? `To: ${to}` : ''}
+${subject ? `Subject: ${subject}` : ''}
+Context: ${context}
+
+REQUIREMENTS:
+- Sound exactly like the user would write this
+- Use their common phrases naturally
+- Match their formality/directness/warmth/humor levels
+- ${p.technicalDepth > 0.7 ? 'Include technical details' : 'Keep it accessible'}
+- ${p.directness > 0.7 ? 'Be direct and concise' : 'Be measured and thorough'}
+
+Draft the ${contentType} below. Only output the content body, no metadata.`;
+
+  try {
+    let result;
+    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+
+    currentDraftText = result.response || result.reply || result.message || 'Draft generation failed.';
+  } catch (e) {
+    currentDraftText = `Hey${to ? ' ' + to : ''},\n\n${context}\n\nLet me know if you have questions.\n\n-${username}`;
+  }
+
+  document.getElementById('draft-output-text').textContent = currentDraftText;
+  document.getElementById('draft-output-area').style.display = 'block';
+
+  // Show tone info
+  if (profile) {
+    profile.draftsGenerated++;
+    saveToneProfiles();
+    document.getElementById('draft-tone-info').innerHTML = `<div style="font-family:JetBrains Mono,monospace;font-size:8px;color:var(--text-muted);">Generated with tone: F${Math.round(p.formalityLevel*100)}% D${Math.round(p.directness*100)}% W${Math.round(p.warmth*100)}% H${Math.round(p.humor*100)}% | Drafts: ${profile.draftsGenerated}</div>`;
+  }
+
+  btn.disabled = false; btn.textContent = 'Generate Draft';
+  setAgentStatus('Draft ready', '');
+  setTimeout(() => setAgentStatus('Ready', ''), 3000);
+}
+
+function acceptDraft() {
+  navigator.clipboard.writeText(currentDraftText).then(() => {
+    showToast('Draft copied to clipboard!', 'success');
+    const profile = toneProfiles[currentDraftAgentId];
+    if (profile) {
+      profile.draftsAccepted++;
+      profile.acceptRate = profile.draftsGenerated > 0 ? profile.draftsAccepted / profile.draftsGenerated : 0;
+      profile.outcomes.push({ time: Date.now(), outcome: 'accepted' });
+      if (profile.outcomes.length > 50) profile.outcomes = profile.outcomes.slice(-50);
+      saveToneProfiles();
+      // Reinforce current tone settings
+      showToneFeedbackAfterDelay(currentDraftAgentId);
+    }
+    closeDraftModal();
+  }).catch(() => {
+    displayAIResponse('[DRAFT — COPY THIS]\n\n' + currentDraftText, false);
+    closeDraftModal();
+  });
+}
+
+function refineDraft() {
+  closeDraftModal();
+  document.getElementById('chat-input').value = `Refine this draft: "${currentDraftText.substring(0,100)}..." I want to: `;
+  document.getElementById('chat-input').focus();
+  displayAIResponse(`Refining draft. Tell me what to adjust:\n- "Make it warmer"\n- "More formal"\n- "Add more technical detail"\n- "Shorter and more direct"\n\nQOPC will learn from your refinements.`, true);
+}
+
+function regenerateDraft() {
+  document.getElementById('draft-output-area').style.display = 'none';
+  generateDraft();
+}
+
+// ── Tone Feedback (after accepted draft) ─────────────
+function showToneFeedbackAfterDelay(agentId) {
+  setTimeout(() => {
+    const agent = spawnedAgents.find(a => a.id === agentId);
+    if (!agent) return;
+    displayAIResponse(`How did the ${agent.name} draft work?\n\n[Click in the response below]`, false);
+    showPatchOffer(`How was the draft from ${agent.name}?`, { id: agentId, type: 'tone_feedback' });
+    // Repurpose patch offer buttons
+    document.getElementById('patch-offer-gen').textContent = '\u2713 Perfect tone';
+    document.getElementById('patch-offer-gen').onclick = () => { toneFeedbackResult(agentId, 'perfect'); };
+    const askBtn = document.querySelector('#patch-offer .patch-offer-btn:nth-child(2)');
+    if (askBtn) { askBtn.textContent = '~ Needs adjustment'; askBtn.onclick = () => { toneFeedbackResult(agentId, 'adjust'); }; }
+    const dismissBtn = document.querySelector('#patch-offer .patch-offer-dismiss');
+    if (dismissBtn) { dismissBtn.textContent = '\u2717 Wrong tone'; dismissBtn.onclick = () => { toneFeedbackResult(agentId, 'wrong'); }; }
+  }, 15000);
+}
+
+function toneFeedbackResult(agentId, feedback) {
+  document.getElementById('patch-offer').classList.remove('visible');
+  // Reset offer button handlers
+  document.getElementById('patch-offer-gen').textContent = 'Generate Prompt';
+  document.getElementById('patch-offer-gen').onclick = acceptPatchOffer;
+  const profile = toneProfiles[agentId];
+  if (!profile) return;
+
+  const step = 0.05;
+  if (feedback === 'perfect') {
+    // Reinforce all current settings slightly
+    profile.outcomes.push({ time: Date.now(), outcome: 'perfect', rating: 5 });
+    profile.avgRating = profile.outcomes.filter(o => o.rating).reduce((s,o) => s + o.rating, 0) / profile.outcomes.filter(o => o.rating).length;
+    showToast('QOPC: voice profile reinforced', 'success');
+  } else if (feedback === 'adjust') {
+    profile.outcomes.push({ time: Date.now(), outcome: 'adjusted', rating: 3 });
+    displayAIResponse(`Tell me how to adjust ${spawnedAgents.find(a=>a.id===agentId)?.name || 'the agent'}'s voice:\n\nExamples:\n- "Make it warmer and less formal"\n- "More humor, less technical"\n- "Shorter sentences, more direct"\n\nType your adjustment below.`, true);
+    document.getElementById('chat-input').value = `Adjust agent voice: `;
+    document.getElementById('chat-input').focus();
+  } else if (feedback === 'wrong') {
+    profile.outcomes.push({ time: Date.now(), outcome: 'wrong', rating: 1 });
+    // Nudge all values toward center
+    const p = profile.learnedPatterns;
+    Object.keys(p).forEach(k => { p[k] = p[k] + (0.5 - p[k]) * 0.15; });
+    showToast('QOPC: tone adjusted toward neutral. Re-train for better results.', 'info');
+  }
+  saveToneProfiles();
+}
+
+// ── Adjust Tone via Chat ────────────────────────────
+function adjustAgentTone(agentId, adjustmentText) {
+  const profile = toneProfiles[agentId];
+  if (!profile) return;
+  const p = profile.learnedPatterns;
+  const t = adjustmentText.toLowerCase();
+  const step = 0.12;
+
+  if (/warm|friend|kind|nice/.test(t)) p.warmth = Math.min(1, p.warmth + step);
+  if (/cold|profession|distant/.test(t)) p.warmth = Math.max(0, p.warmth - step);
+  if (/formal|profession/.test(t)) p.formalityLevel = Math.min(1, p.formalityLevel + step);
+  if (/casual|informal|relax/.test(t)) p.formalityLevel = Math.max(0, p.formalityLevel - step);
+  if (/direct|concise|short|brief/.test(t)) p.directness = Math.min(1, p.directness + step);
+  if (/elaborate|detail|thorough|expand/.test(t)) p.directness = Math.max(0, p.directness - step);
+  if (/humor|funny|joke|witty/.test(t)) p.humor = Math.min(1, p.humor + step);
+  if (/serious|no humor|formal/.test(t)) p.humor = Math.max(0, p.humor - step);
+  if (/technic|deep|expert/.test(t)) p.technicalDepth = Math.min(1, p.technicalDepth + step);
+  if (/simple|easy|layman|basic/.test(t)) p.technicalDepth = Math.max(0, p.technicalDepth - step);
+
+  profile.adjustmentHistory.push({ time: Date.now(), adjustment: adjustmentText, patterns: { ...p } });
+  if (profile.adjustmentHistory.length > 20) profile.adjustmentHistory = profile.adjustmentHistory.slice(-20);
+  saveToneProfiles();
+  return p;
+}
+
+// ── Enhanced Spawn Flow (with training) ─────────────
+// Override spawnPreset to offer training
+const _originalSpawnPreset = spawnPreset;
+function spawnPresetWithTraining(presetId) {
+  const preset = AGENT_PRESETS[presetId];
+  if (!preset) return;
+  const agentId = Date.now();
+  const agent = {
+    id: agentId,
+    name: preset.name, icon: preset.icon, task: preset.task, schedule: preset.schedule,
+    status: 'idle', created: Date.now(), lastRun: null, runCount: 0, trained: false,
+  };
+  spawnedAgents.push(agent);
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  if (preset.schedule !== 'manual') createTask(agent.id, `${preset.name} (${preset.schedule})`, preset.schedule);
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  renderTaskTracker();
+  addAgentLog(`Spawned: ${preset.name}`, 'done');
+  showToast(`Agent spawned: ${preset.name}`, 'success');
+  if (currentViewMode === 'agent') buildAgentOrbitVault();
+  closeSpawnModal();
+  // Open tone training wizard
+  setTimeout(() => openToneWizard(agentId), 300);
+}
+
+// Override the original spawnPreset
+spawnPreset = spawnPresetWithTraining;
+
+// ── Enhanced Agent Detail (with tone info) ──────────
+const _origShowAgentDetail = showAgentDetail;
+function showAgentDetailEnhanced(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  const tasks = agentTasks.filter(t => t.agentId === agentId);
+  const completedTasks = tasks.filter(t => t.status === 'complete').length;
+  const profile = toneProfiles[agentId];
+  const detail = document.getElementById('agent-detail');
+
+  const toneHTML = profile ? `
+    <div style="margin:8px 0;padding:8px;background:var(--bg-3);border:1px solid var(--border-2);">
+      <div style="font-size:8px;color:var(--accent);letter-spacing:0.5px;margin-bottom:4px;">VOICE PROFILE</div>
+      <div style="font-size:8px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap;">
+        <span>F:${Math.round(profile.learnedPatterns.formalityLevel*100)}%</span>
+        <span>D:${Math.round(profile.learnedPatterns.directness*100)}%</span>
+        <span>W:${Math.round(profile.learnedPatterns.warmth*100)}%</span>
+        <span>H:${Math.round(profile.learnedPatterns.humor*100)}%</span>
+        <span>T:${Math.round(profile.learnedPatterns.technicalDepth*100)}%</span>
+      </div>
+      <div style="font-size:8px;color:var(--text-muted);margin-top:3px;">Drafts: ${profile.draftsGenerated} | Accepted: ${profile.draftsAccepted} | Samples: ${profile.sampleSize}</div>
+    </div>` : '<div style="font-size:8px;color:var(--amber);margin:8px 0;">Not trained — <span style="cursor:pointer;text-decoration:underline;" onclick="openToneWizard('+agentId+');document.getElementById(\'agent-detail\').classList.remove(\'visible\');">Train now</span></div>';
+
+  detail.innerHTML = `
+    <div class="agent-detail-title">${agent.icon} ${escH(agent.name)}</div>
+    <div class="agent-detail-desc">${escH(agent.task)}</div>
+    ${toneHTML}
+    <div class="agent-detail-stats">
+      <div class="agent-detail-stat">Status: <span style="color:${agent.status==='active'?'var(--green)':agent.status==='error'?'var(--red)':'var(--accent)'}">${agent.status.toUpperCase()}</span></div>
+      <div class="agent-detail-stat">Runs: <span>${agent.runCount}</span></div>
+      <div class="agent-detail-stat">Tasks: <span>${completedTasks}/${tasks.length}</span></div>
+    </div>
+    ${agent.lastRun ? `<div style="font-size:8px;color:var(--text-muted);margin-bottom:8px;">Last run: ${new Date(agent.lastRun).toLocaleString()}</div>` : ''}
+    <div class="agent-detail-actions">
+      <button class="agent-detail-btn primary" onclick="openDraftModal(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">Draft</button>
+      <button class="agent-detail-btn primary" onclick="runAgentTask(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">Run</button>
+      <button class="agent-detail-btn" onclick="openToneWizard(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">${profile ? 'Retrain' : 'Train Voice'}</button>
+      <button class="agent-detail-btn" onclick="configureAgent(${agent.id})">Configure</button>
+      <button class="agent-detail-btn" onclick="viewAgentLogs(${agent.id})">Logs</button>
+      <button class="agent-detail-btn danger" onclick="removeAgent(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">Delete</button>
+    </div>
+  `;
+  detail.classList.add('visible');
+}
+
+// Override showAgentDetail
+showAgentDetail = showAgentDetailEnhanced;
+
+// ── Enhanced Sidebar (show training status) ─────────
+const _origRenderSidebar = renderSpawnedAgentsSidebar;
+function renderSpawnedAgentsSidebarEnhanced() {
+  const c = document.getElementById('spawned-agents-list');
+  if (!spawnedAgents.length) { c.innerHTML = ''; return; }
+  c.innerHTML = spawnedAgents.map(a => {
+    const profile = toneProfiles[a.id];
+    const trainedBadge = profile && profile.sampleSize > 0 ? '<span class="tone-trained-badge">TRAINED</span>' : `<span class="tone-untrained-badge" onclick="event.stopPropagation();openToneWizard(${a.id})">TRAIN</span>`;
+    return `<div class="sb-file-entry" style="gap:4px;" title="${escH(a.task)}" onclick="showAgentDetail(${a.id})">
+      <span class="sb-file-icon" style="font-size:11px;">${a.icon}</span>
+      <span class="sb-file-name" style="font-size:9px;">${escH(a.name)}</span>
+      ${trainedBadge}
+      <span class="sb-badge ${a.status==='active'?'green':a.status==='error'?'red':a.status==='processing'?'amber':'blue'}" style="font-size:7px;">${a.status.toUpperCase()}</span>
+    </div>`;
+  }).join('');
+}
+
+// Override renderSpawnedAgentsSidebar
+renderSpawnedAgentsSidebar = renderSpawnedAgentsSidebarEnhanced;
+
+// ── Enhanced Agent Orbit Panel (with Draft button) ──
+const _origRenderOrbit = renderAgentOrbitPanel;
+function renderAgentOrbitPanelEnhanced() {
+  const panel = document.getElementById('agent-orbit-panel');
+  if (!spawnedAgents.length) {
+    panel.innerHTML = '<div style="background:var(--bg-2);border:1px solid var(--border-2);padding:12px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-align:center;">No agents spawned<br><span style="color:var(--accent);cursor:pointer;" onclick="openSpawnModal()">+ Spawn Agent</span></div>';
+    return;
+  }
+  panel.innerHTML = spawnedAgents.map(a => {
+    const profile = toneProfiles[a.id];
+    const trainStatus = profile && profile.sampleSize > 0
+      ? `<span style="color:var(--green);font-size:8px;">\u2713 Trained (${profile.sampleSize} samples)</span>`
+      : '<span style="color:var(--amber);font-size:8px;">Untrained</span>';
+    return `<div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-card-name">${a.icon} ${escH(a.name)}</span>
+        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
+      </div>
+      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
+      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | ${trainStatus}</div>
+      <div class="agent-card-actions">
+        <button class="agent-card-btn" onclick="openDraftModal(${a.id})" style="border-color:var(--accent);color:var(--accent);">Draft</button>
+        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
+        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
+        ${!profile || !profile.sampleSize ? `<button class="agent-card-btn" onclick="openToneWizard(${a.id})">Train</button>` : ''}
+        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Override renderAgentOrbitPanel
+renderAgentOrbitPanel = renderAgentOrbitPanelEnhanced;
+
+// ── Enhanced runAgentTask (tone-injected) ────────────
+const _origRunAgentTask = runAgentTask;
+function runAgentTaskWithTone(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  const profile = toneProfiles[agentId];
+
+  agent.status = 'processing';
+  agent.lastRun = Date.now();
+  agent.runCount++;
+  localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+  renderSpawnedAgentsSidebar();
+  renderAgentOrbitPanel();
+  setAgentStatus(`Running: ${agent.name}`, 'working');
+  addAgentLog(`Running: ${agent.name}`, 'active');
+  displayAIResponse(`Running agent: ${agent.name}\nTask: ${agent.task}${profile ? '\nVoice: Trained (' + profile.sampleSize + ' samples)' : ''}`, true);
+
+  const task = createTask(agent.id, `${agent.name} run #${agent.runCount}`, 'manual');
+  task.status = 'running';
+  localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
+  renderTaskTracker();
+
+  // Build tone-injected query
+  let toneInjection = '';
+  if (profile && profile.sampleSize > 0) {
+    const p = profile.learnedPatterns;
+    toneInjection = `\n\nIMPORTANT: Write in the user's voice. Formality: ${Math.round(p.formalityLevel*100)}%, Directness: ${Math.round(p.directness*100)}%, Warmth: ${Math.round(p.warmth*100)}%, Humor: ${Math.round(p.humor*100)}%, Technical Depth: ${Math.round(p.technicalDepth*100)}%.${profile.commonPhrases.length ? ' Use phrases like: ' + profile.commonPhrases.join(', ') + '.' : ''}`;
+  }
+
+  const query = `You are the "${agent.name}" agent. Your task: ${agent.task}. Execute this task now and report results.${toneInjection}`;
+  (async () => {
+    try {
+      let result;
+      if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
+      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+      const reply = result.response || result.reply || result.message || 'Task complete';
+      agent.status = 'active';
+      completeTask(task.id, reply);
+      localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      renderSpawnedAgentsSidebar();
+      renderAgentOrbitPanel();
+      if (currentViewMode === 'agent') buildAgentOrbitVault();
+      displayAIResponse(`[${agent.name}] ${reply}`, false);
+      addAgentLog(`${agent.name}: done`, 'done');
+      setAgentStatus('Complete', '');
+      setTimeout(() => setAgentStatus('Ready', ''), 3000);
+    } catch (e) {
+      agent.status = 'error';
+      task.status = 'error';
+      localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
+      renderSpawnedAgentsSidebar();
+      renderAgentOrbitPanel();
+      renderTaskTracker();
+      if (currentViewMode === 'agent') buildAgentOrbitVault();
+      displayAIResponse(`[${agent.name}] Error: ${e.message}`, false);
+      setAgentStatus('Error', 'error');
+    }
+  })();
+}
+
+// Override runAgentTask
+runAgentTask = runAgentTaskWithTone;
+
+// ── Cleanup: remove agent also removes tone profile ──
+const _origRemoveAgent = removeAgent;
+function removeAgentWithTone(agentId) {
+  delete toneProfiles[agentId];
+  saveToneProfiles();
+  _origRemoveAgent(agentId);
+}
+removeAgent = removeAgentWithTone;
+
+// ════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); closeToneWizard(); closeDraftModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
