@@ -152,7 +152,8 @@ def execute_task(task: dict, username: str = None) -> dict:
     owner = username or task.get("_owner")
 
     try:
-        from config.settings import CLAUDE_API_KEY
+        from config.key_manager import get_anthropic_key
+        CLAUDE_API_KEY = get_anthropic_key()
 
         if not CLAUDE_API_KEY:
             return {

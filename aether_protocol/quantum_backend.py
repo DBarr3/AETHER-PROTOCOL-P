@@ -112,8 +112,12 @@ def load_ibm_credentials(
                 raise IBMConnectionError(f"Invalid credentials file {p}: {e}")
         raise IBMConnectionError(f"Credentials file not found: {credentials_path}")
 
-    # 2. Environment variable
-    env_key = os.environ.get("IBM_QUANTUM_API_KEY")
+    # 2. Environment variable (via key_manager or direct)
+    try:
+        from config.key_manager import get_ibm_token
+        env_key = get_ibm_token()
+    except ImportError:
+        env_key = os.environ.get("IBM_QUANTUM_API_KEY")
     if env_key:
         return env_key
 

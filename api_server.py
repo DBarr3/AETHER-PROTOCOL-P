@@ -21,6 +21,10 @@ from datetime import datetime
 # Ensure project root is on path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Load secure key store FIRST — before any service that needs API keys
+from config.key_manager import load_all_keys, get_anthropic_key, get_ibm_token, get_dev_key, mask
+load_all_keys()
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, Query
@@ -303,7 +307,7 @@ def _init_services():
     log.info("Loaded %d scheduled tasks across all users", total_tasks)
 
     # Dev user — password is bcrypt-hashed on registration, never stored in plaintext
-    _dev_pass = os.environ.get("AETHER_DEV_KEY", "fdf&*79u9*(*HJBh*U((9jijkKKL-d8a9(OS)0k")
+    _dev_pass = get_dev_key()
     if svc.auth.register_user("ZO", _dev_pass):
         log.info("Registered dev user: ZO")
     del _dev_pass  # scrub from memory immediately

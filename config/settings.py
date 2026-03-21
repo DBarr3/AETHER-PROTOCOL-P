@@ -24,7 +24,9 @@ AUDIT_LOG_MAX_SIZE_MB = int(os.getenv("AETHER_AUDIT_MAX_MB", "100"))
 FILE_HASH_ALGORITHM = "sha256"
 
 # ─── Claude API Agent ──────────────────────────────────
-CLAUDE_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+# Key loaded via key_manager — never hardcoded
+from config.key_manager import get_anthropic_key
+CLAUDE_API_KEY = get_anthropic_key()
 CLAUDE_MODEL = os.getenv("AETHER_AGENT_MODEL", "claude-opus-4-5")
 CLAUDE_MAX_TOKENS = 1024
 

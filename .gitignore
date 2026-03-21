@@ -29,11 +29,14 @@ data/
 vault_data/
 *.db
 
-# Credentials
+# Credentials & Secrets
 config/credentials.json
 ibm_credentials.json
 *.pem
 *.key
+env.py
+*.env
+!.env.example
 
 # PyInstaller backend build output
 desktop/backend/
