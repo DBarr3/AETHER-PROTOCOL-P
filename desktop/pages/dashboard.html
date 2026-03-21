@@ -928,9 +928,21 @@ function showLoading(text, progress) {
 function hideLoading() { document.getElementById('loading-overlay').classList.remove('visible'); }
 
 // ════════════════════════════════════════════════════
-// CIRCUIT GRAPH ENGINE
+// CIRCUIT GRAPH ENGINE — Radial Quantum Layout
 // ════════════════════════════════════════════════════
-const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[] };
+const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[], cx:0, cy:0 };
+
+// File type → color mapping
+const TYPE_COLORS = {
+  Python:'#00ff88', JavaScript:'#00ff88', TypeScript:'#00ff88',
+  JSON:'#0088ff', CSV:'#0088ff', SQL:'#0088ff', YAML:'#0088ff',
+  Markdown:'#ff9900', PDF:'#ff9900', Text:'#ff9900',
+  Config:'#888888', Env:'#888888', TOML:'#888888',
+  Binary:'#cc44ff', Image:'#cc44ff', EXE:'#cc44ff',
+  HTML:'#00ff88', CSS:'#00ff88', Log:'#888888',
+  directory:'#00d4ff'
+};
+function typeColor(type) { return TYPE_COLORS[type] || '#666666'; }
 
 function initCircuit() {
   const canvas = document.getElementById('circuit-canvas');
@@ -986,14 +998,14 @@ function initCircuit() {
     }
   });
 
-  // Zoom — clamped 0.5x - 3x
+  // Zoom — clamped 0.3x - 3x, centered on cursor
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const d = e.deltaY > 0 ? 0.92 : 1.08;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    const newZoom = Math.max(0.5, Math.min(3, CS.zoom * d));
+    const newZoom = Math.max(0.3, Math.min(3, CS.zoom * d));
     const factor = newZoom / CS.zoom;
     CS.panX = mx - (mx - CS.panX) * factor;
     CS.panY = my - (my - CS.panY) * factor;
@@ -1006,15 +1018,20 @@ function initCircuit() {
   drawCircuit();
 }
 
+// ── Hit detection for radial nodes ───────────────────
 function handleHover(e) {
   const canvas = document.getElementById('circuit-canvas');
   const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left - CS.panX) / CS.zoom;
   const my = (e.clientY - rect.top - CS.panY) / CS.zoom;
   let found = null;
+
+  // Check radial hit: distance from node center < node radius
   for (const n of CS.nodes) {
-    if (mx >= n.x && mx <= n.x + n.w && my >= n.y && my <= n.y + n.h) { found = n; break; }
+    const dx = mx - n.cx, dy = my - n.cy;
+    if (Math.sqrt(dx*dx + dy*dy) <= n.r + 2) { found = n; break; }
   }
+
   if (found !== CS.hoveredNode) {
     CS.hoveredNode = found;
     drawCircuit();
@@ -1048,6 +1065,117 @@ function getPathToRoot(node) {
   return path;
 }
 
+// ── Radial Layout Engine ─────────────────────────────
+// Places nodes in concentric rings: root at center, dirs at tier 1, files at tier 2+
+function radialLayout(nodes, edges) {
+  if (!nodes.length) return;
+
+  // Build adjacency: parent → children
+  const childMap = {};
+  nodes.forEach(n => { childMap[n.id] = []; });
+  edges.forEach(e => { if (childMap[e.from]) childMap[e.from].push(e.to); });
+
+  const root = nodes.find(n => n.isRoot) || nodes[0];
+  const wrap = document.getElementById('canvas-wrap');
+  const centerX = (wrap?.clientWidth || 900) / 2 / CS.zoom;
+  const centerY = (wrap?.clientHeight || 600) / 2 / CS.zoom;
+
+  CS.cx = centerX; CS.cy = centerY;
+
+  // Assign depth via BFS
+  const depthMap = {}; depthMap[root.id] = 0;
+  const queue = [root.id];
+  while (queue.length) {
+    const pid = queue.shift();
+    (childMap[pid] || []).forEach(cid => {
+      if (depthMap[cid] === undefined) {
+        depthMap[cid] = depthMap[pid] + 1;
+        queue.push(cid);
+      }
+    });
+  }
+
+  // Radial distances per depth
+  const ringRadius = [0, 140, 280, 400, 500];
+  // Node sizes per depth
+  const nodeSizes = [30, 18, 12, 9, 7];
+
+  // Count children per parent to compute angular spans
+  function subtreeSize(nid) {
+    const kids = childMap[nid] || [];
+    if (kids.length === 0) return 1;
+    let s = 0;
+    kids.forEach(k => { s += subtreeSize(k); });
+    return Math.max(s, 1);
+  }
+
+  // Recursive radial placement
+  function place(nid, angleStart, angleEnd, depth) {
+    const node = nodes.find(n => n.id === nid);
+    if (!node) return;
+
+    const angle = (angleStart + angleEnd) / 2;
+    const radius = ringRadius[Math.min(depth, ringRadius.length - 1)] || (depth * 110);
+    const r = nodeSizes[Math.min(depth, nodeSizes.length - 1)] || 6;
+
+    node.cx = centerX + Math.cos(angle) * radius;
+    node.cy = centerY + Math.sin(angle) * radius;
+    node.r = r;
+    node.depth = depth;
+
+    // Place children spread evenly within angular span
+    const kids = childMap[nid] || [];
+    if (kids.length === 0) return;
+
+    const totalWeight = kids.reduce((s, kid) => s + subtreeSize(kid), 0);
+    let curAngle = angleStart;
+
+    kids.forEach(kid => {
+      const weight = subtreeSize(kid) / totalWeight;
+      const span = (angleEnd - angleStart) * weight;
+      place(kid, curAngle, curAngle + span, depth + 1);
+      curAngle += span;
+    });
+  }
+
+  // Root at center
+  root.cx = centerX; root.cy = centerY;
+  root.r = nodeSizes[0]; root.depth = 0;
+
+  // Place tier 1+ with full 360° spread
+  const rootKids = childMap[root.id] || [];
+  const totalWeight = rootKids.reduce((s, kid) => s + subtreeSize(kid), 0);
+  let curAngle = -Math.PI * 0.6; // Start from upper-left
+  const fullSpan = Math.PI * 2;
+
+  rootKids.forEach(kid => {
+    const weight = subtreeSize(kid) / totalWeight;
+    const span = fullSpan * weight;
+    place(kid, curAngle, curAngle + span, 1);
+    curAngle += span;
+  });
+
+  // Simple collision resolution: push overlapping nodes apart
+  for (let iter = 0; iter < 6; iter++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const dx = b.cx - a.cx, dy = b.cy - a.cy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const minDist = a.r + b.r + 6;
+        if (dist < minDist && dist > 0) {
+          const push = (minDist - dist) / 2;
+          const nx = dx/dist, ny = dy/dist;
+          // Don't move root
+          if (!a.isRoot) { a.cx -= nx * push; a.cy -= ny * push; }
+          if (!b.isRoot) { b.cx += nx * push; b.cy += ny * push; }
+        }
+      }
+    }
+  }
+}
+
+// ── Draw Engine ──────────────────────────────────────
 function drawCircuit() {
   const canvas = document.getElementById('circuit-canvas');
   const ctx = canvas.getContext('2d');
@@ -1058,151 +1186,191 @@ function drawCircuit() {
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // Grid
-  ctx.strokeStyle = '#1a1a1a';
-  ctx.lineWidth = 0.5;
-  const gs = 40 * CS.zoom;
-  const ox = CS.panX % gs, oy = CS.panY % gs;
-  for (let x = ox; x < w; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-  for (let y = oy; y < h; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-
+  // Subtle radial grid rings
   ctx.translate(CS.panX, CS.panY);
   ctx.scale(CS.zoom, CS.zoom);
+  const gx = CS.cx || w/2, gy = CS.cy || h/2;
+  ctx.strokeStyle = 'rgba(0,212,255,0.04)';
+  ctx.lineWidth = 0.5;
+  for (let ring = 1; ring <= 5; ring++) {
+    ctx.beginPath(); ctx.arc(gx, gy, ring * 110, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Crosshair at center
+  ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+  ctx.beginPath(); ctx.moveTo(gx - 500, gy); ctx.lineTo(gx + 500, gy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(gx, gy - 500); ctx.lineTo(gx, gy + 500); ctx.stroke();
 
-  // Edges
+  // Zoom-level visibility: hide labels for tiny nodes when zoomed out
+  const showLabels = CS.zoom >= 0.6;
+  const showFileLabels = CS.zoom >= 0.85;
+
+  // ── Draw edges ──────────────────────────────────
   for (const e of CS.edges) {
     const from = CS.nodes.find(n => n.id === e.from);
     const to = CS.nodes.find(n => n.id === e.to);
     if (!from || !to) continue;
-    const fx = from.x + from.w, fy = from.y + from.h / 2;
-    const tx = to.x, ty = to.y + to.h / 2;
-    const midX = fx + 20;
+
     const isPath = CS.highlightPath.includes(e.from) && CS.highlightPath.includes(e.to);
     const isH = CS.hoveredNode && (CS.hoveredNode === from || CS.hoveredNode === to);
     const isS = CS.selectedNode && (CS.selectedNode === from || CS.selectedNode === to);
 
-    ctx.strokeStyle = isPath ? '#00d4ff' : isS ? 'rgba(0,212,255,0.8)' : isH ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = isPath ? 2.5 : isS ? 2 : isH ? 1.5 : 1;
-    if (!isPath && !isS && !isH) { ctx.setLineDash([4,3]); } else { ctx.setLineDash([]); }
+    // Line style based on depth
+    const depth = to.depth || 1;
+    if (isPath) {
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
+      ctx.setLineDash([]);
+    } else if (isS || isH) {
+      ctx.strokeStyle = 'rgba(0,212,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+    } else if (depth <= 1) {
+      ctx.strokeStyle = 'rgba(0,212,255,0.25)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      ctx.setLineDash([6, 4]);
+    } else if (depth === 2) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 0.5;
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      ctx.setLineDash([2, 3]);
+    }
 
     ctx.beginPath();
-    ctx.moveTo(fx, fy); ctx.lineTo(midX, fy); ctx.lineTo(midX, ty); ctx.lineTo(tx, ty);
+    ctx.moveTo(from.cx, from.cy);
+    ctx.lineTo(to.cx, to.cy);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-    // Junction dots
-    if (isPath || isH || isS) {
+    // Junction dot on highlighted paths
+    if (isPath) {
       ctx.fillStyle = '#00d4ff';
-      ctx.beginPath(); ctx.arc(midX, fy, 2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(midX, ty, 2, 0, Math.PI * 2); ctx.fill();
+      const mx = (from.cx + to.cx) / 2, my = (from.cy + to.cy) / 2;
+      ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  // Nodes
+  // ── Draw nodes ──────────────────────────────────
   for (const n of CS.nodes) {
     const isH = CS.hoveredNode === n;
     const isS = CS.selectedNode === n;
     const isOnPath = CS.highlightPath.includes(n.id);
     const isRoot = n.isRoot;
 
-    // Glow for root
-    if (isRoot) {
-      ctx.shadowColor = '#00d4ff';
-      ctx.shadowBlur = 20;
-    } else if (isS) {
-      ctx.shadowColor = '#00d4ff';
-      ctx.shadowBlur = 12;
-    }
+    const color = n.dir ? '#00d4ff' : typeColor(n.type);
+
+    // Glow
+    if (isRoot || isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = isRoot ? 24 : 14; }
+    else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
 
     // Fill
-    ctx.fillStyle = isRoot ? 'rgba(0,212,255,0.15)' : isS ? 'rgba(0,212,255,0.12)' : isH ? 'rgba(255,255,255,0.06)' : isOnPath ? 'rgba(0,212,255,0.05)' : 'rgba(255,255,255,0.02)';
-    ctx.fillRect(n.x, n.y, n.w, n.h);
+    const alpha = isRoot ? 0.2 : isS ? 0.18 : isH ? 0.15 : isOnPath ? 0.08 : 0.04;
+    ctx.fillStyle = isRoot || n.dir
+      ? `rgba(0,212,255,${alpha})`
+      : hexToRGBA(color, alpha);
+    ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
 
     // Border
-    ctx.strokeStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? 'rgba(0,212,255,0.6)' : isOnPath ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = isRoot ? 2.5 : isS ? 2 : 1;
-    ctx.strokeRect(n.x, n.y, n.w, n.h);
+    ctx.strokeStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = isRoot ? 2.5 : isS ? 2 : isH ? 1.5 : 1;
+    ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-    // Icon well
-    const iW = n.dir ? 28 : 24;
-    ctx.fillStyle = n.dir ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.03)';
-    ctx.fillRect(n.x, n.y, iW, n.h);
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(n.x + iW, n.y); ctx.lineTo(n.x + iW, n.y + n.h); ctx.stroke();
+    // Inner icon/dot for small nodes
+    if (n.r <= 10 && !isRoot) {
+      ctx.fillStyle = isH || isS || isOnPath ? color : 'rgba(255,255,255,0.2)';
+      ctx.beginPath(); ctx.arc(n.cx, n.cy, 2, 0, Math.PI * 2); ctx.fill();
+    }
 
-    // Icon
-    ctx.font = n.dir ? '11px Inter' : '9px Inter';
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    ctx.fillStyle = isRoot ? '#00d4ff' : n.dir ? 'rgba(0,212,255,0.8)' : isH ? '#ffffff' : '#666666';
-    const icon = n.dir ? '\u{1F4C1}' : fileIcon(n.type);
-    ctx.fillText(icon, n.x + iW / 2, n.y + n.h / 2);
+    // Labels — visibility depends on zoom level + node size
+    const shouldLabel = isRoot || isH || isS || (n.dir && showLabels) || (!n.dir && showFileLabels && isOnPath);
+    if (shouldLabel) {
+      const fontSize = isRoot ? 11 : n.dir ? 9 : 8;
+      ctx.font = `${isRoot || n.dir ? '500 ' : ''}${fontSize}px JetBrains Mono`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? '#efefef' : isOnPath ? 'rgba(0,212,255,0.9)' : '#888888';
 
-    // Label
-    ctx.fillStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? '#efefef' : isOnPath ? 'rgba(0,212,255,0.8)' : n.dir ? '#aaaaaa' : '#777777';
-    ctx.font = `${isRoot || n.dir ? '500 ' : ''}${isRoot ? 12 : 10}px JetBrains Mono`;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    const maxW = n.w - iW - 10;
-    let label = n.name;
-    while (ctx.measureText(label).width > maxW && label.length > 3) label = label.slice(0, -4) + '...';
-    ctx.fillText(label, n.x + iW + 6, n.y + n.h / 2);
+      // Label below node
+      const label = n.name.length > 18 ? n.name.slice(0, 15) + '...' : n.name;
+      ctx.fillText(label, n.cx, n.cy + n.r + 4);
+    }
 
-    // Connector dots
-    ctx.fillStyle = isOnPath || isH || isS || isRoot ? '#00d4ff' : 'rgba(255,255,255,0.15)';
-    ctx.beginPath(); ctx.arc(n.x, n.y + n.h / 2, isRoot ? 3.5 : 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(n.x + n.w, n.y + n.h / 2, isRoot ? 3.5 : 2.5, 0, Math.PI * 2); ctx.fill();
+    // Always show label on hover (even when zoomed out)
+    if (isH && !shouldLabel) {
+      ctx.font = '8px JetBrains Mono';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#efefef';
+      ctx.fillText(n.name, n.cx, n.cy + n.r + 3);
+    }
   }
 
   ctx.restore();
 }
 
+function hexToRGBA(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // ════════════════════════════════════════════════════
-// VAULT BUILDERS
+// VAULT BUILDERS — Radial
 // ════════════════════════════════════════════════════
 function buildDemoVault() {
   const N = [], E = [];
-  const cx = 250, cy = 220;
-  // VAULT ROOT — center
-  N.push({ id:0, name:'VAULT ROOT', x:cx, y:cy, w:160, h:36, dir:true, type:'directory', children:5, isRoot:true, totalSize:4800000 });
+  let id = 0;
+
+  N.push({ id:id++, name:'VAULT ROOT', dir:true, type:'directory', children:5, isRoot:true, totalSize:4800000, cx:0, cy:0, r:30 });
 
   const dirs = [
-    { name:'patents/', y:cy-180, children:3, totalSize:291000 },
-    { name:'trading/', y:cy-80, children:2, totalSize:164900 },
-    { name:'security/', y:cy+10, children:4, totalSize:125300 },
-    { name:'models/', y:cy+100, children:2, totalSize:4203400 },
-    { name:'config/', y:cy+200, children:3, totalSize:4350 },
+    { name:'patents/', children:3, totalSize:291000 },
+    { name:'trading/', children:2, totalSize:164900 },
+    { name:'security/', children:4, totalSize:125300 },
+    { name:'models/', children:2, totalSize:4203400 },
+    { name:'config/', children:3, totalSize:4350 },
   ];
-  dirs.forEach((d,i) => {
-    const id=N.length;
-    N.push({ id, name:d.name, x:cx+220, y:d.y, w:130, h:28, dir:true, type:'directory', children:d.children, totalSize:d.totalSize });
-    E.push({ from:0, to:id });
+  dirs.forEach(d => {
+    const did = id++;
+    N.push({ id:did, name:d.name, dir:true, type:'directory', children:d.children, totalSize:d.totalSize, cx:0, cy:0, r:18 });
+    E.push({ from:0, to:did });
   });
 
   const files = [
-    {p:1,name:'patent_64010131.pdf',y:dirs[0].y-30,size:245000,type:'PDF'},
-    {p:1,name:'claims_draft.md',y:dirs[0].y+4,size:12800,type:'Markdown'},
-    {p:1,name:'prior_art.json',y:dirs[0].y+38,size:34200,type:'JSON'},
-    {p:2,name:'strategy_v3.py',y:dirs[1].y-12,size:8900,type:'Python'},
-    {p:2,name:'backtest_log.csv',y:dirs[1].y+22,size:156000,type:'CSV'},
-    {p:3,name:'threat_model.md',y:dirs[2].y-25,size:6700,type:'Markdown'},
-    {p:3,name:'vuln_scan.json',y:dirs[2].y+5,size:28400,type:'JSON'},
-    {p:3,name:'firewall.rules',y:dirs[2].y+35,size:1200,type:'Config'},
-    {p:3,name:'audit_2026.log',y:dirs[2].y+65,size:89000,type:'Log'},
-    {p:4,name:'qopc_weights.bin',y:dirs[3].y-12,size:4200000,type:'Binary'},
-    {p:4,name:'training_cfg.yaml',y:dirs[3].y+22,size:3400,type:'YAML'},
-    {p:5,name:'settings.json',y:dirs[4].y-22,size:2100,type:'JSON'},
-    {p:5,name:'.env',y:dirs[4].y+8,size:450,type:'Env'},
-    {p:5,name:'credentials.json',y:dirs[4].y+38,size:1800,type:'JSON'},
+    {p:1,name:'patent_64010131.pdf',size:245000,type:'PDF'},
+    {p:1,name:'claims_draft.md',size:12800,type:'Markdown'},
+    {p:1,name:'prior_art.json',size:34200,type:'JSON'},
+    {p:2,name:'strategy_v3.py',size:8900,type:'Python'},
+    {p:2,name:'backtest_log.csv',size:156000,type:'CSV'},
+    {p:3,name:'threat_model.md',size:6700,type:'Markdown'},
+    {p:3,name:'vuln_scan.json',size:28400,type:'JSON'},
+    {p:3,name:'firewall.rules',size:1200,type:'Config'},
+    {p:3,name:'audit_2026.log',size:89000,type:'Log'},
+    {p:4,name:'qopc_weights.bin',size:4200000,type:'Binary'},
+    {p:4,name:'training_cfg.yaml',size:3400,type:'YAML'},
+    {p:5,name:'settings.json',size:2100,type:'JSON'},
+    {p:5,name:'.env',size:450,type:'Env'},
+    {p:5,name:'credentials.json',size:1800,type:'JSON'},
   ];
   files.forEach(f => {
-    const id=N.length;
+    const fid = id++;
     const parentNode = N[f.p];
-    N.push({ id, name:f.name, x:cx+450, y:f.y, w:160, h:24, dir:false, type:f.type, size:f.size, path:`vault/${parentNode.name}${f.name}` });
-    E.push({ from:f.p, to:id });
+    N.push({ id:fid, name:f.name, dir:false, type:f.type, size:f.size, path:`vault/${parentNode.name}${f.name}`, cx:0, cy:0, r:10 });
+    E.push({ from:f.p, to:fid });
   });
 
   CS.nodes = N; CS.edges = E;
-  CS.panX = 20; CS.panY = 30; CS.zoom = 1.0;
+  radialLayout(N, E);
+
+  // Center view on root
+  const wrap = document.getElementById('canvas-wrap');
+  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
   document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
   updateZoom();
 
@@ -1215,38 +1383,41 @@ function buildDemoVault() {
 function buildVaultFromScan(tree, rootName, rootPath) {
   const N = [], E = [];
   let id = 0;
-  const cx = 250, cy = 40;
 
-  function add(item, pid, depth, yo) {
+  function add(item, pid) {
     const nid = id++;
     const isDir = !!item.children;
-    const nodeW = isDir ? 140 : 160;
-    const nodeH = isDir ? 28 : 24;
-    const nodeX = cx + depth * 230;
     N.push({
       id:nid, name:item.name,
-      x:nodeX, y:yo.v,
-      w:nodeW, h:nodeH,
       dir:isDir,
       type:isDir?'directory':extType(item.name),
       size:item.size||0,
       children:isDir?(item.children||[]).length:0,
       isRoot:pid===null,
-      path:(item.path||item.name)
+      path:(item.path||item.name),
+      totalSize:0,
+      cx:0, cy:0, r:0
     });
     if (pid !== null) E.push({ from:pid, to:nid });
-    yo.v += isDir ? 36 : 28;
     if (isDir && item.children) {
-      item.children.forEach(c => add(c, nid, depth+1, yo));
+      item.children.forEach(c => add(c, nid));
     }
   }
 
-  add({ name:rootName||'VAULT', children:tree, path:rootPath||'' }, null, 0, { v:cy });
+  add({ name:rootName||'VAULT', children:tree, path:rootPath||'' }, null);
 
   CS.nodes = N; CS.edges = E;
-  CS.panX = 20; CS.panY = 20;
-  CS.zoom = Math.max(0.5, Math.min(1.2, 700 / Math.max(N.length * 28, 400)));
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+
+  radialLayout(N, E);
+
+  // Auto-fit zoom to contain all nodes
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  N.forEach(n => { minX=Math.min(minX,n.cx-n.r); maxX=Math.max(maxX,n.cx+n.r); minY=Math.min(minY,n.cy-n.r); maxY=Math.max(maxY,n.cy+n.r); });
+  const wrap = document.getElementById('canvas-wrap');
+  const spanX = maxX - minX + 80, spanY = maxY - minY + 80;
+  CS.zoom = Math.max(0.3, Math.min(1.5, Math.min((wrap?.clientWidth||900)/spanX, (wrap?.clientHeight||600)/spanY)));
+  CS.panX = 0; CS.panY = 0;
 
   document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
   updateZoom();
@@ -1261,7 +1432,7 @@ function buildVaultFromScan(tree, rootName, rootPath) {
 
 function extType(name) {
   const ext = (name.split('.').pop()||'').toLowerCase();
-  const m = {py:'Python',js:'JavaScript',ts:'JavaScript',json:'JSON',md:'Markdown',pdf:'PDF',csv:'CSV',yaml:'YAML',yml:'YAML',log:'Log',txt:'Text',html:'HTML',css:'CSS',png:'Image',jpg:'Image',jpeg:'Image',gif:'Image',svg:'Image',bin:'Binary',exe:'Binary',dll:'Binary',env:'Env',ini:'Config',cfg:'Config',conf:'Config',rules:'Config',toml:'Config'};
+  const m = {py:'Python',js:'JavaScript',ts:'TypeScript',json:'JSON',md:'Markdown',pdf:'PDF',csv:'CSV',yaml:'YAML',yml:'YAML',log:'Log',txt:'Text',html:'HTML',css:'CSS',png:'Image',jpg:'Image',jpeg:'Image',gif:'Image',svg:'Image',bin:'Binary',exe:'Binary',dll:'Binary',env:'Env',ini:'Config',cfg:'Config',conf:'Config',rules:'Config',toml:'Config'};
   return m[ext] || ext.toUpperCase();
 }
 
@@ -1273,22 +1444,22 @@ function fmtSize(b) {
 }
 
 function circuitZoomIn() { CS.zoom=Math.min(3,CS.zoom*1.2); updateZoom(); drawCircuit(); closeMenus(); }
-function circuitZoomOut() { CS.zoom=Math.max(0.5,CS.zoom*0.8); updateZoom(); drawCircuit(); closeMenus(); }
+function circuitZoomOut() { CS.zoom=Math.max(0.3,CS.zoom*0.8); updateZoom(); drawCircuit(); closeMenus(); }
 function circuitResetView() {
-  CS.zoom=1; CS.panX=20; CS.panY=20; CS.selectedNode=null; CS.highlightPath=[];
+  CS.zoom=1; CS.panX=0; CS.panY=0; CS.selectedNode=null; CS.highlightPath=[];
   updateZoom(); drawCircuit(); closeMenus();
   updateBreadcrumbPath(currentVaultPath || 'Home');
 }
 function updateZoom() { document.getElementById('status-zoom').textContent=`ZOOM: ${Math.round(CS.zoom*100)}%`; }
 
-// Smooth zoom-to-node
+// Smooth zoom-to-node (radial version — centers on node.cx, node.cy)
 function zoomToNode(node) {
   const wrap = document.getElementById('canvas-wrap');
-  const targetZoom = Math.min(2, Math.max(1, CS.zoom));
-  const targetX = wrap.clientWidth / 2 - (node.x + node.w / 2) * targetZoom;
-  const targetY = wrap.clientHeight / 2 - (node.y + node.h / 2) * targetZoom;
+  const targetZoom = Math.min(2.5, Math.max(1.2, CS.zoom * 1.5));
+  const targetX = wrap.clientWidth / 2 - node.cx * targetZoom;
+  const targetY = wrap.clientHeight / 2 - node.cy * targetZoom;
   const startX = CS.panX, startY = CS.panY, startZ = CS.zoom;
-  const steps = 20;
+  const steps = 25;
   let step = 0;
   function animate() {
     step++;
