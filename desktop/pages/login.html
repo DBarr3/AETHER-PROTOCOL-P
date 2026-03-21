@@ -291,9 +291,9 @@ async function handleLogin() {
   // Dev mode: skip VPS, store fake token, auto-navigate
   if (DEV_MODE) {
     const devUser = document.getElementById('username').value.trim() || 'dev';
-    sessionStorage.setItem('session_token', 'dev-token-' + Date.now());
-    sessionStorage.setItem('commitment_hash', 'dev-mode');
-    sessionStorage.setItem('username', devUser);
+    localStorage.setItem('aether_session', 'dev-token-' + Date.now());
+    localStorage.setItem('aether_commitment', 'dev-mode');
+    localStorage.setItem('aether_user', devUser);
     showStatus('DEV MODE — BYPASSING AUTH', 'ok');
     await new Promise(r => setTimeout(r, 300));
     if (window.aether?.navigate) {
@@ -337,9 +337,9 @@ async function handleLogin() {
     }
 
     if (result.authenticated && result.session_token) {
-      sessionStorage.setItem('session_token', result.session_token);
-      sessionStorage.setItem('commitment_hash', result.commitment_hash || '');
-      sessionStorage.setItem('username', username);
+      localStorage.setItem('aether_session', result.session_token);
+      localStorage.setItem('aether_commitment', result.commitment_hash || '');
+      localStorage.setItem('aether_user', username);
 
       showStatus('SESSION AUTHENTICATED — LOADING VAULT', 'ok');
       await new Promise(r => setTimeout(r, 500));

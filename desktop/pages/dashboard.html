@@ -2309,8 +2309,8 @@
 // STATE
 // ════════════════════════════════════════════════════
 const API_BASE = 'http://198.211.115.41:8080';
-let sessionToken = sessionStorage.getItem('session_token') || '';
-let username = sessionStorage.getItem('username') || 'user';
+let sessionToken = localStorage.getItem('aether_session') || '';
+let username = localStorage.getItem('aether_user') || 'user';
 let bypassMode = false;
 let planMode = false;
 let analysisHistory = [];
@@ -3377,7 +3377,7 @@ async function menuOpen() {
         if (window.aetherAPI?.browseVault) {
           data = await window.aetherAPI.browseVault(dirPath);
         } else {
-          const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`);
+          const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`, { headers: { 'Authorization': `Bearer ${sessionToken}` } });
           data = await r.json();
         }
       } catch (vpsErr) {

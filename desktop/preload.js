@@ -49,7 +49,7 @@ const API_BASE = 'http://198.211.115.41:8080';
 
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
-  const token = sessionStorage.getItem('session_token');
+  const token = localStorage.getItem('aether_session');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
