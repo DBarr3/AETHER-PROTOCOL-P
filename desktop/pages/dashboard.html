@@ -782,6 +782,55 @@
   .agent-card-btn:hover { border-color: var(--accent); color: var(--accent); }
   .agent-card-btn.danger:hover { border-color: var(--red); color: var(--red); }
 
+  /* Task tracker bar */
+  .task-tracker {
+    position: absolute; top: 12px; left: 12px; right: 260px;
+    display: none; flex-direction: column; gap: 4px;
+    z-index: 55; max-height: 160px; overflow-y: auto;
+  }
+  .task-tracker.visible { display: flex; }
+  .task-item {
+    background: var(--bg-2); border: 1px solid var(--border-2);
+    padding: 6px 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; display: flex; align-items: center; gap: 8px;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .task-item:hover { border-color: var(--accent); }
+  .task-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .task-dot.pending { background: var(--amber); }
+  .task-dot.running { background: var(--accent); animation: pulse 1s infinite; }
+  .task-dot.complete { background: var(--green); }
+  .task-dot.error { background: var(--red); }
+  .task-name { flex: 1; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-time { color: var(--text-muted); font-size: 8px; flex-shrink: 0; }
+
+  /* Agent detail overlay */
+  .agent-detail {
+    position: absolute; bottom: 60px; left: 50%;
+    transform: translateX(-50%);
+    display: none; z-index: 60;
+    background: var(--bg-2); border: 1px solid var(--accent);
+    padding: 16px; min-width: 320px; max-width: 420px;
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .agent-detail.visible { display: block; }
+  .agent-detail-title { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+  .agent-detail-desc { font-size: 10px; color: var(--text-secondary); margin-bottom: 8px; }
+  .agent-detail-stats { display: flex; gap: 16px; margin-bottom: 10px; }
+  .agent-detail-stat { font-size: 9px; color: var(--text-muted); }
+  .agent-detail-stat span { color: var(--text-primary); }
+  .agent-detail-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .agent-detail-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; padding: 5px 10px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .agent-detail-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .agent-detail-btn.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .agent-detail-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
   /* ═══ SPAWN AGENT MODAL ══════════════════════════ */
   .spawn-modal-overlay {
     position: fixed; inset: 0;
@@ -832,7 +881,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.5</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.6</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -992,6 +1041,10 @@
         <button class="project-action-btn" onclick="projectAction('organize')"><span class="project-action-icon">&#128451;</span>Organize &amp; Improve</button>
         <button class="project-action-btn" onclick="projectAction('recommend')"><span class="project-action-icon">&#11088;</span>Get Recommendations</button>
       </div>
+      <!-- Task Tracker (Agent Mode) -->
+      <div class="task-tracker" id="task-tracker"></div>
+      <!-- Agent Detail Panel (on click) -->
+      <div class="agent-detail" id="agent-detail"></div>
       <!-- Agent Mode Orbit Panel -->
       <div class="agent-orbit-panel" id="agent-orbit-panel"></div>
     </div>
@@ -1172,6 +1225,8 @@ const AGENT_PRESETS = {
   cards: { name:'Card Creator', icon:'\u{1F0CF}', task:'Generate system design cards and flashcards', schedule:'manual', status:'idle' },
 };
 let spawnedAgents = JSON.parse(localStorage.getItem('aether_agents') || '[]');
+let agentTasks = JSON.parse(localStorage.getItem('aether_tasks') || '[]');
+let savedVaultState = null; // preserve vault circuit when switching views
 
 // File type icons
 const FILE_ICONS = { Python:'\u{1F40D}', JavaScript:'JS', JSON:'{}', Markdown:'\u{1F4DD}', PDF:'\u{1F4C4}', CSV:'\u{1F4CA}', YAML:'\u2699', Log:'\u{1F4CB}', Text:'\u{1F4C3}', HTML:'\u{1F310}', CSS:'\u{1F3A8}', Binary:'\u{1F4E6}', Config:'\u2699', Env:'\u{1F510}', Image:'\u{1F5BC}', default:'\u{25AB}' };
@@ -1278,12 +1333,17 @@ function initCircuit() {
     updateBreadcrumb(CS.hoveredNode);
 
     if (currentViewMode === 'project' && CS.hoveredNode.isRoot) {
-      // Show project action panel
       document.getElementById('project-actions').classList.add('visible');
     } else if (currentViewMode === 'agent' && CS.hoveredNode.isRoot) {
       openSpawnModal();
+    } else if (currentViewMode === 'agent' && CS.hoveredNode.agentId) {
+      // Show agent detail panel
+      showAgentDetail(CS.hoveredNode.agentId);
+    } else if (currentViewMode === 'agent' && CS.hoveredNode.taskId) {
+      viewTaskResults(CS.hoveredNode.taskId);
     } else {
       document.getElementById('project-actions').classList.remove('visible');
+      document.getElementById('agent-detail').classList.remove('visible');
       if (!CS.hoveredNode.dir) analyzeNode(CS.hoveredNode);
       else showToast(`${CS.hoveredNode.name} — ${CS.hoveredNode.children||0} items`, 'info');
     }
@@ -2547,15 +2607,20 @@ function resizeCanvas() {
 }
 
 // ════════════════════════════════════════════════════
-// VIEW MODE SWITCHING
+// VIEW MODE SWITCHING (preserves vault state)
 // ════════════════════════════════════════════════════
 function switchViewMode(mode) {
+  const prevMode = currentViewMode;
   currentViewMode = mode;
   document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('vm-' + mode).classList.add('active');
   document.getElementById('status-view').textContent = 'VIEW: ' + mode.toUpperCase();
   document.getElementById('project-actions').classList.remove('visible');
+  document.getElementById('agent-detail').classList.remove('visible');
+
+  // Show/hide mode-specific UI
   document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
+  document.getElementById('task-tracker').classList.toggle('visible', mode === 'agent');
 
   // Update chat placeholder
   const input = document.getElementById('chat-input');
@@ -2563,16 +2628,32 @@ function switchViewMode(mode) {
   else if (mode === 'project') input.placeholder = 'Describe your project or ask for analysis...';
   else input.placeholder = 'Command your agents...';
 
-  // Rebuild agent orbit panel if in agent mode
-  if (mode === 'agent') {
-    renderAgentOrbitPanel();
-    // Change root label for agent mode
-    const root = CS.nodes.find(n => n.isRoot);
-    if (root) root.name = 'AETHER MAIN';
-  } else {
-    const root = CS.nodes.find(n => n.isRoot);
-    if (root && root.name === 'AETHER MAIN') root.name = 'VAULT ROOT';
+  // Save vault state when leaving vault
+  if (prevMode === 'vault' && mode !== 'vault') {
+    savedVaultState = { nodes: JSON.parse(JSON.stringify(CS.nodes)), edges: JSON.parse(JSON.stringify(CS.edges)), zoom: CS.zoom, panX: CS.panX, panY: CS.panY };
   }
+
+  // Switch circuit content
+  if (mode === 'vault') {
+    if (savedVaultState) {
+      CS.nodes = savedVaultState.nodes;
+      CS.edges = savedVaultState.edges;
+      CS.zoom = savedVaultState.zoom;
+      CS.panX = savedVaultState.panX;
+      CS.panY = savedVaultState.panY;
+      buildEdgeMaps();
+      document.getElementById('status-nodes').textContent = `NODES: ${CS.nodes.length}`;
+      updateZoom();
+    }
+  } else if (mode === 'agent') {
+    buildAgentOrbitVault();
+    renderAgentOrbitPanel();
+    renderTaskTracker();
+  } else if (mode === 'project') {
+    buildProjectVault();
+  }
+
+  CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = []; CS.connectedSet = new Set();
   drawCircuit();
   showToast(mode.charAt(0).toUpperCase() + mode.slice(1) + ' Mode', 'info');
 }
@@ -2637,8 +2718,15 @@ function spawnAgent(name, icon, task, schedule) {
   };
   spawnedAgents.push(agent);
   localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+
+  // Auto-create task if scheduled
+  if (schedule !== 'manual') {
+    createTask(agent.id, `${name} (${schedule})`, schedule);
+  }
+
   renderSpawnedAgentsSidebar();
   renderAgentOrbitPanel();
+  renderTaskTracker();
   addAgentLog(`Spawned: ${name}`, 'done');
   showToast(`Agent spawned: ${name}`, 'success');
 
@@ -2680,7 +2768,12 @@ function runAgentTask(agentId) {
   addAgentLog(`Running: ${agent.name}`, 'active');
   displayAIResponse(`Running agent: ${agent.name}\nTask: ${agent.task}`, true);
 
-  // Simulate agent task via chat
+  // Create a task for this run
+  const task = createTask(agent.id, `${agent.name} run #${agent.runCount}`, 'manual');
+  task.status = 'running';
+  localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
+  renderTaskTracker();
+
   const query = `You are the "${agent.name}" agent. Your task: ${agent.task}. Execute this task now and report results.`;
   (async () => {
     try {
@@ -2689,18 +2782,24 @@ function runAgentTask(agentId) {
       else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
       const reply = result.response || result.reply || result.message || 'Task complete';
       agent.status = 'active';
+      completeTask(task.id, reply);
       localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
       renderSpawnedAgentsSidebar();
       renderAgentOrbitPanel();
+      if (currentViewMode === 'agent') buildAgentOrbitVault();
       displayAIResponse(`[${agent.name}] ${reply}`, false);
       addAgentLog(`${agent.name}: done`, 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
     } catch (e) {
       agent.status = 'error';
+      task.status = 'error';
       localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
       renderSpawnedAgentsSidebar();
       renderAgentOrbitPanel();
+      renderTaskTracker();
+      if (currentViewMode === 'agent') buildAgentOrbitVault();
       displayAIResponse(`[${agent.name}] Error: ${e.message}`, false);
       setAgentStatus('Error', 'error');
     }
@@ -2742,48 +2841,231 @@ function renderAgentOrbitPanel() {
   `).join('');
 }
 
-// Build agent-mode circuit: AETHER MAIN at center, spawned agents in orbit
+// Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
 function buildAgentOrbitVault() {
   const N = [], E = [];
   let id = 0;
 
-  N.push({ id:id++, name:'AETHER MAIN', dir:true, type:'directory', children:spawnedAgents.length, isRoot:true, totalSize:0, cx:0, cy:0, r:32 });
+  const agentCount = spawnedAgents.length;
+  N.push({ id:id++, name:'AETHER_MAIN', dir:true, type:'directory', children:agentCount, isRoot:true, totalSize:0, cx:0, cy:0, r:36, isAgentRoot:true });
 
-  // Main capabilities as first ring
-  const caps = [
-    { name:'Frontend Dev', icon:'HTML' },
-    { name:'Code Writer', icon:'Python' },
-    { name:'Content Creator', icon:'Markdown' },
-    { name:'File Manager', icon:'Config' },
-  ];
-  caps.forEach(c => {
-    const cid = id++;
-    N.push({ id:cid, name:c.name, dir:true, type:c.icon, children:0, totalSize:0, cx:0, cy:0, r:14 });
-    E.push({ from:0, to:cid });
-  });
-
-  // Spawned agents as second ring
+  // Only show branches for agents user has CREATED
   spawnedAgents.forEach(a => {
     const aid = id++;
-    const statusColor = a.status === 'active' ? 'Python' : a.status === 'error' ? 'Binary' : 'Config';
-    N.push({ id:aid, name:a.name, dir:false, type:statusColor, size:0, path:'agent://'+a.name, cx:0, cy:0, r:12 });
+    // Color based on status
+    const statusType = a.status === 'active' ? 'Python' : a.status === 'processing' ? 'JSON' : a.status === 'error' ? 'Binary' : 'Config';
+    N.push({
+      id:aid, name:a.name, dir:false, type:statusType,
+      size:0, path:'agent://'+a.id,
+      cx:0, cy:0, r:18,
+      agentId:a.id, agentStatus:a.status, agentIcon:a.icon
+    });
     E.push({ from:0, to:aid });
+
+    // Show agent's tasks as sub-nodes
+    const tasks = agentTasks.filter(t => t.agentId === a.id);
+    tasks.forEach(t => {
+      const tid = id++;
+      const taskType = t.status === 'complete' ? 'Python' : t.status === 'running' ? 'JSON' : t.status === 'error' ? 'Binary' : 'YAML';
+      N.push({ id:tid, name:t.label || 'Task', dir:false, type:taskType, size:0, path:'task://'+t.id, cx:0, cy:0, r:8, taskId:t.id });
+      E.push({ from:aid, to:tid });
+    });
   });
 
   CS.nodes = N; CS.edges = E;
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
   radialLayout(N, E);
   CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
-  document.getElementById('status-nodes').textContent = `AGENTS: ${spawnedAgents.length}`;
+  document.getElementById('status-nodes').textContent = `AGENTS: ${agentCount}`;
   updateZoom();
-  drawCircuit();
+}
+
+// Build project-mode circuit: PROJECT center with LLM-inferred branches
+function buildProjectVault() {
+  const N = [], E = [];
+  let id = 0;
+
+  // Use current vault data to infer project structure
+  const projectName = currentVaultPath ? currentVaultPath.split(/[/\\]/).pop() : 'PROJECT';
+  const dirCount = savedVaultState ? savedVaultState.nodes.filter(n => n.dir && !n.isRoot).length : 0;
+  const fileCount = savedVaultState ? savedVaultState.nodes.filter(n => !n.dir).length : 0;
+
+  N.push({ id:id++, name:projectName.toUpperCase(), dir:true, type:'directory', children:dirCount, isRoot:true, totalSize:0, cx:0, cy:0, r:36 });
+
+  if (savedVaultState && savedVaultState.nodes.length > 1) {
+    // Group files by top-level directory from vault state
+    const topDirs = savedVaultState.nodes.filter(n => n.dir && !n.isRoot);
+    const topFiles = savedVaultState.nodes.filter(n => !n.dir);
+
+    // Categorize directories into project branches
+    const categories = {};
+    topDirs.forEach(d => {
+      const name = d.name.replace(/\/$/, '').toLowerCase();
+      let cat = 'Other';
+      if (/front|ui|client|component|page|view|style|css|public|static|asset/.test(name)) cat = 'Frontend';
+      else if (/back|server|api|route|model|service|middleware|handler|controller/.test(name)) cat = 'Backend';
+      else if (/db|database|migration|schema|seed|sql/.test(name)) cat = 'Database';
+      else if (/test|spec|__test|cypress|jest|pytest/.test(name)) cat = 'Tests';
+      else if (/doc|readme|guide|wiki|changelog/.test(name)) cat = 'Documentation';
+      else if (/config|env|setting|deploy|docker|ci|github|\./.test(name)) cat = 'Config';
+      else if (/lib|util|helper|common|shared|pkg/.test(name)) cat = 'Libraries';
+      else if (/script|tool|bin|cmd/.test(name)) cat = 'Scripts';
+
+      if (!categories[cat]) categories[cat] = { dirs:[], files:0 };
+      categories[cat].dirs.push(d);
+    });
+
+    // Assign uncategorized files
+    const catColors = {
+      Frontend:'#00FF00', Backend:'#0088FF', Database:'#FFA500', Tests:'#FF00FF',
+      Documentation:'#FFFF00', Config:'#CCCCCC', Libraries:'#00DDAA', Scripts:'#00DD00', Other:'#888888'
+    };
+
+    Object.entries(categories).forEach(([cat, data]) => {
+      const cid = id++;
+      const fileCount = data.dirs.reduce((s, d) => s + (d.children || 0), 0);
+      N.push({ id:cid, name:cat, dir:true, type:'directory', children:data.dirs.length, totalSize:0, cx:0, cy:0, r:20 });
+      E.push({ from:0, to:cid });
+
+      // Add individual dirs under category
+      data.dirs.forEach(d => {
+        const did = id++;
+        N.push({ id:did, name:d.name, dir:true, type:'directory', children:d.children||0, totalSize:d.totalSize||0, cx:0, cy:0, r:12, path:d.path });
+        E.push({ from:cid, to:did });
+      });
+    });
+  } else {
+    // No vault loaded — show placeholder branches
+    ['Source', 'Tests', 'Docs', 'Config'].forEach(cat => {
+      const cid = id++;
+      N.push({ id:cid, name:cat, dir:true, type:'directory', children:0, totalSize:0, cx:0, cy:0, r:16 });
+      E.push({ from:0, to:cid });
+    });
+  }
+
+  CS.nodes = N; CS.edges = E;
+  CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+  radialLayout(N, E);
+  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
+  document.getElementById('status-nodes').textContent = `MODULES: ${N.length}`;
+  updateZoom();
+}
+
+// ════════════════════════════════════════════════════
+// TASK SYSTEM
+// ════════════════════════════════════════════════════
+function createTask(agentId, label, schedule) {
+  const task = {
+    id: Date.now(),
+    agentId, label, schedule,
+    status: 'pending',
+    created: Date.now(),
+    lastRun: null, nextRun: null,
+    results: null,
+  };
+  // Compute next run
+  if (schedule === 'hourly') task.nextRun = Date.now() + 3600000;
+  else if (schedule === 'daily') { const d = new Date(); d.setHours(7,0,0,0); if (d < Date.now()) d.setDate(d.getDate()+1); task.nextRun = d.getTime(); }
+  else if (schedule === 'weekly') { const d = new Date(); d.setDate(d.getDate() + (8-d.getDay())%7); d.setHours(9,0,0,0); task.nextRun = d.getTime(); }
+
+  agentTasks.push(task);
+  localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
+  renderTaskTracker();
+  return task;
+}
+
+function completeTask(taskId, results) {
+  const task = agentTasks.find(t => t.id === taskId);
+  if (!task) return;
+  task.status = 'complete';
+  task.lastRun = Date.now();
+  task.results = results;
+  localStorage.setItem('aether_tasks', JSON.stringify(agentTasks));
+  renderTaskTracker();
+}
+
+function renderTaskTracker() {
+  const tracker = document.getElementById('task-tracker');
+  if (!agentTasks.length) {
+    tracker.innerHTML = '<div class="task-item" style="color:var(--text-muted);justify-content:center;">No scheduled tasks</div>';
+    return;
+  }
+  tracker.innerHTML = agentTasks.slice(-8).reverse().map(t => {
+    const agent = spawnedAgents.find(a => a.id === t.agentId);
+    const agentName = agent ? agent.name : 'Unknown';
+    const timeStr = t.status === 'complete' ? fmtTime(t.lastRun) + ' ago' : t.nextRun ? 'Next: ' + new Date(t.nextRun).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="task-item" onclick="viewTaskResults(${t.id})">
+      <span class="task-dot ${t.status}"></span>
+      <span class="task-name">${t.status === 'complete' ? '\u2713 ' : ''}${escH(t.label || agentName)}</span>
+      <span class="task-time">${timeStr}</span>
+    </div>`;
+  }).join('');
+}
+
+function viewTaskResults(taskId) {
+  const task = agentTasks.find(t => t.id === taskId);
+  if (!task) return;
+  const agent = spawnedAgents.find(a => a.id === task.agentId);
+  const agentName = agent ? agent.name : 'Unknown Agent';
+
+  if (task.results) {
+    displayAIResponse(`[TASK RESULTS: ${task.label || agentName}]\nStatus: ${task.status}\nCompleted: ${task.lastRun ? new Date(task.lastRun).toLocaleString() : 'N/A'}\n\n${task.results}`, false);
+  } else {
+    displayAIResponse(`[TASK: ${task.label || agentName}]\nStatus: ${task.status}\nSchedule: ${task.schedule}\nNext run: ${task.nextRun ? new Date(task.nextRun).toLocaleString() : 'Manual'}`, false);
+  }
+  showToast(`Task: ${task.label || agentName} — ${task.status}`, 'info');
+}
+
+// Show agent detail panel on agent node click
+function showAgentDetail(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  const tasks = agentTasks.filter(t => t.agentId === agentId);
+  const completedTasks = tasks.filter(t => t.status === 'complete').length;
+  const detail = document.getElementById('agent-detail');
+  detail.innerHTML = `
+    <div class="agent-detail-title">${agent.icon} ${escH(agent.name)}</div>
+    <div class="agent-detail-desc">${escH(agent.task)}</div>
+    <div class="agent-detail-stats">
+      <div class="agent-detail-stat">Status: <span style="color:${agent.status==='active'?'var(--green)':agent.status==='error'?'var(--red)':'var(--accent)'}">${agent.status.toUpperCase()}</span></div>
+      <div class="agent-detail-stat">Runs: <span>${agent.runCount}</span></div>
+      <div class="agent-detail-stat">Tasks: <span>${completedTasks}/${tasks.length}</span></div>
+      <div class="agent-detail-stat">Schedule: <span>${agent.schedule}</span></div>
+    </div>
+    ${agent.lastRun ? `<div style="font-size:8px;color:var(--text-muted);margin-bottom:8px;">Last run: ${new Date(agent.lastRun).toLocaleString()}</div>` : ''}
+    <div class="agent-detail-actions">
+      <button class="agent-detail-btn primary" onclick="runAgentTask(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">Run Now</button>
+      <button class="agent-detail-btn" onclick="configureAgent(${agent.id})">Configure</button>
+      <button class="agent-detail-btn" onclick="toggleAgentStatus(${agent.id});showAgentDetail(${agent.id});">${agent.status==='active'?'Pause':'Start'}</button>
+      <button class="agent-detail-btn" onclick="viewAgentLogs(${agent.id})">Logs</button>
+      <button class="agent-detail-btn danger" onclick="removeAgent(${agent.id});document.getElementById('agent-detail').classList.remove('visible');">Delete</button>
+    </div>
+  `;
+  detail.classList.add('visible');
+}
+
+function configureAgent(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  document.getElementById('agent-detail').classList.remove('visible');
+  displayAIResponse(`Configuring ${agent.name}...\nTell me how you'd like ${agent.name} to work.\n\nCurrent task: ${agent.task}\nSchedule: ${agent.schedule}\n\nType your instructions below to update this agent.`, true);
+  document.getElementById('chat-input').value = `Update agent "${agent.name}": `;
+  document.getElementById('chat-input').focus();
+}
+
+function viewAgentLogs(agentId) {
+  const agent = spawnedAgents.find(a => a.id === agentId);
+  if (!agent) return;
+  const tasks = agentTasks.filter(t => t.agentId === agentId);
+  const logLines = tasks.map(t => `[${t.status.toUpperCase()}] ${t.label || 'Task'} — ${t.lastRun ? new Date(t.lastRun).toLocaleString() : 'pending'}`).join('\n');
+  displayAIResponse(`[AGENT LOGS: ${agent.name}]\nCreated: ${new Date(agent.created).toLocaleString()}\nTotal runs: ${agent.runCount}\nSchedule: ${agent.schedule}\n\n${logLines || 'No task history yet.'}`, false);
 }
 
 // ════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
