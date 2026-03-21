@@ -42,6 +42,7 @@ from auth.login import AetherCloudAuth
 from auth.session import SessionManager
 from vault.filebase import AetherVault
 from vault.watcher import VaultWatcher
+from vault.read_detector import ReadDetector
 from agent.file_agent import AetherFileAgent
 from agent.task_scheduler import (
     TaskScheduler, execute_task, load_task_store, save_task_store,
@@ -174,6 +175,7 @@ class Services:
     watcher: Optional[VaultWatcher] = None
     agent: Optional[AetherFileAgent] = None
     scheduler: Optional[TaskScheduler] = None
+    read_detector: Optional[ReadDetector] = None
 
     @property
     def ready(self) -> bool:
@@ -260,6 +262,16 @@ def _init_services():
         svc.watcher.start()
     except Exception as e:
         log.warning("Vault watcher failed to start: %s", e)
+
+    # Read Detector (st_atime polling)
+    svc.read_detector = ReadDetector(
+        vault_root=vault_root,
+        audit_log=svc.audit_log,
+    )
+    try:
+        svc.read_detector.start()
+    except Exception as e:
+        log.warning("Read detector failed to start: %s", e)
 
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
@@ -438,6 +450,7 @@ class StatusResponse(BaseModel):
     protocol_l: str
     watcher: str
     agent: str
+    read_detector: str = "INACTIVE"
     session_active: bool
     vault_root: str
     ibm_status: str
@@ -491,6 +504,18 @@ class TaskRunResult(BaseModel):
 class TaskSignalRequest(BaseModel):
     signal_type: str        # "OPENED" | "USED" | "EDITED" | "IGNORED" | "DELETED"
     metadata: Optional[dict] = {}
+
+
+class ProofExportRequest(BaseModel):
+    entry_ids: list[str]   # list of order_ids to include
+    label: Optional[str] = None
+
+
+class ProofExportResponse(BaseModel):
+    filename: str
+    entry_count: int
+    commitment_hash: str
+    created_at: str
 
 
 # ═══════════════════════════════════════════════════
@@ -769,6 +794,174 @@ async def audit_trail(
             break
 
     return AuditTrailResponse(entries=entries)
+
+
+@app.get("/audit/trail/live")
+async def audit_trail_live(
+    token: str = Depends(get_session_token),
+    since: Optional[float] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    event_type: Optional[str] = Query(default=None),
+):
+    """Live audit trail with filtering — powers the LOGS tab."""
+    if not svc.audit_log:
+        raise HTTPException(status_code=503, detail="Audit log not initialized")
+
+    try:
+        raw = svc.audit_log.query(since=since, limit=limit * 2)
+    except Exception as e:
+        log.warning("audit_log.query failed: %s", e)
+        raw = []
+
+    entries = []
+    for r in raw:
+        data = r if isinstance(r, dict) else {}
+        trade = data.get("data", {}).get("trade_details", data.get("data", {}))
+        evt = trade.get("event_type", data.get("phase", "UNKNOWN"))
+
+        if event_type and event_type.upper() != evt.upper():
+            continue
+
+        entries.append({
+            "timestamp": data.get("timestamp", 0),
+            "phase": data.get("phase", ""),
+            "order_id": data.get("order_id", ""),
+            "event_type": evt,
+            "path": trade.get("path", ""),
+            "source": trade.get("source", ""),
+            "severity": trade.get("severity", ""),
+            "commitment_hash": data.get("signature", {}).get("commitment_hash", ""),
+            "data": trade,
+        })
+        if len(entries) >= limit:
+            break
+
+    return {"entries": entries, "count": len(entries)}
+
+
+@app.post("/audit/export-proof")
+async def export_proof(
+    req: ProofExportRequest,
+    token: str = Depends(get_session_token),
+):
+    """Export a cryptographic proof package for selected audit entries."""
+    if not svc.audit_log:
+        raise HTTPException(status_code=503, detail="Audit log not initialized")
+
+    username = get_username_from_token(token)
+
+    # Collect entries by order_id
+    proof_entries = []
+    for oid in req.entry_ids:
+        try:
+            results = svc.audit_log.read_by_order_id(oid)
+            for entry in results:
+                proof_entries.append(entry.to_json())
+        except Exception:
+            pass
+
+    if not proof_entries:
+        raise HTTPException(status_code=404, detail="No matching audit entries found")
+
+    # Build proof package
+    package = {
+        "proof_package_version": "1.0",
+        "generated_by": "AetherCloud-L",
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_for": username,
+        "label": req.label or f"Proof export ({len(proof_entries)} entries)",
+        "entry_count": len(proof_entries),
+        "entries": proof_entries,
+    }
+
+    # Commitment hash over entire package
+    package_hash = hashlib.sha256(
+        json.dumps(package, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    package["package_commitment_hash"] = package_hash
+
+    # Save to exports directory
+    from config.storage import CRYPTO_ROOT
+    exports_dir = CRYPTO_ROOT / "exports"
+    exports_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"proof_{ts}_{package_hash[:8]}.json"
+    filepath = exports_dir / filename
+    filepath.write_text(json.dumps(package, indent=2, default=str))
+
+    # Log the export itself as an audit event
+    seed = os.urandom(32)
+    seed_hash = hashlib.sha256(seed).hexdigest()
+    now = int(time.time())
+    from aether_protocol.quantum_crypto import QuantumSeedCommitment
+    seed_commitment = QuantumSeedCommitment(seed_hash, now, "OS_URANDOM", now, now + 3600)
+
+    export_audit = {
+        "order_id": f"proof_export_{package_hash[:12]}",
+        "trade_details": {
+            "event_type": "PROOF_EXPORT",
+            "username": username,
+            "filename": filename,
+            "entry_count": len(proof_entries),
+            "package_hash": package_hash,
+            "timestamp": time.time(),
+        },
+        "quantum_seed_commitment": seed_commitment.seed_hash,
+        "seed_measurement_method": "OS_URANDOM",
+        "timestamp": time.time(),
+    }
+    try:
+        svc.audit_log.append_commitment(export_audit, {"commitment_hash": package_hash})
+    except Exception:
+        pass
+
+    return ProofExportResponse(
+        filename=filename,
+        entry_count=len(proof_entries),
+        commitment_hash=package_hash,
+        created_at=package["generated_at"],
+    )
+
+
+@app.get("/audit/exports")
+async def list_exports(token: str = Depends(get_session_token)):
+    """List all proof export packages."""
+    from config.storage import CRYPTO_ROOT
+    exports_dir = CRYPTO_ROOT / "exports"
+
+    exports = []
+    if exports_dir.exists():
+        for f in sorted(exports_dir.glob("proof_*.json"), reverse=True):
+            try:
+                pkg = json.loads(f.read_text())
+                exports.append({
+                    "filename": f.name,
+                    "label": pkg.get("label", ""),
+                    "entry_count": pkg.get("entry_count", 0),
+                    "generated_at": pkg.get("generated_at", ""),
+                    "package_hash": pkg.get("package_commitment_hash", ""),
+                })
+            except Exception:
+                continue
+
+    return {"exports": exports[:50]}
+
+
+@app.get("/audit/download/{filename}")
+async def download_proof(filename: str, token: str = Depends(get_session_token)):
+    """Download a proof package JSON file."""
+    from config.storage import CRYPTO_ROOT
+    filepath = CRYPTO_ROOT / "exports" / filename
+
+    if not filepath.exists() or not filepath.name.startswith("proof_"):
+        raise HTTPException(status_code=404, detail="Proof package not found")
+
+    try:
+        content = json.loads(filepath.read_text())
+        return content
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to read proof package")
 
 
 # ── Scan (POST — structured vault scan, no auth) ──
@@ -1261,6 +1454,13 @@ async def status():
             hasattr(svc.agent, "is_hardened") and svc.agent.is_hardened
         ) else "ACTIVE"
 
+    read_detector_status = "INACTIVE"
+    if svc.read_detector:
+        try:
+            read_detector_status = "ACTIVE" if svc.read_detector.is_running else "STANDBY"
+        except Exception:
+            read_detector_status = "STANDBY"
+
     session_active = bool(svc.session_mgr and svc.session_mgr.active_count > 0)
 
     # IBM Quantum status — cached with 30s TTL
@@ -1289,6 +1489,7 @@ async def status():
         protocol_l="ACTIVE",
         watcher=watcher_status,
         agent=agent_status,
+        read_detector=read_detector_status,
         session_active=session_active,
         vault_root=str(DEFAULT_VAULT_ROOT),
         ibm_status=_ibm_status_cache["value"],

@@ -41,7 +41,7 @@ class TestVaultWatcher:
         (vault_root / "intruder.txt").write_text("hacked")
         changes = populated_watcher._check_changes()
         types = [c["type"] for c in changes]
-        assert "UNAUTHORIZED_CREATE" in types
+        assert "FILE_CREATED" in types
 
     def test_detect_modified_file(self, populated_watcher, vault_root):
         populated_watcher._known_state = populated_watcher._snapshot_state()
@@ -49,14 +49,14 @@ class TestVaultWatcher:
         (vault_root / "existing.txt").write_text("modified content")
         changes = populated_watcher._check_changes()
         types = [c["type"] for c in changes]
-        assert "UNAUTHORIZED_MODIFY" in types
+        assert "FILE_MODIFIED" in types
 
     def test_detect_deleted_file(self, populated_watcher, vault_root):
         populated_watcher._known_state = populated_watcher._snapshot_state()
         (vault_root / "existing.txt").unlink()
         changes = populated_watcher._check_changes()
         types = [c["type"] for c in changes]
-        assert "UNAUTHORIZED_DELETE" in types
+        assert "FILE_DELETED" in types
 
     def test_no_changes_detected(self, populated_watcher):
         populated_watcher._known_state = populated_watcher._snapshot_state()
