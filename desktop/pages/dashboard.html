@@ -1321,6 +1321,57 @@
     letter-spacing: 0.5px; cursor: pointer;
   }
 
+  /* ═══ SCHEDULED TASKS SIDEBAR ═════════════════════ */
+  .sched-task-card {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .sched-task-card:hover { background: var(--bg-3); }
+  .sched-task-header {
+    display: flex; align-items: center; gap: 6px; font-size: 9px;
+  }
+  .sched-task-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .sched-task-dot.success { background: var(--green); }
+  .sched-task-dot.running { background: var(--amber); animation: pulse 1.5s infinite; }
+  .sched-task-dot.failed { background: var(--red); }
+  .sched-task-dot.disabled { background: var(--text-muted); }
+  .sched-task-dot.pending { background: var(--accent); }
+  .sched-task-name {
+    flex: 1; font-weight: 500; color: var(--text-primary); font-size: 9px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .sched-task-actions { display: flex; gap: 2px; }
+  .sched-task-actions button {
+    background: none; border: 1px solid var(--border); color: var(--text-secondary);
+    width: 18px; height: 18px; font-size: 8px; cursor: pointer; border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .sched-task-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .sched-task-actions button.danger:hover { border-color: var(--red); color: var(--red); }
+  .sched-task-meta {
+    font-size: 8px; color: var(--text-secondary); margin-top: 3px;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .sched-task-meta span { display: block; }
+  .sched-task-output {
+    font-size: 8px; color: var(--text-muted); font-style: italic;
+    margin-top: 2px; max-height: 0; overflow: hidden; transition: max-height 0.2s;
+  }
+  .sched-task-card.expanded .sched-task-output { max-height: 200px; overflow-y: auto; }
+  .sched-task-spinner {
+    width: 10px; height: 10px; border: 1.5px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ═══ CONTEXT GATHERING SYSTEM ═══════════════════ */
   .ctx-gather-modal {
     background: var(--bg-2);
@@ -1455,7 +1506,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.10</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.11</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1561,6 +1612,15 @@
         </div>
         <div class="sb-filter-row" id="filter-row"></div>
         <div id="recent-files"></div>
+      </div>
+
+      <!-- SCHEDULED TASKS -->
+      <div class="sb-section">
+        <div class="sb-header">
+          SCHEDULED TASKS
+          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openScheduledTaskModal()" title="Add Task">+</span>
+        </div>
+        <div id="scheduled-tasks-list" style="display:flex;flex-direction:column;"></div>
       </div>
 
       <!-- AGENTS -->
@@ -1924,6 +1984,52 @@
         <button class="ctx-nav-btn primary" id="ctx-next-btn" onclick="ctxNext()">Next &#8594;</button>
       </div>
       <div class="ctx-implication-banner" id="ctx-implication" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULED TASK CREATION MODAL -->
+<div class="spawn-modal-overlay" id="sched-task-modal">
+  <div class="spawn-modal" style="width:460px;">
+    <div class="modal-header">
+      <span class="modal-title">&#9201; CREATE SCHEDULED TASK</span>
+      <button class="modal-close" onclick="closeScheduledTaskModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Task Name</label>
+        <input type="text" id="sched-task-name" placeholder="e.g. Daily Email Drafts">
+      </div>
+      <div class="modal-field">
+        <label>Description</label>
+        <textarea id="sched-task-desc" rows="2" placeholder="e.g. Browse my emails and write response drafts"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Schedule</label>
+        <select id="sched-task-schedule">
+          <option value="0 * * * *">Every Hour</option>
+          <option value="0 7 * * *" selected>Daily 7:00 AM</option>
+          <option value="0 9 * * *">Daily 9:00 AM</option>
+          <option value="0 12 * * *">Daily 12:00 PM</option>
+          <option value="0 8 * * 1-5">Weekdays 8:00 AM</option>
+          <option value="0 8,18 * * *">Twice Daily</option>
+          <option value="custom">Custom cron...</option>
+        </select>
+        <input type="text" id="sched-task-cron" placeholder="e.g. 0 7 * * *" style="display:none;margin-top:4px;">
+      </div>
+      <div class="modal-field">
+        <label>Agent Type</label>
+        <select id="sched-task-type">
+          <option value="email">&#9993; Email</option>
+          <option value="file">&#128196; File Analysis</option>
+          <option value="code">&#128187; Code Review</option>
+          <option value="custom">&#9881; Custom</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button class="modal-submit" style="background:var(--bg-3);color:var(--text-secondary);flex:0;" onclick="closeScheduledTaskModal()">CANCEL</button>
+        <button class="modal-submit" style="flex:0;" onclick="createScheduledTask()">CREATE TASK</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5253,6 +5359,240 @@ function removeAgentWithTone(agentId) {
 removeAgent = removeAgentWithTone;
 
 // ════════════════════════════════════════════════════
+// SCHEDULED TASKS SYSTEM (v0.8.9.11)
+// ════════════════════════════════════════════════════
+let scheduledTasks = [];
+let schedTaskPollTimer = null;
+
+function openScheduledTaskModal() {
+  document.getElementById('sched-task-modal').classList.add('open');
+  document.getElementById('sched-task-name').value = '';
+  document.getElementById('sched-task-desc').value = '';
+  document.getElementById('sched-task-schedule').value = '0 7 * * *';
+  document.getElementById('sched-task-cron').style.display = 'none';
+}
+function closeScheduledTaskModal() {
+  document.getElementById('sched-task-modal').classList.remove('open');
+}
+document.getElementById('sched-task-modal').addEventListener('click', (e) => { if(e.target.classList.contains('spawn-modal-overlay')) closeScheduledTaskModal(); });
+
+// Custom cron toggle
+document.getElementById('sched-task-schedule').addEventListener('change', function() {
+  document.getElementById('sched-task-cron').style.display = this.value === 'custom' ? '' : 'none';
+});
+
+// Schedule label lookup
+const SCHED_LABELS = {
+  '0 * * * *': 'Hourly',
+  '0 7 * * *': 'Daily 7:00 AM',
+  '0 9 * * *': 'Daily 9:00 AM',
+  '0 12 * * *': 'Daily 12:00 PM',
+  '0 8 * * 1-5': 'Weekdays 8:00 AM',
+  '0 8,18 * * *': 'Twice Daily',
+};
+
+async function createScheduledTask() {
+  const name = document.getElementById('sched-task-name').value.trim();
+  const desc = document.getElementById('sched-task-desc').value.trim();
+  const schedSelect = document.getElementById('sched-task-schedule').value;
+  const customCron = document.getElementById('sched-task-cron').value.trim();
+  const agentType = document.getElementById('sched-task-type').value;
+
+  if (!name) { showToast('Task name is required', 'error'); return; }
+  if (!desc) { showToast('Description is required', 'error'); return; }
+
+  const cronExpr = schedSelect === 'custom' ? customCron : schedSelect;
+  const cronLabel = SCHED_LABELS[cronExpr] || cronExpr;
+
+  const mcpServers = [];
+  if (agentType === 'email') {
+    mcpServers.push({ type: 'url', url: 'https://gmail.mcp.claude.com/mcp', name: 'gmail-mcp' });
+  }
+
+  try {
+    const r = await fetch(`${API_BASE}/tasks/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({
+        name,
+        natural_language: desc,
+        schedule_cron: cronExpr,
+        schedule_label: cronLabel,
+        agent_type: agentType,
+        mcp_servers: mcpServers,
+        enabled: true,
+      }),
+    });
+    const data = await r.json();
+    if (data.task_id) {
+      scheduledTasks.push(data);
+      renderScheduledTasks();
+      closeScheduledTaskModal();
+      showToast(`Task "${name}" scheduled`, 'success');
+    } else {
+      showToast('Failed to create task: ' + (data.detail || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    // Offline fallback — store locally
+    const localTask = {
+      task_id: 'local_' + Date.now(),
+      name, natural_language: desc,
+      schedule_cron: cronExpr, schedule_label: cronLabel,
+      agent_type: agentType, enabled: true,
+      created_at: new Date().toISOString(),
+      last_run: null, last_status: 'PENDING', last_output_preview: null,
+      next_run: null, run_count: 0,
+    };
+    scheduledTasks.push(localTask);
+    renderScheduledTasks();
+    closeScheduledTaskModal();
+    showToast(`Task "${name}" saved locally (offline)`, 'info');
+  }
+}
+
+function renderScheduledTasks() {
+  const list = document.getElementById('scheduled-tasks-list');
+  if (!scheduledTasks.length) {
+    list.innerHTML = '<div style="font-size:9px;color:var(--text-muted);padding:6px 4px;font-family:JetBrains Mono,monospace;">No scheduled tasks</div>';
+    return;
+  }
+
+  list.innerHTML = scheduledTasks.map(t => {
+    const statusClass = !t.enabled ? 'disabled' : (t.last_status === 'SUCCESS' ? 'success' : t.last_status === 'FAILED' ? 'failed' : t.last_status === 'RUNNING' ? 'running' : 'pending');
+    const pauseIcon = t.enabled ? '&#9208;' : '&#9654;';
+    const pauseTitle = t.enabled ? 'Pause' : 'Resume';
+    const lastRunText = t.last_run ? timeAgo(new Date(t.last_run)) + ' \u2014 ' + (t.last_status || 'UNKNOWN') : 'Never run';
+    const nextRunText = t.next_run ? 'in ' + timeUntil(new Date(t.next_run)) : t.schedule_label || '';
+    const previewText = t.last_output_preview ? '"' + t.last_output_preview.substring(0, 80) + (t.last_output_preview.length > 80 ? '...' : '') + '"' : '';
+    const typeIcons = { email: '\u2709', file: '\u{1F4C4}', code: '\u{1F4BB}', custom: '\u2699' };
+    const icon = typeIcons[t.agent_type] || '\u2699';
+
+    return `<div class="sched-task-card" id="sched-card-${t.task_id}" onclick="toggleSchedTaskExpand('${t.task_id}')">
+      <div class="sched-task-header">
+        <div class="sched-task-dot ${statusClass}"></div>
+        <span class="sched-task-name">${icon} ${escH(t.name)}</span>
+        <div class="sched-task-actions" onclick="event.stopPropagation()">
+          <button onclick="runScheduledTask('${t.task_id}')" title="Run Now" id="sched-run-${t.task_id}">&#9654;</button>
+          <button onclick="toggleScheduledTask('${t.task_id}')" title="${pauseTitle}">${pauseIcon}</button>
+          <button class="danger" onclick="deleteScheduledTask('${t.task_id}')" title="Delete">&#10005;</button>
+        </div>
+      </div>
+      <div class="sched-task-meta">
+        <span>${escH(t.schedule_label || t.schedule_cron)}</span>
+        <span>Last: ${lastRunText}</span>
+        ${nextRunText ? `<span>Next: ${nextRunText}</span>` : ''}
+      </div>
+      ${previewText ? `<div class="sched-task-output">${escH(previewText)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleSchedTaskExpand(taskId) {
+  const card = document.getElementById('sched-card-' + taskId);
+  if (card) card.classList.toggle('expanded');
+}
+
+async function runScheduledTask(taskId) {
+  const btn = document.getElementById('sched-run-' + taskId);
+  if (btn) btn.innerHTML = '<div class="sched-task-spinner"></div>';
+
+  // Update dot to running
+  const task = scheduledTasks.find(t => t.task_id === taskId);
+  if (task) task.last_status = 'RUNNING';
+  renderScheduledTasks();
+
+  try {
+    const r = await fetch(`${API_BASE}/tasks/${taskId}/run`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    });
+    const data = await r.json();
+    if (task) {
+      task.last_run = data.ran_at;
+      task.last_status = data.status;
+      task.last_output_preview = data.output_preview;
+      task.run_count = (task.run_count || 0) + 1;
+    }
+    renderScheduledTasks();
+    showToast(`Task "${task?.name}" ${data.status}`, data.status === 'SUCCESS' ? 'success' : 'error');
+  } catch (e) {
+    if (task) task.last_status = 'FAILED';
+    renderScheduledTasks();
+    showToast('Task execution failed: ' + e.message, 'error');
+  }
+}
+
+async function toggleScheduledTask(taskId) {
+  const task = scheduledTasks.find(t => t.task_id === taskId);
+  if (!task) return;
+  const newEnabled = !task.enabled;
+
+  try {
+    await fetch(`${API_BASE}/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({ enabled: newEnabled }),
+    });
+  } catch (e) { /* offline — just toggle locally */ }
+
+  task.enabled = newEnabled;
+  renderScheduledTasks();
+  showToast(newEnabled ? 'Task resumed' : 'Task paused', 'info');
+}
+
+async function deleteScheduledTask(taskId) {
+  try {
+    await fetch(`${API_BASE}/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    });
+  } catch (e) { /* offline — just remove locally */ }
+
+  scheduledTasks = scheduledTasks.filter(t => t.task_id !== taskId);
+  renderScheduledTasks();
+  showToast('Task deleted', 'info');
+}
+
+// Time helper utilities
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+  return Math.floor(secs / 86400) + 'd ago';
+}
+
+function timeUntil(date) {
+  const secs = Math.floor((date.getTime() - Date.now()) / 1000);
+  if (secs < 0) return 'overdue';
+  if (secs < 60) return secs + 's';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h';
+  return Math.floor(secs / 86400) + 'd';
+}
+
+// Poll for task updates every 30 seconds
+async function pollScheduledTasks() {
+  try {
+    const r = await fetch(`${API_BASE}/tasks/list`, {
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    });
+    if (r.ok) {
+      const data = await r.json();
+      scheduledTasks = data;
+      renderScheduledTasks();
+    }
+  } catch (e) { /* offline — keep local state */ }
+}
+
+function startSchedTaskPolling() {
+  if (schedTaskPollTimer) clearInterval(schedTaskPollTimer);
+  schedTaskPollTimer = setInterval(pollScheduledTasks, 30000);
+  // Initial load
+  pollScheduledTasks();
+}
+
+// ════════════════════════════════════════════════════
 // INTELLIGENT CONTEXT GATHERING (v0.8.9.10)
 // ════════════════════════════════════════════════════
 let ctxProfile = JSON.parse(localStorage.getItem('aether_ctx_profile') || 'null') || { answers: {}, depth: 0, level: 'shallow', projectPath: '', lastGathered: 0, implications: [], questionEffectiveness: {} };
@@ -5873,7 +6213,7 @@ document.getElementById('ctx-gather-modal').addEventListener('click', (e) => { i
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); closeToneWizard(); closeDraftModal(); closeContextGathering(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); closeToneWizard(); closeDraftModal(); closeContextGathering(); closeScheduledTaskModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
@@ -5897,6 +6237,8 @@ window.addEventListener('load', async () => {
   }
   renderChatHistory();
   renderSpawnedAgentsSidebar();
+  renderScheduledTasks();
+  startSchedTaskPolling();
   initCircuit();
   pushHistory('Initial vault');
   showToast('AetherCloud-L ready', 'success');

@@ -12,7 +12,8 @@ import sys
 import time
 import hashlib
 import logging
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -36,6 +37,10 @@ from auth.session import SessionManager
 from vault.filebase import AetherVault
 from vault.watcher import VaultWatcher
 from agent.file_agent import AetherFileAgent
+from agent.task_scheduler import (
+    TaskScheduler, execute_task, load_task_store, save_task_store,
+    get_task_history, parse_schedule,
+)
 from aether_protocol.audit import AuditLog
 
 log = logging.getLogger("aethercloud.api")
@@ -161,6 +166,7 @@ class Services:
     vault: Optional[AetherVault] = None
     watcher: Optional[VaultWatcher] = None
     agent: Optional[AetherFileAgent] = None
+    scheduler: Optional[TaskScheduler] = None
 
     @property
     def ready(self) -> bool:
@@ -169,6 +175,7 @@ class Services:
 
 svc = Services()
 session_context: dict[str, str] = {}
+_task_store: dict[str, dict] = {}
 _start_time = time.time()
 _ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
 
@@ -212,6 +219,16 @@ def _init_services():
 
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
+
+    # Task scheduler
+    global _task_store
+    _task_store = load_task_store()
+    svc.scheduler = TaskScheduler()
+    svc.scheduler.start()
+    for task in _task_store.values():
+        if task.get("enabled", True):
+            svc.scheduler.add_task(task)
+    log.info("Loaded %d scheduled tasks", len(_task_store))
 
     # Dev user — password is bcrypt-hashed on registration, never stored in plaintext
     _dev_pass = os.environ.get("AETHER_DEV_KEY", "fdf&*79u9*(*HJBh*U((9jijkKKL-d8a9(OS)0k")
@@ -359,6 +376,47 @@ class StatusResponse(BaseModel):
     uptime: float
     version: str
     needs_setup: bool = False
+
+
+# ── Scheduled Task Models ────────────────────────
+class TaskCreateRequest(BaseModel):
+    name: str
+    natural_language: str
+    schedule_cron: Optional[str] = None
+    schedule_label: Optional[str] = None
+    agent_type: str = "custom"
+    mcp_servers: Optional[list] = []
+    enabled: bool = True
+
+
+class TaskResponse(BaseModel):
+    task_id: str
+    name: str
+    natural_language: str
+    schedule_cron: str
+    schedule_label: str
+    agent_type: str
+    enabled: bool
+    created_at: str
+    last_run: Optional[str] = None
+    last_status: Optional[str] = None
+    last_output_preview: Optional[str] = None
+    next_run: Optional[str] = None
+    run_count: int = 0
+
+
+class TaskUpdateRequest(BaseModel):
+    enabled: Optional[bool] = None
+    schedule_cron: Optional[str] = None
+    schedule_label: Optional[str] = None
+
+
+class TaskRunResult(BaseModel):
+    task_id: str
+    status: str
+    output_preview: str
+    ran_at: str
+    duration_ms: int
 
 
 # ═══════════════════════════════════════════════════
@@ -823,6 +881,193 @@ async def vault_browse(
             "displayed_files": len(display_files),
         },
     }
+
+
+# ── Scheduled Tasks ───────────────────────────────
+@app.post("/tasks/create", response_model=TaskResponse)
+async def create_task(req: TaskCreateRequest, token: str = Depends(get_session_token)):
+    """Create a new scheduled task."""
+    task_id = str(uuid.uuid4())
+
+    # Auto-parse schedule from natural language if not provided
+    cron_expr = req.schedule_cron
+    cron_label = req.schedule_label
+    if not cron_expr:
+        cron_expr, cron_label = parse_schedule(req.natural_language)
+    if not cron_label:
+        _, cron_label = parse_schedule(req.natural_language)
+
+    task = {
+        "task_id": task_id,
+        "name": req.name,
+        "natural_language": req.natural_language,
+        "schedule_cron": cron_expr,
+        "schedule_label": cron_label,
+        "agent_type": req.agent_type,
+        "mcp_servers": req.mcp_servers or [],
+        "enabled": req.enabled,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "last_run": None,
+        "last_status": None,
+        "last_output_preview": None,
+        "run_count": 0,
+    }
+
+    # Inject user context if available
+    ctx = session_context.get(token, "")
+    if ctx:
+        task["_user_context"] = ctx
+
+    _task_store[task_id] = task
+    save_task_store(_task_store)
+
+    # Schedule it
+    if svc.scheduler and req.enabled:
+        svc.scheduler.add_task(task)
+
+    # Get next run
+    next_run = None
+    if svc.scheduler:
+        next_run = svc.scheduler.get_next_run(task_id)
+
+    return TaskResponse(
+        task_id=task_id,
+        name=req.name,
+        natural_language=req.natural_language,
+        schedule_cron=cron_expr,
+        schedule_label=cron_label,
+        agent_type=req.agent_type,
+        enabled=req.enabled,
+        created_at=task["created_at"],
+        next_run=next_run,
+    )
+
+
+@app.get("/tasks/list")
+async def list_tasks(token: str = Depends(get_session_token)):
+    """List all scheduled tasks with current status."""
+    tasks = []
+    for task in _task_store.values():
+        next_run = None
+        if svc.scheduler:
+            next_run = svc.scheduler.get_next_run(task["task_id"])
+
+        tasks.append(TaskResponse(
+            task_id=task["task_id"],
+            name=task["name"],
+            natural_language=task.get("natural_language", ""),
+            schedule_cron=task.get("schedule_cron", "0 9 * * *"),
+            schedule_label=task.get("schedule_label", "Daily 9:00 AM"),
+            agent_type=task.get("agent_type", "custom"),
+            enabled=task.get("enabled", True),
+            created_at=task.get("created_at", ""),
+            last_run=task.get("last_run"),
+            last_status=task.get("last_status"),
+            last_output_preview=task.get("last_output_preview"),
+            next_run=next_run,
+            run_count=task.get("run_count", 0),
+        ))
+
+    return tasks
+
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, token: str = Depends(get_session_token)):
+    """Delete a scheduled task."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if svc.scheduler:
+        svc.scheduler.remove_task(task_id)
+
+    del _task_store[task_id]
+    save_task_store(_task_store)
+
+    return {"deleted": True, "task_id": task_id}
+
+
+@app.patch("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(task_id: str, req: TaskUpdateRequest, token: str = Depends(get_session_token)):
+    """Update task enabled state or schedule."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = _task_store[task_id]
+
+    if req.enabled is not None:
+        old_enabled = task.get("enabled", True)
+        task["enabled"] = req.enabled
+        if svc.scheduler:
+            if req.enabled and not old_enabled:
+                svc.scheduler.add_task(task)
+            elif not req.enabled and old_enabled:
+                svc.scheduler.pause_task(task_id)
+
+    if req.schedule_cron is not None:
+        task["schedule_cron"] = req.schedule_cron
+        if req.schedule_label:
+            task["schedule_label"] = req.schedule_label
+        # Reschedule
+        if svc.scheduler and task.get("enabled", True):
+            svc.scheduler.remove_task(task_id)
+            svc.scheduler.add_task(task)
+
+    save_task_store(_task_store)
+
+    next_run = None
+    if svc.scheduler:
+        next_run = svc.scheduler.get_next_run(task_id)
+
+    return TaskResponse(
+        task_id=task["task_id"],
+        name=task["name"],
+        natural_language=task.get("natural_language", ""),
+        schedule_cron=task.get("schedule_cron", ""),
+        schedule_label=task.get("schedule_label", ""),
+        agent_type=task.get("agent_type", "custom"),
+        enabled=task.get("enabled", True),
+        created_at=task.get("created_at", ""),
+        last_run=task.get("last_run"),
+        last_status=task.get("last_status"),
+        last_output_preview=task.get("last_output_preview"),
+        next_run=next_run,
+        run_count=task.get("run_count", 0),
+    )
+
+
+@app.post("/tasks/{task_id}/run", response_model=TaskRunResult)
+async def run_task(task_id: str, token: str = Depends(get_session_token)):
+    """Manually trigger a task immediately."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = _task_store[task_id]
+
+    # Inject user context from session
+    ctx = session_context.get(token, "")
+    if ctx:
+        task["_user_context"] = ctx
+
+    result = execute_task(task)
+
+    # Update store
+    task["last_run"] = result["ran_at"]
+    task["last_status"] = result["status"]
+    task["last_output_preview"] = result["output_preview"]
+    task["run_count"] = task.get("run_count", 0) + 1
+    save_task_store(_task_store)
+
+    return TaskRunResult(**result)
+
+
+@app.get("/tasks/{task_id}/history")
+async def task_history(task_id: str, token: str = Depends(get_session_token)):
+    """Get last 20 run results for a task."""
+    if task_id not in _task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    history = get_task_history(task_id)
+    return history
 
 
 # ── Status ────────────────────────────────────────
