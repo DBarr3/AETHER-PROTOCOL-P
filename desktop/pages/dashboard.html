@@ -1810,13 +1810,13 @@
         </div>
       </div>
 
-      <!-- PROJECTS -->
+      <!-- CONVERSATIONS -->
       <div class="sb-section" style="flex:1;">
         <div class="sb-header">
-          PROJECTS
-          <span style="cursor:pointer; color:var(--accent); font-size:10px;" onclick="clearChatHistory()" title="Clear">&#10005;</span>
+          CONVERSATIONS
+          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="handleNewConversation()" title="New Conversation">+</span>
         </div>
-        <input type="text" class="sb-search" id="chat-search" placeholder="Search projects..." oninput="filterChatHistory()">
+        <input type="text" class="sb-search" id="chat-search" placeholder="Search conversations..." oninput="filterConversations()">
         <div id="chat-history"></div>
       </div>
 
@@ -3517,13 +3517,13 @@ async function sendMessage() {
     if (result.error) {
       const errMsg = result.message || 'Failed';
       displayAIResponse('Error: ' + errMsg, false);
-      appendMessage('SYSTEM', 'Error: ' + errMsg, 'agent');
+      saveAgentReply('Error: ' + errMsg);
       addAgentLog('Error', 'idle');
       setAgentStatus('Error', 'error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
       displayAIResponse(reply, false);
-      appendMessage('AETHER', reply, 'agent');
+      saveAgentReply(reply);
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
@@ -3537,7 +3537,7 @@ async function sendMessage() {
     }
   } catch (e) {
     displayAIResponse('Connection error: ' + e.message, false);
-    appendMessage('SYSTEM', 'Connection error: ' + e.message, 'agent');
+    saveAgentReply('Connection error: ' + e.message);
     addAgentLog('Connection error', 'idle');
     setAgentStatus('Error', 'error');
   }
@@ -3557,20 +3557,9 @@ function displayAIResponse(text, isThinking) {
   panel.scrollTop = panel.scrollHeight;
 }
 
-let chatOverlay = null;
-function appendMessage(label, text, type) {
-  if (!chatOverlay) {
-    chatOverlay = document.createElement('div');
-    chatOverlay.style.cssText = 'position:absolute;bottom:8px;right:8px;width:380px;max-height:300px;overflow-y:auto;z-index:50;display:flex;flex-direction:column;gap:6px;';
-    document.getElementById('canvas-wrap').appendChild(chatOverlay);
-  }
-  const d = document.createElement('div');
-  d.style.cssText = `background:var(--bg-2);border:1px solid ${type==='user'?'rgba(0,212,255,0.2)':'var(--border-2)'};padding:10px 12px;font-size:11px;line-height:1.5;${type==='agent'?'border-left:2px solid var(--accent);':''}`;
-  d.innerHTML = `<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--text-muted);margin-bottom:3px;">${label}</div><div style="color:var(--text-primary);">${escH(text)}</div>`;
-  chatOverlay.appendChild(d);
-  chatOverlay.scrollTop = chatOverlay.scrollHeight;
-  while (chatOverlay.children.length > 5) chatOverlay.removeChild(chatOverlay.firstChild);
-}
+// FIX 1 — Overlay removed. appendMessage is now a no-op.
+// All responses display in the single #ai-response-panel only.
+function appendMessage(label, text, type) { /* removed — single response panel only */ }
 
 // ════════════════════════════════════════════════════
 // SIDEBAR
@@ -3583,34 +3572,139 @@ function toggleSidebar() {
 }
 
 // ════════════════════════════════════════════════════
-// CHAT HISTORY
+// CONVERSATIONS (FIX 2 + FIX 3)
 // ════════════════════════════════════════════════════
-function saveChatToHistory(q) {
-  const h = JSON.parse(localStorage.getItem('aether_chat_history') || '[]');
-  h.unshift({ query:q, time:Date.now() });
-  if (h.length > 20) h.length = 20;
-  localStorage.setItem('aether_chat_history', JSON.stringify(h));
-  renderChatHistory();
+let activeConversationId = null;
+
+function getConversations() {
+  return JSON.parse(localStorage.getItem('aether_conversations') || '{}');
 }
-function renderChatHistory() {
+function saveConversations(convs) {
+  localStorage.setItem('aether_conversations', JSON.stringify(convs));
+}
+
+function createNewConversation() {
+  const id = 'conv-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+  const convs = getConversations();
+  convs[id] = { id, name:'New conversation', messages:[], created:Date.now(), named:false };
+  saveConversations(convs);
+  activeConversationId = id;
+  localStorage.setItem('active_conversation_id', id);
+  return id;
+}
+
+function handleNewConversation() {
+  createNewConversation();
+  clearChatArea();
+  renderConversations();
+  showToast('New conversation started', 'info');
+}
+
+function clearChatArea() {
+  const panel = document.getElementById('ai-response-panel');
+  const respText = document.getElementById('response-text');
+  if (respText) respText.textContent = '';
+  if (panel) panel.classList.remove('visible');
+}
+
+function ensureActiveConversation() {
+  activeConversationId = localStorage.getItem('active_conversation_id');
+  if (activeConversationId) {
+    const convs = getConversations();
+    if (convs[activeConversationId]) return;
+  }
+  // No valid conversation — create one
+  createNewConversation();
+  renderConversations();
+}
+
+function saveChatToHistory(q) {
+  ensureActiveConversation();
+  const convs = getConversations();
+  const conv = convs[activeConversationId];
+  if (!conv) return;
+  conv.messages.push({ role:'user', text:q, time:Date.now() });
+  // FIX 3 — auto-name from first message
+  if (!conv.named && q.length >= 5) {
+    conv.name = q.length > 40 ? q.substring(0, 40) + '...' : q;
+    conv.named = true;
+  }
+  saveConversations(convs);
+  renderConversations();
+}
+
+function saveAgentReply(text) {
+  ensureActiveConversation();
+  const convs = getConversations();
+  const conv = convs[activeConversationId];
+  if (!conv) return;
+  conv.messages.push({ role:'agent', text, time:Date.now() });
+  saveConversations(convs);
+}
+
+function switchConversation(id) {
+  activeConversationId = id;
+  localStorage.setItem('active_conversation_id', id);
+  renderConversations();
+  // Restore last agent reply in the response panel
+  const convs = getConversations();
+  const conv = convs[id];
+  if (conv && conv.messages.length) {
+    const lastAgent = [...conv.messages].reverse().find(m => m.role === 'agent');
+    if (lastAgent) {
+      displayAIResponse(lastAgent.text, false);
+    } else {
+      clearChatArea();
+    }
+  } else {
+    clearChatArea();
+  }
+}
+
+function deleteConversation(id, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  const convs = getConversations();
+  delete convs[id];
+  saveConversations(convs);
+  if (activeConversationId === id) {
+    const ids = Object.keys(convs);
+    if (ids.length) switchConversation(ids[0]);
+    else { createNewConversation(); clearChatArea(); }
+  }
+  renderConversations();
+}
+
+function renderConversations() {
   const c = document.getElementById('chat-history');
-  const h = JSON.parse(localStorage.getItem('aether_chat_history') || '[]');
+  if (!c) return;
+  const convs = getConversations();
   const filter = (document.getElementById('chat-search')?.value || '').toLowerCase();
-  const filtered = filter ? h.filter(e => e.query.toLowerCase().includes(filter)) : h;
-  if (!filtered.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);padding:2px 0;">No projects</div>'; return; }
-  c.innerHTML = filtered.slice(0, 10).map((e,i) => `
-    <div class="sb-chat-entry${i===0?' active':''}" onclick="restoreChat('${esc(e.query)}')">
+  // Sort by most recent activity
+  const sorted = Object.values(convs).sort((a,b) => {
+    const aLast = a.messages.length ? a.messages[a.messages.length-1].time : a.created;
+    const bLast = b.messages.length ? b.messages[b.messages.length-1].time : b.created;
+    return bLast - aLast;
+  });
+  const filtered = filter ? sorted.filter(cv => cv.name.toLowerCase().includes(filter)) : sorted;
+  if (!filtered.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);padding:2px 0;">No conversations</div>'; return; }
+  c.innerHTML = filtered.slice(0, 20).map(cv => {
+    const active = cv.id === activeConversationId ? ' active' : '';
+    const msgCount = cv.messages.length;
+    const lastTime = msgCount ? fmtTime(cv.messages[msgCount-1].time) : fmtTime(cv.created);
+    return `
+    <div class="sb-chat-entry${active}" onclick="switchConversation('${cv.id}')">
       <span class="sb-chat-icon">&#9679;</span>
       <div class="sb-chat-info">
-        <div class="sb-chat-time">${fmtTime(e.time)}</div>
-        <div class="sb-chat-preview">${escH(e.query)}</div>
+        <div class="sb-chat-time">${lastTime}<span style="margin-left:6px;color:var(--text-muted);font-size:9px;">${msgCount} msg</span>
+          <span style="cursor:pointer;color:var(--text-muted);margin-left:4px;font-size:9px;" onclick="deleteConversation('${cv.id}',event)" title="Delete">&#10005;</span>
+        </div>
+        <div class="sb-chat-preview">${escH(cv.name)}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
-function filterChatHistory() { renderChatHistory(); }
-function restoreChat(q) { document.getElementById('chat-input').value = q; document.getElementById('chat-input').focus(); }
-function clearChatHistory() { localStorage.removeItem('aether_chat_history'); renderChatHistory(); showToast('Chat history cleared', 'info'); }
+function filterConversations() { renderConversations(); }
+function clearChatHistory() { localStorage.removeItem('aether_conversations'); localStorage.removeItem('active_conversation_id'); createNewConversation(); clearChatArea(); renderConversations(); showToast('All conversations cleared', 'info'); }
 function fmtTime(ts) { const m=Math.floor((Date.now()-ts)/60000); if(m<1)return'now'; if(m<60)return m+'m'; const h=Math.floor(m/60); if(h<24)return h+'h'; return Math.floor(h/24)+'d'; }
 function esc(s) { return s.replace(/'/g,"\\'").replace(/\n/g,' '); }
 function escH(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
@@ -6967,7 +7061,8 @@ window.addEventListener('load', async () => {
   if (localStorage.getItem('sidebar_collapsed') === 'true') {
     document.getElementById('sidebar').classList.add('collapsed');
   }
-  renderChatHistory();
+  ensureActiveConversation();
+  renderConversations();
   renderSpawnedAgentsSidebar();
   renderScheduledTasks();
   startSchedTaskPolling();
