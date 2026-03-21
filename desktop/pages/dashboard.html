@@ -1321,6 +1321,130 @@
     letter-spacing: 0.5px; cursor: pointer;
   }
 
+  /* ═══ CONTEXT GATHERING SYSTEM ═══════════════════ */
+  .ctx-gather-modal {
+    background: var(--bg-2);
+    border: 1px solid var(--accent);
+    width: 520px; max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .ctx-depth-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+  }
+  .ctx-depth-indicator {
+    display: flex; gap: 2px;
+  }
+  .ctx-depth-seg {
+    width: 20px; height: 4px; border-radius: 2px;
+    background: var(--bg-3);
+  }
+  .ctx-depth-seg.active { background: var(--accent); }
+  .ctx-depth-seg.active.high { background: var(--green); }
+  .ctx-depth-seg.active.med { background: var(--amber); }
+  .ctx-depth-label { color: var(--accent); font-weight: 500; }
+  .ctx-question {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctx-question-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-primary);
+    margin-bottom: 10px; line-height: 1.5;
+  }
+  .ctx-question-hint {
+    font-size: 9px; color: var(--text-muted);
+    margin-bottom: 8px; font-style: italic;
+  }
+  .ctx-options { display: flex; flex-direction: column; gap: 4px; }
+  .ctx-option {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    padding: 8px 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ctx-option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .ctx-option.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .ctx-option-radio {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--border-2); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .ctx-option.selected .ctx-option-radio { border-color: var(--accent); }
+  .ctx-option.selected .ctx-option-radio::after {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  .ctx-option-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-secondary);
+    flex: 1;
+  }
+  .ctx-option-implication {
+    font-size: 8px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .ctx-freeform {
+    width: 100%; background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; padding: 8px; outline: none;
+    resize: vertical; transition: border-color 0.15s;
+    min-height: 60px;
+  }
+  .ctx-freeform:focus { border-color: var(--accent); }
+  .ctx-implication-banner {
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    margin-top: 8px; line-height: 1.5;
+  }
+  .ctx-progress {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+  }
+  .ctx-progress-bar {
+    flex: 1; height: 3px; background: var(--bg-3);
+    border-radius: 2px; overflow: hidden;
+  }
+  .ctx-progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; border-radius: 2px; }
+  .ctx-nav { display: flex; gap: 6px; }
+  .ctx-nav-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; padding: 5px 14px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ctx-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ctx-nav-btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .ctx-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ctx-context-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 6px; border-radius: 2px;
+    background: var(--green-dim); color: var(--green);
+  }
+  .ctx-why-banner {
+    background: var(--bg-3);
+    border-left: 3px solid var(--green);
+    padding: 8px 12px; margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -1331,7 +1455,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.9</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.10</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1759,6 +1883,47 @@
         </div>
         <div id="draft-tone-info" style="margin-top:10px;"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT GATHERING MODAL -->
+<div class="spawn-modal-overlay" id="ctx-gather-modal">
+  <div class="ctx-gather-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="ctx-modal-title">&#128270; INTELLIGENT CONTEXT GATHERING</span>
+      <button class="modal-close" onclick="closeContextGathering()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="ctx-depth-bar" id="ctx-depth-bar">
+        <div style="font-size:9px;color:var(--text-secondary);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">ANALYSIS DEPTH</div>
+        <div class="ctx-depth-indicator">
+          <div class="ctx-depth-seg" id="ctx-seg-0"></div>
+          <div class="ctx-depth-seg" id="ctx-seg-1"></div>
+          <div class="ctx-depth-seg" id="ctx-seg-2"></div>
+          <div class="ctx-depth-seg" id="ctx-seg-3"></div>
+          <div class="ctx-depth-seg" id="ctx-seg-4"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:2px;">
+          <span>SHALLOW</span>
+          <span class="ctx-depth-label" id="ctx-depth-label">MODERATE</span>
+          <span>DEEP</span>
+        </div>
+      </div>
+      <div class="ctx-progress" id="ctx-progress">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-secondary);margin-bottom:2px;">
+          <span id="ctx-progress-label">Question 1 of 3</span>
+          <span id="ctx-progress-pct">0%</span>
+        </div>
+        <div class="ctx-progress-bar"><div class="ctx-progress-fill" id="ctx-progress-fill"></div></div>
+      </div>
+      <div id="ctx-question-area"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <button class="ctx-nav-btn" id="ctx-back-btn" onclick="ctxBack()" style="display:none;">&#8592; Back</button>
+        <button class="ctx-nav-btn" id="ctx-skip-btn" onclick="ctxSkip()">Skip</button>
+        <button class="ctx-nav-btn primary" id="ctx-next-btn" onclick="ctxNext()">Next &#8594;</button>
+      </div>
+      <div class="ctx-implication-banner" id="ctx-implication" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -2891,6 +3056,7 @@ async function menuOpen() {
       addAgentLog(`Circuit generated — ${CS.nodes.length} nodes`, 'done');
       setAgentStatus('Complete', '');
       showToast(`Vault loaded: ${CS.nodes.length} nodes`, 'success');
+      checkContextOnFolderLoad();
 
       await new Promise(r => setTimeout(r, 300));
       hideLoading();
@@ -5087,10 +5253,627 @@ function removeAgentWithTone(agentId) {
 removeAgent = removeAgentWithTone;
 
 // ════════════════════════════════════════════════════
+// INTELLIGENT CONTEXT GATHERING (v0.8.9.10)
+// ════════════════════════════════════════════════════
+let ctxProfile = JSON.parse(localStorage.getItem('aether_ctx_profile') || 'null') || { answers: {}, depth: 0, level: 'shallow', projectPath: '', lastGathered: 0, implications: [], questionEffectiveness: {} };
+let ctxCurrentQuestions = [];
+let ctxCurrentIndex = 0;
+let ctxAnswers = {};
+let ctxCallback = null; // called when gathering completes
+let ctxTargetIssue = null; // issue being gathered for
+
+function saveCtxProfile() { localStorage.setItem('aether_ctx_profile', JSON.stringify(ctxProfile)); }
+
+// ── 1. Analysis Depth Calculator ──────────────────
+function calculateAnalysisDepth() {
+  const vaultNodes = savedVaultState ? savedVaultState.nodes : CS.nodes;
+  const files = vaultNodes.filter(n => !n.dir);
+  const dirs = vaultNodes.filter(n => n.dir && !n.isRoot);
+
+  // Metrics
+  const fileCount = files.length;
+  const dirCount = dirs.length;
+  const totalSize = files.reduce((s, f) => s + (f.size || 0), 0);
+  const extensions = new Set(files.map(f => (f.name.split('.').pop() || '').toLowerCase()));
+  const langCount = extensions.size;
+
+  // Detect patterns
+  const hasTests = files.some(f => /test|spec|__test/i.test(f.name)) || dirs.some(d => /test/i.test(d.name));
+  const hasConfig = files.some(f => /config|\.env|\.yaml|\.yml|\.toml|\.json$/i.test(f.name));
+  const hasDocs = files.some(f => /readme|docs|\.md$/i.test(f.name)) || dirs.some(d => /doc/i.test(d.name));
+  const hasCi = files.some(f => /ci|workflow|pipeline|\.github/i.test(f.name || f.path || ''));
+  const hasPackageManager = files.some(f => /package\.json|requirements\.txt|pyproject\.toml|Cargo\.toml|go\.mod/i.test(f.name));
+
+  // Detect imbalances
+  const testRatio = hasTests ? files.filter(f => /test|spec/i.test(f.name)).length / Math.max(1, fileCount) : 0;
+  const docRatio = hasDocs ? files.filter(f => /\.md$/i.test(f.name)).length / Math.max(1, fileCount) : 0;
+
+  // Calculate depth score (0-100)
+  let score = 0;
+  score += Math.min(25, fileCount * 0.5); // up to 25 for file count
+  score += Math.min(15, dirCount * 1.5);  // up to 15 for dir structure
+  score += Math.min(10, langCount * 2);   // up to 10 for language diversity
+  score += hasTests ? 8 : 0;
+  score += hasConfig ? 5 : 0;
+  score += hasCi ? 7 : 0;
+  score += hasPackageManager ? 5 : 0;
+  score += hasDocs ? 3 : 0;
+  // Penalize imbalances (low test/doc ratio in large projects = deeper questions needed)
+  if (fileCount > 10 && testRatio < 0.1) score += 8;
+  if (fileCount > 20 && docRatio < 0.05) score += 5;
+  // Size factor
+  score += Math.min(10, totalSize / (1024 * 1024)); // up to 10 for total MB
+
+  score = Math.min(100, Math.max(0, Math.round(score)));
+
+  const level = score >= 60 ? 'deep' : score >= 30 ? 'moderate' : 'shallow';
+
+  return { score, level, fileCount, dirCount, langCount, hasTests, hasConfig, hasCi, hasDocs, hasPackageManager, testRatio, docRatio, totalSize, extensions: [...extensions] };
+}
+
+// ── 2. Question Sets ──────────────────────────────
+const CTX_QUESTIONS = {
+  // Deep projects: targeted, specific
+  targeted: [
+    { id: 'arch_pattern', label: 'What architecture pattern does this project follow?', hint: 'Helps generate structurally-appropriate patches',
+      options: [
+        { value: 'monolith', text: 'Monolith', implication: 'Patches will consider shared state and tight coupling' },
+        { value: 'microservices', text: 'Microservices / Modular', implication: 'Patches will respect service boundaries' },
+        { value: 'serverless', text: 'Serverless / Functions', implication: 'Patches will be scoped to individual handlers' },
+        { value: 'mvc', text: 'MVC / Layered', implication: 'Patches will respect layer boundaries (model/view/controller)' },
+        { value: 'event_driven', text: 'Event-Driven', implication: 'Patches will consider async flows and event propagation' },
+      ] },
+    { id: 'deploy_target', label: 'Where is this deployed?', hint: 'Affects security and performance recommendations',
+      options: [
+        { value: 'cloud_prod', text: 'Cloud (Production)', implication: 'Patches will prioritize security, scalability, monitoring' },
+        { value: 'cloud_dev', text: 'Cloud (Dev/Staging)', implication: 'Patches can be more experimental' },
+        { value: 'local_only', text: 'Local / Desktop', implication: 'Focus on UX and local performance' },
+        { value: 'embedded', text: 'Embedded / IoT', implication: 'Patches will consider resource constraints' },
+        { value: 'not_deployed', text: 'Not deployed yet', implication: 'Patches will focus on getting deployment-ready' },
+      ] },
+    { id: 'team_size', label: 'How many developers work on this?', hint: 'Affects code style and documentation recommendations',
+      options: [
+        { value: 'solo', text: 'Just me', implication: 'Patches optimized for speed, less ceremony' },
+        { value: 'small', text: '2-5 people', implication: 'Patches include clear comments and conventions' },
+        { value: 'medium', text: '6-20 people', implication: 'Patches emphasize consistency and documentation' },
+        { value: 'large', text: '20+ people', implication: 'Patches follow strict conventions with thorough docs' },
+      ] },
+    { id: 'test_strategy', label: 'What\'s your testing approach?', hint: 'Shapes testing-related patches',
+      options: [
+        { value: 'tdd', text: 'Test-Driven (TDD)', implication: 'Patches will always include tests first' },
+        { value: 'unit_heavy', text: 'Heavy unit tests', implication: 'Patches will include granular unit tests' },
+        { value: 'integration', text: 'Integration / E2E focused', implication: 'Patches will include integration test scenarios' },
+        { value: 'minimal', text: 'Minimal / manual', implication: 'Patches will suggest but not require tests' },
+        { value: 'none', text: 'No tests yet', implication: 'Patches may suggest adding a test framework' },
+      ] },
+  ],
+  // Moderate projects: clarifying
+  clarifying: [
+    { id: 'project_stage', label: 'What stage is this project in?', hint: 'Determines patch aggressiveness',
+      options: [
+        { value: 'prototype', text: 'Prototype / MVP', implication: 'Patches focus on getting it working, not perfect' },
+        { value: 'active_dev', text: 'Active Development', implication: 'Balanced patches — quality matters but velocity too' },
+        { value: 'maintenance', text: 'Maintenance Mode', implication: 'Conservative patches, minimize disruption' },
+        { value: 'legacy', text: 'Legacy / Refactoring', implication: 'Patches focus on modernization and safety' },
+      ] },
+    { id: 'priority_focus', label: 'What matters most right now?', hint: 'Aligns patch priorities with your goals',
+      options: [
+        { value: 'ship_fast', text: 'Ship features fast', implication: 'Patches prioritize velocity over perfection' },
+        { value: 'stability', text: 'Stability & reliability', implication: 'Patches focus on error handling and edge cases' },
+        { value: 'security', text: 'Security hardening', implication: 'Patches prioritize vulnerability fixes' },
+        { value: 'performance', text: 'Performance optimization', implication: 'Patches focus on speed and resource usage' },
+        { value: 'cleanup', text: 'Code cleanup & debt', implication: 'Patches focus on refactoring and readability' },
+      ] },
+    { id: 'change_comfort', label: 'How comfortable are you with large changes?', hint: 'Controls patch scope',
+      options: [
+        { value: 'bold', text: 'Go big — refactor freely', implication: 'Patches can suggest major restructuring' },
+        { value: 'moderate', text: 'Moderate changes are fine', implication: 'Patches balance scope with safety' },
+        { value: 'conservative', text: 'Small, safe changes only', implication: 'Patches are minimal and surgical' },
+      ] },
+  ],
+  // Shallow projects: foundational
+  foundational: [
+    { id: 'project_type', label: 'What type of project is this?', hint: 'Helps understand the domain',
+      options: [
+        { value: 'web_app', text: 'Web Application', implication: 'Patches will consider browser compat, UX, security' },
+        { value: 'api', text: 'API / Backend Service', implication: 'Patches focus on endpoints, auth, data handling' },
+        { value: 'cli', text: 'CLI Tool / Script', implication: 'Patches focus on argument handling, output formatting' },
+        { value: 'library', text: 'Library / Package', implication: 'Patches focus on API design, backwards compat' },
+        { value: 'desktop', text: 'Desktop Application', implication: 'Patches consider OS integration, file handling' },
+        { value: 'mobile', text: 'Mobile App', implication: 'Patches consider device constraints, offline handling' },
+        { value: 'data', text: 'Data / ML Pipeline', implication: 'Patches focus on data quality, reproducibility' },
+      ] },
+    { id: 'primary_language', label: 'What\'s the primary language?', hint: 'Affects code style in patches', type: 'freeform', placeholder: 'e.g. Python, JavaScript, Rust...' },
+    { id: 'main_concern', label: 'What\'s your biggest concern about this codebase?', hint: 'Focuses patch priorities', type: 'freeform', placeholder: 'e.g. "No error handling", "Too many dependencies", "Security gaps"...' },
+  ],
+};
+
+// ── 3. Question Router ────────────────────────────
+function routeContextQuestions(depth, issue) {
+  let questions = [];
+  const level = depth.level;
+
+  if (level === 'deep') {
+    questions = [...CTX_QUESTIONS.targeted];
+    // Add 1 clarifying question for extra context
+    questions.push(CTX_QUESTIONS.clarifying[1]); // priority_focus
+  } else if (level === 'moderate') {
+    questions = [...CTX_QUESTIONS.clarifying];
+    // Add 1 foundational if we don't know project type
+    if (!ctxProfile.answers.project_type) questions.unshift(CTX_QUESTIONS.foundational[0]);
+  } else {
+    questions = [...CTX_QUESTIONS.foundational];
+  }
+
+  // If targeting a specific issue, add issue-relevant questions
+  if (issue) {
+    if (issue.category === 'security' && !ctxProfile.answers.deploy_target) {
+      questions.push(CTX_QUESTIONS.targeted[1]); // deploy_target
+    }
+    if (issue.category === 'testing' && !ctxProfile.answers.test_strategy) {
+      questions.push(CTX_QUESTIONS.targeted[3]); // test_strategy
+    }
+  }
+
+  // Filter out already-answered questions (unless stale > 7 days)
+  const staleMs = 7 * 24 * 60 * 60 * 1000;
+  questions = questions.filter(q => {
+    const prev = ctxProfile.answers[q.id];
+    if (!prev) return true;
+    if (Date.now() - (prev.timestamp || 0) > staleMs) return true;
+    return false;
+  });
+
+  // Limit to 5 max questions
+  return questions.slice(0, 5);
+}
+
+// ── 4. Context Gathering UI ──────────────────────
+function openContextGathering(issue, callback) {
+  const depth = calculateAnalysisDepth();
+  ctxProfile.depth = depth.score;
+  ctxProfile.level = depth.level;
+  ctxProfile.projectPath = currentVaultPath || '';
+  saveCtxProfile();
+
+  ctxCurrentQuestions = routeContextQuestions(depth, issue);
+  if (ctxCurrentQuestions.length === 0) {
+    // All questions already answered — proceed directly
+    if (callback) callback();
+    return;
+  }
+
+  ctxCurrentIndex = 0;
+  ctxAnswers = {};
+  ctxCallback = callback;
+  ctxTargetIssue = issue;
+
+  // Update depth bar
+  updateDepthBar(depth.score, depth.level);
+
+  // Show first question
+  renderContextQuestion();
+
+  document.getElementById('ctx-gather-modal').classList.add('open');
+}
+
+function closeContextGathering() {
+  document.getElementById('ctx-gather-modal').classList.remove('open');
+  ctxCallback = null;
+  ctxTargetIssue = null;
+}
+
+function updateDepthBar(score, level) {
+  const segs = 5;
+  const activeSeg = Math.min(segs - 1, Math.floor(score / 20));
+  for (let i = 0; i < segs; i++) {
+    const el = document.getElementById('ctx-seg-' + i);
+    el.className = 'ctx-depth-seg';
+    if (i <= activeSeg) {
+      el.classList.add('active');
+      if (score >= 60) el.classList.add('high');
+      else if (score >= 30) el.classList.add('med');
+    }
+  }
+  document.getElementById('ctx-depth-label').textContent = level.toUpperCase() + ' (' + score + ')';
+}
+
+function renderContextQuestion() {
+  const area = document.getElementById('ctx-question-area');
+  const q = ctxCurrentQuestions[ctxCurrentIndex];
+  if (!q) { finishContextGathering(); return; }
+
+  // Update progress
+  const total = ctxCurrentQuestions.length;
+  const pct = Math.round(((ctxCurrentIndex) / total) * 100);
+  document.getElementById('ctx-progress-label').textContent = `Question ${ctxCurrentIndex + 1} of ${total}`;
+  document.getElementById('ctx-progress-pct').textContent = pct + '%';
+  document.getElementById('ctx-progress-fill').style.width = pct + '%';
+
+  // Back button visibility
+  document.getElementById('ctx-back-btn').style.display = ctxCurrentIndex > 0 ? '' : 'none';
+
+  // Next button label
+  const nextBtn = document.getElementById('ctx-next-btn');
+  nextBtn.textContent = ctxCurrentIndex === total - 1 ? 'Finish \u2713' : 'Next \u2192';
+
+  // Hide implication
+  document.getElementById('ctx-implication').style.display = 'none';
+
+  if (q.type === 'freeform') {
+    area.innerHTML = `
+      <div class="ctx-question">
+        <div class="ctx-question-label">${escH(q.label)}</div>
+        <div class="ctx-question-hint">${escH(q.hint || '')}</div>
+        <textarea class="ctx-freeform" id="ctx-freeform-input" placeholder="${escH(q.placeholder || 'Type your answer...')}">${escH(ctxAnswers[q.id] || '')}</textarea>
+      </div>`;
+  } else {
+    const prevAnswer = ctxAnswers[q.id] || '';
+    area.innerHTML = `
+      <div class="ctx-question">
+        <div class="ctx-question-label">${escH(q.label)}</div>
+        <div class="ctx-question-hint">${escH(q.hint || '')}</div>
+        <div class="ctx-options">
+          ${q.options.map(o => `
+            <div class="ctx-option ${prevAnswer === o.value ? 'selected' : ''}" data-value="${escH(o.value)}" data-implication="${escH(o.implication || '')}" onclick="selectCtxOption(this)">
+              <div class="ctx-option-radio"></div>
+              <div>
+                <div class="ctx-option-text">${escH(o.text)}</div>
+                <div class="ctx-option-implication">${escH(o.implication || '')}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+}
+
+function selectCtxOption(el) {
+  const q = ctxCurrentQuestions[ctxCurrentIndex];
+  // Deselect siblings
+  el.parentElement.querySelectorAll('.ctx-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  ctxAnswers[q.id] = el.dataset.value;
+
+  // Show implication
+  const impl = el.dataset.implication;
+  if (impl) {
+    const banner = document.getElementById('ctx-implication');
+    banner.textContent = '\u2192 ' + impl;
+    banner.style.display = 'block';
+  }
+}
+
+function ctxNext() {
+  const q = ctxCurrentQuestions[ctxCurrentIndex];
+  // Save freeform answer
+  if (q.type === 'freeform') {
+    const input = document.getElementById('ctx-freeform-input');
+    if (input && input.value.trim()) ctxAnswers[q.id] = input.value.trim();
+  }
+
+  // Validate — must have answer
+  if (!ctxAnswers[q.id]) {
+    showToast('Please select an answer or skip', 'info');
+    return;
+  }
+
+  // Store in profile
+  ctxProfile.answers[q.id] = { value: ctxAnswers[q.id], timestamp: Date.now(), questionId: q.id };
+  saveCtxProfile();
+
+  // Track effectiveness
+  if (!ctxProfile.questionEffectiveness[q.id]) ctxProfile.questionEffectiveness[q.id] = { asked: 0, useful: 0 };
+  ctxProfile.questionEffectiveness[q.id].asked++;
+  saveCtxProfile();
+
+  ctxCurrentIndex++;
+  if (ctxCurrentIndex >= ctxCurrentQuestions.length) {
+    finishContextGathering();
+  } else {
+    renderContextQuestion();
+  }
+}
+
+function ctxBack() {
+  if (ctxCurrentIndex > 0) {
+    ctxCurrentIndex--;
+    renderContextQuestion();
+  }
+}
+
+function ctxSkip() {
+  ctxCurrentIndex++;
+  if (ctxCurrentIndex >= ctxCurrentQuestions.length) {
+    finishContextGathering();
+  } else {
+    renderContextQuestion();
+  }
+}
+
+function finishContextGathering() {
+  // Derive implications from all answers
+  ctxProfile.implications = deriveImplications();
+  ctxProfile.lastGathered = Date.now();
+  saveCtxProfile();
+
+  closeContextGathering();
+  showToast('Context gathered — patches will be personalized', 'success');
+
+  if (ctxCallback) ctxCallback();
+}
+
+// ── 5. Derive Implications ────────────────────────
+function deriveImplications() {
+  const a = ctxProfile.answers;
+  const implications = [];
+
+  if (a.arch_pattern) {
+    const v = a.arch_pattern.value;
+    if (v === 'monolith') implications.push('Consider coupling impact across modules');
+    if (v === 'microservices') implications.push('Respect service boundaries; patches should be service-scoped');
+    if (v === 'event_driven') implications.push('Consider async side-effects and event ordering');
+  }
+  if (a.deploy_target) {
+    const v = a.deploy_target.value;
+    if (v === 'cloud_prod') implications.push('Production deployment — security and stability are critical');
+    if (v === 'local_only') implications.push('Local-only — optimize for developer experience');
+    if (v === 'not_deployed') implications.push('Pre-deployment — focus on deployment readiness');
+  }
+  if (a.team_size) {
+    const v = a.team_size.value;
+    if (v === 'solo') implications.push('Solo developer — prioritize speed over ceremony');
+    if (v === 'large') implications.push('Large team — thorough documentation and conventions required');
+  }
+  if (a.project_stage) {
+    const v = a.project_stage.value;
+    if (v === 'prototype') implications.push('Prototype stage — favor speed, accept tech debt');
+    if (v === 'maintenance') implications.push('Maintenance mode — conservative changes, extensive testing');
+    if (v === 'legacy') implications.push('Legacy code — careful refactoring with safety nets');
+  }
+  if (a.priority_focus) {
+    const v = a.priority_focus.value;
+    if (v === 'ship_fast') implications.push('Priority: shipping fast — minimize scope per patch');
+    if (v === 'security') implications.push('Priority: security — always include security review');
+    if (v === 'performance') implications.push('Priority: performance — include benchmarks');
+    if (v === 'cleanup') implications.push('Priority: code cleanup — emphasize readability');
+  }
+  if (a.change_comfort) {
+    const v = a.change_comfort.value;
+    if (v === 'bold') implications.push('User open to large refactors');
+    if (v === 'conservative') implications.push('User prefers small, surgical changes');
+  }
+  if (a.test_strategy) {
+    const v = a.test_strategy.value;
+    if (v === 'tdd') implications.push('TDD workflow — tests must come first');
+    if (v === 'none') implications.push('No tests yet — consider suggesting test setup');
+  }
+  if (a.project_type) {
+    const v = a.project_type.value;
+    if (v === 'web_app') implications.push('Web app — consider browser compat and XSS');
+    if (v === 'api') implications.push('API service — focus on input validation and auth');
+    if (v === 'library') implications.push('Library — maintain backward compatibility');
+  }
+  if (a.main_concern && a.main_concern.value) {
+    implications.push('User concern: ' + a.main_concern.value);
+  }
+  if (a.primary_language && a.primary_language.value) {
+    implications.push('Primary language: ' + a.primary_language.value);
+  }
+
+  return implications;
+}
+
+// ── 6. Context-Injected Patch Generation ──────────
+function buildContextSection() {
+  if (!ctxProfile.implications || !ctxProfile.implications.length) return '';
+
+  let section = '\n## Project Context (gathered from developer)\n';
+  ctxProfile.implications.forEach(imp => { section += '- ' + imp + '\n'; });
+
+  // Add specific answers that matter
+  const a = ctxProfile.answers;
+  if (a.arch_pattern) section += `\nArchitecture: ${a.arch_pattern.value}`;
+  if (a.deploy_target) section += `\nDeployment: ${a.deploy_target.value}`;
+  if (a.project_stage) section += `\nStage: ${a.project_stage.value}`;
+  if (a.change_comfort) section += `\nChange tolerance: ${a.change_comfort.value}`;
+
+  return section + '\n';
+}
+
+function buildWhyBanner(issue) {
+  const a = ctxProfile.answers;
+  const reasons = [];
+
+  if (issue.category === 'security' && a.deploy_target && a.deploy_target.value === 'cloud_prod') {
+    reasons.push('This is deployed to production — security issues have real-world impact');
+  }
+  if (issue.category === 'testing' && a.test_strategy && a.test_strategy.value === 'none') {
+    reasons.push('Your project has no tests yet — this is a great place to start');
+  }
+  if (issue.category === 'performance' && a.priority_focus && a.priority_focus.value === 'performance') {
+    reasons.push('Performance is your current priority — this aligns with your goals');
+  }
+  if (issue.category === 'architecture' && a.change_comfort && a.change_comfort.value === 'bold') {
+    reasons.push('You\'re open to big changes — this architectural fix is worth it');
+  }
+  if (issue.severity === 'critical' && a.project_stage && (a.project_stage.value === 'maintenance' || a.project_stage.value === 'legacy')) {
+    reasons.push('In maintenance mode, critical issues should be addressed immediately');
+  }
+  if (a.main_concern && a.main_concern.value) {
+    const concern = a.main_concern.value.toLowerCase();
+    if (concern.includes('security') && issue.category === 'security') reasons.push('This directly addresses your stated concern about security');
+    if (concern.includes('test') && issue.category === 'testing') reasons.push('This directly addresses your testing concerns');
+    if (concern.includes('error') && issue.category === 'quality') reasons.push('This addresses your concern about error handling');
+  }
+
+  return reasons.length ? reasons[0] : '';
+}
+
+// Override buildAdaptivePrompt to inject context
+const _origBuildAdaptivePrompt = buildAdaptivePrompt;
+function buildAdaptivePromptWithContext(issue) {
+  let prompt = _origBuildAdaptivePrompt(issue);
+  const ctxSection = buildContextSection();
+  if (ctxSection) {
+    // Insert context section after ## Problem section
+    const insertPoint = prompt.indexOf('## Files to Modify');
+    if (insertPoint > 0) {
+      prompt = prompt.slice(0, insertPoint) + ctxSection + '\n' + prompt.slice(insertPoint);
+    } else {
+      prompt += ctxSection;
+    }
+  }
+  return prompt;
+}
+buildAdaptivePrompt = buildAdaptivePromptWithContext;
+
+// Override buildStyleInstructions to include context
+const _origBuildStyleInstructions = buildStyleInstructions;
+function buildStyleInstructionsWithContext() {
+  let instructions = _origBuildStyleInstructions();
+  const a = ctxProfile.answers;
+
+  if (a.change_comfort) {
+    if (a.change_comfort.value === 'conservative') instructions += '\nKeep changes minimal and surgical. Avoid unnecessary refactoring.';
+    if (a.change_comfort.value === 'bold') instructions += '\nFeel free to suggest larger refactors if they improve the codebase.';
+  }
+  if (a.team_size) {
+    if (a.team_size.value === 'solo') instructions += '\nOptimize for developer speed — less ceremony is OK.';
+    if (a.team_size.value === 'large') instructions += '\nInclude thorough documentation. Many developers will read this.';
+  }
+  if (a.project_stage) {
+    if (a.project_stage.value === 'prototype') instructions += '\nThis is a prototype — pragmatic solutions over perfect ones.';
+    if (a.project_stage.value === 'maintenance') instructions += '\nMaintenance mode — be very conservative, minimize side effects.';
+  }
+
+  return instructions;
+}
+buildStyleInstructions = buildStyleInstructionsWithContext;
+
+// Override generatePatchPrompt to inject context section into API query
+const _origGeneratePatchPrompt = generatePatchPrompt;
+async function generatePatchPromptWithContext(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (!issue) return;
+
+  // Check if we have context gathered for this project
+  const hasContext = ctxProfile.implications && ctxProfile.implications.length > 0 && ctxProfile.projectPath === (currentVaultPath || '');
+  const contextFresh = (Date.now() - ctxProfile.lastGathered) < 24 * 60 * 60 * 1000; // within 24h
+
+  if (!hasContext || !contextFresh) {
+    // Offer to gather context first
+    openContextGathering(issue, () => {
+      _origGeneratePatchPrompt(issueId);
+    });
+  } else {
+    _origGeneratePatchPrompt(issueId);
+  }
+}
+generatePatchPrompt = generatePatchPromptWithContext;
+
+// Override renderPatchIssues to add context badges and why banners
+const _origRenderPatchIssues = renderPatchIssues;
+function renderPatchIssuesWithContext() {
+  _origRenderPatchIssues();
+
+  // Add context badges and why banners to each issue
+  const hasCtx = ctxProfile.implications && ctxProfile.implications.length > 0;
+  if (!hasCtx) return;
+
+  patchIssues.forEach(issue => {
+    const el = document.getElementById('patch-issue-' + issue.id);
+    if (!el) return;
+
+    // Add context badge if not already there
+    if (!el.querySelector('.ctx-context-badge')) {
+      const header = el.querySelector('.patch-issue-header');
+      if (header) {
+        const badge = document.createElement('span');
+        badge.className = 'ctx-context-badge';
+        badge.textContent = 'CTX';
+        badge.title = 'Context-enhanced patch';
+        header.appendChild(badge);
+      }
+    }
+
+    // Add why banner
+    const why = buildWhyBanner(issue);
+    if (why && !el.querySelector('.ctx-why-banner')) {
+      const banner = document.createElement('div');
+      banner.className = 'ctx-why-banner';
+      banner.innerHTML = '\u{1F4A1} <strong>Why this matters for you:</strong> ' + escH(why);
+      const actions = el.querySelector('.patch-issue-actions');
+      if (actions) el.insertBefore(banner, actions);
+    }
+  });
+}
+renderPatchIssues = renderPatchIssuesWithContext;
+
+// ── 7. Vault Mode Context Trigger ─────────────────
+// After loading a folder, check if we should ask context questions
+const _origSetProjectView = typeof switchToProjectView === 'function' ? switchToProjectView : null;
+
+function checkContextOnFolderLoad() {
+  // If we haven't gathered context for this path, or it's stale > 7 days
+  const isNewProject = ctxProfile.projectPath !== (currentVaultPath || '');
+  const isStale = (Date.now() - ctxProfile.lastGathered) > 7 * 24 * 60 * 60 * 1000;
+
+  if ((isNewProject || isStale) && currentVaultPath) {
+    // Delay slightly so the UI loads first
+    setTimeout(() => {
+      const depth = calculateAnalysisDepth();
+      const questions = routeContextQuestions(depth, null);
+      if (questions.length > 0) {
+        showToast('Context questions available — click "Gather Context" in patch panel', 'info');
+      }
+    }, 2000);
+  }
+}
+
+// ── 8. QOPC Question Effectiveness Tracking ──────
+function markQuestionUseful(questionId) {
+  if (!ctxProfile.questionEffectiveness[questionId]) ctxProfile.questionEffectiveness[questionId] = { asked: 0, useful: 0 };
+  ctxProfile.questionEffectiveness[questionId].useful++;
+  saveCtxProfile();
+}
+
+// When a patch with context is applied, mark the questions that contributed as useful
+const _origQopcLearnFromOutcome = typeof qopcLearnFromOutcome === 'function' ? qopcLearnFromOutcome : null;
+function qopcLearnWithContextTracking(lifecycle, outcome) {
+  if (_origQopcLearnFromOutcome) _origQopcLearnFromOutcome(lifecycle, outcome);
+
+  if (outcome === 'applied' && ctxProfile.answers) {
+    // Mark all answered questions as useful (the context helped produce an accepted patch)
+    Object.keys(ctxProfile.answers).forEach(qId => {
+      markQuestionUseful(qId);
+    });
+  }
+}
+if (_origQopcLearnFromOutcome) qopcLearnFromOutcome = qopcLearnWithContextTracking;
+
+// ── Context Gathering Modal Events ────────────────
+document.getElementById('ctx-gather-modal').addEventListener('click', (e) => { if (e.target.classList.contains('spawn-modal-overlay')) closeContextGathering(); });
+
+// Add "Gather Context" button to patch panel analysis bar
+(function injectContextButton() {
+  const analyzeBtn = document.getElementById('patch-analyze-btn');
+  if (analyzeBtn && !document.getElementById('ctx-gather-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'ctx-gather-btn';
+    btn.className = 'patch-issue-btn';
+    btn.style.cssText = 'font-size:10px;padding:4px 10px;margin-left:6px;';
+    btn.textContent = '\u{1F50D} Gather Context';
+    btn.onclick = () => openContextGathering(null, null);
+    analyzeBtn.parentElement.appendChild(btn);
+  }
+})();
+
+// ════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ════════════════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); closeToneWizard(); closeDraftModal(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
+  if (e.key === 'Escape') { closePromptOptimizer(); closeSpawnModal(); closePatchPanel(); dismissPatchOffer(); closeToneWizard(); closeDraftModal(); closeContextGathering(); document.getElementById('context-menu').classList.remove('open'); document.getElementById('project-actions').classList.remove('visible'); document.getElementById('agent-detail').classList.remove('visible'); }
   if (e.ctrlKey && e.key === 'o') { e.preventDefault(); menuOpen(); }
   if (e.ctrlKey && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
   if (e.ctrlKey && e.key === '0') { e.preventDefault(); circuitResetView(); }
