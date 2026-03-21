@@ -1054,6 +1054,155 @@
   }
   .patch-offer-dismiss:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 
+  /* ═══ QOPC PATCH LEARNING ══════════════════════════ */
+  .patch-panel-tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-2);
+  }
+  .patch-tab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.5px;
+    padding: 8px 16px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .patch-tab:hover { color: var(--text-secondary); }
+  .patch-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .qopc-confidence {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 2px 6px; border-radius: 2px;
+    margin-left: 8px;
+  }
+  .qopc-confidence.high { background: var(--green-dim); color: var(--green); }
+  .qopc-confidence.medium { background: var(--amber-dim); color: var(--amber); }
+  .qopc-confidence.low { background: var(--red-dim); color: var(--red); }
+
+  .qopc-reasoning {
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    padding: 10px 12px; margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-muted);
+    line-height: 1.6;
+    display: none;
+  }
+  .qopc-reasoning.visible { display: block; }
+  .qopc-reasoning-title { color: var(--accent); font-size: 8px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .qopc-reasoning-item { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .qopc-reasoning-check { color: var(--green); font-size: 10px; }
+
+  .patch-outcome {
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 0.2s;
+  }
+  .patch-outcome:hover { border-color: var(--accent); }
+  .patch-outcome-header { display: flex; align-items: center; gap: 8px; }
+  .patch-outcome-icon { font-size: 14px; width: 20px; text-align: center; }
+  .patch-outcome-icon.applied { color: var(--green); }
+  .patch-outcome-icon.pending { color: var(--amber); }
+  .patch-outcome-icon.dismissed { color: var(--red); }
+  .patch-outcome-icon.modified { color: var(--accent); }
+  .patch-outcome-title {
+    flex: 1; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-primary);
+  }
+  .patch-outcome-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+  }
+  .patch-outcome-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-secondary);
+  }
+  .patch-outcome-actions { display: flex; gap: 4px; margin-top: 4px; }
+  .patch-outcome-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; padding: 3px 8px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .patch-outcome-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .patch-outcome-btn.good:hover { border-color: var(--green); color: var(--green); }
+  .patch-outcome-btn.bad:hover { border-color: var(--red); color: var(--red); }
+
+  .qopc-feedback-bar {
+    background: var(--bg-2);
+    border: 1px solid var(--accent);
+    padding: 10px 14px;
+    display: none;
+    align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+  .qopc-feedback-bar.visible { display: flex; }
+  .qopc-feedback-text { flex: 1; color: var(--text-secondary); }
+  .qopc-feedback-btns { display: flex; gap: 4px; }
+  .qopc-feedback-btn {
+    background: var(--bg-3); border: 1px solid var(--border-2);
+    color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; padding: 4px 10px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .qopc-feedback-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .qopc-feedback-btn.positive:hover { border-color: var(--green); color: var(--green); }
+  .qopc-feedback-btn.negative:hover { border-color: var(--red); color: var(--red); }
+
+  .qopc-stats-bar {
+    display: flex; gap: 12px; padding: 8px 16px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .qopc-stat { display: flex; align-items: center; gap: 4px; }
+  .qopc-stat-value { color: var(--accent); }
+  .qopc-stat-bar {
+    width: 40px; height: 4px; background: var(--bg-3);
+    border-radius: 2px; overflow: hidden;
+  }
+  .qopc-stat-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+
+  .ab-variant-container {
+    background: var(--bg-3);
+    border: 1px solid var(--accent);
+    padding: 14px; margin-top: 8px;
+    display: none;
+  }
+  .ab-variant-container.visible { display: block; }
+  .ab-variant-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .ab-variant-options { display: flex; gap: 8px; }
+  .ab-variant-opt {
+    flex: 1; background: var(--bg);
+    border: 1px solid var(--border-2);
+    padding: 10px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ab-variant-opt:hover { border-color: var(--accent); }
+  .ab-variant-opt.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .ab-variant-opt-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-primary); margin-bottom: 6px;
+  }
+  .ab-variant-opt-preview {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: var(--text-muted);
+    max-height: 80px; overflow: hidden;
+    line-height: 1.5;
+  }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -1064,7 +1213,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9.7</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.8</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1235,13 +1384,24 @@
       <!-- Patch Prompt Generator Panel -->
       <div class="patch-panel" id="patch-panel">
         <div class="patch-panel-header">
-          <span class="patch-panel-title">INTELLIGENT PATCH PROMPT GENERATOR</span>
+          <span class="patch-panel-title">QOPC-ADAPTIVE PATCH PROMPT GENERATOR</span>
           <button class="patch-panel-close" onclick="closePatchPanel()">&#10005;</button>
+        </div>
+        <div class="patch-panel-tabs">
+          <button class="patch-tab active" id="ptab-issues" onclick="switchPatchTab('issues')">ISSUES</button>
+          <button class="patch-tab" id="ptab-history" onclick="switchPatchTab('history')">RECENT PATCHES</button>
+          <button class="patch-tab" id="ptab-profile" onclick="switchPatchTab('profile')">QOPC PROFILE</button>
         </div>
         <div class="patch-analysis-bar">
           <button class="patch-analysis-btn" id="patch-analyze-btn" onclick="runPatchAnalysis()">Analyze Project</button>
           <button class="patch-analysis-btn" style="background:var(--bg-3);color:var(--text-secondary);border:1px solid var(--border-2);" onclick="reanalyzePatchProject()">Re-Analyze</button>
           <span class="patch-analysis-status" id="patch-status">Ready to analyze</span>
+        </div>
+        <div class="qopc-stats-bar" id="qopc-stats-bar">
+          <div class="qopc-stat">Patches: <span class="qopc-stat-value" id="qopc-total">0</span></div>
+          <div class="qopc-stat">Applied: <span class="qopc-stat-value" id="qopc-applied">0</span></div>
+          <div class="qopc-stat">Top: <span class="qopc-stat-value" id="qopc-top-cat">—</span></div>
+          <div class="qopc-stat">Accuracy: <span class="qopc-stat-value" id="qopc-accuracy">—</span></div>
         </div>
         <div class="patch-filter-bar" id="patch-filters">
           <button class="patch-filter-chip active" onclick="filterPatches('all',this)">ALL</button>
@@ -1253,9 +1413,13 @@
         <div class="patch-panel-body" id="patch-issues-list">
           <div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">
             Click <span style="color:var(--accent);">Analyze Project</span> to scan your codebase<br>
-            <span style="font-size:9px;margin-top:6px;display:block;">AETHER will identify issues and generate structured Claude Code prompts</span>
+            <span style="font-size:9px;margin-top:6px;display:block;">QOPC learns your preferences — patches ranked by YOUR priorities</span>
           </div>
         </div>
+        <!-- Recent Patches (hidden by default) -->
+        <div class="patch-panel-body" id="patch-history-list" style="display:none;"></div>
+        <!-- QOPC Profile (hidden by default) -->
+        <div class="patch-panel-body" id="patch-profile-view" style="display:none;"></div>
       </div>
     </div>
     <!-- Patch Offer Bar (contextual prompt suggestion) -->
@@ -1264,6 +1428,16 @@
       <button class="patch-offer-btn" id="patch-offer-gen" onclick="acceptPatchOffer()">Generate Prompt</button>
       <button class="patch-offer-btn" style="background:none;border-color:var(--border-2);color:var(--text-secondary);" onclick="askPatchQuestions()">Ask Questions</button>
       <button class="patch-offer-dismiss" onclick="dismissPatchOffer()">Dismiss</button>
+    </div>
+    <!-- QOPC Outcome Feedback Bar -->
+    <div class="qopc-feedback-bar" id="qopc-feedback-bar">
+      <span class="qopc-feedback-text" id="qopc-feedback-text">How did the patch work out?</span>
+      <div class="qopc-feedback-btns">
+        <button class="qopc-feedback-btn positive" onclick="qopcFeedback('applied')">&#10003; Applied as-is</button>
+        <button class="qopc-feedback-btn" onclick="qopcFeedback('modified')">~ Modified</button>
+        <button class="qopc-feedback-btn negative" onclick="qopcFeedback('rejected')">&#10007; Didn't use</button>
+        <button class="qopc-feedback-btn" onclick="qopcFeedback('pending')">? Not yet</button>
+      </div>
     </div>
     <!-- AI Response Panel -->
     <div id="ai-response-panel">
@@ -3288,20 +3462,56 @@ function viewAgentLogs(agentId) {
 }
 
 // ════════════════════════════════════════════════════
-// INTELLIGENT PATCH PROMPT GENERATOR
+// QOPC-ADAPTIVE PATCH PROMPT GENERATOR
 // ════════════════════════════════════════════════════
 let patchIssues = [];
 let patchFilter = 'all';
 let currentPatchOffer = null;
+let currentPatchTab = 'issues';
+let pendingFeedbackPatch = null;
+let patchCounter = parseInt(localStorage.getItem('aether_patch_counter') || '0');
 
+// ── QOPC Model (persisted in localStorage) ──────────
+const QOPC_DEFAULTS = {
+  issueTypePreference: { security:0.5, performance:0.5, architecture:0.5, quality:0.5, testing:0.5, documentation:0.5, dependency:0.5 },
+  severityResponse: { critical:0.9, high:0.7, medium:0.5, low:0.3 },
+  promptStyle: { length:'medium', depth:'technical', examples:true, acceptanceCriteria:true, files:true },
+  codePhilosophy: { testCoverage:0.5, documentation:0.5, refactoring:0.5, performance:0.5, security:0.5, simplicity:0.5 },
+  totalPatches: 0,
+  appliedCount: 0,
+  modifiedCount: 0,
+  rejectedCount: 0,
+  dismissedCount: 0,
+  commonModifications: [],
+};
+let qopcModel = JSON.parse(localStorage.getItem('aether_qopc_model') || 'null') || JSON.parse(JSON.stringify(QOPC_DEFAULTS));
+let patchLifecycles = JSON.parse(localStorage.getItem('aether_patch_lifecycles') || '[]');
+
+function saveQOPC() { localStorage.setItem('aether_qopc_model', JSON.stringify(qopcModel)); }
+function savePatchLifecycles() { localStorage.setItem('aether_patch_lifecycles', JSON.stringify(patchLifecycles)); }
+
+// ── Patch Panel UI ──────────────────────────────────
 function openPatchPanel() {
   document.getElementById('project-actions').classList.remove('visible');
   document.getElementById('patch-panel').classList.add('visible');
+  updateQOPCStatsBar();
   if (patchIssues.length) renderPatchIssues();
 }
 
 function closePatchPanel() {
   document.getElementById('patch-panel').classList.remove('visible');
+}
+
+function switchPatchTab(tab) {
+  currentPatchTab = tab;
+  document.querySelectorAll('.patch-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('ptab-' + tab).classList.add('active');
+  document.getElementById('patch-issues-list').style.display = tab === 'issues' ? '' : 'none';
+  document.getElementById('patch-history-list').style.display = tab === 'history' ? '' : 'none';
+  document.getElementById('patch-profile-view').style.display = tab === 'profile' ? '' : 'none';
+  document.getElementById('patch-filters').style.display = tab === 'issues' ? '' : 'none';
+  if (tab === 'history') renderPatchHistory();
+  if (tab === 'profile') renderQOPCProfile();
 }
 
 function filterPatches(filter, btn) {
@@ -3311,6 +3521,295 @@ function filterPatches(filter, btn) {
   renderPatchIssues();
 }
 
+function updateQOPCStatsBar() {
+  document.getElementById('qopc-total').textContent = qopcModel.totalPatches;
+  document.getElementById('qopc-applied').textContent = qopcModel.appliedCount;
+  // Find top category
+  const cats = qopcModel.issueTypePreference;
+  const topCat = Object.entries(cats).sort((a,b) => b[1] - a[1])[0];
+  document.getElementById('qopc-top-cat').textContent = topCat ? topCat[0] : '—';
+  const total = qopcModel.appliedCount + qopcModel.modifiedCount + qopcModel.rejectedCount;
+  const accuracy = total > 0 ? Math.round(((qopcModel.appliedCount + qopcModel.modifiedCount) / total) * 100) : '—';
+  document.getElementById('qopc-accuracy').textContent = typeof accuracy === 'number' ? accuracy + '%' : accuracy;
+}
+
+// ── QOPC Confidence & Ranking ───────────────────────
+function qopcConfidence(issue) {
+  const catPref = qopcModel.issueTypePreference[issue.category] || 0.5;
+  const sevPref = qopcModel.severityResponse[issue.severity] || 0.5;
+  // Blend category preference (60%) + severity response (40%)
+  const raw = catPref * 0.6 + sevPref * 0.4;
+  // Add noise to prevent ossification (±3%)
+  const noise = (Math.random() - 0.5) * 0.06;
+  return Math.max(0.05, Math.min(0.99, raw + noise));
+}
+
+function qopcConfidenceLabel(conf) {
+  if (conf >= 0.75) return 'high';
+  if (conf >= 0.45) return 'medium';
+  return 'low';
+}
+
+function qopcRankIssues(issues) {
+  return issues.map(i => ({ ...i, qopcScore: qopcConfidence(i) }))
+    .sort((a, b) => b.qopcScore - a.qopcScore);
+}
+
+function qopcReasoningHTML(issue, conf) {
+  const catPref = qopcModel.issueTypePreference[issue.category] || 0.5;
+  const sevPref = qopcModel.severityResponse[issue.severity] || 0.5;
+  const catPct = Math.round(catPref * 100);
+  const sevPct = Math.round(sevPref * 100);
+  const confPct = Math.round(conf * 100);
+  const similar = patchLifecycles.filter(p => p.category === issue.category && p.outcome === 'applied').length;
+  return `<div class="qopc-reasoning" id="qopc-reason-${issue.id}">
+    <div class="qopc-reasoning-title">WHY RECOMMENDED</div>
+    <div class="qopc-reasoning-item"><span class="qopc-reasoning-check">\u2713</span> You accept ${issue.category} patches ${catPct}% of the time</div>
+    <div class="qopc-reasoning-item"><span class="qopc-reasoning-check">\u2713</span> ${issue.severity.toUpperCase()} severity: ${sevPct}% action rate</div>
+    ${similar > 0 ? `<div class="qopc-reasoning-item"><span class="qopc-reasoning-check">\u2713</span> You've applied ${similar} similar patches before</div>` : ''}
+    <div class="qopc-reasoning-item" style="margin-top:6px;color:var(--accent);">AETHER confidence: ${confPct}%</div>
+  </div>`;
+}
+
+// ── Patch Lifecycle Tracking ────────────────────────
+function trackPatchAction(issue, action, prompt) {
+  patchCounter++;
+  localStorage.setItem('aether_patch_counter', patchCounter);
+  const lifecycle = {
+    id: 'patch_' + Date.now(),
+    issueTitle: issue.title,
+    severity: issue.severity,
+    category: issue.category,
+    effort: issue.effort,
+    generatedTime: Date.now(),
+    promptLength: (prompt || '').length,
+    userAction: action, // copy | send | edit | dismiss | ask
+    actionTime: Date.now(),
+    outcome: 'pending', // pending | applied | modified | rejected
+    outcomeTime: null,
+    feedback: null, // good | needs_improvement | wrong_style
+    qopcScore: qopcConfidence(issue),
+  };
+  patchLifecycles.push(lifecycle);
+  // Keep last 100
+  if (patchLifecycles.length > 100) patchLifecycles = patchLifecycles.slice(-100);
+  savePatchLifecycles();
+  qopcModel.totalPatches++;
+  saveQOPC();
+  updateQOPCStatsBar();
+  // Show feedback bar after a delay for copy/send actions
+  if (action === 'copy' || action === 'send') {
+    pendingFeedbackPatch = lifecycle;
+    setTimeout(() => showQOPCFeedbackBar(lifecycle), 30000); // 30s delay
+  }
+  return lifecycle;
+}
+
+// ── QOPC Feedback System ────────────────────────────
+function showQOPCFeedbackBar(lifecycle) {
+  if (!lifecycle || !pendingFeedbackPatch || pendingFeedbackPatch.id !== lifecycle.id) return;
+  document.getElementById('qopc-feedback-text').textContent =
+    `Did you apply the "${lifecycle.issueTitle}" patch?`;
+  document.getElementById('qopc-feedback-bar').classList.add('visible');
+}
+
+function qopcFeedback(outcome) {
+  document.getElementById('qopc-feedback-bar').classList.remove('visible');
+  if (!pendingFeedbackPatch) return;
+  const lc = patchLifecycles.find(p => p.id === pendingFeedbackPatch.id);
+  if (lc) {
+    lc.outcome = outcome;
+    lc.outcomeTime = Date.now();
+    savePatchLifecycles();
+  }
+  // Update QOPC model
+  qopcLearnFromOutcome(pendingFeedbackPatch, outcome);
+  pendingFeedbackPatch = null;
+  updateQOPCStatsBar();
+  if (outcome === 'applied') showToast('QOPC learned: patch applied successfully', 'success');
+  else if (outcome === 'modified') showToast('QOPC learned: you modified the patch', 'info');
+  else if (outcome === 'rejected') showToast('QOPC learned: patch not used', 'info');
+}
+
+function qopcLearnFromOutcome(lifecycle, outcome) {
+  const cat = lifecycle.category;
+  const sev = lifecycle.severity;
+  const step = 0.05; // Learning rate
+  const decay = 0.02;
+
+  if (outcome === 'applied') {
+    qopcModel.appliedCount++;
+    // Reinforce category + severity
+    if (qopcModel.issueTypePreference[cat] !== undefined) qopcModel.issueTypePreference[cat] = Math.min(0.99, qopcModel.issueTypePreference[cat] + step);
+    if (qopcModel.severityResponse[sev] !== undefined) qopcModel.severityResponse[sev] = Math.min(0.99, qopcModel.severityResponse[sev] + step * 0.6);
+    // Reinforce code philosophy
+    if (cat === 'security') qopcModel.codePhilosophy.security = Math.min(0.99, qopcModel.codePhilosophy.security + step);
+    if (cat === 'testing') qopcModel.codePhilosophy.testCoverage = Math.min(0.99, qopcModel.codePhilosophy.testCoverage + step);
+    if (cat === 'performance') qopcModel.codePhilosophy.performance = Math.min(0.99, qopcModel.codePhilosophy.performance + step);
+    if (cat === 'documentation') qopcModel.codePhilosophy.documentation = Math.min(0.99, qopcModel.codePhilosophy.documentation + step);
+    if (cat === 'architecture') qopcModel.codePhilosophy.refactoring = Math.min(0.99, qopcModel.codePhilosophy.refactoring + step);
+    // Learn prompt length preference
+    if (lifecycle.promptLength > 1200) qopcModel.promptStyle.length = 'long';
+    else if (lifecycle.promptLength < 500) qopcModel.promptStyle.length = 'short';
+    else qopcModel.promptStyle.length = 'medium';
+  } else if (outcome === 'modified') {
+    qopcModel.modifiedCount++;
+    // Slight positive (user still used it)
+    if (qopcModel.issueTypePreference[cat] !== undefined) qopcModel.issueTypePreference[cat] = Math.min(0.99, qopcModel.issueTypePreference[cat] + step * 0.3);
+  } else if (outcome === 'rejected') {
+    qopcModel.rejectedCount++;
+    // Decrease preference
+    if (qopcModel.issueTypePreference[cat] !== undefined) qopcModel.issueTypePreference[cat] = Math.max(0.05, qopcModel.issueTypePreference[cat] - step * 1.5);
+    if (qopcModel.severityResponse[sev] !== undefined) qopcModel.severityResponse[sev] = Math.max(0.05, qopcModel.severityResponse[sev] - decay);
+    // Decrease philosophy
+    if (cat === 'documentation') qopcModel.codePhilosophy.documentation = Math.max(0.05, qopcModel.codePhilosophy.documentation - step);
+  }
+  // Dismiss counts separately
+  if (outcome === 'dismissed') qopcModel.dismissedCount++;
+  saveQOPC();
+}
+
+function recordPatchFeedbackDetailed(lifecycleId, feedback) {
+  const lc = patchLifecycles.find(p => p.id === lifecycleId);
+  if (!lc) return;
+  lc.feedback = feedback; // 'good' | 'needs_improvement' | 'wrong_style'
+  savePatchLifecycles();
+  if (feedback === 'good') {
+    showToast('QOPC: positive signal recorded', 'success');
+  } else if (feedback === 'needs_improvement') {
+    // Nudge prompt style
+    qopcModel.promptStyle.depth = 'technical_but_concise';
+    saveQOPC();
+    showToast('QOPC: will adjust prompt detail level', 'info');
+  } else if (feedback === 'wrong_style') {
+    const cat = lc.category;
+    if (qopcModel.issueTypePreference[cat] !== undefined) qopcModel.issueTypePreference[cat] = Math.max(0.05, qopcModel.issueTypePreference[cat] - 0.1);
+    saveQOPC();
+    showToast('QOPC: will deprioritize this issue type', 'info');
+  }
+  updateQOPCStatsBar();
+}
+
+// ── Patch History Tab ───────────────────────────────
+function renderPatchHistory() {
+  const list = document.getElementById('patch-history-list');
+  if (!patchLifecycles.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">No patch history yet<br><span style="font-size:9px;margin-top:4px;display:block;">Generate and use patches to build your QOPC profile</span></div>';
+    return;
+  }
+  const sorted = [...patchLifecycles].reverse();
+  list.innerHTML = sorted.map(lc => {
+    const outcomeIcons = { applied: '\u2713', modified: '~', rejected: '\u2717', pending: '\u23F3', dismissed: '\u2212' };
+    const outcomeClasses = { applied: 'applied', modified: 'modified', rejected: 'dismissed', pending: 'pending', dismissed: 'dismissed' };
+    const icon = outcomeIcons[lc.outcome] || '\u2022';
+    const cls = outcomeClasses[lc.outcome] || 'pending';
+    const ago = fmtTime(lc.actionTime);
+    const feedbackHTML = lc.outcome === 'applied' && !lc.feedback ? `
+      <div class="patch-outcome-actions">
+        <button class="patch-outcome-btn good" onclick="recordPatchFeedbackDetailed('${lc.id}','good')">Good, it worked</button>
+        <button class="patch-outcome-btn" onclick="recordPatchFeedbackDetailed('${lc.id}','needs_improvement')">Needs improvement</button>
+        <button class="patch-outcome-btn bad" onclick="recordPatchFeedbackDetailed('${lc.id}','wrong_style')">Didn't fit my style</button>
+      </div>` : lc.feedback ? `<div style="font-size:8px;color:var(--text-muted);margin-top:4px;">Feedback: ${lc.feedback}</div>` : '';
+    const pendingActions = lc.outcome === 'pending' ? `
+      <div class="patch-outcome-actions">
+        <button class="patch-outcome-btn good" onclick="updatePatchOutcome('${lc.id}','applied')">Applied</button>
+        <button class="patch-outcome-btn" onclick="updatePatchOutcome('${lc.id}','modified')">Modified</button>
+        <button class="patch-outcome-btn bad" onclick="updatePatchOutcome('${lc.id}','rejected')">Didn't use</button>
+      </div>` : '';
+    return `<div class="patch-outcome">
+      <div class="patch-outcome-header">
+        <span class="patch-outcome-icon ${cls}">${icon}</span>
+        <span class="patch-outcome-title">${escH(lc.issueTitle)}</span>
+        <span class="patch-outcome-time">${ago} ago</span>
+      </div>
+      <div class="patch-outcome-status">Action: ${lc.userAction} | Outcome: ${lc.outcome} | Category: ${lc.category} | QOPC: ${Math.round(lc.qopcScore * 100)}%</div>
+      ${pendingActions}
+      ${feedbackHTML}
+    </div>`;
+  }).join('');
+}
+
+function updatePatchOutcome(lifecycleId, outcome) {
+  const lc = patchLifecycles.find(p => p.id === lifecycleId);
+  if (!lc) return;
+  lc.outcome = outcome;
+  lc.outcomeTime = Date.now();
+  savePatchLifecycles();
+  qopcLearnFromOutcome(lc, outcome);
+  renderPatchHistory();
+  updateQOPCStatsBar();
+  showToast(`Patch marked as ${outcome}`, 'info');
+}
+
+// ── QOPC Profile Tab ────────────────────────────────
+function renderQOPCProfile() {
+  const view = document.getElementById('patch-profile-view');
+  const m = qopcModel;
+  const mkBar = (val) => `<div class="qopc-stat-bar"><div class="qopc-stat-fill" style="width:${Math.round(val*100)}%"></div></div>`;
+
+  view.innerHTML = `
+    <div style="font-family:JetBrains Mono,monospace;">
+      <div style="font-size:11px;color:var(--accent);margin-bottom:12px;font-weight:600;">YOUR CODE PHILOSOPHY</div>
+
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">ISSUE TYPE PREFERENCE</div>
+      ${Object.entries(m.issueTypePreference).map(([k,v]) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:9px;">
+          <span style="width:90px;color:var(--text-secondary);">${k}</span>
+          ${mkBar(v)}
+          <span style="color:var(--text-muted);width:30px;text-align:right;">${Math.round(v*100)}%</span>
+        </div>`).join('')}
+
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 6px;">SEVERITY RESPONSE</div>
+      ${Object.entries(m.severityResponse).map(([k,v]) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:9px;">
+          <span style="width:90px;color:var(--text-secondary);">${k}</span>
+          ${mkBar(v)}
+          <span style="color:var(--text-muted);width:30px;text-align:right;">${Math.round(v*100)}%</span>
+        </div>`).join('')}
+
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 6px;">CODE PHILOSOPHY</div>
+      ${Object.entries(m.codePhilosophy).map(([k,v]) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:9px;">
+          <span style="width:90px;color:var(--text-secondary);">${k.replace(/([A-Z])/g,' $1').trim()}</span>
+          ${mkBar(v)}
+          <span style="color:var(--text-muted);width:30px;text-align:right;">${Math.round(v*100)}%</span>
+        </div>`).join('')}
+
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 6px;">PROMPT STYLE</div>
+      <div style="display:flex;gap:16px;font-size:9px;color:var(--text-secondary);">
+        <span>Length: <span style="color:var(--accent);">${m.promptStyle.length}</span></span>
+        <span>Depth: <span style="color:var(--accent);">${m.promptStyle.depth}</span></span>
+        <span>Examples: <span style="color:var(--accent);">${m.promptStyle.examples ? 'yes' : 'no'}</span></span>
+      </div>
+
+      <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 6px;">STATISTICS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:9px;color:var(--text-secondary);">
+        <span>Total patches: <span style="color:var(--accent);">${m.totalPatches}</span></span>
+        <span>Applied: <span style="color:var(--green);">${m.appliedCount}</span></span>
+        <span>Modified: <span style="color:var(--accent);">${m.modifiedCount}</span></span>
+        <span>Rejected: <span style="color:var(--red);">${m.rejectedCount}</span></span>
+        <span>Dismissed: <span style="color:var(--text-muted);">${m.dismissedCount}</span></span>
+      </div>
+
+      <div style="margin-top:16px;">
+        <button class="patch-issue-btn" onclick="resetQOPCProfile()" style="font-size:8px;">Reset QOPC Profile</button>
+      </div>
+    </div>`;
+}
+
+function resetQOPCProfile() {
+  qopcModel = JSON.parse(JSON.stringify(QOPC_DEFAULTS));
+  saveQOPC();
+  patchLifecycles = [];
+  savePatchLifecycles();
+  patchCounter = 0;
+  localStorage.setItem('aether_patch_counter', '0');
+  renderQOPCProfile();
+  updateQOPCStatsBar();
+  showToast('QOPC profile reset', 'info');
+}
+
+// ── Analysis & Issue Detection ──────────────────────
 async function runPatchAnalysis() {
   const btn = document.getElementById('patch-analyze-btn');
   const status = document.getElementById('patch-status');
@@ -3318,7 +3817,6 @@ async function runPatchAnalysis() {
   status.textContent = 'Scanning codebase...';
   setAgentStatus('Analyzing project...', 'working');
 
-  // Build file context from vault
   const vaultNodes = savedVaultState ? savedVaultState.nodes : CS.nodes;
   const dirs = vaultNodes.filter(n => n.dir && !n.isRoot);
   const files = vaultNodes.filter(n => !n.dir);
@@ -3330,8 +3828,12 @@ async function runPatchAnalysis() {
 
   const dirList = dirs.map(d => `${d.name}/ (${d.children || 0} items)`).join('\n');
 
+  // Build QOPC context for adaptive analysis
+  const topCats = Object.entries(qopcModel.issueTypePreference).sort((a,b) => b[1] - a[1]).slice(0,3).map(e => e[0]).join(', ');
+  const qopcContext = qopcModel.totalPatches > 3 ? `\nUser priorities (learned): ${topCats}. Focus more on these categories.` : '';
+
   const contextStr = currentVaultPath ? `Project: ${currentVaultPath}\n` : '';
-  const query = `You are a senior software architect performing a codebase audit. Analyze the following project structure and identify issues, improvements, and optimizations.
+  const query = `You are a senior software architect performing a codebase audit. Analyze the following project structure and identify issues, improvements, and optimizations.${qopcContext}
 
 ${contextStr}DIRECTORIES (${dirs.length}):
 ${dirList || '(none loaded)'}
@@ -3363,11 +3865,8 @@ Find 4-8 issues. Focus on: missing security measures, architectural problems, pe
     } else {
       const raw = result.response || result.reply || result.message || '';
       patchIssues = parsePatchIssues(raw);
-      if (!patchIssues.length) {
-        // Fallback: generate demo issues from structure analysis
-        patchIssues = generateStructureIssues(dirs, files);
-      }
-      status.textContent = `Found ${patchIssues.length} issues`;
+      if (!patchIssues.length) patchIssues = generateStructureIssues(dirs, files);
+      status.textContent = `Found ${patchIssues.length} issues (QOPC-ranked)`;
       renderPatchIssues();
       setAgentStatus('Analysis complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
@@ -3375,7 +3874,6 @@ Find 4-8 issues. Focus on: missing security measures, architectural problems, pe
     }
   } catch (e) {
     status.textContent = 'Connection error: ' + e.message;
-    // Fallback to structure-based analysis
     patchIssues = generateStructureIssues(dirs, files);
     if (patchIssues.length) {
       status.textContent = `Offline analysis: ${patchIssues.length} issues`;
@@ -3388,7 +3886,7 @@ Find 4-8 issues. Focus on: missing security measures, architectural problems, pe
 
 function reanalyzePatchProject() {
   patchIssues = [];
-  document.getElementById('patch-issues-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">Re-analyzing...</div>';
+  document.getElementById('patch-issues-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:40px 20px;font-family:JetBrains Mono,monospace;">Re-analyzing with QOPC profile...</div>';
   runPatchAnalysis();
 }
 
@@ -3412,52 +3910,37 @@ function generateStructureIssues(dirs, files) {
   const dirNames = dirs.map(d => d.name.toLowerCase());
   const fileNames = files.map(f => f.name.toLowerCase());
 
-  // Check for missing .env protection
   if (fileNames.some(f => f === '.env' || f.endsWith('.env'))) {
-    const hasGitignore = fileNames.includes('.gitignore');
-    if (!hasGitignore) {
-      issues.push({ id: id+1, title: 'Environment files exposed — no .gitignore detected', severity: 'critical', category: 'security', effort: 'quick', files: '.env, .gitignore', description: 'Environment files containing secrets are present but no .gitignore was found to prevent them from being committed to version control.', fix: 'Create a .gitignore file that excludes .env, node_modules, __pycache__, and other sensitive/generated files.', promptGenerated: false, prompt: '' });
+    if (!fileNames.includes('.gitignore')) {
+      issues.push({ id: id+1, title: 'Environment files exposed — no .gitignore detected', severity: 'critical', category: 'security', effort: 'quick', files: '.env, .gitignore', description: 'Environment files containing secrets are present but no .gitignore was found.', fix: 'Create a .gitignore file that excludes .env, node_modules, __pycache__, and sensitive files.', promptGenerated: false, prompt: '' });
     }
   }
-
-  // Check for missing tests
   if (!dirNames.some(d => /test|spec|__test|cypress/.test(d))) {
-    issues.push({ id: id+2, title: 'No test directory found', severity: 'high', category: 'testing', effort: 'significant', files: 'project root', description: 'The project has no dedicated test directory. Without automated tests, regressions can go undetected and code quality degrades over time.', fix: 'Create a tests/ directory with unit tests for critical modules. Set up a test runner (pytest, jest, etc.) and add CI configuration.', promptGenerated: false, prompt: '' });
+    issues.push({ id: id+2, title: 'No test directory found', severity: 'high', category: 'testing', effort: 'significant', files: 'project root', description: 'No dedicated test directory. Regressions can go undetected.', fix: 'Create tests/ with unit tests for critical modules. Set up a test runner.', promptGenerated: false, prompt: '' });
   }
-
-  // Check for missing docs
   if (!fileNames.includes('readme.md') && !fileNames.includes('readme')) {
-    issues.push({ id: id+3, title: 'Missing README documentation', severity: 'medium', category: 'documentation', effort: 'moderate', files: 'README.md', description: 'No README.md found at the project root. This makes it difficult for new contributors to understand the project setup and architecture.', fix: 'Create a comprehensive README.md with project description, setup instructions, architecture overview, and contribution guidelines.', promptGenerated: false, prompt: '' });
+    issues.push({ id: id+3, title: 'Missing README documentation', severity: 'medium', category: 'documentation', effort: 'moderate', files: 'README.md', description: 'No README.md found. New contributors can\'t understand the project.', fix: 'Create README.md with description, setup, architecture, and contribution guidelines.', promptGenerated: false, prompt: '' });
   }
-
-  // Check for large number of root files (poor organization)
   const rootFiles = files.filter(f => !f.path || (f.path.split(/[/\\]/).length <= 2));
   if (rootFiles.length > 15) {
-    issues.push({ id: id+4, title: 'Too many files at project root (' + rootFiles.length + ')', severity: 'medium', category: 'architecture', effort: 'moderate', files: 'project root', description: `${rootFiles.length} files sit at the project root. This makes navigation difficult and suggests the project needs better modular organization.`, fix: 'Group related files into subdirectories (src/, config/, scripts/, docs/). Move implementation files into logical modules.', promptGenerated: false, prompt: '' });
+    issues.push({ id: id+4, title: 'Too many files at project root (' + rootFiles.length + ')', severity: 'medium', category: 'architecture', effort: 'moderate', files: 'project root', description: `${rootFiles.length} files at root suggests poor modular organization.`, fix: 'Group into subdirectories (src/, config/, scripts/, docs/).', promptGenerated: false, prompt: '' });
   }
-
-  // Check for missing dependency lock file
   const hasPackageJson = fileNames.includes('package.json');
   const hasLock = fileNames.some(f => f === 'package-lock.json' || f === 'yarn.lock' || f === 'pnpm-lock.yaml');
   if (hasPackageJson && !hasLock) {
-    issues.push({ id: id+5, title: 'Missing dependency lock file', severity: 'high', category: 'dependency', effort: 'quick', files: 'package.json', description: 'package.json exists but no lock file (package-lock.json, yarn.lock) was found. This means builds are not reproducible and dependency versions may drift.', fix: 'Run npm install or yarn install to generate a lock file. Commit it to version control.', promptGenerated: false, prompt: '' });
+    issues.push({ id: id+5, title: 'Missing dependency lock file', severity: 'high', category: 'dependency', effort: 'quick', files: 'package.json', description: 'No lock file found. Builds are not reproducible.', fix: 'Run npm install to generate package-lock.json. Commit it.', promptGenerated: false, prompt: '' });
   }
-
-  // Check Python projects for requirements.txt
   const hasPyFiles = fileNames.some(f => f.endsWith('.py'));
-  const hasReqs = fileNames.includes('requirements.txt') || fileNames.includes('pyproject.toml');
-  if (hasPyFiles && !hasReqs) {
-    issues.push({ id: id+6, title: 'Python project missing dependency manifest', severity: 'high', category: 'dependency', effort: 'quick', files: 'requirements.txt or pyproject.toml', description: 'Python files exist but no requirements.txt or pyproject.toml was found. Dependencies are not tracked, making environment setup unreliable.', fix: 'Create a requirements.txt with pinned versions (pip freeze > requirements.txt) or set up pyproject.toml with dependencies.', promptGenerated: false, prompt: '' });
+  if (hasPyFiles && !fileNames.includes('requirements.txt') && !fileNames.includes('pyproject.toml')) {
+    issues.push({ id: id+6, title: 'Python project missing dependency manifest', severity: 'high', category: 'dependency', effort: 'quick', files: 'requirements.txt or pyproject.toml', description: 'Python files exist but no dependency manifest found.', fix: 'Create requirements.txt with pinned versions.', promptGenerated: false, prompt: '' });
   }
-
-  // Generic code quality
   if (files.length > 30) {
-    issues.push({ id: id+7, title: 'Consider adding linting configuration', severity: 'low', category: 'quality', effort: 'quick', files: '.eslintrc.json or setup.cfg', description: 'With ' + files.length + ' files, enforcing consistent code style through a linter would improve maintainability and catch common bugs early.', fix: 'Add ESLint/Prettier for JS/TS projects, or flake8/black for Python projects. Configure rules and add to CI pipeline.', promptGenerated: false, prompt: '' });
+    issues.push({ id: id+7, title: 'Consider adding linting configuration', severity: 'low', category: 'quality', effort: 'quick', files: '.eslintrc.json or setup.cfg', description: `${files.length} files without linting. Inconsistent code style likely.`, fix: 'Add ESLint/Prettier or flake8/black. Configure and add to CI.', promptGenerated: false, prompt: '' });
   }
-
   return issues;
 }
 
+// ── Render Issues (QOPC-ranked) ─────────────────────
 function renderPatchIssues() {
   const list = document.getElementById('patch-issues-list');
   const filtered = patchFilter === 'all' ? patchIssues : patchIssues.filter(i => i.severity === patchFilter);
@@ -3467,15 +3950,22 @@ function renderPatchIssues() {
     return;
   }
 
-  const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-  const sorted = [...filtered].sort((a, b) => (sevOrder[a.severity] || 4) - (sevOrder[b.severity] || 4));
+  // QOPC-rank issues (not arbitrary severity)
+  const ranked = qopcRankIssues(filtered);
 
-  list.innerHTML = sorted.map(issue => {
+  list.innerHTML = ranked.map(issue => {
     const catIcons = { security: '\u{1F512}', performance: '\u26A1', architecture: '\u{1F3D7}', quality: '\u2728', testing: '\u{1F9EA}', documentation: '\u{1F4DD}', dependency: '\u{1F4E6}' };
     const icon = catIcons[issue.category] || '\u{1F527}';
+    const conf = issue.qopcScore;
+    const confLabel = qopcConfidenceLabel(conf);
+    const confPct = Math.round(conf * 100);
+
+    // A/B variant display (every 10th patch)
+    const showAB = patchCounter > 0 && patchCounter % 10 === 0 && issue === ranked[0] && issue.promptGenerated;
+
     const promptHTML = issue.promptGenerated ? `
       <div class="patch-prompt-display visible" id="prompt-display-${issue.id}">
-        <div class="patch-prompt-label">GENERATED CLAUDE CODE PROMPT</div>
+        <div class="patch-prompt-label">GENERATED CLAUDE CODE PROMPT (QOPC-ADAPTED)</div>
         <div class="patch-prompt-text" id="prompt-text-${issue.id}">${escH(issue.prompt)}</div>
         <div class="patch-prompt-actions">
           <button class="patch-issue-btn primary" onclick="copyPatchPrompt(${issue.id})">Copy to Clipboard</button>
@@ -3488,13 +3978,16 @@ function renderPatchIssues() {
     return `<div class="patch-issue" id="patch-issue-${issue.id}">
       <div class="patch-issue-header">
         <span class="patch-issue-title">${icon} ${escH(issue.title)}</span>
+        <span class="qopc-confidence ${confLabel}" title="QOPC prediction: ${confPct}% likely you'll want this">${confPct}%</span>
         <span class="patch-issue-severity ${issue.severity}">${issue.severity.toUpperCase()}</span>
       </div>
       <div class="patch-issue-desc">${escH(issue.description)}</div>
       <div class="patch-issue-meta">
         <span>Category: ${issue.category}</span>
         <span>Effort: ${issue.effort}</span>
+        <span style="color:var(--accent);cursor:pointer;" onclick="toggleQOPCReasoning(${issue.id})">Why recommended?</span>
       </div>
+      ${qopcReasoningHTML(issue, conf)}
       ${issue.files ? `<div class="patch-issue-files">Files: ${escH(issue.files)}</div>` : ''}
       <div class="patch-issue-actions">
         <button class="patch-issue-btn primary" onclick="generatePatchPrompt(${issue.id})">${issue.promptGenerated ? 'Regenerate Prompt' : 'Generate Prompt'}</button>
@@ -3506,14 +3999,24 @@ function renderPatchIssues() {
   }).join('');
 }
 
+function toggleQOPCReasoning(issueId) {
+  const el = document.getElementById('qopc-reason-' + issueId);
+  if (el) el.classList.toggle('visible');
+}
+
+// ── Adaptive Prompt Generation ──────────────────────
 async function generatePatchPrompt(issueId) {
   const issue = patchIssues.find(i => i.id === issueId);
   if (!issue) return;
 
-  setAgentStatus('Generating prompt...', 'working');
+  setAgentStatus('Generating QOPC-adapted prompt...', 'working');
   document.getElementById('patch-status').textContent = 'Generating prompt for: ' + issue.title;
 
   const projectPath = currentVaultPath || 'the project';
+
+  // QOPC-adapted prompt instructions
+  const styleInstructions = buildStyleInstructions();
+
   const query = `Generate a detailed, copy-paste-ready Claude Code prompt to fix this issue. The prompt should be self-contained and include all context needed.
 
 ISSUE: ${issue.title}
@@ -3523,6 +4026,8 @@ DESCRIPTION: ${issue.description}
 AFFECTED FILES: ${issue.files}
 RECOMMENDED FIX: ${issue.fix}
 PROJECT PATH: ${projectPath}
+
+${styleInstructions}
 
 Generate the prompt in this format:
 ---PROMPT---
@@ -3539,26 +4044,41 @@ Generate the prompt in this format:
     } else {
       const raw = result.response || result.reply || result.message || '';
       const promptMatch = raw.match(/---PROMPT---([\s\S]*?)---END---/);
-      issue.prompt = promptMatch ? promptMatch[1].trim() : buildFallbackPrompt(issue);
+      issue.prompt = promptMatch ? promptMatch[1].trim() : buildAdaptivePrompt(issue);
       issue.promptGenerated = true;
       renderPatchIssues();
-      showToast('Prompt generated', 'success');
+      showToast('QOPC-adapted prompt generated', 'success');
     }
   } catch (e) {
-    // Fallback: generate prompt locally
-    issue.prompt = buildFallbackPrompt(issue);
+    issue.prompt = buildAdaptivePrompt(issue);
     issue.promptGenerated = true;
     renderPatchIssues();
-    showToast('Prompt generated (offline)', 'info');
+    showToast('Prompt generated (offline, QOPC-adapted)', 'info');
   }
 
   setAgentStatus('Ready', '');
   document.getElementById('patch-status').textContent = `${patchIssues.length} issues | Prompt ready`;
 }
 
-function buildFallbackPrompt(issue) {
+function buildStyleInstructions() {
+  const m = qopcModel;
+  const parts = [];
+  if (m.promptStyle.length === 'short') parts.push('Keep the prompt concise (under 400 words). No fluff.');
+  else if (m.promptStyle.length === 'long') parts.push('Be thorough and detailed (800+ words). Include extensive context.');
+  else parts.push('Medium length prompt (500-800 words). Technical but not verbose.');
+  if (m.promptStyle.depth === 'technical_but_concise') parts.push('Be direct and technical. Skip verbose explanations.');
+  if (m.codePhilosophy.testCoverage > 0.7) parts.push('Include a testing section. User values test coverage highly.');
+  if (m.codePhilosophy.documentation < 0.4) parts.push('Skip documentation sections. User doesn\'t prioritize docs.');
+  if (m.codePhilosophy.security > 0.7) parts.push('Emphasize security implications and secure coding practices.');
+  if (m.codePhilosophy.performance > 0.7) parts.push('Include performance considerations and benchmarking guidance.');
+  if (m.promptStyle.examples) parts.push('Include code examples where helpful.');
+  return parts.length ? 'STYLE PREFERENCES (learned from user):\n' + parts.join('\n') : '';
+}
+
+function buildAdaptivePrompt(issue) {
   const projectPath = currentVaultPath || '[project path]';
-  return `## Context
+  const m = qopcModel;
+  let prompt = `## Context
 In the project at ${projectPath}, there is a ${issue.severity}-severity ${issue.category} issue:
 ${issue.title}
 
@@ -3570,36 +4090,58 @@ ${issue.files || 'See project structure'}
 
 ## Task
 ${issue.fix}
+`;
+  // Add testing section if user values it
+  if (m.codePhilosophy.testCoverage > 0.6) {
+    prompt += `\n## Testing
+- Write tests for any new or changed functionality
+- Ensure existing tests still pass
+- Target test coverage for modified files\n`;
+  }
+  // Add security section if relevant
+  if (m.codePhilosophy.security > 0.6 || issue.category === 'security') {
+    prompt += `\n## Security
+- Validate all inputs
+- No secrets in source code
+- Follow least-privilege principle\n`;
+  }
+  // Skip docs if user doesn't care
+  if (m.codePhilosophy.documentation >= 0.5) {
+    prompt += `\n## Documentation
+- Update relevant documentation
+- Add inline comments for complex logic\n`;
+  }
 
-## Acceptance Criteria
+  prompt += `\n## Acceptance Criteria
 - The ${issue.category} issue described above is resolved
 - No existing functionality is broken
-- Changes follow the project's existing code style
-- Add comments explaining any non-obvious changes
-${issue.category === 'testing' ? '- All new tests pass\n- Test coverage is improved' : ''}
-${issue.category === 'security' ? '- No secrets are exposed in version control\n- Input validation is in place' : ''}
-${issue.category === 'documentation' ? '- Documentation is clear and complete\n- Examples are provided where helpful' : ''}`;
+- Changes follow the project's existing code style`;
+
+  if (m.codePhilosophy.testCoverage > 0.7) prompt += '\n- All tests pass with improved coverage';
+  if (m.codePhilosophy.simplicity > 0.6) prompt += '\n- Solution is clean and minimal — no over-engineering';
+
+  return prompt;
 }
 
+// ── Patch Actions (with QOPC tracking) ──────────────
 function copyPatchPrompt(issueId) {
   const issue = patchIssues.find(i => i.id === issueId);
   if (!issue || !issue.prompt) return;
+  trackPatchAction(issue, 'copy', issue.prompt);
   navigator.clipboard.writeText(issue.prompt).then(() => {
     showToast('Prompt copied to clipboard', 'success');
     displayAIResponse('Prompt copied! Paste it into Claude Code on your desktop to apply the fix.', false);
-  }).catch(() => {
-    showToast('Failed to copy', 'error');
-  });
+  }).catch(() => { showToast('Failed to copy', 'error'); });
 }
 
 function sendToClaudeCode(issueId) {
   const issue = patchIssues.find(i => i.id === issueId);
   if (!issue || !issue.prompt) return;
+  trackPatchAction(issue, 'send', issue.prompt);
   navigator.clipboard.writeText(issue.prompt).then(() => {
     showToast('Prompt copied — paste into Claude Code terminal', 'success');
     displayAIResponse(`[PATCH PROMPT READY]\nThe prompt for "${issue.title}" has been copied to your clipboard.\n\nTo apply:\n1. Open Claude Code in your terminal\n2. Paste the prompt (Ctrl+V)\n3. Review Claude's proposed changes\n4. Accept or iterate\n\nAfter applying, click "Re-Analyze" in the Patch Panel to verify the fix.`, false);
   }).catch(() => {
-    // Fallback: show prompt in response panel for manual copy
     displayAIResponse(`[COPY THIS PROMPT TO CLAUDE CODE]\n\n${issue.prompt}`, false);
     showToast('Clipboard unavailable — prompt shown in response panel', 'info');
   });
@@ -3608,10 +4150,11 @@ function sendToClaudeCode(issueId) {
 function editPatchPrompt(issueId) {
   const issue = patchIssues.find(i => i.id === issueId);
   if (!issue) return;
+  trackPatchAction(issue, 'edit', issue.prompt);
   closePatchPanel();
   document.getElementById('chat-input').value = `Refine this patch prompt for "${issue.title}":\n\n${issue.prompt.substring(0, 200)}...\n\nI want to change: `;
   document.getElementById('chat-input').focus();
-  displayAIResponse(`Editing prompt for: ${issue.title}\n\nDescribe what you'd like to change about the prompt. For example:\n- "Make it more specific about the error handling"\n- "Add instructions for writing tests"\n- "Focus on the API routes only"`, true);
+  displayAIResponse(`Editing prompt for: ${issue.title}\n\nDescribe what you'd like to change. QOPC will learn from your edits to improve future prompts.`, true);
 }
 
 function discardPatchPrompt(issueId) {
@@ -3624,21 +4167,27 @@ function discardPatchPrompt(issueId) {
 }
 
 function dismissIssue(issueId) {
+  const issue = patchIssues.find(i => i.id === issueId);
+  if (issue) {
+    trackPatchAction(issue, 'dismiss', '');
+    qopcLearnFromOutcome({ category: issue.category, severity: issue.severity }, 'dismissed');
+  }
   patchIssues = patchIssues.filter(i => i.id !== issueId);
   renderPatchIssues();
   document.getElementById('patch-status').textContent = `${patchIssues.length} issues remaining`;
-  showToast('Issue dismissed', 'info');
+  showToast('Issue dismissed — QOPC updated', 'info');
 }
 
 function askAboutIssue(issueId) {
   const issue = patchIssues.find(i => i.id === issueId);
   if (!issue) return;
+  trackPatchAction(issue, 'ask', '');
   closePatchPanel();
   document.getElementById('chat-input').value = `Tell me more about this issue: "${issue.title}" — ${issue.description} What are the risks if I don't fix it?`;
   document.getElementById('chat-input').focus();
 }
 
-// Patch offer system — shown after project analysis
+// ── Patch Offer System ──────────────────────────────
 function showPatchOffer(text, issueContext) {
   currentPatchOffer = issueContext;
   document.getElementById('patch-offer-text').textContent = text;
