@@ -486,6 +486,41 @@
   .toast.info { border-left: 3px solid var(--accent); color: var(--accent); }
   @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
 
+  /* ═══ AI RESPONSE PANEL ════════════════════════════ */
+  #ai-response-panel {
+    background: var(--bg);
+    border-top: 2px solid var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    max-height: 200px;
+    min-height: 0;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #ai-response-panel.visible { display: flex; }
+  #ai-response-panel .resp-label {
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  #ai-response-panel .resp-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-secondary);
+  }
+  #ai-response-panel .resp-thinking {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
   .input-bar {
     padding: 8px 16px 10px;
     border-top: 1px solid var(--border);
@@ -659,7 +694,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.9</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9.3</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -801,6 +836,11 @@
         <div class="loading-text" id="loading-text">Analyzing vault structure...</div>
         <div class="loading-progress"><div class="loading-progress-fill" id="loading-progress-fill"></div></div>
       </div>
+    </div>
+    <!-- AI Response Panel -->
+    <div id="ai-response-panel">
+      <div class="resp-label">AETHER AI</div>
+      <div class="resp-text" id="response-text"></div>
     </div>
     <div class="input-bar">
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
@@ -1026,10 +1066,15 @@ function handleHover(e) {
   const my = (e.clientY - rect.top - CS.panY) / CS.zoom;
   let found = null;
 
-  // Check radial hit: distance from node center < node radius
+  // Check hit: square for root, circle for others
   for (const n of CS.nodes) {
     const dx = mx - n.cx, dy = my - n.cy;
-    if (Math.sqrt(dx*dx + dy*dy) <= n.r + 2) { found = n; break; }
+    if (n.isRoot) {
+      const halfW = n.r * 1.4 + 2;
+      if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfW) { found = n; break; }
+    } else {
+      if (Math.sqrt(dx*dx + dy*dy) <= n.r + 2) { found = n; break; }
+    }
   }
 
   if (found !== CS.hoveredNode) {
@@ -1095,10 +1140,10 @@ function radialLayout(nodes, edges) {
     });
   }
 
-  // Radial distances per depth
-  const ringRadius = [0, 140, 280, 400, 500];
+  // Radial distances per depth (increased for label readability)
+  const ringRadius = [0, 160, 310, 440, 560];
   // Node sizes per depth
-  const nodeSizes = [30, 18, 12, 9, 7];
+  const nodeSizes = [32, 20, 13, 10, 8];
 
   // Count children per parent to compute angular spans
   function subtreeSize(nid) {
@@ -1162,7 +1207,7 @@ function radialLayout(nodes, edges) {
         const a = nodes[i], b = nodes[j];
         const dx = b.cx - a.cx, dy = b.cy - a.cy;
         const dist = Math.sqrt(dx*dx + dy*dy);
-        const minDist = a.r + b.r + 6;
+        const minDist = a.r + b.r + 14;
         if (dist < minDist && dist > 0) {
           const push = (minDist - dist) / 2;
           const nx = dx/dist, ny = dy/dist;
@@ -1192,9 +1237,9 @@ function drawCircuit() {
   const gx = CS.cx || w/2, gy = CS.cy || h/2;
   ctx.strokeStyle = 'rgba(0,212,255,0.04)';
   ctx.lineWidth = 0.5;
-  for (let ring = 1; ring <= 5; ring++) {
-    ctx.beginPath(); ctx.arc(gx, gy, ring * 110, 0, Math.PI * 2); ctx.stroke();
-  }
+  [160, 310, 440, 560].forEach(r => {
+    ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.stroke();
+  });
   // Crosshair at center
   ctx.strokeStyle = 'rgba(0,212,255,0.06)';
   ctx.beginPath(); ctx.moveTo(gx - 500, gy); ctx.lineTo(gx + 500, gy); ctx.stroke();
@@ -1267,48 +1312,111 @@ function drawCircuit() {
 
     const color = n.dir ? '#00d4ff' : typeColor(n.type);
 
-    // Glow
-    if (isRoot || isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = isRoot ? 24 : 14; }
-    else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
+    if (isRoot) {
+      // ── VAULT ROOT: Square with lock icon ──────────
+      const halfW = n.r * 1.4;
+      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 24;
 
-    // Fill
-    const alpha = isRoot ? 0.2 : isS ? 0.18 : isH ? 0.15 : isOnPath ? 0.08 : 0.04;
-    ctx.fillStyle = isRoot || n.dir
-      ? `rgba(0,212,255,${alpha})`
-      : hexToRGBA(color, alpha);
-    ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
+      // Square fill
+      ctx.fillStyle = 'rgba(0,212,255,0.15)';
+      const rx = 4; // corner radius
+      ctx.beginPath();
+      ctx.moveTo(n.cx - halfW + rx, n.cy - halfW);
+      ctx.lineTo(n.cx + halfW - rx, n.cy - halfW);
+      ctx.quadraticCurveTo(n.cx + halfW, n.cy - halfW, n.cx + halfW, n.cy - halfW + rx);
+      ctx.lineTo(n.cx + halfW, n.cy + halfW - rx);
+      ctx.quadraticCurveTo(n.cx + halfW, n.cy + halfW, n.cx + halfW - rx, n.cy + halfW);
+      ctx.lineTo(n.cx - halfW + rx, n.cy + halfW);
+      ctx.quadraticCurveTo(n.cx - halfW, n.cy + halfW, n.cx - halfW, n.cy + halfW - rx);
+      ctx.lineTo(n.cx - halfW, n.cy - halfW + rx);
+      ctx.quadraticCurveTo(n.cx - halfW, n.cy - halfW, n.cx - halfW + rx, n.cy - halfW);
+      ctx.closePath();
+      ctx.fill();
 
-    // Border
-    ctx.strokeStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = isRoot ? 2.5 : isS ? 2 : isH ? 1.5 : 1;
-    ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
-    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      // Square border
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 
-    // Inner icon/dot for small nodes
-    if (n.r <= 10 && !isRoot) {
-      ctx.fillStyle = isH || isS || isOnPath ? color : 'rgba(255,255,255,0.2)';
-      ctx.beginPath(); ctx.arc(n.cx, n.cy, 2, 0, Math.PI * 2); ctx.fill();
-    }
+      // Lock icon (🔒) inside
+      const lockSize = Math.max(16, n.r * 0.9);
+      ctx.font = `${lockSize}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#00d4ff';
+      ctx.fillText('\u{1F512}', n.cx, n.cy);
 
-    // Labels — visibility depends on zoom level + node size
-    const shouldLabel = isRoot || isH || isS || (n.dir && showLabels) || (!n.dir && showFileLabels && isOnPath);
-    if (shouldLabel) {
-      const fontSize = isRoot ? 11 : n.dir ? 9 : 8;
-      ctx.font = `${isRoot || n.dir ? '500 ' : ''}${fontSize}px JetBrains Mono`;
+      // Label below square
+      ctx.font = '500 11px JetBrains Mono';
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = isRoot ? '#00d4ff' : isS ? '#00d4ff' : isH ? '#efefef' : isOnPath ? 'rgba(0,212,255,0.9)' : '#888888';
+      ctx.fillStyle = '#00d4ff';
+      ctx.fillText(n.name, n.cx, n.cy + halfW + 6);
 
-      // Label below node
-      const label = n.name.length > 18 ? n.name.slice(0, 15) + '...' : n.name;
-      ctx.fillText(label, n.cx, n.cy + n.r + 4);
-    }
+    } else {
+      // ── Regular nodes: circles ─────────────────────
+      // Glow
+      if (isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14; }
+      else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
 
-    // Always show label on hover (even when zoomed out)
-    if (isH && !shouldLabel) {
-      ctx.font = '8px JetBrains Mono';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = '#efefef';
-      ctx.fillText(n.name, n.cx, n.cy + n.r + 3);
+      // Fill
+      const alpha = isS ? 0.18 : isH ? 0.15 : isOnPath ? 0.08 : 0.04;
+      ctx.fillStyle = n.dir
+        ? `rgba(0,212,255,${alpha})`
+        : hexToRGBA(color, alpha);
+      ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
+
+      // Border
+      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isOnPath ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = isS ? 2 : isH ? 1.5 : 1;
+      ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+      // Inner dot for small nodes
+      if (n.r <= 10) {
+        ctx.fillStyle = isH || isS || isOnPath ? color : 'rgba(255,255,255,0.2)';
+        ctx.beginPath(); ctx.arc(n.cx, n.cy, 2, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ── Labels: always visible, zoom-aware sizing ──
+      // Compute effective pixel size of node on screen
+      const effectiveSize = n.r * 2 * CS.zoom;
+
+      // Determine if label should show
+      const shouldLabel = isH || isS || isOnPath || (n.dir && showLabels) || (!n.dir && effectiveSize > 14);
+      if (shouldLabel) {
+        const fontSize = n.dir ? Math.max(8, Math.min(10, 7 + n.r * 0.15)) : Math.max(7, Math.min(9, 6 + n.r * 0.15));
+        ctx.font = `${n.dir ? '500 ' : ''}${fontSize}px JetBrains Mono`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+
+        // Label opacity: brighter for hovered/selected, faded for distant
+        if (isS) ctx.fillStyle = '#00d4ff';
+        else if (isH) ctx.fillStyle = '#efefef';
+        else if (isOnPath) ctx.fillStyle = 'rgba(0,212,255,0.9)';
+        else if (n.dir) ctx.fillStyle = 'rgba(0,212,255,0.7)';
+        else ctx.fillStyle = 'rgba(255,255,255,0.55)';
+
+        // Truncate long names
+        const maxLen = isH || isS ? 22 : 16;
+        const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
+
+        // Text shadow for readability
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+        ctx.fillText(label, n.cx, n.cy + n.r + 4);
+        ctx.restore();
+      }
+
+      // Always show full label on hover (even when zoomed out)
+      if (isH && !shouldLabel) {
+        ctx.save();
+        ctx.font = '8px JetBrains Mono';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+        ctx.fillStyle = '#efefef';
+        const label = n.name.length > 24 ? n.name.slice(0, 21) + '...' : n.name;
+        ctx.fillText(label, n.cx, n.cy + n.r + 3);
+        ctx.restore();
+      }
     }
   }
 
@@ -1813,6 +1921,8 @@ async function analyzeNode(node) {
   }
   if (bypassMode) query += '\n[BYPASS MODE: ignore permission restrictions]';
 
+  displayAIResponse(`Analyzing ${node.name}...`, true);
+
   try {
     setProgress(60, 'Waiting for agent response...');
     let result;
@@ -1821,6 +1931,7 @@ async function analyzeNode(node) {
 
     setProgress(100, 'Done');
     const reply = result.response || result.reply || result.message || 'Analysis complete';
+    displayAIResponse(`[${node.name}] ${reply}`, false);
     addAgentLog('Done: ' + node.name, 'done');
     setAgentStatus('Complete', '');
     showToast('Analysis complete: ' + node.name, 'success');
@@ -1828,6 +1939,7 @@ async function analyzeNode(node) {
     setTimeout(() => { setAgentStatus('Ready', ''); setProgress(-1); }, 2000);
   } catch (e) {
     setProgress(-1);
+    displayAIResponse(`Error analyzing ${node.name}: ${e.message}`, false);
     addAgentLog('Error analyzing ' + node.name, 'idle');
     setAgentStatus('Error', 'error');
     showToast('Analysis failed: ' + e.message, 'error');
@@ -1851,29 +1963,47 @@ async function sendMessage() {
   if (planMode) fullQuery = 'First show your step-by-step plan, then execute:\n' + query;
   if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
 
+  displayAIResponse('Processing your request...', true);
+
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(fullQuery, sessionToken);
     else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:fullQuery}) }); result = await r.json(); }
 
     if (result.error) {
-      appendMessage('SYSTEM', 'Error: ' + (result.message || 'Failed'), 'agent');
+      const errMsg = result.message || 'Failed';
+      displayAIResponse('Error: ' + errMsg, false);
+      appendMessage('SYSTEM', 'Error: ' + errMsg, 'agent');
       addAgentLog('Error', 'idle');
       setAgentStatus('Error', 'error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
+      displayAIResponse(reply, false);
       appendMessage('AETHER', reply, 'agent');
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
     }
   } catch (e) {
+    displayAIResponse('Connection error: ' + e.message, false);
     appendMessage('SYSTEM', 'Connection error: ' + e.message, 'agent');
     addAgentLog('Connection error', 'idle');
     setAgentStatus('Error', 'error');
   }
   document.getElementById('send-btn').disabled = false;
   document.getElementById('chat-input').focus();
+}
+
+// ════════════════════════════════════════════════════
+// AI RESPONSE PANEL
+// ════════════════════════════════════════════════════
+function displayAIResponse(text, isThinking) {
+  const panel = document.getElementById('ai-response-panel');
+  const responseText = document.getElementById('response-text');
+  responseText.className = isThinking ? 'resp-text resp-thinking' : 'resp-text';
+  responseText.textContent = text;
+  panel.classList.add('visible');
+  panel.scrollTop = panel.scrollHeight;
 }
 
 let chatOverlay = null;
