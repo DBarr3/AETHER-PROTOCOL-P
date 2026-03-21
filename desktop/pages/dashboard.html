@@ -525,6 +525,69 @@
     font-size: 9px; color: var(--text-muted);
   }
 
+  /* ═══ RIGHT SIDEBAR (Preview) ═════════════════════ */
+  .right-panel {
+    width: 0;
+    background: var(--bg-2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: width 0.25s;
+  }
+  .right-panel.open { width: 300px; }
+  .rp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .rp-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+  .rp-close {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 12px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .rp-close:hover { color: var(--text-primary); }
+  .rp-meta {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .rp-meta-row {
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-secondary);
+    padding: 3px 0;
+  }
+  .rp-meta-label { color: var(--text-muted); }
+  .rp-preview {
+    flex: 1;
+    overflow: auto;
+    padding: 10px 12px;
+  }
+  .rp-preview pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+  }
+  .rp-preview .preview-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
   /* Modal */
   .modal-overlay {
     position: fixed; inset: 0;
@@ -596,7 +659,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.8.8</span>
+  <span class="titlebar-label">AetherCloud-L v0.8.9</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -743,6 +806,24 @@
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
       <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL (File Preview) -->
+  <div class="right-panel" id="right-panel">
+    <div class="rp-header">
+      <span class="rp-title" id="rp-title">FILE PREVIEW</span>
+      <button class="rp-close" onclick="closeRightPanel()">&#10005;</button>
+    </div>
+    <div class="rp-meta" id="rp-meta">
+      <div class="rp-meta-row"><span class="rp-meta-label">NAME</span><span id="rp-name">—</span></div>
+      <div class="rp-meta-row"><span class="rp-meta-label">TYPE</span><span id="rp-type">—</span></div>
+      <div class="rp-meta-row"><span class="rp-meta-label">SIZE</span><span id="rp-size">—</span></div>
+      <div class="rp-meta-row"><span class="rp-meta-label">PATH</span><span id="rp-path" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">—</span></div>
+      <div class="rp-meta-row"><span class="rp-meta-label">ENCODING</span><span id="rp-encoding">—</span></div>
+    </div>
+    <div class="rp-preview" id="rp-preview">
+      <div class="preview-placeholder">Select a file to preview</div>
     </div>
   </div>
 </div>
@@ -1456,15 +1537,31 @@ async function menuOpen() {
   setProgress(20, `Analyzing ${dirName}...`);
 
   try {
-    let data;
-    showLoading('Analyzing directory structure...', 30);
-    setProgress(40, 'Fetching directory listing...');
+    let data = null;
+    showLoading('Scanning directory...', 20);
+    setProgress(30, 'Scanning local filesystem...');
 
-    if (window.aetherAPI?.browseVault) {
-      data = await window.aetherAPI.browseVault(dirPath);
-    } else {
-      const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`);
-      data = await r.json();
+    // PRIMARY: Local filesystem scan (works offline / dev mode)
+    if (window.aether?.scanDirectory) {
+      addAgentLog('Local scan: ' + dirName, 'active');
+      data = await window.aether.scanDirectory(dirPath, 2);
+    }
+
+    // FALLBACK: VPS browse endpoint
+    if (!data || data.error) {
+      addAgentLog('Trying VPS scan...', 'active');
+      setProgress(40, 'Fetching from VPS...');
+      try {
+        if (window.aetherAPI?.browseVault) {
+          data = await window.aetherAPI.browseVault(dirPath);
+        } else {
+          const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`);
+          data = await r.json();
+        }
+      } catch (vpsErr) {
+        // VPS also failed — use whatever local scan returned or show error
+        if (!data) data = { error: true, message: 'Both local and VPS scans failed: ' + vpsErr.message };
+      }
     }
 
     if (data && !data.error) {
@@ -1473,13 +1570,29 @@ async function menuOpen() {
 
       const tree = [];
       const totalItems = (data.folders?.length||0) + (data.files?.length||0);
-      if (data.folders) data.folders.forEach(f => tree.push({ name:f.name+'/', children:[], size:0, path:f.path||'' }));
-      if (data.files) data.files.forEach(f => tree.push({ name:f.name, size:f.size||0, path:f.path||'' }));
+
+      // Build tree from scan data — group files by parent folder
+      if (data.folders) {
+        data.folders.forEach(f => {
+          const name = f.name.includes('/') ? f.name : f.name;
+          const childFiles = data.files ? data.files.filter(file => file.parent === (f.name.split('/')[0] || f.name)) : [];
+          tree.push({
+            name: name.endsWith('/') ? name : name + '/',
+            children: childFiles.map(cf => ({ name: cf.name, size: cf.size||0, path: cf.path||'' })),
+            size: 0,
+            path: f.path || ''
+          });
+        });
+      }
+      // Add root-level files (no parent folder)
+      if (data.files) {
+        data.files.filter(f => !f.parent).forEach(f => tree.push({ name:f.name, size:f.size||0, path:f.path||'' }));
+      }
 
       showLoading('Rendering ' + totalItems + ' nodes...', 80);
       setProgress(80, `Rendering ${totalItems} nodes...`);
 
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 150));
       buildVaultFromScan(tree, dirName.toUpperCase(), dirPath);
 
       showLoading('Complete!', 100);
@@ -1488,7 +1601,7 @@ async function menuOpen() {
       setAgentStatus('Complete', '');
       showToast(`Vault loaded: ${CS.nodes.length} nodes`, 'success');
 
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
       hideLoading();
       setProgress(-1);
       setTimeout(() => setAgentStatus('Ready', ''), 2000);
@@ -1517,6 +1630,9 @@ async function analyzeNode(node) {
   addAgentLog('Analyzing: ' + node.name, 'active');
   setProgress(30, 'Analyzing ' + node.name + '...');
   pushHistory('Analyzed: ' + node.name);
+
+  // Open right panel with file preview
+  openRightPanel(node);
 
   let query;
   if (planMode) {
@@ -1611,15 +1727,7 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   sb.classList.toggle('collapsed');
   localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed'));
-  setTimeout(() => {
-    const wrap = document.getElementById('canvas-wrap');
-    const canvas = document.getElementById('circuit-canvas');
-    canvas.width = wrap.clientWidth * devicePixelRatio;
-    canvas.height = wrap.clientHeight * devicePixelRatio;
-    canvas.style.width = wrap.clientWidth + 'px';
-    canvas.style.height = wrap.clientHeight + 'px';
-    drawCircuit();
-  }, 250);
+  setTimeout(resizeCanvas, 250);
 }
 
 // ════════════════════════════════════════════════════
@@ -1704,6 +1812,61 @@ function copyVar(btn) {
     btn.textContent='COPIED';btn.style.borderColor='var(--green)';btn.style.color='var(--green)';
     setTimeout(()=>{btn.textContent='COPY';btn.style.borderColor='';btn.style.color='';},2000);
   });
+}
+
+// ════════════════════════════════════════════════════
+// RIGHT PANEL (File Preview)
+// ════════════════════════════════════════════════════
+function openRightPanel(node) {
+  const rp = document.getElementById('right-panel');
+  rp.classList.add('open');
+  document.getElementById('rp-title').textContent = 'FILE PREVIEW';
+  document.getElementById('rp-name').textContent = node.name;
+  document.getElementById('rp-type').textContent = node.type || 'unknown';
+  document.getElementById('rp-size').textContent = fmtSize(node.size || 0);
+  document.getElementById('rp-path').textContent = node.path || '—';
+  document.getElementById('rp-path').title = node.path || '';
+  document.getElementById('rp-encoding').textContent = '...';
+  document.getElementById('rp-preview').innerHTML = '<div class="preview-placeholder">Loading preview...</div>';
+
+  // Try to load file preview via IPC
+  if (window.aether?.readFilePreview && node.path) {
+    window.aether.readFilePreview(node.path, 80).then(result => {
+      if (result.error) {
+        document.getElementById('rp-preview').innerHTML = `<div class="preview-placeholder" style="color:var(--red);">${escH(result.message)}</div>`;
+        document.getElementById('rp-encoding').textContent = '—';
+      } else {
+        document.getElementById('rp-encoding').textContent = result.binary ? 'binary' : 'utf-8';
+        if (result.binary) {
+          document.getElementById('rp-preview').innerHTML = `<div class="preview-placeholder">${escH(result.preview)}</div>`;
+        } else {
+          document.getElementById('rp-preview').innerHTML = `<pre>${escH(result.preview)}</pre>`;
+          if (result.totalLines) document.getElementById('rp-title').textContent = `PREVIEW (${result.lines}/${result.totalLines} lines)`;
+        }
+      }
+    });
+  } else {
+    document.getElementById('rp-encoding').textContent = '—';
+    document.getElementById('rp-preview').innerHTML = '<div class="preview-placeholder">Preview requires local file path</div>';
+  }
+
+  // Resize canvas after panel opens
+  setTimeout(resizeCanvas, 300);
+}
+
+function closeRightPanel() {
+  document.getElementById('right-panel').classList.remove('open');
+  setTimeout(resizeCanvas, 300);
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  const canvas = document.getElementById('circuit-canvas');
+  canvas.width = wrap.clientWidth * devicePixelRatio;
+  canvas.height = wrap.clientHeight * devicePixelRatio;
+  canvas.style.width = wrap.clientWidth + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  drawCircuit();
 }
 
 // ════════════════════════════════════════════════════

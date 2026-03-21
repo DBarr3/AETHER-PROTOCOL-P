@@ -1,5 +1,5 @@
 /**
- * AetherCloud-L v0.8.5 — Preload (context bridge)
+ * AetherCloud-L v0.8.9 — Preload (context bridge)
  * Aether Systems LLC · Patent Pending
  *
  * Two bridges:
@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('aether', {
   openFile:      (p) => ipcRenderer.invoke('open-file', p),
   showInExplorer:(p) => ipcRenderer.invoke('show-in-explorer', p),
   requestFsPermission: () => ipcRenderer.invoke('request-fs-permission'),
+  scanDirectory:  (dirPath, depth) => ipcRenderer.invoke('scan-directory', dirPath, depth || 2),
+  readFilePreview: (filePath, maxLines) => ipcRenderer.invoke('read-file-preview', filePath, maxLines || 80),
   keys: {
     set:      (name, value) => ipcRenderer.invoke('keys:set', name, value),
     has:      (name)        => ipcRenderer.invoke('keys:has', name),

@@ -1,5 +1,5 @@
 /**
- * AetherCloud-L v0.8.8 — Electron Main Process
+ * AetherCloud-L v0.8.9 — Electron Main Process
  * Aether Systems LLC · Patent Pending
  *
  * Fresh minimal launcher: login.html → dashboard.html
@@ -9,6 +9,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const http = require('http');
+const fs   = require('fs');
 
 const keyManager = require('./key-manager');
 
@@ -185,4 +186,108 @@ ipcMain.handle('request-fs-permission', async () => {
     title: 'Grant filesystem access',
   });
   return result.canceled ? null : result.filePaths[0];
+});
+
+// ── IPC: Local directory scanner ─────────────────────
+// Scans a directory on the local filesystem (no VPS needed).
+// Returns { folders: [...], files: [...], path, name }
+ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
+  try {
+    if (!dirPath || !fs.existsSync(dirPath)) {
+      return { error: true, message: 'Path does not exist: ' + dirPath };
+    }
+    const stat = fs.statSync(dirPath);
+    if (!stat.isDirectory()) {
+      return { error: true, message: 'Not a directory: ' + dirPath };
+    }
+
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    const folders = [];
+    const files = [];
+
+    for (const entry of entries) {
+      // Skip hidden files/dirs and node_modules
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+      const fullPath = path.join(dirPath, entry.name);
+      try {
+        if (entry.isDirectory()) {
+          let childCount = 0;
+          let totalSize = 0;
+          try {
+            const children = fs.readdirSync(fullPath);
+            childCount = children.filter(c => !c.startsWith('.')).length;
+          } catch { /* permission denied */ }
+          folders.push({
+            name: entry.name,
+            path: fullPath,
+            children: childCount,
+            isDirectory: true,
+          });
+
+          // Recurse one level if maxDepth > 1
+          if (maxDepth > 1) {
+            try {
+              const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
+              for (const sub of subEntries) {
+                if (sub.name.startsWith('.') || sub.name === 'node_modules') continue;
+                const subPath = path.join(fullPath, sub.name);
+                try {
+                  if (sub.isDirectory()) {
+                    const sc = fs.readdirSync(subPath).filter(c => !c.startsWith('.')).length;
+                    folders.push({ name: entry.name + '/' + sub.name, path: subPath, children: sc, isDirectory: true });
+                  } else {
+                    const ss = fs.statSync(subPath);
+                    files.push({ name: sub.name, path: subPath, size: ss.size, modified: ss.mtimeMs, parent: entry.name });
+                  }
+                } catch { /* skip */ }
+              }
+            } catch { /* skip */ }
+          }
+        } else if (entry.isFile()) {
+          const st = fs.statSync(fullPath);
+          files.push({
+            name: entry.name,
+            path: fullPath,
+            size: st.size,
+            modified: st.mtimeMs,
+            parent: null,
+          });
+        }
+      } catch { /* permission denied — skip */ }
+    }
+
+    return {
+      path: dirPath,
+      name: path.basename(dirPath),
+      folders,
+      files,
+    };
+  } catch (err) {
+    return { error: true, message: err.message };
+  }
+});
+
+// Read first N lines of a text file for preview
+ipcMain.handle('read-file-preview', async (_e, filePath, maxLines = 80) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return { error: true, message: 'File not found' };
+    const stat = fs.statSync(filePath);
+    if (stat.size > 2 * 1024 * 1024) return { preview: '[File too large for preview]', size: stat.size, binary: true };
+
+    const buf = fs.readFileSync(filePath);
+    // Detect binary
+    const sample = buf.slice(0, Math.min(512, buf.length));
+    let nullCount = 0;
+    for (let i = 0; i < sample.length; i++) { if (sample[i] === 0) nullCount++; }
+    if (nullCount > sample.length * 0.1) {
+      return { preview: `[Binary file: ${stat.size} bytes]`, size: stat.size, binary: true };
+    }
+
+    const text = buf.toString('utf-8');
+    const lines = text.split('\n').slice(0, maxLines);
+    return { preview: lines.join('\n'), size: stat.size, binary: false, lines: lines.length, totalLines: text.split('\n').length };
+  } catch (err) {
+    return { error: true, message: err.message };
+  }
 });
