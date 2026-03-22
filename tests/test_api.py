@@ -109,7 +109,7 @@ class TestStatus:
 
     def test_status_ibm_status_present(self, client):
         data = client.get("/status").json()
-        assert data["ibm_status"] in ["IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM", "SIMULATOR"]
+        assert data["ibm_status"] in ["IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM", "CSPRNG", "SIMULATOR"]
 
 
 # ═══════════════════════════════════════════════════

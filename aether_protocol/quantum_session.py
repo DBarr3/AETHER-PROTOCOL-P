@@ -20,9 +20,13 @@ import os
 import time
 from typing import Any, List, Optional
 
+# Protocol variant: "C" = CSPRNG (default), "L" = quantum
+PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
+
 # ── Suppress qiskit_ibm_runtime INFO/WARNING spam ─────────────────────────
-logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
-logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
+if PROTOCOL_VARIANT == "L":
+    logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
+    logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +125,34 @@ class QuantumSessionManager:
         str
             Batch job ID.
         """
+        import secrets
+
+        # ── Protocol-C: pure CSPRNG, no circuits needed ───────────────
+        if PROTOCOL_VARIANT == "C":
+            self._batch_results = []
+            for _ in range(max_cycles):
+                random_bytes = secrets.token_bytes(32)
+                seed_int = int.from_bytes(random_bytes, "big")
+                self._batch_results.append({
+                    "seed_int": seed_int,
+                    "seed_bytes": random_bytes,
+                    "raw_bitstring": None,
+                    "method": "CSPRNG",
+                    "backend_name": "csprng_os_urandom",
+                    "n_qubits": 0,
+                    "job_id": None,
+                    "timestamp": int(time.time()),
+                    "circuit_depth": 0,
+                })
+            self._batch_job_id = f"csprng_batch_{max_cycles}"
+            self._initialized = True
+            logger.info(
+                "[QUANTUM-SESSION] CSPRNG batch: %d seeds | 0 IBM calls | Protocol-C",
+                max_cycles,
+            )
+            return self._batch_job_id
+
+        # ── Protocol-L: quantum circuit paths ─────────────────────────
         from aether_protocol.quantum_backend import _build_entropy_circuit, _bitstring_to_seed
 
         circuits = []

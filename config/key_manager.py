@@ -34,6 +34,7 @@ _OPTIONAL_KEYS = [
     "AETHER_BIND_HOST",
     "AETHER_BIND_PORT",
     "AETHER_VAULT_ROOT",
+    "AETHER_PROTOCOL_VARIANT",
 ]
 
 
@@ -75,6 +76,7 @@ def load_all_keys() -> None:
     """Call once at startup — loads env file then validates required keys."""
     _load_env_file()
     _validate_required()
+    _validate_protocol_variant()
 
 
 def _validate_required() -> None:
@@ -89,6 +91,23 @@ def _validate_required() -> None:
         )
         # Warning, not fatal — allows tests and local dev to run
         # without keys. Services that need keys will fail gracefully.
+
+
+def _validate_protocol_variant() -> None:
+    """Validate AETHER_PROTOCOL_VARIANT if set. Must be 'C' or 'L'."""
+    variant = os.environ.get("AETHER_PROTOCOL_VARIANT", "C")
+    if variant not in ("C", "L"):
+        log.error(
+            "Invalid AETHER_PROTOCOL_VARIANT: '%s'. Must be 'C' or 'L'. "
+            "Defaulting to 'C' (CSPRNG).",
+            variant,
+        )
+        os.environ["AETHER_PROTOCOL_VARIANT"] = "C"
+
+
+def get_protocol_variant() -> str:
+    """Return protocol variant ('C' for CSPRNG, 'L' for quantum). Default: 'C'."""
+    return os.environ.get("AETHER_PROTOCOL_VARIANT", "C")
 
 
 def get_anthropic_key() -> Optional[str]:

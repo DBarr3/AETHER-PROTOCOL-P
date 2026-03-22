@@ -224,7 +224,11 @@ def _get_task_qopc(username: str) -> TaskQOPC:
     if username not in _task_qopcs:
         _task_qopcs[username] = TaskQOPC(username)
     return _task_qopcs[username]
-_ibm_status_cache: dict = {"value": "OS_URANDOM", "expires": 0.0}
+_PROTOCOL_VARIANT = os.environ.get("AETHER_PROTOCOL_VARIANT", "C")
+_ibm_status_cache: dict = {
+    "value": "CSPRNG" if _PROTOCOL_VARIANT == "C" else "OS_URANDOM",
+    "expires": 0.0,
+}
 
 security = HTTPBearer(auto_error=False)
 
@@ -1616,15 +1620,18 @@ async def status():
 
     session_active = bool(svc.session_mgr and svc.session_mgr.active_count > 0)
 
-    # IBM Quantum status — cached with 30s TTL
+    # IBM Quantum / CSPRNG status — cached with 30s TTL
     now = time.time()
     if now > _ibm_status_cache["expires"]:
-        try:
-            from aether_protocol.quantum_backend import get_quantum_seed
-            _, method = get_quantum_seed()
-            _ibm_status_cache["value"] = method
-        except Exception:
-            _ibm_status_cache["value"] = "OS_URANDOM"
+        if _PROTOCOL_VARIANT == "C":
+            _ibm_status_cache["value"] = "CSPRNG"
+        else:
+            try:
+                from aether_protocol.quantum_crypto import get_quantum_seed
+                _, method = get_quantum_seed()
+                _ibm_status_cache["value"] = method
+            except Exception:
+                _ibm_status_cache["value"] = "OS_URANDOM"
         _ibm_status_cache["expires"] = now + 30.0
 
     # Check if setup is needed (no credentials file or only dev user)

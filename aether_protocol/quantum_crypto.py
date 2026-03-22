@@ -51,7 +51,10 @@ DEFAULT_KEY_LIFETIME_SECONDS = 3600
 SHOR_EARLIEST_ATTACK_SECONDS = 7 * 24 * 3600
 
 # Valid measurement methods
-MEASUREMENT_METHODS = ("IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM")
+MEASUREMENT_METHODS = ("IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM", "CSPRNG")
+
+# Protocol variant: "C" = CSPRNG (default), "L" = quantum
+PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
 
 
 # ── Quantum Seed Commitment ──────────────────────────────────────────────────
@@ -281,34 +284,18 @@ def get_quantum_seed(
     n_qubits: int = 30,
 ) -> Tuple[int, str]:
     """
-    Obtain a quantum seed from hardware or classical fallback.
+    Obtain a seed from quantum hardware or CSPRNG.
 
-    Supports three sources:
-        IBM_QUANTUM   -- Real quantum hardware (ibm_fez, 156 qubits)
-        AER_SIMULATOR -- Qiskit Aer local simulator
-        OS_URANDOM    -- Classical fallback (os.urandom)
+    When AETHER_PROTOCOL_VARIANT=C (default), all paths use CSPRNG
+    (secrets.token_bytes) regardless of the requested method.  The
+    quantum paths (IBM_QUANTUM, AER_SIMULATOR) are only active when
+    AETHER_PROTOCOL_VARIANT=L.
 
-    Circuit architecture (30-qubit entangled high-entropy scrambler):
-        Layer 1: Hadamard on all 30 qubits (maximum superposition)
-        Layer 2: CNOT chain CX(0,1) -> CX(1,2) -> ... -> CX(28,29)
-                 (GHZ-like entanglement across all qubits)
-        Layer 3: S (phase) gate on all 30 qubits (breaks H-CX-H
-                 self-inverse symmetry; ensures non-trivial output
-                 even on a noiseless simulator)
-        Layer 4: Second Hadamard on all 30 qubits (combined with S,
-                 rotates into Y-basis creating complex interference)
-        Layer 5: Measure all 30 qubits
-        Depth:   33 (1 + 29 + 1 + 1 + 1)
-
-    Seed extraction:
-        The 30-bit measurement bitstring is hashed with SHA-256 to
-        produce a uniform 256-bit seed.  SHA-256 post-processing
-        eliminates any residual bias from qubit correlations or
-        hardware noise -- the output is uniformly distributed
-        regardless of the raw bitstring's statistical properties.
-
-    ibm_fez capacity: 156 qubits (Heron r2).  30 qubits is well
-    within capacity -- no backend swap needed.
+    Supports four sources:
+        CSPRNG        -- os.urandom via secrets module (Protocol-C default)
+        IBM_QUANTUM   -- Real quantum hardware (Protocol-L only)
+        AER_SIMULATOR -- Qiskit Aer local simulator (Protocol-L only)
+        OS_URANDOM    -- Classical fallback (legacy alias for CSPRNG)
 
     Args:
         method: Desired source ("IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM").
@@ -319,6 +306,15 @@ def get_quantum_seed(
     Returns:
         Tuple of (seed_as_int, measurement_method_used).
     """
+    import secrets
+
+    # ── Protocol-C: always use CSPRNG ─────────────────────────────────
+    if PROTOCOL_VARIANT == "C":
+        seed_bytes = secrets.token_bytes(32)
+        seed_int = int.from_bytes(seed_bytes, "big")
+        return seed_int, "CSPRNG"
+
+    # ── Protocol-L: quantum paths (unchanged) ─────────────────────────
     if method == "IBM_QUANTUM":
         # Try the pre-generation pool first for zero-latency IBM seeds
         try:

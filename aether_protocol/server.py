@@ -27,9 +27,13 @@ from typing import Any, Optional
 
 import logging
 
+# Protocol variant: "C" = CSPRNG (default), "L" = quantum
+PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
+
 # ── Suppress qiskit_ibm_runtime INFO/WARNING spam ─────────────────────────
-logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
-logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
+if PROTOCOL_VARIANT == "L":
+    logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
+    logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
 
 from .async_protocol import AsyncQuantumProtocol
 from .audit import PHASE_COMMITMENT, PHASE_EXECUTION, PHASE_SETTLEMENT
@@ -119,7 +123,9 @@ async def lifespan(app: FastAPI):
     """Initialise protocol on startup, clean up on shutdown."""
     global _protocol
     log_path = os.environ.get("AETHER_LOG_PATH", "audit.jsonl")
-    seed_method = os.environ.get("AETHER_SEED_METHOD", "OS_URANDOM")
+    # Default seed method depends on protocol variant
+    default_seed = "CSPRNG" if PROTOCOL_VARIANT == "C" else "OS_URANDOM"
+    seed_method = os.environ.get("AETHER_SEED_METHOD", default_seed)
     max_mb = int(os.environ.get("AETHER_MAX_LOG_MB", "100"))
     _protocol = AsyncQuantumProtocol(
         log_path=log_path,
@@ -413,7 +419,8 @@ def run():
 
     host = os.environ.get("AETHER_HOST", "0.0.0.0")
     port = int(os.environ.get("AETHER_PORT", "8765"))
-    seed_method = os.environ.get("AETHER_SEED_METHOD", "OS_URANDOM")
+    default_seed = "CSPRNG" if PROTOCOL_VARIANT == "C" else "OS_URANDOM"
+    seed_method = os.environ.get("AETHER_SEED_METHOD", default_seed)
     log_path = os.environ.get("AETHER_LOG_PATH", "audit.jsonl")
 
     # ── Retro terminal boot banner ──

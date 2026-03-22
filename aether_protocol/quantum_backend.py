@@ -41,15 +41,20 @@ import json
 import logging
 import os
 import queue
+import secrets
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Protocol variant: "C" = CSPRNG (default), "L" = quantum
+PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
+
 # ── Suppress qiskit_ibm_runtime INFO/WARNING spam ─────────────────────────
-logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
-logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
+if PROTOCOL_VARIANT == "L":
+    logging.getLogger('qiskit_ibm_runtime').setLevel(logging.ERROR)
+    logging.getLogger('qiskit_ibm_provider').setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +258,7 @@ class QuantumSeedResult:
     """
     seed_int: int
     seed_bytes: bytes
-    method: str                     # "IBM_QUANTUM" | "AER_SIMULATOR" | "OS_URANDOM"
+    method: str                     # "CSPRNG" | "IBM_QUANTUM" | "AER_SIMULATOR" | "OS_URANDOM"
     backend_name: str               # e.g. "ibm_fez", "aer_simulator", "os_urandom"
     n_qubits: int                   # Number of qubits measured (0 for OS_URANDOM)
     raw_bitstring: Optional[str]    # Raw measurement result (None for OS_URANDOM)
@@ -627,6 +632,29 @@ def _generate_os_urandom_seed() -> QuantumSeedResult:
     )
 
 
+def _generate_csprng_seed() -> QuantumSeedResult:
+    """
+    Protocol-C entropy source using secrets.token_bytes (CSPRNG).
+
+    Uses os.urandom via the secrets module — cryptographically secure
+    and always available without any external dependencies.
+    """
+    seed_bytes = secrets.token_bytes(32)
+    seed_int = int.from_bytes(seed_bytes, "big")
+
+    return QuantumSeedResult(
+        seed_int=seed_int,
+        seed_bytes=seed_bytes,
+        method="CSPRNG",
+        backend_name="csprng_os_urandom",
+        n_qubits=0,
+        raw_bitstring=None,
+        job_id=None,
+        timestamp=int(time.time()),
+        circuit_depth=0,
+    )
+
+
 # ── Quantum Seed Pool ──────────────────────────────────────────────────────
 
 class QuantumSeedPool:
@@ -851,13 +879,15 @@ def generate_quantum_seed(
     n_qubits: int = DEFAULT_SEED_QUBITS,
 ) -> QuantumSeedResult:
     """
-    Generate a quantum seed using the specified method.
+    Generate a seed using the specified method.
 
-    This is the main entry point for seed generation. It handles
-    backend selection, connection management, and fallback logic.
+    When AETHER_PROTOCOL_VARIANT=C (default), this always returns a
+    CSPRNG seed regardless of the requested method.  The quantum paths
+    (IBM_QUANTUM, AER_SIMULATOR) are only active when
+    AETHER_PROTOCOL_VARIANT=L.
 
     Args:
-        method: "IBM_QUANTUM", "AER_SIMULATOR", or "OS_URANDOM".
+        method: "CSPRNG", "IBM_QUANTUM", "AER_SIMULATOR", or "OS_URANDOM".
         backend_name: IBM backend name (only used for IBM_QUANTUM).
         credentials_path: Path to credentials JSON (only for IBM_QUANTUM).
         n_qubits: Number of qubits to measure.
@@ -867,7 +897,15 @@ def generate_quantum_seed(
     """
     global _ibm_backend_singleton
 
-    if method == "IBM_QUANTUM":
+    # ── Protocol-C: always CSPRNG ─────────────────────────────────────
+    if PROTOCOL_VARIANT == "C":
+        return _generate_csprng_seed()
+
+    # ── Protocol-L: quantum paths ─────────────────────────────────────
+    if method == "CSPRNG":
+        return _generate_csprng_seed()
+
+    elif method == "IBM_QUANTUM":
         if _ibm_backend_singleton is None or not _ibm_backend_singleton.is_connected:
             _ibm_backend_singleton = IBMQuantumBackend(
                 credentials_path=credentials_path,

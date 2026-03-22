@@ -119,7 +119,7 @@ class TestHardenedClaudeAgent:
         hardened = agent._commit_response("hello", "prompt")
         assert "seed_hash" in hardened.seed_commitment
         assert "measurement_method" in hardened.seed_commitment
-        assert hardened.seed_commitment["measurement_method"] == "OS_URANDOM"
+        assert hardened.seed_commitment["measurement_method"] in ("OS_URANDOM", "CSPRNG")
 
     def test_commit_response_increments_counter(self, agent):
         agent._commit_response("a", "b")

@@ -321,7 +321,7 @@ class QuantumCommitmentVerifier:
             return False
 
         method = commitment.get("seed_measurement_method", "")
-        if method not in ("IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM"):
+        if method not in ("IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM", "CSPRNG"):
             return False
 
         window = commitment.get("key_temporal_window", {})

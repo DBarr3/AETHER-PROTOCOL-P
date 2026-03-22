@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 import time
 from pathlib import Path
 from typing import Any, Optional, Tuple
@@ -37,6 +38,9 @@ from .quantum_backend import QuantumSeedResult, generate_quantum_seed
 from .settlement import QuantumSettlementRecord
 from .state import AccountSnapshot
 from .verify import AuditVerifier
+
+# Protocol variant: "C" = CSPRNG (default), "L" = quantum
+PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
 
 try:
     from .dispute_report import DisputeReportGenerator
@@ -62,11 +66,15 @@ class AsyncQuantumProtocol:
     def __init__(
         self,
         log_path: str | Path = "audit.jsonl",
-        seed_method: str = "OS_URANDOM",
+        seed_method: str | None = None,
         max_file_size_mb: int = 100,
     ) -> None:
         self._audit_log = AuditLog(log_path, max_file_size_mb=max_file_size_mb)
-        self._seed_method = seed_method
+        # Default seed method: CSPRNG for Protocol-C, OS_URANDOM for Protocol-L
+        if seed_method is None:
+            self._seed_method = "CSPRNG" if PROTOCOL_VARIANT == "C" else "OS_URANDOM"
+        else:
+            self._seed_method = seed_method
         self._verifier = AuditVerifier()
 
     # ── helpers ───────────────────────────────────────────────────────
