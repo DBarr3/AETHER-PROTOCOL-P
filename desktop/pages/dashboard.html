@@ -1410,6 +1410,28 @@
   }
   .sched-qopc-suggest button:hover { opacity: 0.8; }
 
+  /* ═══ MCP TOOL INDICATORS ════════════════════════ */
+  #tool-indicator {
+    display: none; color: var(--amber);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; padding: 6px 14px;
+    animation: mcp-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes mcp-pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .tools-used-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 14px; margin-bottom: 4px;
+  }
+  .tools-label {
+    color: rgba(255,255,255,0.3); font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tool-badge {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    color: var(--green); border: 1px solid var(--green);
+    padding: 1px 5px; border-radius: 2px;
+  }
+
   /* ═══ OPERATION CONFIRMATION CARDS ═══════════════ */
   .operation-confirm-card {
     background: rgba(0, 212, 255, 0.03);
@@ -2065,6 +2087,7 @@
       <div class="resp-label">AETHER AI</div>
       <div class="resp-text" id="response-text"></div>
     </div>
+    <div id="tool-indicator"></div>
     <div class="input-bar">
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
@@ -3650,6 +3673,37 @@ async function executeConfirmedOps(btn, operation) {
 }
 
 // ════════════════════════════════════════════════════
+// MCP ROUTING + TOOL INDICATORS
+// ════════════════════════════════════════════════════
+const _mcpTriggers = [
+  'email','gmail','inbox','draft','reply','unread','send message','compose',
+  'calendar','meeting','schedule','event','tomorrow','today','what meetings','check my'
+];
+
+function requiresMCP(q) {
+  const lower = q.toLowerCase();
+  return _mcpTriggers.some(t => lower.includes(t));
+}
+
+function showToolIndicator(msg) {
+  const el = document.getElementById('tool-indicator');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function hideToolIndicator() {
+  const el = document.getElementById('tool-indicator');
+  if (el) el.style.display = 'none';
+}
+function showToolsUsedBadge(tools) {
+  const panel = document.getElementById('ai-response-panel');
+  if (!panel || !tools.length) return;
+  const row = document.createElement('div');
+  row.className = 'tools-used-row';
+  row.innerHTML = '<span class="tools-label">via</span> ' +
+    tools.map(t => `<span class="tool-badge">${escH(t.replace(/-mcp$/, '').toUpperCase())}</span>`).join(' ');
+  panel.insertBefore(row, panel.querySelector('.resp-text'));
+}
+
+// ════════════════════════════════════════════════════
 // CHAT
 // ════════════════════════════════════════════════════
 async function sendMessage() {
@@ -3666,30 +3720,51 @@ async function sendMessage() {
   if (planMode) fullQuery = 'First show your step-by-step plan, then execute:\n' + query;
   if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
 
-  displayAIResponse('Processing your request...', true);
+  // Determine routing: MCP for web-tool queries, standard for everything else
+  const usesMCP = requiresMCP(query);
 
   // Auto-inject vault context for file-related queries
   let vaultContext = null;
-  if (isFileRelatedQuery(query)) {
+  if (isFileRelatedQuery(query) || usesMCP) {
     vaultContext = await buildVaultContextPayload();
   }
 
+  if (usesMCP) showToolIndicator('Connecting to web tools...');
+  displayAIResponse('Processing your request...', true);
+
   try {
     let result;
-    const payload = { query: fullQuery, vault_context: vaultContext };
-    if (window.aetherAPI?.chat) {
-      result = await window.aetherAPI.chat(fullQuery, sessionToken);
-    } else {
-      const r = await fetch(`${API_BASE}/agent/chat`, {
+    if (usesMCP) {
+      // Route to MCP-enabled endpoint
+      const r = await fetch(`${API_BASE}/agent/mcp-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          query: fullQuery,
+          vault_context: vaultContext,
+          mcp_servers: [],
+          conversation_history: [],
+        })
       });
       result = await r.json();
+    } else {
+      const payload = { query: fullQuery, vault_context: vaultContext };
+      if (window.aetherAPI?.chat) {
+        result = await window.aetherAPI.chat(fullQuery, sessionToken);
+      } else {
+        const r = await fetch(`${API_BASE}/agent/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+          body: JSON.stringify(payload)
+        });
+        result = await r.json();
+      }
     }
 
+    hideToolIndicator();
+
     if (result.error) {
-      const errMsg = result.message || 'Failed';
+      const errMsg = result.message || result.detail || 'Failed';
       displayAIResponse('Error: ' + errMsg, false);
       saveAgentReply('Error: ' + errMsg);
       addAgentLog('Error', 'idle');
@@ -3701,6 +3776,11 @@ async function sendMessage() {
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
+
+      // Show which MCP tools fired
+      if (result.tools_used && result.tools_used.length > 0) {
+        showToolsUsedBadge(result.tools_used);
+      }
 
       // Detect proposed operations and show confirmation card
       const proposed = detectProposedOperation(reply);
@@ -3714,6 +3794,7 @@ async function sendMessage() {
       }
     }
   } catch (e) {
+    hideToolIndicator();
     displayAIResponse('Connection error: ' + e.message, false);
     saveAgentReply('Connection error: ' + e.message);
     addAgentLog('Connection error', 'idle');

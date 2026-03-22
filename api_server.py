@@ -773,6 +773,141 @@ async def get_agent_context(token: str = Depends(get_session_token)):
     }
 
 
+# ── MCP Agent ─────────────────────────────────────
+class MCPAgentRequest(BaseModel):
+    query: str
+    mcp_servers: Optional[list] = []
+    vault_context: Optional[dict] = None
+    max_tokens: int = 2000
+    conversation_history: Optional[list] = []
+
+
+class MCPAgentResponse(BaseModel):
+    response: str
+    tools_used: list = []
+    commitment_hash: Optional[str] = None
+    verified: bool = False
+
+
+def _build_mcp_system_prompt(vault_context: Optional[dict], username: str) -> str:
+    base = (
+        f"You are AetherCloud's autonomous agent for {username}.\n\n"
+        "You have access to external tools via MCP servers. Use them proactively.\n\n"
+        "RULES:\n"
+        "1. When asked about emails — USE the Gmail tool to actually read them. "
+        "Never say you cannot access email.\n"
+        "2. When asked about calendar — USE the calendar tool to check actual events.\n"
+        "3. When you have vault context — use the file manifest to propose specific operations.\n"
+        "4. Always complete the full task autonomously before responding.\n"
+        "5. Format your response cleanly — the user sees your final output, not your tool calls.\n"
+        "6. After using tools, summarize what you found and what you did or propose to do.\n"
+        "7. Format rename proposals as: `old_filename` → `new_filename`\n"
+    )
+
+    if vault_context and vault_context.get("files"):
+        file_lines = "\n".join(
+            f"- {f['name']} ({f.get('size', '?')}) [{f.get('category', '?')}]"
+            for f in vault_context["files"][:50]
+        )
+        base += (
+            f"\nVAULT CONTENTS ({vault_context.get('file_count', 0)} files):\n"
+            f"{file_lines}\n\n"
+            "Use these exact filenames when proposing file operations.\n"
+        )
+
+    return base
+
+
+@app.post("/agent/mcp-chat", response_model=MCPAgentResponse)
+async def agent_mcp_chat(
+    req: MCPAgentRequest,
+    token: str = Depends(get_session_token),
+):
+    """
+    MCP-enabled agent endpoint. Attaches MCP servers to Claude API call
+    so Claude can autonomously use external tools (Gmail, Calendar, etc.).
+    """
+    import httpx
+    from agent.mcp_registry import detect_required_servers
+
+    api_key = get_anthropic_key()
+    username = get_username_from_token(token)
+
+    system = _build_mcp_system_prompt(req.vault_context, username)
+
+    messages = list(req.conversation_history or [])
+    messages.append({"role": "user", "content": req.query})
+
+    payload = {
+        "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
+        "max_tokens": req.max_tokens,
+        "system": system,
+        "messages": messages,
+    }
+
+    # Auto-detect MCP servers from query if none explicitly provided
+    mcp_servers = req.mcp_servers or detect_required_servers(req.query)
+    if mcp_servers:
+        payload["mcp_servers"] = mcp_servers
+
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    if mcp_servers:
+        headers["anthropic-beta"] = "mcp-client-2025-04-04"
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        log.warning("MCP agent call failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Agent error: {str(e)}")
+
+    # Extract text and tool use from response content blocks
+    response_text = ""
+    tools_used = []
+    for block in data.get("content", []):
+        btype = block.get("type", "")
+        if btype == "text":
+            response_text += block.get("text", "")
+        elif btype in ("tool_use", "mcp_tool_use"):
+            tools_used.append(block.get("name", "unknown"))
+
+    commitment_hash = _commitment_hash(response_text)
+
+    # Audit log
+    if svc.audit_log:
+        try:
+            svc.audit_log.append_commitment(
+                order_id=f"mcp_chat_{int(time.time())}",
+                trade_details={
+                    "event_type": "MCP_CHAT",
+                    "username": username,
+                    "query_hash": hashlib.sha256(req.query.encode()).hexdigest()[:16],
+                    "tools_used": tools_used,
+                    "mcp_servers": [s.get("name") for s in mcp_servers],
+                },
+                commitment_hash=commitment_hash,
+            )
+        except Exception:
+            pass
+
+    return MCPAgentResponse(
+        response=response_text,
+        tools_used=tools_used,
+        commitment_hash=commitment_hash,
+        verified=True,
+    )
+
+
 # ── Audit ─────────────────────────────────────────
 @app.get("/audit/trail", response_model=AuditTrailResponse)
 async def audit_trail(
