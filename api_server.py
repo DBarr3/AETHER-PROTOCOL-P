@@ -659,7 +659,21 @@ async def agent_chat(req: ChatRequest, token: str = Depends(get_session_token)):
         raise HTTPException(status_code=503, detail="Agent not initialized")
 
     try:
-        response_text = svc.agent.chat(req.query)
+        # If frontend sent vault context, inject it into the query
+        query = req.query
+        if req.vault_context:
+            vc = req.vault_context
+            ctx_lines = [f"\n\n[VAULT CONTEXT — {vc.get('file_count', 0)} items, {vc.get('folder_count', 0)} folders]"]
+            for f in (vc.get('files') or [])[:50]:
+                name = f.get('name', '?')
+                size = f.get('size', '')
+                ext = f.get('extension', '')
+                cat = f.get('category', '')
+                ctx_lines.append(f"  {name}  {size}  {ext}  {cat}")
+            ctx_lines.append("[END VAULT CONTEXT]")
+            query = query + '\n'.join(ctx_lines)
+
+        response_text = svc.agent.chat(query)
     except Exception as e:
         log.warning("agent.chat failed: %s", e)
         response_text = f"Agent error: {str(e)}"

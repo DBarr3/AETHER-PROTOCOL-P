@@ -1410,6 +1410,65 @@
   }
   .sched-qopc-suggest button:hover { opacity: 0.8; }
 
+  /* ═══ OPERATION CONFIRMATION CARDS ═══════════════ */
+  .operation-confirm-card {
+    background: rgba(0, 212, 255, 0.03);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .op-card-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    background: rgba(0, 212, 255, 0.05);
+  }
+  .op-icon { font-size: 14px; }
+  .op-title {
+    color: var(--accent); font-size: 12px; font-weight: 500; flex: 1;
+  }
+  .op-badge {
+    font-size: 9px; color: var(--amber);
+    border: 1px solid var(--amber); padding: 1px 6px; border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .op-file-list { padding: 6px 0; max-height: 240px; overflow-y: auto; }
+  .op-file-row {
+    display: grid;
+    grid-template-columns: 24px 1fr 20px 1fr 20px;
+    align-items: center; gap: 6px;
+    padding: 4px 14px; font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .op-file-row:hover { background: rgba(0, 212, 255, 0.03); }
+  .op-index { color: rgba(255,255,255,0.3); font-size: 10px; }
+  .op-from  { color: rgba(255,255,255,0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-arrow { color: var(--accent); text-align: center; }
+  .op-to    { color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-check { color: var(--green); text-align: center; }
+  .op-card-footer {
+    display: flex; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+    justify-content: flex-end;
+  }
+  .op-btn-cancel {
+    background: transparent; border: 1px solid var(--border-2);
+    color: var(--text-secondary); padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    cursor: pointer; border-radius: 3px;
+  }
+  .op-btn-cancel:hover { border-color: var(--text-secondary); }
+  .op-btn-confirm {
+    background: rgba(0, 212, 255, 0.1); border: 1px solid var(--accent);
+    color: var(--accent); padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    cursor: pointer; border-radius: 3px; font-weight: 500;
+  }
+  .op-btn-confirm:hover { background: rgba(0, 212, 255, 0.2); }
+  .op-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* ═══ CONTEXT GATHERING SYSTEM ═══════════════════ */
   .ctx-gather-modal {
     background: var(--bg-2);
@@ -3491,6 +3550,106 @@ async function analyzeNode(node) {
 }
 
 // ════════════════════════════════════════════════════
+// VAULT CONTEXT BUILDER
+// ════════════════════════════════════════════════════
+const _vaultFileKeywords = [
+  'rename','move','organize','sort','file','folder','patent','document',
+  'pdf','find','show','list','delete','copy','search','what files',
+  'my files','trading','security','backup','archive','clean','duplicate'
+];
+
+async function buildVaultContextPayload() {
+  try {
+    const res = await fetch(`${API_BASE}/vault/browse`, {
+      headers: { 'Authorization': `Bearer ${sessionToken}` }
+    });
+    const vault = await res.json();
+    if (vault.error) return null;
+
+    const fileManifest = [];
+    if (vault.folders) {
+      vault.folders.forEach(f => {
+        fileManifest.push({ name: f.name, path: f.path, type: 'folder', count: f.file_count, modified: f.modified });
+      });
+    }
+    if (vault.files) {
+      vault.files.forEach(f => {
+        fileManifest.push({ name: f.name, path: f.path, size: f.size, extension: f.extension, category: f.category, modified: f.modified });
+      });
+    }
+    return {
+      file_count: fileManifest.length,
+      vault_root: vault.vault_root || '',
+      files: fileManifest,
+      folder_count: vault.folders?.length || 0
+    };
+  } catch (err) {
+    console.warn('Vault context fetch failed:', err.message);
+    return null;
+  }
+}
+
+function isFileRelatedQuery(q) {
+  const lower = q.toLowerCase();
+  return _vaultFileKeywords.some(kw => lower.includes(kw));
+}
+
+// ════════════════════════════════════════════════════
+// OPERATION CONFIRMATION CARDS
+// ════════════════════════════════════════════════════
+function detectProposedOperation(text) {
+  const renamePattern = /`([^`]+)`\s*[→➜->]+\s*`([^`]+)`/g;
+  const ops = [];
+  let m;
+  while ((m = renamePattern.exec(text)) !== null) {
+    ops.push({ type: 'RENAME', from: m[1], to: m[2] });
+  }
+  if (ops.length > 0) return { type: 'BATCH_RENAME', operations: ops };
+  return null;
+}
+
+function renderOperationConfirmationCard(operation) {
+  const panel = document.getElementById('ai-response-panel');
+  const card = document.createElement('div');
+  card.className = 'operation-confirm-card';
+  const opsJson = JSON.stringify(operation).replace(/"/g, '&quot;');
+  card.innerHTML = `
+    <div class="op-card-header">
+      <span class="op-icon">&#9889;</span>
+      <span class="op-title">${operation.operations.length} operation${operation.operations.length > 1 ? 's' : ''} ready</span>
+      <span class="op-badge">PREVIEW</span>
+    </div>
+    <div class="op-file-list">
+      ${operation.operations.map((op, i) => `
+        <div class="op-file-row">
+          <span class="op-index">${i + 1}</span>
+          <span class="op-from">${escH(op.from)}</span>
+          <span class="op-arrow">&#8594;</span>
+          <span class="op-to">${escH(op.to)}</span>
+          <span class="op-check">&#10003;</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="op-card-footer">
+      <button class="op-btn-cancel" onclick="this.closest('.operation-confirm-card').remove()">CANCEL</button>
+      <button class="op-btn-confirm" onclick="executeConfirmedOps(this, ${opsJson})">EXECUTE ${operation.operations.length} OPERATIONS</button>
+    </div>`;
+  panel.appendChild(card);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+async function executeConfirmedOps(btn, operation) {
+  btn.textContent = 'EXECUTING...';
+  btn.disabled = true;
+  const confirmMsg = `Confirmed. Execute all ${operation.operations.length} operations now.`;
+  const input = document.getElementById('chat-input');
+  input.value = confirmMsg;
+  await sendMessage();
+  const card = btn.closest('.operation-confirm-card');
+  if (card) card.remove();
+}
+
+// ════════════════════════════════════════════════════
 // CHAT
 // ════════════════════════════════════════════════════
 async function sendMessage() {
@@ -3509,10 +3668,25 @@ async function sendMessage() {
 
   displayAIResponse('Processing your request...', true);
 
+  // Auto-inject vault context for file-related queries
+  let vaultContext = null;
+  if (isFileRelatedQuery(query)) {
+    vaultContext = await buildVaultContextPayload();
+  }
+
   try {
     let result;
-    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(fullQuery, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:fullQuery}) }); result = await r.json(); }
+    const payload = { query: fullQuery, vault_context: vaultContext };
+    if (window.aetherAPI?.chat) {
+      result = await window.aetherAPI.chat(fullQuery, sessionToken);
+    } else {
+      const r = await fetch(`${API_BASE}/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        body: JSON.stringify(payload)
+      });
+      result = await r.json();
+    }
 
     if (result.error) {
       const errMsg = result.message || 'Failed';
@@ -3527,6 +3701,10 @@ async function sendMessage() {
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
+
+      // Detect proposed operations and show confirmation card
+      const proposed = detectProposedOperation(reply);
+      if (proposed) renderOperationConfirmationCard(proposed);
 
       // In project mode, offer patch prompts if analysis detected issues
       if (currentViewMode === 'project' && /issue|problem|missing|improve|bug|vuln|secur|optim|refactor/i.test(reply)) {
