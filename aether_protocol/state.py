@@ -45,6 +45,19 @@ class AccountSnapshot:
     nonce: int
     timestamp: int
 
+    def __post_init__(self) -> None:
+        """Validate field ranges."""
+        if self.capital < 0:
+            raise StateError("capital cannot be negative")
+        if self.equity < 0:
+            raise StateError("equity cannot be negative")
+        if not (0.0 <= self.risk_used <= 1.0):
+            raise StateError("risk_used must be between 0.0 and 1.0")
+        if not (0.0 <= self.risk_limit <= 1.0):
+            raise StateError("risk_limit must be between 0.0 and 1.0")
+        if self.nonce < 0:
+            raise StateError("nonce cannot be negative")
+
     def to_json(self) -> dict:
         """
         Canonical JSON-serialisable dict representation.

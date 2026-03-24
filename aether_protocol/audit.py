@@ -42,11 +42,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class AuditError(Exception):
@@ -173,6 +177,10 @@ class AuditLog:
 
         self._max_file_size = max_file_size_mb * 1024 * 1024
         self._db_path = self._path.with_suffix(".db")
+        self._write_lock = threading.Lock()
+
+        # Hash chain: track hash of last written line
+        self._last_entry_hash: str = "GENESIS"
 
         # Initialise SQLite index
         self._init_db()
@@ -184,6 +192,9 @@ class AuditLog:
         if self._line_count > 0 and self._index_is_empty():
             self._rebuild_index()
 
+        # Initialize hash chain from last line of existing JSONL
+        self._init_last_hash()
+
     @property
     def path(self) -> Path:
         """Return the log file path."""
@@ -191,12 +202,29 @@ class AuditLog:
 
     # ── SQLite index management ──────────────────────────────────────
 
+    def _init_last_hash(self) -> None:
+        """Read the last JSONL line and compute its hash for chain continuity."""
+        if self._line_count == 0:
+            self._last_entry_hash = "GENESIS"
+            return
+        try:
+            with open(self._path, "rb") as f:
+                last_line = b""
+                for raw in f:
+                    if raw.strip():
+                        last_line = raw
+                if last_line:
+                    self._last_entry_hash = hashlib.sha256(last_line.strip()).hexdigest()
+        except Exception:
+            self._last_entry_hash = "GENESIS"
+
     def _init_db(self) -> None:
         """Create or connect to the SQLite index database."""
         self._conn = sqlite3.connect(
             str(self._db_path), check_same_thread=False
         )
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS audit_index (
                 record_id     TEXT PRIMARY KEY,
@@ -233,6 +261,7 @@ class AuditLog:
 
     def _rebuild_index(self) -> None:
         """Full-scan JSONL and populate SQLite index for existing data."""
+        corrupt_count = 0
         with open(self._path, "rb") as f:
             line_num = 0
             while True:
@@ -248,10 +277,21 @@ class AuditLog:
                     entry = AuditEntry.from_dict(data)
                     self._index_entry(entry, offset, line_num)
                     line_num += 1
-                except (json.JSONDecodeError, KeyError):
+                except (json.JSONDecodeError, KeyError) as exc:
+                    corrupt_count += 1
+                    logger.warning(
+                        "AUDIT REBUILD — skipped corrupt entry at line %d: %s",
+                        line_num, exc,
+                    )
                     line_num += 1
                     continue
         self._conn.commit()
+        if corrupt_count > 0:
+            logger.warning(
+                "AUDIT REBUILD COMPLETE — %d corrupt entries skipped. "
+                "JSONL may be partially damaged. Backup recommended.",
+                corrupt_count,
+            )
 
     def _index_entry(
         self, entry: AuditEntry, offset: int, line_num: int
@@ -358,26 +398,32 @@ class AuditLog:
         Append a single entry to the log.
 
         Writes to the JSONL file (binary mode for reliable byte offsets)
-        and indexes the entry in SQLite.
+        and indexes the entry in SQLite.  Thread-safe via _write_lock.
+        Includes prev_hash for hash chain integrity.
         """
-        # Check rotation before writing (but not for rotation entries
-        # themselves, to avoid infinite recursion)
-        if entry.phase != "LOG_ROTATION":
-            self._maybe_rotate()
+        with self._write_lock:
+            if entry.phase != "LOG_ROTATION":
+                self._maybe_rotate()
 
-        line = json.dumps(
-            entry.to_json(), sort_keys=True, separators=(",", ":")
-        )
+            # Build JSON with hash chain
+            entry_dict = entry.to_json()
+            entry_dict["prev_hash"] = self._last_entry_hash
 
-        # Write to JSONL in binary mode for reliable byte offsets
-        with open(self._path, "ab") as f:
-            offset = f.tell()
-            f.write((line + "\n").encode("utf-8"))
+            line = json.dumps(
+                entry_dict, sort_keys=True, separators=(",", ":")
+            )
+            line_bytes = (line + "\n").encode("utf-8")
 
-        # Index in SQLite
-        self._index_entry(entry, offset, self._line_count)
-        self._conn.commit()
-        self._line_count += 1
+            with open(self._path, "ab") as f:
+                offset = f.tell()
+                f.write(line_bytes)
+
+            # Update hash chain
+            self._last_entry_hash = hashlib.sha256(line_bytes.strip()).hexdigest()
+
+            self._index_entry(entry, offset, self._line_count)
+            self._conn.commit()
+            self._line_count += 1
 
     def append_commitment(
         self, commitment: dict, signature: dict
@@ -633,3 +679,65 @@ class AuditLog:
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     return None
         return None
+
+    # ── Chain integrity verification ─────────────────────────────────
+
+    def verify_chain_integrity(self) -> dict:
+        """
+        Verify the hash chain integrity of the audit log.
+
+        Reads all JSONL entries in order and verifies that each entry's
+        ``prev_hash`` field matches the SHA-256 of the previous raw line.
+
+        Entries written before the hash-chain patch (no ``prev_hash`` field)
+        are counted as ``missing_prev_hash`` but do not break the chain.
+
+        Returns:
+            Dict with total_entries, chain_valid, broken_at_entry,
+            and missing_prev_hash count.
+        """
+        total = 0
+        missing_prev_hash = 0
+        broken_at: int | None = None
+        prev_line_hash = "GENESIS"
+
+        if not self._path.exists():
+            return {
+                "total_entries": 0,
+                "chain_valid": True,
+                "broken_at_entry": None,
+                "missing_prev_hash": 0,
+            }
+
+        with open(self._path, "rb") as f:
+            for raw in f:
+                stripped = raw.strip()
+                if not stripped:
+                    continue
+                total += 1
+
+                try:
+                    data = json.loads(stripped.decode("utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    if broken_at is None:
+                        broken_at = total
+                    continue
+
+                entry_prev = data.get("prev_hash")
+                if entry_prev is None:
+                    # Pre-patch entry — skip chain check, resume from next
+                    missing_prev_hash += 1
+                    prev_line_hash = hashlib.sha256(stripped).hexdigest()
+                    continue
+
+                if entry_prev != prev_line_hash and broken_at is None:
+                    broken_at = total
+
+                prev_line_hash = hashlib.sha256(stripped).hexdigest()
+
+        return {
+            "total_entries": total,
+            "chain_valid": broken_at is None,
+            "broken_at_entry": broken_at,
+            "missing_prev_hash": missing_prev_hash,
+        }

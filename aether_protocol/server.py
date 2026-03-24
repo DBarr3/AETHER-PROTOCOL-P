@@ -1,31 +1,32 @@
 """
 aether_protocol/server.py
 
-FastAPI REST wrapper for the AETHER-PROTOCOL-L quantum trade protocol.
+Hardened FastAPI REST wrapper for the AETHER-PROTOCOL quantum trade protocol.
 
-Exposes the full protocol lifecycle (seed → commit → execute → settle)
+Exposes the full protocol lifecycle (seed -> commit -> execute -> settle)
 plus audit log querying and verification over HTTP.
+
+Security:
+    - API key authentication via X-Aether-Key header (all endpoints except /health)
+    - Per-IP rate limiting (in-memory token bucket)
+    - CORS with explicit allow-list (internal only)
+    - Bind to 127.0.0.1 only — deploy behind nginx reverse proxy
 
 Start the server::
 
+    export AETHER_API_KEY="your-secret-key"
     pip install -e ".[server]"
-    aether-server          # listens on 0.0.0.0:8765
-
-Or programmatically::
-
-    from aether_protocol.server import app
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8765)
+    aether-server          # listens on 127.0.0.1:8765
 """
 
 from __future__ import annotations
 
+import collections
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
 from typing import Any, Optional
-
-import logging
 
 # Protocol variant: "C" = CSPRNG (default), "L" = quantum
 PROTOCOL_VARIANT = os.getenv("AETHER_PROTOCOL_VARIANT", "C")
@@ -47,13 +48,97 @@ from .timestamp_authority import (
 )
 
 try:
-    from fastapi import FastAPI, HTTPException, Query
-    from pydantic import BaseModel
+    from fastapi import FastAPI, HTTPException, Query, Depends, Request
+    from fastapi.responses import JSONResponse
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel, field_validator
 except ImportError as _exc:
     raise ImportError(
         "FastAPI is required for the REST server.  "
         "Install with:  pip install aether-protocol-l[server]"
     ) from _exc
+
+logger = logging.getLogger(__name__)
+
+
+# ── Configuration ────────────────────────────────────────────────────
+
+_API_KEY = os.environ.get("AETHER_API_KEY")
+
+# Protocol-C/L server is internal only. Never add external domains here.
+# Browsers do not call it directly — AetherCloud does, server-side.
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "AETHER_ALLOWED_ORIGINS",
+        "http://localhost:8080,http://127.0.0.1:8080",
+    ).split(",")
+    if o.strip() and "aethersecurity.net" not in o
+]
+
+if not _API_KEY:
+    logger.warning(
+        "WARNING: AETHER_API_KEY not set — server running without authentication"
+    )
+
+
+# ── Rate limiter (in-memory token bucket) ────────────────────────────
+
+class _RateLimiter:
+    """Simple in-memory per-IP rate limiter using sliding window."""
+
+    def __init__(self) -> None:
+        self._requests: dict[str, list[float]] = collections.defaultdict(list)
+
+    def _clean(self, ip: str, window: float) -> None:
+        cutoff = time.monotonic() - window
+        self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
+
+    def check(self, ip: str, limit: int, window: float = 60.0) -> bool:
+        """Return True if request is allowed, False if rate limited."""
+        now = time.monotonic()
+        self._clean(ip, window)
+        if len(self._requests[ip]) >= limit:
+            return False
+        self._requests[ip].append(now)
+        return True
+
+
+_rate_limiter = _RateLimiter()
+
+# Per-IP limits per 60-second window
+_GENERAL_LIMIT = 60   # all endpoints
+_COMMIT_LIMIT = 10    # /commit, /execute, /settle
+
+
+# ── Auth dependency ──────────────────────────────────────────────────
+
+async def _require_auth(request: Request):
+    """Dependency that enforces API key authentication."""
+    if not _API_KEY:
+        return  # No key configured — running open (dev mode)
+
+    provided = request.headers.get("X-Aether-Key", "")
+    if provided != _API_KEY:
+        client_ip = request.client.host if request.client else "unknown"
+        logger.warning("AUTH DENIED: invalid key from %s on %s", client_ip, request.url.path)
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+async def _rate_limit_general(request: Request):
+    """General rate limit: 60 req/min/IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.check(client_ip, _GENERAL_LIMIT):
+        logger.warning("RATE LIMITED: %s exceeded %d req/min", client_ip, _GENERAL_LIMIT)
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+
+async def _rate_limit_commit(request: Request):
+    """Commit rate limit: 10 req/min/IP on write endpoints."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.check(client_ip + ":commit", _COMMIT_LIMIT):
+        logger.warning("RATE LIMITED: %s exceeded %d commit req/min", client_ip, _COMMIT_LIMIT)
+        raise HTTPException(status_code=429, detail="Commit rate limit exceeded")
 
 
 # ── Pydantic request / response models ──────────────────────────────
@@ -79,6 +164,14 @@ class CommitRequest(BaseModel):
     reasoning_model: Optional[str] = None
     reasoning_token_count: Optional[int] = None
 
+    @field_validator("order_id")
+    @classmethod
+    def order_id_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) > 255:
+            raise ValueError("order_id must be 1-255 characters")
+        return v
+
 
 class ReasoningVerifyRequest(BaseModel):
     reasoning_text: str
@@ -101,6 +194,14 @@ class ExecuteRequest(BaseModel):
     execution_timestamp: Optional[int] = None
     broker_response: dict = {}
 
+    @field_validator("order_id")
+    @classmethod
+    def order_id_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) > 255:
+            raise ValueError("order_id must be 1-255 characters")
+        return v
+
 
 class SettleRequest(BaseModel):
     seed_hash: str
@@ -110,6 +211,14 @@ class SettleRequest(BaseModel):
     attestation: dict
     attestation_sig: dict
     broker_sig: str
+
+    @field_validator("order_id")
+    @classmethod
+    def order_id_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) > 255:
+            raise ValueError("order_id must be 1-255 characters")
+        return v
 
 
 # ── Application state ───────────────────────────────────────────────
@@ -138,10 +247,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AETHER-PROTOCOL-L",
-    version="0.5.1",
+    title="AETHER-PROTOCOL",
+    version="0.6.0",
     description="Quantum-authenticated decision protocol REST API",
     lifespan=lifespan,
+)
+
+# CORS — internal only. Never add external domains here.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["X-Aether-Key", "Content-Type"],
 )
 
 
@@ -152,9 +270,24 @@ def _get_protocol() -> AsyncQuantumProtocol:
     return _protocol
 
 
+# ── Health endpoint (no auth) ────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    """Health check — no auth required so nginx can probe it."""
+    return {
+        "status": "healthy",
+        "version": "0.6.0",
+        "protocol_variant": PROTOCOL_VARIANT,
+        "authenticated": _API_KEY is not None,
+        "timestamp": int(time.time()),
+    }
+
+
 # ── Seed endpoint ────────────────────────────────────────────────────
 
-@app.post("/seed", response_model=SeedResponse)
+@app.post("/seed", response_model=SeedResponse,
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def create_seed(req: SeedRequest):
     """Generate a quantum seed and cache it for subsequent operations."""
     proto = _get_protocol()
@@ -179,7 +312,8 @@ def _pop_seed(seed_hash: str) -> QuantumSeedResult:
 
 # ── Commit endpoint ──────────────────────────────────────────────────
 
-@app.post("/commit")
+@app.post("/commit",
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general), Depends(_rate_limit_commit)])
 async def commit(req: CommitRequest):
     """Create a quantum decision commitment."""
     proto = _get_protocol()
@@ -210,7 +344,8 @@ async def commit(req: CommitRequest):
 
 # ── Execute endpoint ─────────────────────────────────────────────────
 
-@app.post("/execute")
+@app.post("/execute",
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general), Depends(_rate_limit_commit)])
 async def execute(req: ExecuteRequest):
     """Create a quantum execution attestation."""
     proto = _get_protocol()
@@ -233,7 +368,8 @@ async def execute(req: ExecuteRequest):
 
 # ── Settle endpoint ──────────────────────────────────────────────────
 
-@app.post("/settle")
+@app.post("/settle",
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general), Depends(_rate_limit_commit)])
 async def settle(req: SettleRequest):
     """Create a quantum settlement record."""
     proto = _get_protocol()
@@ -251,7 +387,8 @@ async def settle(req: SettleRequest):
 
 # ── Reasoning verification endpoint ──────────────────────────────────
 
-@app.post("/reasoning/verify")
+@app.post("/reasoning/verify",
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def verify_reasoning(req: ReasoningVerifyRequest):
     """Verify that a reasoning hash matches the reasoning text."""
     import hashlib
@@ -266,7 +403,8 @@ async def verify_reasoning(req: ReasoningVerifyRequest):
 
 # ── Timestamp verification endpoint ─────────────────────────────────
 
-@app.post("/timestamp/verify")
+@app.post("/timestamp/verify",
+          dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def verify_timestamp(req: TimestampVerifyRequest):
     """Verify that a timestamp token matches the given data."""
     try:
@@ -284,7 +422,8 @@ async def verify_timestamp(req: TimestampVerifyRequest):
 
 # ── Audit query endpoints ────────────────────────────────────────────
 
-@app.get("/audit")
+@app.get("/audit",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def query_audit(
     record_type: Optional[str] = Query(None),
     since: Optional[float] = Query(None),
@@ -304,7 +443,17 @@ async def query_audit(
     return {"records": records, "count": len(records)}
 
 
-@app.get("/audit/{record_id}")
+@app.get("/audit/chain-integrity",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
+async def audit_chain_integrity():
+    """Verify audit log hash chain integrity."""
+    proto = _get_protocol()
+    result = proto._audit_log.verify_chain_integrity()
+    return result
+
+
+@app.get("/audit/{record_id}",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def get_record(record_id: str):
     """Retrieve a single audit record by ID."""
     proto = _get_protocol()
@@ -314,7 +463,8 @@ async def get_record(record_id: str):
     return record
 
 
-@app.get("/audit/{record_id}/verify")
+@app.get("/audit/{record_id}/verify",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def verify_record(record_id: str):
     """Verify the trade flow containing this record."""
     proto = _get_protocol()
@@ -343,7 +493,8 @@ async def verify_record(record_id: str):
     }
 
 
-@app.get("/audit/{record_id}/report")
+@app.get("/audit/{record_id}/report",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def get_report(record_id: str):
     """Generate a PDF dispute report for the trade flow containing this record."""
     from fastapi.responses import Response
@@ -387,7 +538,8 @@ async def get_report(record_id: str):
 
 # ── Status endpoint ──────────────────────────────────────────────────
 
-@app.get("/status")
+@app.get("/status",
+         dependencies=[Depends(_require_auth), Depends(_rate_limit_general)])
 async def status():
     """Return server and protocol status."""
     proto = _get_protocol()
@@ -400,7 +552,8 @@ async def status():
         record_count = proto._audit_log._line_count
 
     return {
-        "version": "0.5.1",
+        "version": "0.6.0",
+        "protocol_variant": PROTOCOL_VARIANT,
         "pool": get_pool_status(),
         "log": {
             "current_file": str(log_path.name),
@@ -414,10 +567,11 @@ async def status():
 # ── CLI entry point ──────────────────────────────────────────────────
 
 def run():
-    """Start the AETHER-PROTOCOL-L server (called by ``aether-server``)."""
+    """Start the AETHER-PROTOCOL server (called by ``aether-server``)."""
     import uvicorn
 
-    host = os.environ.get("AETHER_HOST", "0.0.0.0")
+    # Deploy behind nginx reverse proxy — do not expose directly
+    host = os.environ.get("AETHER_HOST", "127.0.0.1")
     port = int(os.environ.get("AETHER_PORT", "8765"))
     default_seed = "CSPRNG" if PROTOCOL_VARIANT == "C" else "OS_URANDOM"
     seed_method = os.environ.get("AETHER_SEED_METHOD", default_seed)
@@ -426,7 +580,7 @@ def run():
     # ── Retro terminal boot banner ──
     ui = get_console()
     ui.boot_banner(
-        version="0.5.1",
+        version="0.6.0",
         seed_method=seed_method,
         log_path=log_path,
         host=host,
