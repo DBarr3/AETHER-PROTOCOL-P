@@ -360,3 +360,109 @@ ipcMain.handle('read-file-preview', async (_e, filePath, maxLines = 80) => {
     return { error: true, message: err.message };
   }
 });
+
+// ═══════════════════════════════════════════════════
+// IPC: Auth Persistence (remember me)
+// ═══════════════════════════════════════════════════
+let authStore = null;
+function getAuthStore() {
+  if (!authStore) authStore = require('./auth-store');
+  return authStore;
+}
+
+ipcMain.handle('auth:get', () => {
+  const store = getAuthStore();
+  return {
+    sessionToken: store.get('sessionToken') || null,
+    userId: store.get('userId') || null,
+    email: store.get('email') || null,
+    rememberMe: store.get('rememberMe', true),
+    lastLogin: store.get('lastLogin') || null,
+    serverUrl: store.get('serverUrl') || null,
+    licenseKey: store.get('licenseKey') || null,
+    plan: store.get('plan') || null,
+  };
+});
+
+ipcMain.handle('auth:set', (_e, data) => {
+  const store = getAuthStore();
+  if (data.sessionToken !== undefined) store.set('sessionToken', data.sessionToken);
+  if (data.userId !== undefined) store.set('userId', data.userId);
+  if (data.email !== undefined) store.set('email', data.email);
+  if (data.rememberMe !== undefined) store.set('rememberMe', data.rememberMe);
+  if (data.lastLogin !== undefined) store.set('lastLogin', data.lastLogin);
+  if (data.serverUrl !== undefined) store.set('serverUrl', data.serverUrl);
+  if (data.licenseKey !== undefined) store.set('licenseKey', data.licenseKey);
+  if (data.plan !== undefined) store.set('plan', data.plan);
+  return { success: true };
+});
+
+ipcMain.handle('auth:clear', () => {
+  const store = getAuthStore();
+  store.delete('sessionToken');
+  store.delete('userId');
+  store.delete('email');
+  return { success: true };
+});
+
+ipcMain.handle('auth:clearAll', () => {
+  const store = getAuthStore();
+  store.clear();
+  return { success: true };
+});
+
+// ═══════════════════════════════════════════════════
+// IPC: Admin License Server Calls
+// ═══════════════════════════════════════════════════
+const LICENSE_SERVER = process.env.AETHER_LICENSE_SERVER || 'https://aethersecurity.net/api/license';
+const ADMIN_KEY = process.env.AETHER_ADMIN_KEY || '';
+
+async function adminFetch(endpoint, options = {}) {
+  const url = `${LICENSE_SERVER}${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Aether-Admin-Key': ADMIN_KEY,
+    ...(options.headers || {}),
+  };
+  try {
+    const resp = await fetch(url, { ...options, headers });
+    return await resp.json();
+  } catch (err) {
+    return { error: true, message: err.message };
+  }
+}
+
+ipcMain.handle('admin:overview', () => adminFetch('/admin/overview'));
+ipcMain.handle('admin:scrambler:list', (_e, params) => {
+  const qs = new URLSearchParams(params || {}).toString();
+  return adminFetch(`/license/scrambler/list?${qs}`);
+});
+ipcMain.handle('admin:scrambler:issue', (_e, data) =>
+  adminFetch('/license/scrambler/issue', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:scrambler:revoke', (_e, data) =>
+  adminFetch('/license/scrambler/revoke', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:scrambler:extend', (_e, data) =>
+  adminFetch('/license/scrambler/extend', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:cloud:list', (_e, params) => {
+  const qs = new URLSearchParams(params || {}).toString();
+  return adminFetch(`/license/cloud/list?${qs}`);
+});
+ipcMain.handle('admin:cloud:issue', (_e, data) =>
+  adminFetch('/license/cloud/issue', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:cloud:revoke', (_e, data) =>
+  adminFetch('/license/cloud/revoke', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:apikey:list', (_e, params) => {
+  const qs = new URLSearchParams(params || {}).toString();
+  return adminFetch(`/license/api/list?${qs}`);
+});
+ipcMain.handle('admin:apikey:issue', (_e, data) =>
+  adminFetch('/license/api/issue', { method: 'POST', body: JSON.stringify(data) })
+);
+ipcMain.handle('admin:apikey:revoke', (_e, data) =>
+  adminFetch('/license/api/revoke', { method: 'POST', body: JSON.stringify(data) })
+);

@@ -324,6 +324,30 @@ def _init_services():
 async def lifespan(application: FastAPI):
     """Initialize services on startup, cleanup on shutdown."""
     _init_services()
+
+    # Validate AetherCloud license (non-blocking — log only)
+    try:
+        from license_client import CloudLicenseClient, _license_info
+        import license_client
+        _lc = CloudLicenseClient()
+        if _lc.key:
+            _result = _lc.validate()
+            license_client._license_info = _result
+            if _result.get("valid"):
+                if _result.get("grace_mode"):
+                    log.warning("CLOUD LICENSE — grace mode (server unreachable)")
+                else:
+                    log.info(
+                        "CLOUD LICENSE VALID — plan=%s expires=%s",
+                        _result.get("plan"), _result.get("expires_at"),
+                    )
+            else:
+                log.warning("CLOUD LICENSE INVALID — %s", _result.get("reason"))
+        else:
+            log.info("No AETHERCLOUD_LICENSE_KEY set — running unlicensed")
+    except Exception as e:
+        log.warning("License validation error: %s", e)
+
     yield
 
 app = FastAPI(
@@ -454,6 +478,13 @@ class ContextRequest(BaseModel):
     context: str
 
 
+class LicenseStatus(BaseModel):
+    valid: bool = False
+    plan: Optional[str] = None
+    expires_at: Optional[str] = None
+    grace_mode: bool = False
+
+
 class StatusResponse(BaseModel):
     protocol_l: str
     watcher: str
@@ -465,6 +496,7 @@ class StatusResponse(BaseModel):
     uptime: float
     version: str
     needs_setup: bool = False
+    license: Optional[LicenseStatus] = None
 
 
 # ── Scheduled Task Models ────────────────────────
@@ -1645,6 +1677,21 @@ async def status():
         except Exception:
             needs_setup = True
 
+    # License info
+    _lic_status = None
+    try:
+        from license_client import get_license_info
+        _li = get_license_info()
+        if _li:
+            _lic_status = LicenseStatus(
+                valid=_li.get("valid", False),
+                plan=_li.get("plan"),
+                expires_at=_li.get("expires_at"),
+                grace_mode=_li.get("grace_mode", False),
+            )
+    except Exception:
+        pass
+
     return StatusResponse(
         protocol_l="ACTIVE",
         watcher=watcher_status,
@@ -1656,6 +1703,7 @@ async def status():
         uptime=round(time.time() - _start_time, 1),
         version=APP_VERSION,
         needs_setup=needs_setup,
+        license=_lic_status,
     )
 
 

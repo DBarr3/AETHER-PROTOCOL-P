@@ -110,4 +110,23 @@ contextBridge.exposeInMainWorld('aetherAPI', {
       body: JSON.stringify({ root_path: rootPath }),
       headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
     }),
+
+  // ── Admin License Server ──────────────────────
+  adminOverview:       () => ipcRenderer.invoke('admin:overview'),
+  adminScramblerList:  (params) => ipcRenderer.invoke('admin:scrambler:list', params),
+  adminScramblerIssue: (data) => ipcRenderer.invoke('admin:scrambler:issue', data),
+  adminScramblerRevoke:(data) => ipcRenderer.invoke('admin:scrambler:revoke', data),
+  adminScramblerExtend:(data) => ipcRenderer.invoke('admin:scrambler:extend', data),
+  adminCloudList:      (params) => ipcRenderer.invoke('admin:cloud:list', params),
+  adminCloudIssue:     (data) => ipcRenderer.invoke('admin:cloud:issue', data),
+  adminCloudRevoke:    (data) => ipcRenderer.invoke('admin:cloud:revoke', data),
+  adminApiKeyList:     (params) => ipcRenderer.invoke('admin:apikey:list', params),
+  adminApiKeyIssue:    (data) => ipcRenderer.invoke('admin:apikey:issue', data),
+  adminApiKeyRevoke:   (data) => ipcRenderer.invoke('admin:apikey:revoke', data),
+
+  // ── Auth Persistence ──────────────────────────
+  authGet:    () => ipcRenderer.invoke('auth:get'),
+  authSet:    (data) => ipcRenderer.invoke('auth:set', data),
+  authClear:  () => ipcRenderer.invoke('auth:clear'),
+  authClearAll: () => ipcRenderer.invoke('auth:clearAll'),
 });

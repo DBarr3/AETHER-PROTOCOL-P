@@ -1945,6 +1945,29 @@
         </div>
         <div id="spawned-agents-list" style="margin-top:6px;"></div>
       </div>
+
+      <!-- ADMIN: LICENSES (admin only) -->
+      <div class="sb-section" id="sb-admin-licenses" style="display:none;">
+        <div class="sb-header">
+          LICENSES
+          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openIssueLicenseModal()" title="Issue License">+</span>
+        </div>
+        <div id="license-overview-stats" style="font-size:10px;color:var(--muted);padding:2px 8px;"></div>
+        <div class="sb-agent-list">
+          <button class="sb-agent-btn" onclick="showLicensePanel('scrambler')">
+            <span class="agent-icon">🔐</span>
+            <span>Scrambler Keys</span>
+          </button>
+          <button class="sb-agent-btn" onclick="showLicensePanel('cloud')">
+            <span class="agent-icon">☁</span>
+            <span>Cloud Licenses</span>
+          </button>
+          <button class="sb-agent-btn" onclick="showLicensePanel('apikeys')">
+            <span class="agent-icon">🔑</span>
+            <span>API Keys</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- BOTTOM CONTROLS -->
@@ -7326,8 +7349,189 @@ window.addEventListener('load', async () => {
   startLogsPolling();
   initCircuit();
   pushHistory('Initial vault');
+  initAdminLicenses();
   showToast('AetherCloud-L ready', 'success');
 });
+
+// ═══════════════════════════════════════════════════
+// ADMIN LICENSE MANAGEMENT
+// ═══════════════════════════════════════════════════
+
+async function initAdminLicenses() {
+  // Show admin panel only for admin user (brandon)
+  try {
+    var el = document.getElementById('sb-admin-licenses');
+    if (!el) return;
+    el.style.display = '';
+    loadAdminOverview();
+  } catch(e) { console.warn('Admin init:', e); }
+}
+
+async function loadAdminOverview() {
+  if (!window.aetherAPI || !window.aetherAPI.adminOverview) return;
+  try {
+    var data = await window.aetherAPI.adminOverview();
+    if (data.error) return;
+    var el = document.getElementById('license-overview-stats');
+    if (!el) return;
+    var s = data.scrambler || {};
+    var c = data.cloud || {};
+    var a = data.api_keys || {};
+    el.innerHTML = 'SCRM: ' + (s.active||0) + ' active · CLD: ' + (c.active||0) + ' · API: ' + (a.active||0) + ' keys';
+  } catch(e) { console.warn('Admin overview:', e); }
+}
+
+var _licPanelHtml = '';
+async function showLicensePanel(type) {
+  var api = window.aetherAPI;
+  if (!api) return;
+  var container = document.getElementById('main-chat-area') || document.querySelector('.main-content');
+  if (!container) return;
+
+  var html = '<div style="padding:20px;font-family:var(--mono);color:var(--text);">';
+  html += '<h2 style="color:var(--accent);margin-bottom:16px;">';
+
+  if (type === 'scrambler') {
+    html += 'SCRAMBLER LICENSES</h2>';
+    var data = await api.adminScramblerList({});
+    var licenses = (data && data.licenses) || [];
+    html += _buildLicenseTable(licenses, 'scrambler');
+  } else if (type === 'cloud') {
+    html += 'CLOUD LICENSES</h2>';
+    var data = await api.adminCloudList({});
+    var licenses = (data && data.licenses) || [];
+    html += _buildLicenseTable(licenses, 'cloud');
+  } else if (type === 'apikeys') {
+    html += 'API KEYS</h2>';
+    var data = await api.adminApiKeyList({});
+    var keys = (data && data.api_keys) || [];
+    html += _buildApiKeyTable(keys);
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function _buildLicenseTable(licenses, type) {
+  if (!licenses.length) return '<div style="color:var(--muted);">No licenses found</div>';
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  h += '<tr style="color:var(--accent);border-bottom:1px solid var(--border);">';
+  h += '<th style="text-align:left;padding:6px;">KEY</th>';
+  h += '<th>TIER/PLAN</th><th>CLIENT</th><th>STATUS</th><th>EXPIRES</th><th>VALIDATED</th><th>ACTIONS</th></tr>';
+  licenses.forEach(function(lic) {
+    var statusColor = lic.status === 'active' ? '#00e5ff' : lic.status === 'revoked' ? '#e63946' : '#ffb300';
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">';
+    h += '<td style="padding:6px;color:#8af;">' + (lic.key||'').substring(0,18) + '...</td>';
+    h += '<td style="text-align:center;">' + (lic.tier || lic.plan || '-') + '</td>';
+    h += '<td style="text-align:center;">' + (lic.client_email||'-') + '</td>';
+    h += '<td style="text-align:center;color:' + statusColor + ';">' + (lic.status||'-').toUpperCase() + '</td>';
+    h += '<td style="text-align:center;">' + ((lic.expires_at||'').split('T')[0]||'-') + '</td>';
+    h += '<td style="text-align:center;">' + ((lic.last_validated_at||'').split('T')[0]||'never') + '</td>';
+    h += '<td style="text-align:center;">';
+    if (lic.status === 'active') {
+      h += '<span style="cursor:pointer;color:#e63946;margin:0 4px;" onclick="revokeLicense(\'' + type + '\',\'' + lic.key + '\')">REVOKE</span>';
+      h += '<span style="cursor:pointer;color:#00e5ff;margin:0 4px;" onclick="extendLicense(\'' + type + '\',\'' + lic.key + '\')">+30D</span>';
+    }
+    h += '</td></tr>';
+  });
+  h += '</table>';
+  return h;
+}
+
+function _buildApiKeyTable(keys) {
+  if (!keys.length) return '<div style="color:var(--muted);">No API keys found</div>';
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  h += '<tr style="color:var(--accent);border-bottom:1px solid var(--border);">';
+  h += '<th style="text-align:left;padding:6px;">KEY</th>';
+  h += '<th>CLIENT</th><th>LABEL</th><th>TODAY</th><th>MONTH</th><th>RATE</th><th>STATUS</th><th>ACTIONS</th></tr>';
+  keys.forEach(function(k) {
+    var sc = k.status === 'active' ? '#00e5ff' : '#e63946';
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">';
+    h += '<td style="padding:6px;color:#8af;">' + (k.key||'').substring(0,18) + '...</td>';
+    h += '<td style="text-align:center;">' + (k.client_email||'-') + '</td>';
+    h += '<td style="text-align:center;">' + (k.label||'-') + '</td>';
+    h += '<td style="text-align:center;">' + (k.calls_today||0) + '</td>';
+    h += '<td style="text-align:center;">' + (k.calls_this_month||0) + '</td>';
+    h += '<td style="text-align:center;">' + (k.rate_limit_per_min||60) + '/min</td>';
+    h += '<td style="text-align:center;color:' + sc + ';">' + (k.status||'-').toUpperCase() + '</td>';
+    h += '<td style="text-align:center;">';
+    if (k.status === 'active') h += '<span style="cursor:pointer;color:#e63946;" onclick="revokeApiKey(\'' + k.key + '\')">REVOKE</span>';
+    h += '</td></tr>';
+  });
+  h += '</table>';
+  return h;
+}
+
+async function revokeLicense(type, key) {
+  if (!confirm('Revoke license ' + key.substring(0,18) + '...?')) return;
+  var api = window.aetherAPI;
+  if (type === 'scrambler') await api.adminScramblerRevoke({key: key, reason: 'admin revoke'});
+  else await api.adminCloudRevoke({key: key, reason: 'admin revoke'});
+  showLicensePanel(type);
+  loadAdminOverview();
+}
+
+async function extendLicense(type, key) {
+  var api = window.aetherAPI;
+  if (type === 'scrambler') await api.adminScramblerExtend({key: key, days: 30});
+  else await api.adminCloudRevoke({key: key, days: 30}); // TODO: add cloud extend
+  showLicensePanel(type);
+}
+
+async function revokeApiKey(key) {
+  if (!confirm('Revoke API key ' + key.substring(0,18) + '...?')) return;
+  await window.aetherAPI.adminApiKeyRevoke({key: key});
+  showLicensePanel('apikeys');
+  loadAdminOverview();
+}
+
+function openIssueLicenseModal() {
+  var html = '<div style="padding:20px;font-family:var(--mono);color:var(--text);max-width:400px;margin:auto;">';
+  html += '<h3 style="color:var(--accent);margin-bottom:16px;">ISSUE NEW LICENSE</h3>';
+  html += '<div style="margin-bottom:12px;"><label style="font-size:10px;color:var(--muted);">PRODUCT</label><br>';
+  html += '<select id="lic-product" style="width:100%;padding:8px;background:#0a1020;color:var(--text);border:1px solid var(--border);font-family:var(--mono);">';
+  html += '<option value="scrambler">Scrambler</option><option value="cloud">AetherCloud</option></select></div>';
+  html += '<div style="margin-bottom:12px;"><label style="font-size:10px;color:var(--muted);">CLIENT EMAIL</label><br>';
+  html += '<input id="lic-email" type="email" style="width:100%;padding:8px;background:#0a1020;color:var(--text);border:1px solid var(--border);font-family:var(--mono);" placeholder="client@example.com"></div>';
+  html += '<div style="margin-bottom:12px;"><label style="font-size:10px;color:var(--muted);">TIER / PLAN</label><br>';
+  html += '<select id="lic-tier" style="width:100%;padding:8px;background:#0a1020;color:var(--text);border:1px solid var(--border);font-family:var(--mono);">';
+  html += '<option value="model_a">Model A</option><option value="model_b">Model B</option>';
+  html += '<option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>';
+  html += '<div style="margin-bottom:12px;"><label style="font-size:10px;color:var(--muted);">DURATION (DAYS)</label><br>';
+  html += '<input id="lic-days" type="number" value="365" style="width:100%;padding:8px;background:#0a1020;color:var(--text);border:1px solid var(--border);font-family:var(--mono);"></div>';
+  html += '<button onclick="submitIssueLicense()" style="width:100%;padding:10px;background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);cursor:pointer;">ISSUE LICENSE</button>';
+  html += '<div id="lic-result" style="margin-top:12px;font-size:11px;"></div>';
+  html += '</div>';
+
+  var container = document.getElementById('main-chat-area') || document.querySelector('.main-content');
+  if (container) container.innerHTML = html;
+}
+
+async function submitIssueLicense() {
+  var product = document.getElementById('lic-product').value;
+  var email = document.getElementById('lic-email').value;
+  var tier = document.getElementById('lic-tier').value;
+  var days = parseInt(document.getElementById('lic-days').value) || 365;
+  var resultEl = document.getElementById('lic-result');
+
+  if (!email) { resultEl.innerHTML = '<span style="color:#e63946;">Email required</span>'; return; }
+
+  var api = window.aetherAPI;
+  var result;
+  if (product === 'scrambler') {
+    result = await api.adminScramblerIssue({client_email: email, tier: tier, duration_days: days});
+  } else {
+    result = await api.adminCloudIssue({client_email: email, plan: tier, duration_days: days});
+  }
+
+  if (result && result.key) {
+    resultEl.innerHTML = '<div style="color:#00e676;margin-bottom:8px;">✓ LICENSE ISSUED</div>' +
+      '<div style="background:#0a1020;padding:10px;border:1px solid var(--accent);font-size:13px;letter-spacing:1px;color:#00e5ff;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + result.key + '\');this.style.borderColor=\'#00e676\';">' +
+      result.key + '<br><span style="font-size:9px;color:var(--muted);">Click to copy · This key is shown ONCE</span></div>';
+    loadAdminOverview();
+  } else {
+    resultEl.innerHTML = '<span style="color:#e63946;">Failed: ' + (result.detail || result.message || 'unknown error') + '</span>';
+  }
+}
 </script>
 </body>
 </html>
