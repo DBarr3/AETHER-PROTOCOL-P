@@ -1,0 +1,15 @@
+[Unit]
+Description=Aether MCP Agent Worker
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/aether-mcp
+EnvironmentFile=/opt/aether-mcp/.env
+ExecStart=/opt/aether-mcp/venv/bin/python -m uvicorn mcp_worker.server:app --host 0.0.0.0 --port 8095
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
