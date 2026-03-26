@@ -1,21 +1,35 @@
 /**
- * AetherCloud-L v0.8.9 — Electron Main Process
+ * AetherCloud-L v0.9.2 — Electron Main Process
  * Aether Systems LLC · Patent Pending
  *
- * Fresh minimal launcher: login.html → dashboard.html
- * Backend: VPS2 at 198.211.115.41:8080
+ * All traffic routes through VPS1 HTTPS proxy → VPS2 private mesh
  */
+
+// Accept self-signed certificate for VPS1
+// VPS1 uses a self-signed cert — traffic is still fully encrypted
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
-const http = require('http');
-const fs   = require('fs');
+const https = require('https');
+const http  = require('http');
+const fs    = require('fs');
 
 const keyManager = require('./key-manager');
 
+// Accept self-signed cert ONLY from our VPS1 IP
+app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  if (url.startsWith('https://143.198.162.111')) {
+    event.preventDefault();
+    callback(true);
+  } else {
+    callback(false);
+  }
+});
+
 // ── Constants ────────────────────────────────────────
 const PAGES_DIR = path.join(__dirname, 'pages');
-const API_BASE  = 'http://198.211.115.41:8080';
+const API_BASE  = 'https://143.198.162.111/cloud';
 
 let mainWindow = null;
 let appQuitting = false;
@@ -79,7 +93,8 @@ async function waitForBackend(maxRetries = 15, delayMs = 2000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const data = await new Promise((resolve, reject) => {
-        const req = http.get(statusUrl, (res) => {
+        const mod = statusUrl.startsWith('https') ? https : http;
+        const req = mod.get(statusUrl, { rejectUnauthorized: false }, (res) => {
           let body = '';
           res.on('data', (d) => (body += d));
           res.on('end', () => {
@@ -119,7 +134,7 @@ async function waitForBackend(maxRetries = 15, delayMs = 2000) {
     type: 'error',
     title: 'AetherCloud Connection Failed',
     message: 'Cannot reach AetherCloud backend.',
-    detail: `Tried ${maxRetries} times to reach ${API_BASE}/status\n\nCheck:\n• VPS1 is running (143.198.162.111)\n• VPS2 backend is active (198.211.115.41:8080)\n• Your internet connection`,
+    detail: `Tried ${maxRetries} times to reach ${API_BASE}/status\n\nCheck:\n• VPS1 is running (143.198.162.111)\n• Backend is active\n• Your internet connection`,
     buttons: ['Retry', 'Quit'],
   });
 
@@ -137,7 +152,8 @@ async function waitForBackend(maxRetries = 15, delayMs = 2000) {
 async function verifyRouting() {
   try {
     const data = await new Promise((resolve, reject) => {
-      const req = http.get(`${API_BASE}/routing-check`, (res) => {
+      const mod = API_BASE.startsWith('https') ? https : http;
+      const req = mod.get(`${API_BASE}/routing-check`, { rejectUnauthorized: false }, (res) => {
         let body = '';
         res.on('data', (d) => (body += d));
         res.on('end', () => {
@@ -414,7 +430,7 @@ ipcMain.handle('auth:clearAll', () => {
 // ═══════════════════════════════════════════════════
 // IPC: Admin License Server Calls
 // ═══════════════════════════════════════════════════
-const LICENSE_SERVER = process.env.AETHER_LICENSE_SERVER || 'https://aethersecurity.net/api/license';
+const LICENSE_SERVER = process.env.AETHER_LICENSE_SERVER || 'https://143.198.162.111/api/license';
 const ADMIN_KEY = process.env.AETHER_ADMIN_KEY || '';
 
 async function adminFetch(endpoint, options = {}) {

@@ -1,5 +1,5 @@
 /**
- * AetherCloud-L v0.8.9 — Preload (context bridge)
+ * AetherCloud-L v0.9.2 — Preload (context bridge)
  * Aether Systems LLC · Patent Pending
  *
  * Two bridges:
@@ -13,7 +13,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ELECTRON IPC BRIDGE
 // ═══════════════════════════════════════════════════
 contextBridge.exposeInMainWorld('aether', {
-  apiBase: 'http://198.211.115.41:8080',
+  apiBase: 'https://143.198.162.111/cloud',
   navigate:     (page) => ipcRenderer.send('navigate', page),
   minimize:     () => ipcRenderer.send('window:minimize'),
   maximize:     () => ipcRenderer.send('window:maximize'),
@@ -43,9 +43,9 @@ contextBridge.exposeInMainWorld('aether', {
 });
 
 // ═══════════════════════════════════════════════════
-// VPS2 BACKEND API CLIENT
+// VPS BACKEND API CLIENT (via VPS1 HTTPS proxy)
 // ═══════════════════════════════════════════════════
-const API_BASE = 'http://198.211.115.41:8080';
+const API_BASE = 'https://143.198.162.111/cloud';
 
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;

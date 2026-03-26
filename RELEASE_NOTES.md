@@ -4,6 +4,38 @@
 
 ---
 
+## v0.9.2 — Security Hardening Release (2026-03-26)
+
+### Security
+- HTTPS enforced — all traffic encrypted via self-signed cert on VPS1
+- Zero Trust authentication — 15-minute JWT tokens with silent refresh
+- Device fingerprint binding — tokens tied to machine hardware ID
+- Prompt injection detector — 40+ patterns, 6 categories
+- Session management — login history, device tracking, revocation
+- MCP agents isolated on dedicated VPS5 — separate from core backend
+- Protocol-C audit trail on every MCP agent call
+- Ed25519 node certificates — VPS2↔VPS5 mutual authentication
+
+### Features
+- DO Spaces vault storage — files stored in cloud, not on VPS disk
+- Per-client vault isolation — cryptographic prefix enforcement
+- Storage usage meter with upgrade prompts
+- Active session management — view and revoke sessions from dashboard
+- Security events timeline in LOGS tab
+- MCP breach alert panel with severity indicators
+- License activation screen — prompted once per machine, stored encrypted
+
+### Infrastructure
+- VPS5 deployed — 8GB dedicated MCP agent worker
+- Scrambler switched to OS_URANDOM — $0 IBM cost until client onboarded
+- License server operational — AETH-CLD and AETH-SCRM key types live
+- All 5 VPS nodes hardened — SSH keys, fail2ban, UFW locked
+
+### Tests
+- 656 tests passing across all repos
+
+---
+
 ## v0.6.0 — Agent Marketing Skills Patch (2026-03-20)
 
 ### Features
