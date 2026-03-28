@@ -106,10 +106,21 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
+      const text = await resp.text().catch(() => '');
+      let body = {};
+      try { body = JSON.parse(text); } catch {
+        // nginx returned HTML instead of JSON (502/504 gateway error)
+        if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+          return { error: true, status: resp.status, message: `Backend unreachable (${resp.status}). Server may be restarting.` };
+        }
+        return { error: true, status: resp.status, message: text.substring(0, 200) || resp.statusText };
+      }
       return { error: true, status: resp.status, message: body.detail || resp.statusText, ...body };
     }
-    return await resp.json();
+    const text = await resp.text();
+    try { return JSON.parse(text); } catch {
+      return { error: true, message: `Invalid JSON response: ${text.substring(0, 120)}` };
+    }
   } catch (err) {
     return { error: true, message: err.message };
   }

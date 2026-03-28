@@ -2500,6 +2500,27 @@ async function getSessionToken() {
 // Hydrate immediately on load
 getSessionToken();
 
+// Safe JSON parse — handles nginx HTML error pages gracefully
+async function safeJson(resp) {
+  const text = await resp.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // nginx returned HTML (502/504 gateway error) instead of JSON
+    if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+      const status = resp.status;
+      if (status === 502 || status === 504) {
+        return { error: true, message: `Backend unreachable (${status}). The VPS2 server may be restarting — try again in 30 seconds.` };
+      }
+      if (status === 413) {
+        return { error: true, message: 'Request too large. Try a smaller directory or fewer files.' };
+      }
+      return { error: true, message: `Server returned HTML instead of JSON (HTTP ${status}). Check VPS2 status.` };
+    }
+    return { error: true, message: `Invalid response: ${text.substring(0, 120)}` };
+  }
+}
+
 // Auto-retry wrapper: catches 401 → re-authenticates → retries once
 async function authFetch(url, options = {}) {
   const token = await getSessionToken();
@@ -3632,7 +3653,7 @@ async function menuOpen() {
           data = await window.aetherAPI.browseVault(dirPath);
         } else {
           const r = await fetch(`${API_BASE}/vault/browse?path=${encodeURIComponent(dirPath)}`, { headers: { 'Authorization': `Bearer ${sessionToken}` } });
-          data = await r.json();
+          data = await safeJson(r);
         }
       } catch (vpsErr) {
         // VPS also failed — use whatever local scan returned or show error
@@ -3750,7 +3771,7 @@ async function analyzeNode(node) {
     setProgress(60, 'Waiting for agent response...');
     let result;
     const r = await authFetch(`${API_BASE}/agent/chat`, { method:'POST', body:JSON.stringify({query}) });
-    result = await r.json();
+    result = await safeJson(r);
 
     setProgress(100, 'Done');
     const reply = result.response || result.reply || result.message || 'Analysis complete';
@@ -3841,7 +3862,7 @@ async function handleVaultUpload(fileList) {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
-      const result = await resp.json();
+      const result = await safeJson(resp);
 
       if (!resp.ok || result.error) {
         showToast(`Upload failed: ${result.detail || result.message || 'Unknown error'}`, 'error');
@@ -3867,7 +3888,7 @@ async function loadVaultFilesList() {
     const resp = await fetch(`${API_BASE}/vault/spaces/list`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
-    const data = await resp.json();
+    const data = await safeJson(resp);
 
     if (!resp.ok || data.error) {
       listEl.innerHTML = `<div style="font-size:9px;color:var(--red);padding:4px;">${escH(data.detail || 'Failed to load')}</div>`;
@@ -3917,7 +3938,7 @@ async function uploadLocalFileToVault(filePath, fileName) {
       headers: { 'Authorization': `Bearer ${token}` },
       body: formData,
     });
-    const result = await resp.json();
+    const result = await safeJson(resp);
     if (!resp.ok || result.error) {
       showToast(`Upload failed: ${result.detail || result.message}`, 'error');
       return;
@@ -4007,7 +4028,7 @@ async function buildVaultSpacesContext() {
       const resp = await fetch(`${API_BASE}/vault/spaces/content/${encodeURIComponent(f.filename)}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      const data = await resp.json();
+      const data = await safeJson(resp);
       if (data.success && !data.binary && data.content) {
         const content = data.content.substring(0, maxPerFile);
         contextBlock += `--- [VAULT] ${f.filename} ---\n${content}\n`;
@@ -4037,7 +4058,7 @@ async function buildVaultContextPayload() {
     const res = await fetch(`${API_BASE}/vault/browse`, {
       headers: { 'Authorization': `Bearer ${sessionToken}` }
     });
-    const vault = await res.json();
+    const vault = await safeJson(res);
     if (vault.error) return null;
 
     const fileManifest = [];
@@ -4251,14 +4272,14 @@ async function sendMessage() {
           conversation_history: [],
         })
       });
-      result = await r.json();
+      result = await safeJson(r);
     } else {
       const payload = { query: fullQuery, vault_context: vaultContext };
       const r = await authFetch(`${API_BASE}/agent/chat`, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      result = await r.json();
+      result = await safeJson(r);
     }
 
     hideToolIndicator();
@@ -4499,7 +4520,7 @@ async function runPromptOptimizer() {
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(q, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:q}) }); result = await r.json(); }
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query:q}) }); result = await safeJson(r); }
     if (result.error) rd.innerHTML = `<div style="color:var(--red);font-size:10px;">${escH(result.message||'Failed')}</div>`;
     else renderOptPrompts(result.response||result.reply||result.message||'', rd);
     setAgentStatus('Complete', '');
@@ -4776,7 +4797,7 @@ function runAgentTask(agentId) {
     try {
       let result;
       if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
       const reply = result.response || result.reply || result.message || 'Task complete';
       agent.status = 'active';
       completeTask(task.id, reply);
@@ -5454,7 +5475,7 @@ Find 4-8 issues. Focus on: missing security measures, architectural problems, pe
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
 
     if (result.error) {
       status.textContent = 'Analysis failed: ' + (result.message || 'Unknown error');
@@ -5634,7 +5655,7 @@ Generate the prompt in this format:
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
 
     if (result.error) {
       showToast('Failed to generate prompt', 'error');
@@ -5936,7 +5957,7 @@ Respond with ONLY this JSON format (no other text):
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
 
     const raw = result.response || result.reply || result.message || '';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -6169,7 +6190,7 @@ Draft the ${contentType} below. Only output the content body, no metadata.`;
   try {
     let result;
     if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
 
     currentDraftText = result.response || result.reply || result.message || 'Draft generation failed.';
   } catch (e) {
@@ -6459,7 +6480,7 @@ function runAgentTaskWithTone(agentId) {
     try {
       let result;
       if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+      else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await safeJson(r); }
       const reply = result.response || result.reply || result.message || 'Task complete';
       agent.status = 'active';
       completeTask(task.id, reply);
@@ -6563,7 +6584,7 @@ async function createScheduledTask() {
         enabled: true,
       }),
     });
-    const data = await r.json();
+    const data = await safeJson(r);
     if (data.task_id) {
       scheduledTasks.push(data);
       renderScheduledTasks();
@@ -6599,7 +6620,7 @@ function fireTaskSignal(taskId, signalType, metadata = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
     body: JSON.stringify({ signal_type: signalType, metadata }),
-  }).then(r => r.json()).then(data => {
+  }).then(r => safeJson(r)).then(data => {
     if (data.qopc_score !== undefined) {
       schedQopcCache[taskId] = {
         score: data.qopc_score,
@@ -6618,7 +6639,7 @@ async function fetchTaskQopc(taskId) {
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
     if (r.ok) {
-      const data = await r.json();
+      const data = await safeJson(r);
       schedQopcCache[taskId] = {
         score: data.qopc_score,
         signal_count: data.signal_count,
@@ -6795,7 +6816,7 @@ async function runScheduledTask(taskId) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
-    const data = await r.json();
+    const data = await safeJson(r);
     if (task) {
       task.last_run = data.ran_at;
       task.last_status = data.status;
@@ -6875,7 +6896,7 @@ async function pollScheduledTasks() {
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
     if (r.ok) {
-      const data = await r.json();
+      const data = await safeJson(r);
       scheduledTasks = data;
       // Update QOPC cache with scores from server
       data.forEach(t => {
@@ -7546,7 +7567,7 @@ async function loadLogsFeed() {
     const url = `${API_BASE}/audit/trail/live?limit=200`;
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${sessionToken}` } });
     if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
+    const data = await safeJson(res);
     logsEntries = (data.entries || []).reverse();  // newest first
     renderLogsFeed();
   } catch (e) {
@@ -7706,7 +7727,7 @@ async function proveSingle(orderId) {
       body: JSON.stringify({ entry_ids: [orderId], label: `Single proof: ${orderId}` }),
     });
     if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
+    const data = await safeJson(res);
     showToast(`Proof exported: ${data.filename}`, 'success');
     loadRecentExports();
   } catch (e) {
@@ -7727,7 +7748,7 @@ async function exportSelectedProofs() {
       body: JSON.stringify({ entry_ids: ids, label: `Batch proof (${ids.length} entries)` }),
     });
     if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
+    const data = await safeJson(res);
     showToast(`Proof exported: ${data.entry_count} entries`, 'success');
     logsSelectedIds.clear();
     renderLogsFeed();
@@ -7753,7 +7774,7 @@ async function exportBulkProofs() {
       body: JSON.stringify({ entry_ids: ids.slice(0, 200), label: `Bulk export (${Math.min(ids.length, 200)} entries)` }),
     });
     if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
+    const data = await safeJson(res);
     showToast(`Bulk proof: ${data.entry_count} entries exported`, 'success');
     loadRecentExports();
   } catch (e) {
@@ -7767,7 +7788,7 @@ async function loadRecentExports() {
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
     if (!res.ok) return;
-    const data = await res.json();
+    const data = await safeJson(res);
     const list = document.getElementById('logs-exports-list');
     const exports = data.exports || [];
     if (exports.length === 0) {
@@ -7792,7 +7813,7 @@ async function downloadProof(filename) {
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     });
     if (!res.ok) throw new Error(res.statusText);
-    const data = await res.json();
+    const data = await safeJson(res);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
