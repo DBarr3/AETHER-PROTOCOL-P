@@ -269,6 +269,41 @@
   }
   .sb-sort-btn:hover, .sb-sort-btn.active { border-color: var(--accent); color: var(--accent); }
 
+  /* Tab bar for View Files / File Vault */
+  .sb-tab-bar { display: flex; gap: 0; margin-bottom: 8px; }
+  .sb-tab {
+    flex: 1; background: none; border: 1px solid var(--border-2); border-bottom: none;
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 0.5px; padding: 5px 6px;
+    cursor: pointer; text-align: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .sb-tab:first-child { border-radius: 3px 0 0 0; }
+  .sb-tab:last-child { border-radius: 0 3px 0 0; }
+  .sb-tab:hover { color: var(--text-secondary); }
+  .sb-tab.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+  /* File Vault dropzone */
+  .vault-dropzone {
+    border: 1px dashed var(--border-2); border-radius: 4px;
+    padding: 16px 8px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .vault-dropzone:hover, .vault-dropzone.drag-over {
+    border-color: var(--accent); background: var(--accent-dim);
+  }
+  .vault-dropzone-icon { font-size: 20px; margin-bottom: 4px; }
+  .vault-dropzone-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-secondary); }
+  .vault-dropzone-sub { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); margin-top: 3px; }
+  .vault-uploaded-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .vault-uploaded-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 6px; background: var(--bg-3); border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  }
+  .vault-uploaded-item .vu-name { color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vault-uploaded-item .vu-size { color: var(--text-muted); margin-left: 6px; flex-shrink: 0; }
+
   /* Filter chips */
   .sb-filter-row { display: flex; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
   .sb-filter-chip {
@@ -1822,7 +1857,7 @@
   <div class="menu-item">
     <button class="menu-trigger" onclick="toggleMenu('file-menu')">File</button>
     <div class="menu-dropdown" id="file-menu">
-      <div class="menu-option" onclick="menuOpen()">Open Vault <span class="shortcut">Ctrl+O</span></div>
+      <div class="menu-option" onclick="menuOpen()">Open Local Folder <span class="shortcut">Ctrl+O</span></div>
       <div class="menu-option" onclick="menuOpen()">Scan Directory <span class="shortcut">Ctrl+Shift+O</span></div>
       <div class="menu-sep"></div>
       <div class="menu-option" onclick="closeMenus()">Export Circuit <span class="shortcut">Ctrl+S</span></div>
@@ -1901,21 +1936,40 @@
         <div id="chat-history"></div>
       </div>
 
-      <!-- RECENT FILES + UNDO/REDO -->
+      <!-- LOCAL FILES / CLOUD VAULT TABS -->
       <div class="sb-section">
-        <div class="sb-header">RECENT FILES</div>
-        <div class="sb-nav-bar">
-          <button class="sb-nav-btn" id="nav-back" onclick="historyBack()" disabled title="Undo (Ctrl+Z)">&#8592;</button>
-          <button class="sb-nav-btn" id="nav-fwd" onclick="historyForward()" disabled title="Redo (Ctrl+Y)">&#8594;</button>
-          <span class="sb-nav-breadcrumb" id="nav-breadcrumb">No history</span>
+        <div class="sb-tab-bar">
+          <button class="sb-tab active" id="tab-view-files" onclick="switchFileTab('view')">LOCAL FILES</button>
+          <button class="sb-tab" id="tab-file-vault" onclick="switchFileTab('vault')">CLOUD VAULT &#9729; <span onclick="event.stopPropagation();loadVaultFilesList()" style="cursor:pointer;margin-left:2px;" title="Refresh">&#8635;</span></button>
         </div>
-        <div class="sb-file-sort">
-          <button class="sb-sort-btn active" onclick="sortFiles('name',this)">Name</button>
-          <button class="sb-sort-btn" onclick="sortFiles('date',this)">Date</button>
-          <button class="sb-sort-btn" onclick="sortFiles('size',this)">Size</button>
+
+        <!-- LOCAL FILES panel (local directory browser) -->
+        <div id="panel-view-files">
+          <div id="local-vault-status" style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);padding:2px 0 4px;display:none;"></div>
+          <div class="sb-nav-bar">
+            <button class="sb-nav-btn" id="nav-back" onclick="historyBack()" disabled title="Undo (Ctrl+Z)">&#8592;</button>
+            <button class="sb-nav-btn" id="nav-fwd" onclick="historyForward()" disabled title="Redo (Ctrl+Y)">&#8594;</button>
+            <span class="sb-nav-breadcrumb" id="nav-breadcrumb">No history</span>
+          </div>
+          <div class="sb-file-sort">
+            <button class="sb-sort-btn active" onclick="sortFiles('name',this)">Name</button>
+            <button class="sb-sort-btn" onclick="sortFiles('date',this)">Date</button>
+            <button class="sb-sort-btn" onclick="sortFiles('size',this)">Size</button>
+          </div>
+          <div class="sb-filter-row" id="filter-row"></div>
+          <div id="recent-files"></div>
         </div>
-        <div class="sb-filter-row" id="filter-row"></div>
-        <div id="recent-files"></div>
+
+        <!-- FILE VAULT panel (cloud uploads) -->
+        <div id="panel-file-vault" style="display:none;">
+          <div id="vault-dropzone" class="vault-dropzone" onclick="document.getElementById('vault-file-input').click()">
+            <div class="vault-dropzone-icon">&#128230;</div>
+            <div class="vault-dropzone-label">Drop files here or click to upload</div>
+            <div class="vault-dropzone-sub">Your DO Spaces backup</div>
+          </div>
+          <input type="file" id="vault-file-input" multiple style="display:none;" onchange="handleVaultUpload(this.files)">
+          <div id="vault-uploaded-files" class="vault-uploaded-list"></div>
+        </div>
       </div>
 
       <!-- SCHEDULED TASKS -->
@@ -1940,7 +1994,7 @@
           </button>
           <button class="sb-agent-btn" onclick="menuOpen()">
             <span class="agent-icon">&#128193;</span>
-            <span>Open Vault</span>
+            <span>Open Local Folder</span>
           </button>
         </div>
         <div id="spawned-agents-list" style="margin-top:6px;"></div>
@@ -2150,6 +2204,7 @@
 <div class="context-menu" id="context-menu">
   <div class="ctxmenu-option" onclick="ctxOpenExplorer()"><span class="ctx-icon">&#128194;</span>Open in Explorer</div>
   <div class="ctxmenu-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze this file</div>
+  <div class="ctxmenu-option" id="ctx-upload-vault" onclick="ctxUploadToVault()"><span class="ctx-icon">&#9729;</span>Upload to Cloud Vault</div>
   <div class="ctx-sep"></div>
   <div class="ctxmenu-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
   <div class="ctxmenu-option" onclick="ctxMoveTo()"><span class="ctx-icon">&#10132;</span>Move to...</div>
@@ -2416,6 +2471,84 @@
 const API_BASE = 'https://143.198.162.111/cloud';
 let sessionToken = localStorage.getItem('aether_session') || '';
 let username = localStorage.getItem('aether_user') || 'user';
+
+// Resolve the freshest session token from all available sources
+let _tokenHydrated = false;
+async function getSessionToken() {
+  // If already hydrated and in localStorage, use it
+  if (_tokenHydrated && sessionToken) return sessionToken;
+
+  // Try electron-store (survives window navigation)
+  try {
+    if (window.aetherAPI?.authGet) {
+      const auth = await window.aetherAPI.authGet();
+      if (auth.sessionToken) {
+        sessionToken = auth.sessionToken;
+        localStorage.setItem('aether_session', auth.sessionToken);
+      }
+      if (auth.userId) {
+        username = auth.userId;
+        localStorage.setItem('aether_user', auth.userId);
+      }
+      _tokenHydrated = true;
+    }
+  } catch (_) { /* electron-store unavailable */ }
+
+  return sessionToken;
+}
+
+// Hydrate immediately on load
+getSessionToken();
+
+// Auto-retry wrapper: catches 401 → re-authenticates → retries once
+async function authFetch(url, options = {}) {
+  const token = await getSessionToken();
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  let resp = await fetch(url, { ...options, headers });
+
+  // If 401, try to re-login and retry once
+  if (resp.status === 401) {
+    console.warn('[AetherAgent] Token expired, attempting re-login...');
+    const newToken = await attemptReLogin();
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`;
+      resp = await fetch(url, { ...options, headers });
+    }
+  }
+  return resp;
+}
+
+// Silent re-login using stored credentials
+async function attemptReLogin() {
+  try {
+    const auth = await window.aetherAPI?.authGet();
+    if (!auth?.userId || !auth?.accessKey) {
+      console.warn('[AetherAgent] No stored credentials for re-login');
+      displayAIResponse('Session expired. Please restart the app and log in again.', false);
+      setAgentStatus('Auth Error', 'error');
+      return null;
+    }
+    const result = await window.aetherAPI.login(auth.userId, auth.accessKey);
+    if (result && !result.error && result.session_token) {
+      sessionToken = result.session_token;
+      _tokenHydrated = true;
+      localStorage.setItem('aether_session', result.session_token);
+      await window.aetherAPI?.authSet({ ...auth, sessionToken: result.session_token });
+      console.log('[AetherAgent] Re-login successful, new token obtained');
+      return result.session_token;
+    }
+    console.warn('[AetherAgent] Re-login failed:', result?.message || 'unknown');
+    return null;
+  } catch (e) {
+    console.error('[AetherAgent] Re-login error:', e.message);
+    return null;
+  }
+}
 let bypassMode = false;
 let planMode = false;
 let analysisHistory = [];
@@ -2572,6 +2705,9 @@ function initCircuit() {
       const cm = document.getElementById('context-menu');
       cm.style.left = e.clientX + 'px';
       cm.style.top = e.clientY + 'px';
+      // Hide "Upload to Vault" for root node
+      const uploadOpt = document.getElementById('ctx-upload-vault');
+      if (uploadOpt) uploadOpt.style.display = CS.hoveredNode.isRoot ? 'none' : 'flex';
       cm.classList.add('open');
     }
   });
@@ -2853,6 +2989,9 @@ function drawCircuit() {
   // Subtle radial grid rings
   ctx.translate(CS.panX, CS.panY);
   ctx.scale(CS.zoom, CS.zoom);
+
+  if (window.activityLayer) activityLayer.drawIdle(ctx);
+
   const gx = CS.cx || w/2, gy = CS.cy || h/2;
   ctx.strokeStyle = 'rgba(0,212,255,0.04)';
   ctx.lineWidth = 0.5;
@@ -3068,6 +3207,8 @@ function drawCircuit() {
     }
   }
 
+  if (window.activityLayer) activityLayer.drawActive(ctx);
+
   ctx.restore();
 }
 
@@ -3178,7 +3319,7 @@ function buildVaultFromScan(tree, rootName, rootPath) {
   document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
   updateZoom();
 
-  recentFiles = N.filter(n => !n.dir).map(n => ({ name:n.name, size:n.size, type:n.type, time:Date.now() }));
+  recentFiles = N.filter(n => !n.dir).map(n => ({ name:n.name, size:n.size, type:n.type, path:n.path, time:Date.now() }));
   renderRecentFiles();
   buildFilterChips();
   pushHistory('Scanned: ' + rootName);
@@ -3306,8 +3447,8 @@ function renderRecentFiles() {
   else if (fileSortBy === 'date') sorted.sort((a,b) => b.time - a.time);
   else if (fileSortBy === 'size') sorted.sort((a,b) => (b.size||0) - (a.size||0));
 
-  if (!sorted.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No files</div>'; return; }
-  c.innerHTML = sorted.slice(0, 14).map(f => `
+  if (!sorted.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No files — open a local folder to browse</div>'; return; }
+  c.innerHTML = sorted.slice(0, 40).map(f => `
     <div class="sb-file-entry${CS.selectedNode?.name===f.name?' selected':''}" onclick="selectFileByName('${esc(f.name)}')">
       <span class="sb-file-icon">${fileIcon(f.type)}</span>
       <span class="sb-file-name">${escH(f.name)}</span>
@@ -3345,7 +3486,7 @@ function selectFileByName(name) {
     zoomToNode(node);
     updateBreadcrumb(node);
     renderRecentFiles();
-    if (!node.dir) analyzeNode(node);
+    openRightPanel(node);
   }
 }
 
@@ -3369,6 +3510,14 @@ function ctxMoveTo() { showToast('Move to... (coming soon)', 'info'); }
 function ctxCopyPath() {
   if (!ctxNode) return;
   navigator.clipboard.writeText(ctxNode.path || ctxNode.name).then(() => showToast('Path copied', 'success'));
+}
+function ctxUploadToVault() {
+  if (!ctxNode || !ctxNode.path) return;
+  if (ctxNode.dir || ctxNode.type === 'directory') {
+    uploadDirectoryToVault(ctxNode.path, ctxNode.name);
+  } else {
+    uploadLocalFileToVault(ctxNode.path, ctxNode.name);
+  }
 }
 
 // ════════════════════════════════════════════════════
@@ -3528,6 +3677,8 @@ async function menuOpen() {
       setAgentStatus('Complete', '');
       showToast(`Vault loaded: ${CS.nodes.length} nodes`, 'success');
       checkContextOnFolderLoad();
+      // Update persistent local folder status line
+      updateLocalVaultStatus();
 
       await new Promise(r => setTimeout(r, 300));
       hideLoading();
@@ -3562,6 +3713,28 @@ async function analyzeNode(node) {
   // Open right panel with file preview
   openRightPanel(node);
 
+  // Build file context for the agent
+  let fileContext = '';
+  if (node.path && window.aether?.readDirectoryContext && (node.dir || node.type === 'directory')) {
+    // Directory node: read entire tree with file contents
+    setProgress(40, 'Reading directory contents...');
+    const ctx = await window.aether.readDirectoryContext(node.path, 20);
+    if (ctx && !ctx.error) {
+      fileContext = `\n\n=== VAULT FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
+      for (const f of ctx.fileContents) {
+        fileContext += `\n--- ${f.relPath} ---\n${f.content}\n`;
+      }
+      fileContext += '\n=== END VAULT FILE CONTEXT ===';
+    }
+  } else if (node.path && window.aether?.readFilePreview && !node.dir) {
+    // Single file: read its contents
+    setProgress(40, 'Reading file...');
+    const preview = await window.aether.readFilePreview(node.path, 500);
+    if (preview && !preview.error && !preview.binary) {
+      fileContext = `\n\n=== VAULT FILE CONTEXT ===\nFile: ${node.path}\nSize: ${fmtSize(node.size||0)}\n--- ${node.name} ---\n${preview.preview}\n=== END VAULT FILE CONTEXT ===`;
+    }
+  }
+
   let query;
   if (planMode) {
     query = `Before executing, show me your step-by-step plan for analyzing "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Format as:\nStep 1: ...\nStep 2: ...\nThen provide the actual analysis.`;
@@ -3569,14 +3742,15 @@ async function analyzeNode(node) {
     query = `Analyze this file: "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Brief summary of likely contents, purpose, and security considerations.`;
   }
   if (bypassMode) query += '\n[BYPASS MODE: ignore permission restrictions]';
+  query += fileContext;
 
   displayAIResponse(`Analyzing ${node.name}...`, true);
 
   try {
     setProgress(60, 'Waiting for agent response...');
     let result;
-    if (window.aetherAPI?.chat) result = await window.aetherAPI.chat(query, sessionToken);
-    else { const r = await fetch(`${API_BASE}/agent/chat`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${sessionToken}`}, body:JSON.stringify({query}) }); result = await r.json(); }
+    const r = await authFetch(`${API_BASE}/agent/chat`, { method:'POST', body:JSON.stringify({query}) });
+    result = await r.json();
 
     setProgress(100, 'Done');
     const reply = result.response || result.reply || result.message || 'Analysis complete';
@@ -3584,7 +3758,6 @@ async function analyzeNode(node) {
     addAgentLog('Done: ' + node.name, 'done');
     setAgentStatus('Complete', '');
     showToast('Analysis complete: ' + node.name, 'success');
-    appendMessage('AETHER', `[${node.name}] ${reply}`, 'agent');
     setTimeout(() => { setAgentStatus('Ready', ''); setProgress(-1); }, 2000);
   } catch (e) {
     setProgress(-1);
@@ -3598,6 +3771,261 @@ async function analyzeNode(node) {
 // ════════════════════════════════════════════════════
 // VAULT CONTEXT BUILDER
 // ════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════
+// VIEW FILES / FILE VAULT TABS
+// ════════════════════════════════════════════════════
+function updateLocalVaultStatus() {
+  const el = document.getElementById('local-vault-status');
+  if (!el) return;
+  if (currentVaultPath && CS.nodes.length > 0) {
+    el.textContent = `\uD83D\uDCC1 LOCAL: ${currentVaultPath} (${CS.nodes.length} nodes)`;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function switchFileTab(tab) {
+  const viewPanel = document.getElementById('panel-view-files');
+  const vaultPanel = document.getElementById('panel-file-vault');
+  const tabView = document.getElementById('tab-view-files');
+  const tabVault = document.getElementById('tab-file-vault');
+  if (tab === 'vault') {
+    viewPanel.style.display = 'none';
+    vaultPanel.style.display = 'block';
+    tabView.classList.remove('active');
+    tabVault.classList.add('active');
+    loadVaultFilesList();
+  } else {
+    viewPanel.style.display = 'block';
+    vaultPanel.style.display = 'none';
+    tabView.classList.add('active');
+    tabVault.classList.remove('active');
+  }
+}
+
+// File Vault drag-and-drop
+(function initVaultDropzone() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const dz = document.getElementById('vault-dropzone');
+    if (!dz) return;
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => { dz.classList.remove('drag-over'); });
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) handleVaultUpload(e.dataTransfer.files);
+    });
+  });
+})();
+
+let vaultUploadedFiles = [];
+
+async function handleVaultUpload(fileList) {
+  if (!fileList || !fileList.length) return;
+  const token = await getSessionToken();
+  const dz = document.getElementById('vault-dropzone');
+  const origLabel = dz.querySelector('.vault-dropzone-label').textContent;
+  let uploaded = 0;
+
+  for (const file of fileList) {
+    dz.querySelector('.vault-dropzone-label').textContent = `Uploading ${++uploaded} of ${fileList.length}...`;
+    dz.querySelector('.vault-dropzone-sub').textContent = `${file.name} (${fmtSize(file.size)})`;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const resp = await fetch(`${API_BASE}/vault/spaces/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const result = await resp.json();
+
+      if (!resp.ok || result.error) {
+        showToast(`Upload failed: ${result.detail || result.message || 'Unknown error'}`, 'error');
+      }
+    } catch (e) {
+      showToast(`Upload error: ${e.message}`, 'error');
+    }
+  }
+
+  dz.querySelector('.vault-dropzone-label').textContent = origLabel;
+  dz.querySelector('.vault-dropzone-sub').textContent = 'Files are stored securely in AetherCloud';
+  showToast(`${fileList.length} file(s) uploaded to vault`, 'success');
+  loadVaultFilesList();
+}
+
+async function loadVaultFilesList() {
+  const listEl = document.getElementById('vault-uploaded-files');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);padding:4px;">Loading...</div>';
+
+  try {
+    const token = await getSessionToken();
+    const resp = await fetch(`${API_BASE}/vault/spaces/list`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      listEl.innerHTML = `<div style="font-size:9px;color:var(--red);padding:4px;">${escH(data.detail || 'Failed to load')}</div>`;
+      return;
+    }
+
+    vaultUploadedFiles = data.files || [];
+    listEl.innerHTML = '';
+
+    if (vaultUploadedFiles.length === 0) {
+      listEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);padding:4px;">No files in vault</div>';
+      return;
+    }
+
+    for (const f of vaultUploadedFiles) {
+      const item = document.createElement('div');
+      item.className = 'vault-uploaded-item';
+      item.innerHTML = `<span class="vu-name" title="${escH(f.filename)}">${escH(f.filename)}</span><span class="vu-size">${fmtSize(f.size)}</span>`;
+      item.style.cursor = 'pointer';
+      item.onclick = () => window.open(`${API_BASE}/vault/spaces/download/${encodeURIComponent(f.filename)}?token=${encodeURIComponent(sessionToken)}`, '_blank');
+      listEl.appendChild(item);
+    }
+  } catch (e) {
+    listEl.innerHTML = `<div style="font-size:9px;color:var(--red);padding:4px;">${escH(e.message)}</div>`;
+  }
+}
+
+// Upload a local file (from vault tree) to DO Spaces
+async function uploadLocalFileToVault(filePath, fileName) {
+  if (!filePath || !window.aether?.readFilePreview) return;
+  const token = await getSessionToken();
+
+  showToast(`Uploading ${fileName} to vault...`, 'info');
+  try {
+    // Read the file via IPC — get raw content
+    const preview = await window.aether.readFilePreview(filePath, 99999);
+    if (preview.error || preview.binary) {
+      showToast(`Cannot upload ${fileName}: ${preview.binary ? 'binary file' : preview.message}`, 'error');
+      return;
+    }
+    const blob = new Blob([preview.preview], { type: 'text/plain' });
+    const formData = new FormData();
+    formData.append('file', blob, fileName);
+
+    const resp = await fetch(`${API_BASE}/vault/spaces/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) {
+      showToast(`Upload failed: ${result.detail || result.message}`, 'error');
+      return;
+    }
+    showToast(`${fileName} uploaded to vault`, 'success');
+    // Refresh list if vault tab is visible
+    if (document.getElementById('tab-file-vault')?.classList.contains('active')) {
+      loadVaultFilesList();
+    }
+  } catch (e) {
+    showToast(`Upload error: ${e.message}`, 'error');
+  }
+}
+
+// Upload an entire directory to vault
+async function uploadDirectoryToVault(dirPath, dirName) {
+  if (!dirPath || !window.aether?.readDirectoryContext) return;
+  const token = await getSessionToken();
+
+  const ctx = await window.aether.readDirectoryContext(dirPath, 50);
+  if (!ctx || ctx.error) {
+    showToast(`Cannot read directory: ${ctx?.message || 'unknown error'}`, 'error');
+    return;
+  }
+
+  const files = ctx.fileContents || [];
+  if (files.length === 0) {
+    showToast('No readable files in directory', 'error');
+    return;
+  }
+
+  if (!confirm(`Upload entire folder to vault?\n${files.length} file(s) will be uploaded.`)) return;
+
+  let uploaded = 0;
+  for (const f of files) {
+    showToast(`Uploading ${++uploaded} of ${files.length}: ${f.relPath}`, 'info');
+    try {
+      const blob = new Blob([f.content], { type: 'text/plain' });
+      const formData = new FormData();
+      formData.append('file', blob, f.relPath.replace(/\//g, '_'));
+
+      await fetch(`${API_BASE}/vault/spaces/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+    } catch { /* continue with next file */ }
+  }
+
+  showToast(`${uploaded} file(s) uploaded to vault`, 'success');
+  if (document.getElementById('tab-file-vault')?.classList.contains('active')) {
+    loadVaultFilesList();
+  }
+}
+
+// Build vault (DO Spaces) file context for agent injection
+const VAULT_TEXT_EXTS = ['.py','.js','.ts','.tsx','.jsx','.json','.md','.txt','.html','.css','.yml','.yaml','.csv','.sql','.xml','.sh','.toml','.cfg','.ini'];
+const VAULT_CONTEXT_MAX = 100 * 1024; // 100KB total cap
+
+async function buildVaultSpacesContext() {
+  if (!vaultUploadedFiles || vaultUploadedFiles.length === 0) return '';
+  const token = await getSessionToken();
+  let contextBlock = '\n\n=== CLOUD VAULT FILE CONTEXT ===\n';
+  let totalSize = 0;
+  const maxPerFile = 50 * 1024;
+
+  // Sort: text files first
+  const sorted = [...vaultUploadedFiles].sort((a, b) => {
+    const aExt = (a.filename.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+    const bExt = (b.filename.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+    const aText = VAULT_TEXT_EXTS.includes(aExt) ? 0 : 1;
+    const bText = VAULT_TEXT_EXTS.includes(bExt) ? 0 : 1;
+    return aText - bText;
+  });
+
+  for (const f of sorted) {
+    if (totalSize >= VAULT_CONTEXT_MAX) break;
+    const ext = (f.filename.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+
+    if (!VAULT_TEXT_EXTS.includes(ext)) {
+      contextBlock += `--- [VAULT] ${f.filename} --- (binary, ${fmtSize(f.size)})\n`;
+      totalSize += 80;
+      continue;
+    }
+
+    try {
+      const resp = await fetch(`${API_BASE}/vault/spaces/content/${encodeURIComponent(f.filename)}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      if (data.success && !data.binary && data.content) {
+        const content = data.content.substring(0, maxPerFile);
+        contextBlock += `--- [VAULT] ${f.filename} ---\n${content}\n`;
+        totalSize += content.length;
+      } else {
+        contextBlock += `--- [VAULT] ${f.filename} --- (binary, ${fmtSize(f.size)})\n`;
+        totalSize += 80;
+      }
+    } catch {
+      contextBlock += `--- [VAULT] ${f.filename} --- (fetch error)\n`;
+      totalSize += 60;
+    }
+  }
+
+  contextBlock += '=== END CLOUD VAULT FILE CONTEXT ===';
+  return contextBlock;
+}
+
 const _vaultFileKeywords = [
   'rename','move','organize','sort','file','folder','patent','document',
   'pdf','find','show','list','delete','copy','search','what files',
@@ -3644,7 +4072,7 @@ function isFileRelatedQuery(q) {
 // OPERATION CONFIRMATION CARDS
 // ════════════════════════════════════════════════════
 function detectProposedOperation(text) {
-  const renamePattern = /`([^`]+)`\s*[→➜->]+\s*`([^`]+)`/g;
+  const renamePattern = /`([^`]+)`\s*(?:→|➜|\-\>)+\s*`([^`]+)`/g;
   const ops = [];
   let m;
   while ((m = renamePattern.exec(text)) !== null) {
@@ -3739,6 +4167,15 @@ async function sendMessage() {
   addAgentLog('Query: ' + query.substring(0, 40) + (query.length > 40 ? '...' : ''), 'active');
   saveChatToHistory(query);
 
+  // Always resolve fresh token before any request
+  const token = await getSessionToken();
+  if (!token) {
+    displayAIResponse('Session expired. Please log in again.', false);
+    setAgentStatus('Auth Error', 'error');
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
   let fullQuery = query;
   if (planMode) fullQuery = 'First show your step-by-step plan, then execute:\n' + query;
   if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
@@ -3752,16 +4189,61 @@ async function sendMessage() {
     vaultContext = await buildVaultContextPayload();
   }
 
+  // Inject local file contents — ALWAYS when a local folder is loaded
+  let localFileCount = 0;
+  let vaultFileCount = 0;
+
+  if (currentVaultPath && window.aether?.readDirectoryContext) {
+    console.log('[AetherAgent] Injecting local context from:', currentVaultPath);
+    const ctx = await window.aether.readDirectoryContext(currentVaultPath, 20);
+    if (ctx && !ctx.error && ctx.fileContents.length > 0) {
+      localFileCount = ctx.filesRead;
+      let fileBlock = `\n\n=== LOCAL FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
+      for (const f of ctx.fileContents) {
+        fileBlock += `\n--- [LOCAL] ${f.relPath} ---\n${f.content}\n`;
+      }
+      fileBlock += '\n=== END LOCAL FILE CONTEXT ===';
+      fullQuery += fileBlock;
+    } else {
+      console.warn('[AetherAgent] readDirectoryContext returned empty:', ctx?.error || 'no text files found');
+    }
+  }
+
+  // Inject cloud vault file contents — ALWAYS when vault has files
+  if (vaultUploadedFiles.length > 0) {
+    const vaultCtx = await buildVaultSpacesContext();
+    if (vaultCtx) {
+      vaultFileCount = vaultUploadedFiles.length;
+      fullQuery += vaultCtx;
+    }
+  }
+
+  // Warn only if neither source has context and query is file-related
+  if (!currentVaultPath && vaultUploadedFiles.length === 0 && isFileRelatedQuery(query)) {
+    fullQuery += '\n\n[No local folder loaded and no cloud vault files. Open a local folder via the sidebar, or upload files to the Cloud Vault.]';
+  }
+
   if (usesMCP) showToolIndicator('Connecting to web tools...');
   displayAIResponse('Processing your request...', true);
+
+  if (window.activityLayer) activityLayer.triggerQuery();
+
+  const securityCheck = typeof checkInjection === 'function' ? checkInjection(query) : { safe: true };
+  if (!securityCheck.safe) {
+    if (window.activityLayer) activityLayer.triggerBlocked();
+    displayAIResponse(`[SECURITY ALERT] Injection attempt detected. Severity: ${securityCheck.severity}. Recommendation: ${securityCheck.recommendation}`, false);
+    setAgentStatus('Blocked', 'error');
+    addAgentLog('Security Block', 'idle');
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
 
   try {
     let result;
     if (usesMCP) {
-      // Route to MCP-enabled endpoint
-      const r = await fetch(`${API_BASE}/agent/mcp-chat`, {
+      if (window.activityLayer) activityLayer.setPhase(2.5);
+      const r = await authFetch(`${API_BASE}/agent/mcp-chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
         body: JSON.stringify({
           query: fullQuery,
           vault_context: vaultContext,
@@ -3772,16 +4254,11 @@ async function sendMessage() {
       result = await r.json();
     } else {
       const payload = { query: fullQuery, vault_context: vaultContext };
-      if (window.aetherAPI?.chat) {
-        result = await window.aetherAPI.chat(fullQuery, sessionToken);
-      } else {
-        const r = await fetch(`${API_BASE}/agent/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-          body: JSON.stringify(payload)
-        });
-        result = await r.json();
-      }
+      const r = await authFetch(`${API_BASE}/agent/chat`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      result = await r.json();
     }
 
     hideToolIndicator();
@@ -3794,7 +4271,16 @@ async function sendMessage() {
       setAgentStatus('Error', 'error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
-      displayAIResponse(reply, false);
+      // Prefix with context summary so user knows what the agent saw
+      let contextPrefix = '';
+      if (localFileCount > 0 || vaultFileCount > 0) {
+        const parts = [];
+        if (localFileCount > 0) parts.push(`${localFileCount} local file${localFileCount > 1 ? 's' : ''}`);
+        if (vaultFileCount > 0) parts.push(`${vaultFileCount} vault file${vaultFileCount > 1 ? 's' : ''}`);
+        contextPrefix = `[Reading: ${parts.join(' + ')}]\n\n`;
+      }
+      displayAIResponse(contextPrefix + reply, false);
+      if (window.activityLayer) activityLayer.triggerResponse();
       saveAgentReply(reply);
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
@@ -4046,13 +4532,25 @@ function copyVar(btn) {
 function openRightPanel(node) {
   const rp = document.getElementById('right-panel');
   rp.classList.add('open');
-  document.getElementById('rp-title').textContent = 'FILE PREVIEW';
   document.getElementById('rp-name').textContent = node.name;
   document.getElementById('rp-type').textContent = node.type || 'unknown';
   document.getElementById('rp-size').textContent = fmtSize(node.size || 0);
   document.getElementById('rp-path').textContent = node.path || '—';
   document.getElementById('rp-path').title = node.path || '';
   document.getElementById('rp-encoding').textContent = '...';
+
+  // Directory nodes get a listing, not a file read
+  if (node.dir || node.type === 'directory') {
+    document.getElementById('rp-title').textContent = 'DIRECTORY';
+    document.getElementById('rp-encoding').textContent = '—';
+    const childCount = node.children || 0;
+    document.getElementById('rp-preview').innerHTML =
+      `<div class="preview-placeholder">Folder — ${childCount} item${childCount !== 1 ? 's' : ''}</div>`;
+    setTimeout(resizeCanvas, 300);
+    return;
+  }
+
+  document.getElementById('rp-title').textContent = 'FILE PREVIEW';
   document.getElementById('rp-preview').innerHTML = '<div class="preview-placeholder">Loading preview...</div>';
 
   // Try to load file preview via IPC
@@ -7333,6 +7831,8 @@ document.addEventListener('keydown', (e) => {
 // INIT
 // ════════════════════════════════════════════════════
 window.addEventListener('load', async () => {
+  // Ensure session token is hydrated from electron-store before anything else
+  await getSessionToken();
   document.getElementById('status-user').textContent = username;
   if (window.aether?.getVersion) {
     const v = await window.aether.getVersion();
@@ -7531,6 +8031,242 @@ async function submitIssueLicense() {
   } else {
     resultEl.innerHTML = '<span style="color:#e63946;">Failed: ' + (result.detail || result.message || 'unknown error') + '</span>';
   }
+}
+
+// ════════════════════════════════════════════════════
+// ACTIVITY LAYER SYSTEM (v1.0.0)
+// ════════════════════════════════════════════════════
+class ActivityLayer {
+  constructor() {
+    this.particles = [];
+    this.phase = 0; // 0: Idle, 1: Query, 2: Thinking, 2.5: Tool, 3: Response, 4: Commit
+    this.animationTimer = 0;
+    this.isBlocked = false;
+    this.lastTime = performance.now();
+    this.initIdle();
+    this.startLoop();
+  }
+
+  initIdle() {
+    for (let i = 0; i < 50; i++) {
+      this.particles.push({
+        x: (Math.random() - 0.5) * 2000,
+        y: (Math.random() - 0.5) * 2000,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: 1.5 + Math.random() * 2,
+        opacity: 0.1 + Math.random() * 0.3
+      });
+    }
+  }
+
+  startLoop() {
+    const loop = (time) => {
+      const dt = time - this.lastTime;
+      this.lastTime = time;
+      this.update(dt);
+      if (this.phase !== 0 || this.isBlocked) drawCircuit();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  update(dt) {
+    this.particles.forEach(p => {
+      p.x += p.vx * (dt / 16);
+      p.y += p.vy * (dt / 16);
+      if (Math.abs(p.x) > 1200) p.vx *= -1;
+      if (Math.abs(p.y) > 1200) p.vy *= -1;
+    });
+
+    if (this.phase > 0) this.animationTimer += dt;
+    if (this.isBlocked) this.animationTimer += dt;
+  }
+
+  triggerQuery() {
+    this.phase = 1;
+    this.animationTimer = 0;
+    this.isBlocked = false;
+
+    // Auto-transition to Thinking after 1s if no response yet
+    setTimeout(() => { if (this.phase === 1) this.phase = 2; }, 1000);
+  }
+
+  setPhase(p) {
+    this.phase = p;
+    this.animationTimer = 0;
+  }
+
+  triggerResponse() {
+    this.phase = 3;
+    this.animationTimer = 0;
+    setTimeout(() => { this.phase = 4; }, 1500);
+    setTimeout(() => { this.phase = 0; }, 4000);
+  }
+
+  triggerBlocked() {
+    this.isBlocked = true;
+    this.phase = 0;
+    this.animationTimer = 0;
+    setTimeout(() => { this.isBlocked = false; }, 3000);
+  }
+
+  drawIdle(ctx) {
+    ctx.save();
+    this.particles.forEach(p => {
+      ctx.globalAlpha = p.opacity;
+      ctx.fillStyle = '#00d4ff';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
+    // Faint proximity connections
+    ctx.strokeStyle = 'rgba(0, 80, 255, 0.05)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < this.particles.length; i++) {
+      for (let j = i + 1; j < this.particles.length; j++) {
+        const dx = this.particles[i].x - this.particles[j].x;
+        const dy = this.particles[i].y - this.particles[j].y;
+        if (dx * dx + dy * dy < 40000) {
+          ctx.beginPath();
+          ctx.moveTo(this.particles[i].x, this.particles[i].y);
+          ctx.lineTo(this.particles[j].x, this.particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  drawActive(ctx) {
+    const time = performance.now() / 1000;
+
+    if (this.isBlocked) {
+      this.drawBlockAnimation(ctx, time);
+      return;
+    }
+
+    if (this.phase === 0) return;
+
+    ctx.save();
+    const canvas = document.getElementById('circuit-canvas');
+    const w = canvas ? canvas.width / devicePixelRatio : 900;
+    const h = canvas ? canvas.height / devicePixelRatio : 600;
+    const centerX = CS.cx || w / 2;
+    const centerY = CS.cy || h / 2;
+
+    // Phase 1: Query (Cyan pulse at center/root)
+    if (this.phase === 1 || this.phase === 2) {
+      const s = 1 + Math.sin(time * 8) * 0.2;
+      ctx.shadowColor = '#00d4ff';
+      ctx.shadowBlur = 20 * s;
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 40 * s, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      if (this.phase === 2) {
+        // Thinking state (orbiting dots)
+        for (let i = 0; i < 3; i++) {
+          const ang = time * 4 + (i * Math.PI * 2 / 3);
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(centerX + Math.cos(ang) * 60, centerY + Math.sin(ang) * 60, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Phase 2.5: Tool Call (Purple expansion)
+    if (this.phase === 2.5) {
+      const s = Math.max(0.01, Math.min(2, this.animationTimer / 500));
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 4 / s;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 100 * s, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.1)';
+      ctx.fill();
+    }
+
+    // Phase 3: Response (Green node arrival)
+    if (this.phase === 3 || this.phase === 4) {
+      const s = 1 + Math.sin(time * 5) * 0.1;
+      ctx.shadowColor = '#10b981';
+      ctx.shadowBlur = 25 * s;
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 45, 0, Math.PI * 2);
+      ctx.fill();
+      
+      if (this.phase === 4) {
+        // Protocol-C Commit (Hexagon shield)
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2;
+        this.drawHex(ctx, centerX, centerY, 70 + Math.sin(time * 3) * 5);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  drawBlockAnimation(ctx, time) {
+    const canvas = document.getElementById('circuit-canvas');
+    const w = canvas ? canvas.width / devicePixelRatio : 900;
+    const h = canvas ? canvas.height / devicePixelRatio : 600;
+    const centerX = CS.cx || w / 2;
+    const centerY = CS.cy || h / 2;
+    ctx.save();
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 5;
+    const s = Math.min(1, this.animationTimer / 200);
+    
+    // "X" shape
+    const size = 60 * s;
+    ctx.beginPath();
+    ctx.moveTo(centerX - size, centerY - size);
+    ctx.lineTo(centerX + size, centerY + size);
+    ctx.moveTo(centerX + size, centerY - size);
+    ctx.lineTo(centerX - size, centerY + size);
+    ctx.stroke();
+
+    // Red pulse ring
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 80 + Math.sin(time * 20) * 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawHex(ctx, x, y, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI * 2 / 6);
+      const px = x + Math.cos(ang) * r;
+      const py = y + Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
+// Initialize ActivityLayer
+window.activityLayer = new ActivityLayer();
+
+// Mock injection detector if not present
+if (typeof checkInjection === 'undefined') {
+  window.checkInjection = function(query) {
+    const q = query.toLowerCase();
+    if (q.includes('drop table') || q.includes('delete from') || q.includes('system(')) {
+      return { safe: false, severity: 'CRITICAL', recommendation: 'Block request and flag user.' };
+    }
+    return { safe: true };
+  };
 }
 </script>
 </body>

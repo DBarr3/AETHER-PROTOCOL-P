@@ -32,6 +32,7 @@
       "main.js",
       "preload.js",
       "key-manager.js",
+      "auth-store.js",
       "pages/**/*",
       "assets/**/*"
     ],

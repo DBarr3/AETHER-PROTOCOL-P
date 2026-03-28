@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('aether', {
   requestFsPermission: () => ipcRenderer.invoke('request-fs-permission'),
   scanDirectory:  (dirPath, depth) => ipcRenderer.invoke('scan-directory', dirPath, depth || 2),
   readFilePreview: (filePath, maxLines) => ipcRenderer.invoke('read-file-preview', filePath, maxLines || 80),
+  readDirectoryContext: (dirPath, maxFiles) => ipcRenderer.invoke('read-directory-context', dirPath, maxFiles || 20),
   keys: {
     set:      (name, value) => ipcRenderer.invoke('keys:set', name, value),
     has:      (name)        => ipcRenderer.invoke('keys:has', name),
@@ -47,14 +48,63 @@ contextBridge.exposeInMainWorld('aether', {
 // ═══════════════════════════════════════════════════
 const API_BASE = 'https://143.198.162.111/cloud';
 
+// Cache token from electron-store so every apiFetch has it
+let _cachedToken = null;
+async function _resolveToken() {
+  // Prefer localStorage (same-window), fall back to electron-store
+  const local = localStorage.getItem('aether_session');
+  if (local) return local;
+  if (_cachedToken) return _cachedToken;
+  try {
+    const auth = await ipcRenderer.invoke('auth:get');
+    if (auth && auth.sessionToken) {
+      _cachedToken = auth.sessionToken;
+      localStorage.setItem('aether_session', auth.sessionToken);
+      return auth.sessionToken;
+    }
+  } catch (_) { /* electron-store unavailable */ }
+  return null;
+}
+
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
-  const token = localStorage.getItem('aether_session');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  // Only resolve token if the caller didn't already provide Authorization
+  if (!headers['Authorization'] && !headers['authorization']) {
+    const token = await _resolveToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
-    const resp = await fetch(url, { ...options, headers });
+    let resp = await fetch(url, { ...options, headers });
+
+    // Auto re-login on 401 (server session expired / process restarted)
+    if (resp.status === 401 && !endpoint.includes('/auth/login')) {
+      console.warn('[apiFetch] 401 received, attempting re-login...');
+      try {
+        const auth = await ipcRenderer.invoke('auth:get');
+        if (auth?.userId && auth?.accessKey) {
+          const loginResp = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: auth.userId, password: auth.accessKey }),
+          });
+          const loginResult = await loginResp.json();
+          if (loginResult.authenticated && loginResult.session_token) {
+            _cachedToken = loginResult.session_token;
+            localStorage.setItem('aether_session', loginResult.session_token);
+            await ipcRenderer.invoke('auth:set', { ...auth, sessionToken: loginResult.session_token });
+            headers['Authorization'] = `Bearer ${loginResult.session_token}`;
+            console.log('[apiFetch] Re-login successful, retrying request...');
+            resp = await fetch(url, { ...options, headers });
+          }
+        }
+      } catch (reLoginErr) {
+        console.error('[apiFetch] Re-login failed:', reLoginErr.message);
+      }
+    }
+
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
       return { error: true, status: resp.status, message: body.detail || resp.statusText, ...body };

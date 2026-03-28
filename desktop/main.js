@@ -112,7 +112,7 @@ async function waitForBackend(maxRetries = 15, delayMs = 2000) {
         });
       });
 
-      console.log(`[AetherCloud] Backend connected — Protocol-L: ${data.protocol_l}, Agent: ${data.agent}`);
+      console.log(`[AetherCloud] Backend connected — Protocol-C: ${data.protocol_l || data.protocol_c || 'ACTIVE'}, Agent: ${data.agent}`);
 
       if (data.needs_setup) {
         console.warn('[AetherCloud] First-time setup required');
@@ -170,9 +170,7 @@ async function verifyRouting() {
       if (!data.anthropic_key_set) {
         console.error('[AetherCloud] WARNING: ANTHROPIC_API_KEY not set on VPS2');
       }
-      if (!data.ibm_token_set) {
-        console.warn('[AetherCloud] IBM token not set — quantum fallback active');
-      }
+      // IBM quantum references removed — Protocol-C only
     }
     return data;
   } catch (err) {
@@ -358,10 +356,34 @@ ipcMain.handle('read-file-preview', async (_e, filePath, maxLines = 80) => {
   try {
     if (!filePath || !fs.existsSync(filePath)) return { error: true, message: 'File not found' };
     const stat = fs.statSync(filePath);
-    if (stat.size > 2 * 1024 * 1024) return { preview: '[File too large for preview]', size: stat.size, binary: true };
+
+    // Guard: directories cannot be read as files
+    if (stat.isDirectory()) {
+      const entries = fs.readdirSync(filePath, { withFileTypes: true });
+      const listing = entries.slice(0, 50).map(e => `${e.isDirectory() ? '📁' : '📄'} ${e.name}`).join('\n');
+      return { preview: listing, size: 0, binary: false, lines: entries.length, totalLines: entries.length, isDirectory: true };
+    }
+
+    // Skip known binary extensions before reading
+    const binExts = ['.exe','.dll','.bin','.png','.jpg','.jpeg','.gif','.bmp','.ico','.zip','.tar','.gz','.7z','.rar','.mp3','.mp4','.mov','.avi','.woff','.woff2','.ttf','.otf','.so','.dylib','.psd','.ai'];
+    const ext = (filePath.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+    if (binExts.includes(ext)) {
+      return { preview: `[Binary file: ${ext} — ${stat.size} bytes]`, size: stat.size, binary: true };
+    }
+
+    // Cap at 50KB to avoid memory issues
+    if (stat.size > 50 * 1024) {
+      const fd = fs.openSync(filePath, 'r');
+      const buf = Buffer.alloc(50 * 1024);
+      fs.readSync(fd, buf, 0, 50 * 1024, 0);
+      fs.closeSync(fd);
+      const text = buf.toString('utf-8');
+      const lines = text.split('\n').slice(0, maxLines);
+      return { preview: lines.join('\n') + '\n\n[... truncated at 50KB]', size: stat.size, binary: false, lines: lines.length, truncated: true };
+    }
 
     const buf = fs.readFileSync(filePath);
-    // Detect binary
+    // Detect binary via null-byte ratio
     const sample = buf.slice(0, Math.min(512, buf.length));
     let nullCount = 0;
     for (let i = 0; i < sample.length; i++) { if (sample[i] === 0) nullCount++; }
@@ -372,6 +394,89 @@ ipcMain.handle('read-file-preview', async (_e, filePath, maxLines = 80) => {
     const text = buf.toString('utf-8');
     const lines = text.split('\n').slice(0, maxLines);
     return { preview: lines.join('\n'), size: stat.size, binary: false, lines: lines.length, totalLines: text.split('\n').length };
+  } catch (err) {
+    return { error: true, message: err.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// IPC: Read directory tree with file contents for agent context
+// ═══════════════════════════════════════════════════
+const SKIP_DIRS = new Set(['.git', 'node_modules', '__pycache__', '.venv', 'env', '.next', 'dist', 'build', '.cache', '.idea', '.vscode']);
+const TEXT_EXTS = new Set(['.py','.js','.ts','.tsx','.jsx','.json','.md','.txt','.html','.css','.yml','.yaml','.toml','.cfg','.ini','.sh','.bat','.ps1','.sql','.xml','.csv','.env','.gitignore','.dockerfile','.rs','.go','.java','.c','.cpp','.h','.rb','.php','.swift','.kt','.r','.vue','.svelte']);
+const PRIORITY_EXTS = ['.py','.js','.ts','.tsx','.jsx','.json','.md'];
+const MAX_FILE_SIZE = 50 * 1024; // 50KB per file
+const MAX_FILES_READ = 20;
+
+ipcMain.handle('read-directory-context', async (_e, dirPath, maxFiles = MAX_FILES_READ) => {
+  try {
+    if (!dirPath || !fs.existsSync(dirPath)) return { error: true, message: 'Path not found' };
+    const stat = fs.statSync(dirPath);
+    if (!stat.isDirectory()) return { error: true, message: 'Not a directory' };
+
+    const allFiles = [];
+    const walkDir = (dir, rel = '') => {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.name.startsWith('.') && e.name !== '.env.example') continue;
+        const full = path.join(dir, e.name);
+        const relPath = rel ? rel + '/' + e.name : e.name;
+        if (e.isDirectory()) {
+          if (!SKIP_DIRS.has(e.name)) walkDir(full, relPath);
+        } else if (e.isFile()) {
+          try {
+            const s = fs.statSync(full);
+            const ext = path.extname(e.name).toLowerCase();
+            allFiles.push({ path: full, relPath, size: s.size, ext });
+          } catch { /* skip */ }
+        }
+      }
+    };
+    walkDir(dirPath);
+
+    // Sort by priority: priority extensions first, then by size ascending
+    allFiles.sort((a, b) => {
+      const ap = PRIORITY_EXTS.includes(a.ext) ? 0 : 1;
+      const bp = PRIORITY_EXTS.includes(b.ext) ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return a.size - b.size;
+    });
+
+    // Build tree listing (all files)
+    const treeListing = allFiles.map(f => `  ${f.relPath}  (${f.size} bytes)`).join('\n');
+
+    // Read top N text files
+    const fileContents = [];
+    let readCount = 0;
+    for (const f of allFiles) {
+      if (readCount >= maxFiles) break;
+      if (!TEXT_EXTS.has(f.ext)) continue;
+      if (f.size > MAX_FILE_SIZE) {
+        fileContents.push({ relPath: f.relPath, content: `[Truncated — file is ${f.size} bytes, max ${MAX_FILE_SIZE}]`, truncated: true });
+        readCount++;
+        continue;
+      }
+      if (f.size === 0) continue;
+      try {
+        const buf = fs.readFileSync(f.path);
+        // Skip binary
+        const sample = buf.slice(0, Math.min(512, buf.length));
+        let nulls = 0;
+        for (let i = 0; i < sample.length; i++) { if (sample[i] === 0) nulls++; }
+        if (nulls > sample.length * 0.1) continue;
+        fileContents.push({ relPath: f.relPath, content: buf.toString('utf-8') });
+        readCount++;
+      } catch { /* skip unreadable */ }
+    }
+
+    return {
+      directory: dirPath,
+      totalFiles: allFiles.length,
+      filesRead: fileContents.length,
+      treeListing,
+      fileContents,
+    };
   } catch (err) {
     return { error: true, message: err.message };
   }

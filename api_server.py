@@ -27,8 +27,9 @@ load_all_keys()
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import uvicorn
@@ -45,6 +46,7 @@ from config.storage import (
 from auth.login import AetherCloudAuth
 from auth.session import SessionManager
 from vault.filebase import AetherVault
+from vault_spaces import VaultSpacesClient
 from vault.watcher import VaultWatcher
 from vault.read_detector import ReadDetector
 from agent.file_agent import AetherFileAgent
@@ -180,6 +182,7 @@ class Services:
     agent: Optional[AetherFileAgent] = None
     scheduler: Optional[TaskScheduler] = None
     read_detector: Optional[ReadDetector] = None
+    vault_spaces: Optional[VaultSpacesClient] = None
 
     @property
     def ready(self) -> bool:
@@ -280,6 +283,13 @@ def _init_services():
         svc.read_detector.start()
     except Exception as e:
         log.warning("Read detector failed to start: %s", e)
+
+    # DO Spaces vault client
+    svc.vault_spaces = VaultSpacesClient()
+    if svc.vault_spaces.available:
+        log.info("DO Spaces vault client ready")
+    else:
+        log.warning("DO Spaces not configured — vault uploads disabled")
 
     # Agent
     svc.agent = AetherFileAgent(vault=svc.vault)
@@ -685,6 +695,101 @@ async def vault_list(token: str = Depends(get_session_token)):
     stats["folder_count"] = len(folders)
 
     return VaultListResponse(folders=folders, stats=stats)
+
+
+# ── Vault Spaces (DO Spaces cloud storage) ────────
+@app.post("/vault/spaces/upload")
+async def vault_spaces_upload(
+    file: UploadFile = File(...),
+    token: str = Depends(get_session_token),
+):
+    """Upload a file to the user's cloud vault (DO Spaces)."""
+    if not svc.vault_spaces or not svc.vault_spaces.available:
+        raise HTTPException(status_code=503, detail="Cloud vault not configured")
+
+    username = get_username_from_token(token)
+    data = await file.read()
+    try:
+        meta = svc.vault_spaces.upload(
+            username=username,
+            filename=file.filename or "unnamed",
+            data=data,
+            content_type=file.content_type,
+        )
+        return {"success": True, **meta}
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except Exception as exc:
+        log.error("Vault upload failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+
+
+@app.get("/vault/spaces/list")
+async def vault_spaces_list(token: str = Depends(get_session_token)):
+    """List all files in the user's cloud vault."""
+    if not svc.vault_spaces or not svc.vault_spaces.available:
+        raise HTTPException(status_code=503, detail="Cloud vault not configured")
+
+    username = get_username_from_token(token)
+    files = svc.vault_spaces.list_files(username)
+    return {"success": True, "files": files, "count": len(files)}
+
+
+@app.get("/vault/spaces/download/{filename:path}")
+async def vault_spaces_download(
+    filename: str,
+    token: str = Depends(get_session_token),
+):
+    """Download a file from the user's cloud vault."""
+    if not svc.vault_spaces or not svc.vault_spaces.available:
+        raise HTTPException(status_code=503, detail="Cloud vault not configured")
+
+    username = get_username_from_token(token)
+    try:
+        stream, content_type, size = svc.vault_spaces.download(username, filename)
+        return StreamingResponse(
+            stream,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(size),
+            },
+        )
+    except Exception as exc:
+        log.error("Vault download failed: %s", exc)
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+
+@app.get("/vault/spaces/content/{filename:path}")
+async def vault_spaces_content(
+    filename: str,
+    token: str = Depends(get_session_token),
+):
+    """Get text content of a vault file (for agent context injection)."""
+    if not svc.vault_spaces or not svc.vault_spaces.available:
+        raise HTTPException(status_code=503, detail="Cloud vault not configured")
+
+    username = get_username_from_token(token)
+    text = svc.vault_spaces.download_text(username, filename)
+    if text is None:
+        return {"success": True, "binary": True, "content": None, "filename": filename}
+    return {"success": True, "binary": False, "content": text, "filename": filename}
+
+
+@app.delete("/vault/spaces/delete/{filename:path}")
+async def vault_spaces_delete(
+    filename: str,
+    token: str = Depends(get_session_token),
+):
+    """Delete a file from the user's cloud vault."""
+    if not svc.vault_spaces or not svc.vault_spaces.available:
+        raise HTTPException(status_code=503, detail="Cloud vault not configured")
+
+    username = get_username_from_token(token)
+    ok = svc.vault_spaces.delete(username, filename)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Delete failed")
+    return {"success": True, "deleted": filename}
 
 
 # ── Agent ─────────────────────────────────────────

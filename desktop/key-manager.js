@@ -7,7 +7,6 @@
  *
  * On startup, hydrate() injects stored keys into:
  *   - process.env (ANTHROPIC_API_KEY)
- *   - ~/.aether/ibm_credentials.json (IBM Quantum)
  *
  * SECURITY: Key values are NEVER logged or exposed. Only key names are logged.
  */
@@ -46,7 +45,6 @@ function getStore() {
 // ── Key names allowed ────────────────────────────────
 const ALLOWED_KEYS = new Set([
   'ANTHROPIC_API_KEY',
-  'IBM_QUANTUM_API_KEY',
 ]);
 
 // ── Public API ───────────────────────────────────────
@@ -98,24 +96,14 @@ function getAllKeyNames() {
  * hydrate() — called once on app ready.
  * Injects stored keys into the runtime environment:
  *   - ANTHROPIC_API_KEY → process.env
- *   - IBM_QUANTUM_API_KEY → ~/.aether/ibm_credentials.json + process.env
  */
 function hydrate() {
   console.log('[KeyManager] Hydrating keys into runtime...');
 
-  // Anthropic API key → process.env
   const anthropicKey = getKey('ANTHROPIC_API_KEY');
   if (anthropicKey) {
     process.env.ANTHROPIC_API_KEY = anthropicKey;
     console.log('[KeyManager] Injected ANTHROPIC_API_KEY into process.env');
-  }
-
-  // IBM Quantum API key → ~/.aether/ibm_credentials.json + process.env
-  const ibmKey = getKey('IBM_QUANTUM_API_KEY');
-  if (ibmKey) {
-    process.env.IBM_QUANTUM_API_KEY = ibmKey;
-    console.log('[KeyManager] Injected IBM_QUANTUM_API_KEY into process.env');
-    writeIBMCredentials(ibmKey);
   }
 
   const storedKeys = getAllKeyNames();
@@ -123,47 +111,12 @@ function hydrate() {
 }
 
 /**
- * Write IBM credentials to ~/.aether/ibm_credentials.json
- * This is the path that quantum_backend.py's load_ibm_credentials() searches.
- */
-function writeIBMCredentials(apiKey) {
-  try {
-    const homeDir = require('os').homedir();
-    const aetherDir = path.join(homeDir, '.aether');
-    const credPath  = path.join(aetherDir, 'ibm_credentials.json');
-
-    fs.mkdirSync(aetherDir, { recursive: true });
-    fs.writeFileSync(credPath, JSON.stringify({
-      name: 'AETHER1',
-      apikey: apiKey,
-    }, null, 2), { mode: 0o600 });
-
-    console.log('[KeyManager] Wrote IBM credentials to ~/.aether/ibm_credentials.json');
-  } catch (err) {
-    console.error('[KeyManager] Failed to write IBM credentials:', err.message);
-  }
-}
-
-/**
  * validate() — check which keys are usable.
- * Returns { anthropic: bool, ibm: bool }.
+ * Returns { anthropic: bool }.
  */
 function validate() {
   const anthropic = !!getKey('ANTHROPIC_API_KEY');
-
-  // IBM: either in store, or the credentials file exists
-  let ibm = !!getKey('IBM_QUANTUM_API_KEY');
-  if (!ibm) {
-    try {
-      const homeDir = require('os').homedir();
-      const credPath = path.join(homeDir, '.aether', 'ibm_credentials.json');
-      ibm = fs.existsSync(credPath);
-    } catch {
-      ibm = false;
-    }
-  }
-
-  return { anthropic, ibm };
+  return { anthropic };
 }
 
 module.exports = {

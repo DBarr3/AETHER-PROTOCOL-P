@@ -252,8 +252,8 @@
     <div class="login-status" id="login-status"></div>
 
     <div class="protocol-bar">
-      <div class="protocol-item"><div class="protocol-dot on"></div>Protocol-L</div>
-      <div class="protocol-item"><div class="protocol-dot quantum"></div>Quantum Seed</div>
+      <div class="protocol-item"><div class="protocol-dot on"></div>Protocol-C</div>
+      <div class="protocol-item"><div class="protocol-dot on"></div>Commitment</div>
       <div class="protocol-item"><div class="protocol-dot amber" id="dot-vps"></div>VPS2</div>
       <div class="protocol-item"><div class="protocol-dot" id="dot-auth"></div>Auth</div>
     </div>
@@ -337,6 +337,16 @@ async function handleLogin() {
     }
 
     if (result.authenticated && result.session_token) {
+      // Persist to electron-store (survives window navigation)
+      if (window.aetherAPI?.authSet) {
+        await window.aetherAPI.authSet({
+          sessionToken: result.session_token,
+          userId: username,
+          accessKey: password,
+          lastLogin: new Date().toISOString(),
+        });
+      }
+      // Also keep localStorage for same-window fallback
       localStorage.setItem('aether_session', result.session_token);
       localStorage.setItem('aether_commitment', result.commitment_hash || '');
       localStorage.setItem('aether_user', username);
