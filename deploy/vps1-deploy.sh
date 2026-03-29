@@ -198,6 +198,9 @@ server {
     listen [::]:8080 default_server;
     server_name _;
 
+    # Allow large request bodies (agent context injection)
+    client_max_body_size 10m;
+
     # ── CORS Headers ──────────────────────────────
     # Allow Electron app (file://), localhost, and VPS origins
     add_header 'Access-Control-Allow-Origin' '*' always;

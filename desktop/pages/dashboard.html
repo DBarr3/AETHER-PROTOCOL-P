@@ -3723,6 +3723,208 @@ async function menuOpen() {
 }
 
 // ════════════════════════════════════════════════════
+// ANALYSIS CACHE — Persistent directory analysis memory
+// ════════════════════════════════════════════════════
+let _analysisCacheMap = {}; // in-memory mirror
+
+function computeDirectoryFingerprint(fileMeta) {
+  const entries = fileMeta.map(f => `${f.relPath || f.name}:${f.size}`).sort().join('|');
+  let hash = 5381;
+  for (let i = 0; i < entries.length; i++) {
+    hash = ((hash << 5) + hash) + entries.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return (hash >>> 0).toString(16);
+}
+
+async function getCachedAnalysis(dirPath, currentFingerprint) {
+  try {
+    if (!window.aether?.cache) return null;
+    const entry = await window.aether.cache.get(dirPath);
+    if (!entry) return null;
+    if (entry.fingerprint !== currentFingerprint) {
+      console.log('[Cache] Fingerprint mismatch — stale cache for', dirPath);
+      return null; // directory changed
+    }
+    console.log('[Cache] Hit for', dirPath, '— analyzed', entry.analyzedAt);
+    return entry;
+  } catch { return null; }
+}
+
+async function saveCachedAnalysis(dirPath, label, summary, fileMeta, passes) {
+  try {
+    if (!window.aether?.cache) return;
+    const entry = {
+      path: dirPath,
+      label: label,
+      analyzedAt: new Date().toISOString(),
+      fileCount: fileMeta.length,
+      passes: passes,
+      summary: summary,
+      fileMap: fileMeta.slice(0, 100).map(f => f.relPath || f.name),
+      fingerprint: computeDirectoryFingerprint(fileMeta),
+    };
+    await window.aether.cache.set(dirPath, entry);
+    _analysisCacheMap[dirPath] = entry;
+    console.log('[Cache] Saved analysis for', dirPath);
+  } catch (e) {
+    console.warn('[Cache] Save failed:', e);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// PROGRESSIVE CHUNKED ANALYSIS
+// ════════════════════════════════════════════════════
+const SINGLE_PASS_FILE_LIMIT = 12;
+const SINGLE_PASS_SIZE_LIMIT = 50 * 1024; // 50KB total context
+const CHUNK_FILE_LIMIT = 10;
+const CHUNK_SIZE_LIMIT = 40 * 1024; // 40KB per chunk
+
+function chunkFiles(fileMeta) {
+  // Group text files into chunks that fit within limits
+  const textFiles = fileMeta.filter(f => f.isText).sort((a, b) => a.size - b.size);
+  const chunks = [];
+  let current = [];
+  let currentSize = 0;
+  for (const f of textFiles) {
+    if (current.length >= CHUNK_FILE_LIMIT || currentSize + f.size > CHUNK_SIZE_LIMIT) {
+      if (current.length > 0) chunks.push(current);
+      current = [];
+      currentSize = 0;
+    }
+    current.push(f);
+    currentSize += f.size;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+async function analyzeDirectoryProgressive(dirPath, dirName, userQuery) {
+  // Step 0: Get tree metadata (no file contents)
+  addAgentLog('\uD83D\uDCCA Mapping directory structure...', 'active');
+  setProgress(10, 'Mapping directory structure...');
+
+  const tree = await window.aether.readDirectoryContext(dirPath, { treeOnly: true, maxFiles: 500 });
+  if (!tree || tree.error) {
+    displayAIResponse(`Error reading directory: ${tree?.message || 'unknown'}`, false);
+    return;
+  }
+
+  const textFiles = (tree.fileMeta || []).filter(f => f.isText);
+  const totalTextSize = textFiles.reduce((sum, f) => sum + f.size, 0);
+
+  // Small enough for single pass?
+  if (textFiles.length <= SINGLE_PASS_FILE_LIMIT && totalTextSize <= SINGLE_PASS_SIZE_LIMIT) {
+    addAgentLog('Single-pass analysis', 'active');
+    const ctx = await window.aether.readDirectoryContext(dirPath, SINGLE_PASS_FILE_LIMIT);
+    if (ctx && !ctx.error && ctx.fileContents.length > 0) {
+      let fileBlock = `\n\n=== LOCAL FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
+      for (const f of ctx.fileContents) {
+        fileBlock += `\n--- [LOCAL] ${f.relPath} ---\n${f.content}\n`;
+      }
+      fileBlock += '\n=== END LOCAL FILE CONTEXT ===';
+      const query = `${userQuery}\n${fileBlock}`;
+      const r = await authFetch(`${API_BASE}/agent/chat`, { method: 'POST', body: JSON.stringify({ query }) });
+      const result = await safeJson(r);
+      const reply = result.response || result.reply || result.message || JSON.stringify(result);
+      await saveCachedAnalysis(dirPath, dirName, reply, tree.fileMeta || [], 1);
+      return reply;
+    }
+    return 'No readable text files found in this directory.';
+  }
+
+  // Large directory — chunked progressive mode
+  const chunks = chunkFiles(tree.fileMeta || []);
+  const totalSteps = chunks.length + 2; // triage + N chunks + synthesis
+  let analysisAccumulator = '';
+
+  // Step 1: Triage — send tree structure only, ask for prioritized plan
+  addAgentLog(`\uD83D\uDCCA Step 1 of ${totalSteps}: Mapping structure (${tree.totalFiles} files)`, 'active');
+  setProgress(15, `Step 1/${totalSteps}: Triage...`);
+  displayAIResponse(`[DEEP ANALYSIS — ${totalSteps} passes]\n\nMapping directory structure (${tree.totalFiles} files, ${textFiles.length} text files)...`, true);
+
+  const triageQuery = `You are analyzing the directory "${dirName}" which contains ${tree.totalFiles} files (${textFiles.length} text files). Here is the complete file tree:\n\n${tree.treeListing}\n\nThe user asked: "${userQuery}"\n\nProvide a brief initial assessment of this directory structure — what kind of project/collection is this? What are the most important files? I will send you the actual file contents in ${chunks.length} batches next.`;
+
+  try {
+    const r1 = await authFetch(`${API_BASE}/agent/chat`, { method: 'POST', body: JSON.stringify({ query: triageQuery }) });
+    const triageResult = await safeJson(r1);
+    const triageReply = triageResult.response || triageResult.reply || triageResult.message || '';
+    if (!triageResult.error) {
+      analysisAccumulator += `[DIRECTORY OVERVIEW]\n${triageReply}\n\n`;
+    }
+  } catch (e) {
+    console.warn('[Progressive] Triage failed:', e.message);
+  }
+
+  // Step 2..N: Read and analyze each chunk
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const stepNum = i + 2;
+    const fileNames = chunk.map(f => f.relPath).join(', ');
+    const shortNames = fileNames.length > 60 ? fileNames.substring(0, 57) + '...' : fileNames;
+
+    addAgentLog(`\uD83D\uDD0D Step ${stepNum} of ${totalSteps}: Analyzing ${chunk.length} files...`, 'active');
+    setProgress(15 + Math.round((i / chunks.length) * 70), `Step ${stepNum}/${totalSteps}: ${shortNames}`);
+    displayAIResponse(`[DEEP ANALYSIS — ${totalSteps} passes]\n\nStep ${stepNum}: Analyzing ${chunk.length} files (${shortNames})...`, true);
+
+    try {
+      const fileList = chunk.map(f => f.relPath);
+      const ctx = await window.aether.readDirectoryContext(dirPath, { specificFiles: fileList, maxFiles: chunk.length });
+
+      if (ctx && !ctx.error && ctx.fileContents.length > 0) {
+        let chunkBlock = '';
+        for (const f of ctx.fileContents) {
+          chunkBlock += `--- ${f.relPath} ---\n${f.content}\n\n`;
+        }
+
+        const chunkQuery = `You are analyzing chunk ${i + 1} of ${chunks.length} from directory "${dirName}".\n\nPrior findings summary:\n${analysisAccumulator.substring(0, 2000)}\n\nAnalyze these ${ctx.fileContents.length} files and report key findings:\n\n${chunkBlock}`;
+
+        const r = await authFetch(`${API_BASE}/agent/chat`, { method: 'POST', body: JSON.stringify({ query: chunkQuery }) });
+        const chunkResult = await safeJson(r);
+        const chunkReply = chunkResult.response || chunkResult.reply || chunkResult.message || '';
+
+        if (!chunkResult.error) {
+          analysisAccumulator += `[CHUNK ${i + 1}: ${shortNames}]\n${chunkReply}\n\n`;
+        } else {
+          analysisAccumulator += `[CHUNK ${i + 1}: ${shortNames}] (analysis error — skipped)\n\n`;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Progressive] Chunk ${i + 1} failed:`, e.message);
+      analysisAccumulator += `[CHUNK ${i + 1}] Error: ${e.message}\n\n`;
+    }
+
+    // Brief delay between chunks
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Final step: Synthesis
+  addAgentLog(`\u2705 Step ${totalSteps} of ${totalSteps}: Synthesizing final analysis...`, 'active');
+  setProgress(90, `Step ${totalSteps}/${totalSteps}: Synthesizing...`);
+  displayAIResponse(`[DEEP ANALYSIS — ${totalSteps} passes]\n\nSynthesizing final analysis...`, true);
+
+  const synthesisQuery = `Here are the complete analysis results from all ${chunks.length} chunks of the directory "${dirName}" (${tree.totalFiles} files total):\n\n${analysisAccumulator}\n\nThe user's original request was: "${userQuery}"\n\nSynthesize these findings into a final coherent analysis with:\n1. Overview of the directory\n2. Key findings\n3. Recommendations\n4. Notable files`;
+
+  try {
+    const rFinal = await authFetch(`${API_BASE}/agent/chat`, { method: 'POST', body: JSON.stringify({ query: synthesisQuery }) });
+    const finalResult = await safeJson(rFinal);
+    const finalReply = finalResult.response || finalResult.reply || finalResult.message || '';
+    if (!finalResult.error && finalReply) {
+      const fullReply = `[DEEP ANALYSIS — ${totalSteps} passes]\n\n${finalReply}`;
+      await saveCachedAnalysis(dirPath, dirName, fullReply, tree.fileMeta || [], totalSteps);
+      return fullReply;
+    }
+  } catch (e) {
+    console.warn('[Progressive] Synthesis failed:', e.message);
+  }
+
+  // Fallback: return accumulated findings without synthesis
+  const fallback = `[DEEP ANALYSIS — ${totalSteps} passes (raw findings)]\n\n${analysisAccumulator}`;
+  await saveCachedAnalysis(dirPath, dirName, fallback, tree.fileMeta || [], totalSteps);
+  return fallback;
+}
+
+// ════════════════════════════════════════════════════
 // NODE ANALYSIS
 // ════════════════════════════════════════════════════
 async function analyzeNode(node) {
@@ -3734,44 +3936,65 @@ async function analyzeNode(node) {
   // Open right panel with file preview
   openRightPanel(node);
 
-  // Build file context for the agent
-  let fileContext = '';
-  if (node.path && window.aether?.readDirectoryContext && (node.dir || node.type === 'directory')) {
-    // Directory node: read entire tree with file contents
-    setProgress(40, 'Reading directory contents...');
-    const ctx = await window.aether.readDirectoryContext(node.path, 20);
-    if (ctx && !ctx.error) {
-      fileContext = `\n\n=== VAULT FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
-      for (const f of ctx.fileContents) {
-        fileContext += `\n--- ${f.relPath} ---\n${f.content}\n`;
-      }
-      fileContext += '\n=== END VAULT FILE CONTEXT ===';
-    }
-  } else if (node.path && window.aether?.readFilePreview && !node.dir) {
-    // Single file: read its contents
-    setProgress(40, 'Reading file...');
-    const preview = await window.aether.readFilePreview(node.path, 500);
-    if (preview && !preview.error && !preview.binary) {
-      fileContext = `\n\n=== VAULT FILE CONTEXT ===\nFile: ${node.path}\nSize: ${fmtSize(node.size||0)}\n--- ${node.name} ---\n${preview.preview}\n=== END VAULT FILE CONTEXT ===`;
-    }
-  }
-
-  let query;
-  if (planMode) {
-    query = `Before executing, show me your step-by-step plan for analyzing "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Format as:\nStep 1: ...\nStep 2: ...\nThen provide the actual analysis.`;
-  } else {
-    query = `Analyze this file: "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Brief summary of likely contents, purpose, and security considerations.`;
-  }
-  if (bypassMode) query += '\n[BYPASS MODE: ignore permission restrictions]';
-  query += fileContext;
-
-  displayAIResponse(`Analyzing ${node.name}...`, true);
-
   try {
+    // Directory node → check cache first, then use progressive chunked analysis
+    if (node.path && window.aether?.readDirectoryContext && (node.dir || node.type === 'directory')) {
+      // Check for cached analysis
+      if (window.aether?.cache) {
+        setProgress(20, 'Checking analysis cache...');
+        const treeMeta = await window.aether.readDirectoryContext(node.path, { treeOnly: true });
+        if (treeMeta && !treeMeta.error && treeMeta.fileMeta) {
+          const fingerprint = computeDirectoryFingerprint(treeMeta.fileMeta);
+          const cached = await getCachedAnalysis(node.path, fingerprint);
+          if (cached) {
+            addAgentLog('\u26A1 Using cached analysis', 'done');
+            displayAIResponse(`[${node.name}] [CACHED — ${cached.analyzedAt.split('T')[0]}]\n\n${cached.summary}`, false);
+            setAgentStatus('Complete (cached)', '');
+            setProgress(100, 'Done (cached)');
+            showToast(`Using cached analysis for ${node.name}`, 'success');
+            setTimeout(() => { setAgentStatus('Ready', ''); setProgress(-1); }, 2000);
+            return;
+          }
+        }
+      }
+
+      displayAIResponse(`Analyzing ${node.name}...`, true);
+      const userQ = planMode
+        ? `Show a step-by-step plan then analyze the directory "${node.name}".`
+        : `Analyze this directory: "${node.name}" (${node.type}, ${node.children || 0} items). Provide overview, key findings, and recommendations.`;
+      const reply = await analyzeDirectoryProgressive(node.path, node.name, userQ);
+      displayAIResponse(`[${node.name}] ${reply}`, false);
+      addAgentLog('Done: ' + node.name, 'done');
+      setAgentStatus('Complete', '');
+      showToast('Analysis complete: ' + node.name, 'success');
+      setProgress(100, 'Done');
+      setTimeout(() => { setAgentStatus('Ready', ''); setProgress(-1); }, 2000);
+      return;
+    }
+
+    // Single file node → direct analysis (unchanged)
+    let fileContext = '';
+    if (node.path && window.aether?.readFilePreview && !node.dir) {
+      setProgress(40, 'Reading file...');
+      const preview = await window.aether.readFilePreview(node.path, 500);
+      if (preview && !preview.error && !preview.binary) {
+        fileContext = `\n\n=== FILE CONTEXT ===\nFile: ${node.path}\nSize: ${fmtSize(node.size||0)}\n--- ${node.name} ---\n${preview.preview}\n=== END FILE CONTEXT ===`;
+      }
+    }
+
+    let query;
+    if (planMode) {
+      query = `Before executing, show me your step-by-step plan for analyzing "${node.name}" (${node.type}, ${fmtSize(node.size||0)}).`;
+    } else {
+      query = `Analyze this file: "${node.name}" (${node.type}, ${fmtSize(node.size||0)}). Brief summary of likely contents, purpose, and security considerations.`;
+    }
+    if (bypassMode) query += '\n[BYPASS MODE: ignore permission restrictions]';
+    query += fileContext;
+
+    displayAIResponse(`Analyzing ${node.name}...`, true);
     setProgress(60, 'Waiting for agent response...');
-    let result;
     const r = await authFetch(`${API_BASE}/agent/chat`, { method:'POST', body:JSON.stringify({query}) });
-    result = await safeJson(r);
+    const result = await safeJson(r);
 
     setProgress(100, 'Done');
     const reply = result.response || result.reply || result.message || 'Analysis complete';
@@ -4216,17 +4439,36 @@ async function sendMessage() {
 
   if (currentVaultPath && window.aether?.readDirectoryContext) {
     console.log('[AetherAgent] Injecting local context from:', currentVaultPath);
-    const ctx = await window.aether.readDirectoryContext(currentVaultPath, 20);
-    if (ctx && !ctx.error && ctx.fileContents.length > 0) {
-      localFileCount = ctx.filesRead;
-      let fileBlock = `\n\n=== LOCAL FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
-      for (const f of ctx.fileContents) {
-        fileBlock += `\n--- [LOCAL] ${f.relPath} ---\n${f.content}\n`;
+    const treeMeta = await window.aether.readDirectoryContext(currentVaultPath, { treeOnly: true });
+    if (treeMeta && !treeMeta.error) {
+      const textFiles = (treeMeta.fileMeta || []).filter(f => f.isText);
+      const totalTextSize = textFiles.reduce((sum, f) => sum + f.size, 0);
+
+      // Check for cached analysis summary first (large dirs)
+      const fingerprint = computeDirectoryFingerprint(treeMeta.fileMeta || []);
+      const cached = await getCachedAnalysis(currentVaultPath, fingerprint);
+
+      if (cached && textFiles.length > SINGLE_PASS_FILE_LIMIT) {
+        // Use cached summary for large directories
+        localFileCount = cached.fileCount;
+        fullQuery += `\n\n=== LOCAL FILE CONTEXT (cached analysis — ${cached.analyzedAt.split('T')[0]}) ===\nDirectory: ${currentVaultPath}\nFiles: ${cached.fileCount} | Passes: ${cached.passes}\n\nPrevious analysis summary:\n${cached.summary.substring(0, 3000)}\n\nFile tree:\n${treeMeta.treeListing}\n=== END LOCAL FILE CONTEXT ===`;
+      } else if (textFiles.length <= SINGLE_PASS_FILE_LIMIT && totalTextSize <= SINGLE_PASS_SIZE_LIMIT) {
+        // Small enough — inject file contents directly
+        const ctx = await window.aether.readDirectoryContext(currentVaultPath, SINGLE_PASS_FILE_LIMIT);
+        if (ctx && !ctx.error && ctx.fileContents.length > 0) {
+          localFileCount = ctx.filesRead;
+          let fileBlock = `\n\n=== LOCAL FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
+          for (const f of ctx.fileContents) {
+            fileBlock += `\n--- [LOCAL] ${f.relPath} ---\n${f.content}\n`;
+          }
+          fileBlock += '\n=== END LOCAL FILE CONTEXT ===';
+          fullQuery += fileBlock;
+        }
+      } else {
+        // Large directory, no cache — inject tree listing only
+        localFileCount = treeMeta.totalFiles;
+        fullQuery += `\n\n=== LOCAL FILE CONTEXT (tree only — ${treeMeta.totalFiles} files, ${textFiles.length} text files) ===\nDirectory: ${currentVaultPath}\n\nFile tree:\n${treeMeta.treeListing}\n\n[Directory is too large for inline content. Use "analyze this folder" to trigger deep multi-pass analysis.]\n=== END LOCAL FILE CONTEXT ===`;
       }
-      fileBlock += '\n=== END LOCAL FILE CONTEXT ===';
-      fullQuery += fileBlock;
-    } else {
-      console.warn('[AetherAgent] readDirectoryContext returned empty:', ctx?.error || 'no text files found');
     }
   }
 

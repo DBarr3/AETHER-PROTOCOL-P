@@ -408,11 +408,24 @@ const PRIORITY_EXTS = ['.py','.js','.ts','.tsx','.jsx','.json','.md'];
 const MAX_FILE_SIZE = 50 * 1024; // 50KB per file
 const MAX_FILES_READ = 20;
 
-ipcMain.handle('read-directory-context', async (_e, dirPath, maxFiles = MAX_FILES_READ) => {
+// Options: maxFiles (number), treeOnly (bool), specificFiles (string[] of relPaths)
+ipcMain.handle('read-directory-context', async (_e, dirPath, optionsOrMax = MAX_FILES_READ) => {
   try {
     if (!dirPath || !fs.existsSync(dirPath)) return { error: true, message: 'Path not found' };
     const stat = fs.statSync(dirPath);
     if (!stat.isDirectory()) return { error: true, message: 'Not a directory' };
+
+    // Support both old (number) and new (object) signatures
+    let maxFiles = MAX_FILES_READ;
+    let treeOnly = false;
+    let specificFiles = null;
+    if (typeof optionsOrMax === 'number') {
+      maxFiles = optionsOrMax;
+    } else if (typeof optionsOrMax === 'object' && optionsOrMax !== null) {
+      maxFiles = optionsOrMax.maxFiles || MAX_FILES_READ;
+      treeOnly = !!optionsOrMax.treeOnly;
+      specificFiles = optionsOrMax.specificFiles || null;
+    }
 
     const allFiles = [];
     const walkDir = (dir, rel = '') => {
@@ -435,7 +448,7 @@ ipcMain.handle('read-directory-context', async (_e, dirPath, maxFiles = MAX_FILE
     };
     walkDir(dirPath);
 
-    // Sort by priority: priority extensions first, then by size ascending
+    // Sort by priority
     allFiles.sort((a, b) => {
       const ap = PRIORITY_EXTS.includes(a.ext) ? 0 : 1;
       const bp = PRIORITY_EXTS.includes(b.ext) ? 0 : 1;
@@ -443,13 +456,34 @@ ipcMain.handle('read-directory-context', async (_e, dirPath, maxFiles = MAX_FILE
       return a.size - b.size;
     });
 
-    // Build tree listing (all files)
     const treeListing = allFiles.map(f => `  ${f.relPath}  (${f.size} bytes)`).join('\n');
 
-    // Read top N text files
+    // Tree-only mode: return metadata without reading contents
+    if (treeOnly) {
+      const textFiles = allFiles.filter(f => TEXT_EXTS.has(f.ext));
+      return {
+        directory: dirPath,
+        totalFiles: allFiles.length,
+        textFileCount: textFiles.length,
+        filesRead: 0,
+        treeListing,
+        fileContents: [],
+        fileMeta: allFiles.map(f => ({ relPath: f.relPath, size: f.size, ext: f.ext, isText: TEXT_EXTS.has(f.ext) })),
+      };
+    }
+
+    // Determine which files to read
+    let filesToRead = allFiles;
+    if (specificFiles && specificFiles.length > 0) {
+      const specSet = new Set(specificFiles);
+      filesToRead = allFiles.filter(f => specSet.has(f.relPath));
+      maxFiles = specificFiles.length;
+    }
+
+    // Read files
     const fileContents = [];
     let readCount = 0;
-    for (const f of allFiles) {
+    for (const f of filesToRead) {
       if (readCount >= maxFiles) break;
       if (!TEXT_EXTS.has(f.ext)) continue;
       if (f.size > MAX_FILE_SIZE) {
@@ -460,7 +494,6 @@ ipcMain.handle('read-directory-context', async (_e, dirPath, maxFiles = MAX_FILE
       if (f.size === 0) continue;
       try {
         const buf = fs.readFileSync(f.path);
-        // Skip binary
         const sample = buf.slice(0, Math.min(512, buf.length));
         let nulls = 0;
         for (let i = 0; i < sample.length; i++) { if (sample[i] === 0) nulls++; }
@@ -530,6 +563,58 @@ ipcMain.handle('auth:clearAll', () => {
   const store = getAuthStore();
   store.clear();
   return { success: true };
+});
+
+// ═══════════════════════════════════════════════════
+// IPC: Analysis Cache (persistent directory analysis memory)
+// ═══════════════════════════════════════════════════
+let analysisCache = null;
+function getAnalysisCache() {
+  if (!analysisCache) analysisCache = require('./analysis-cache');
+  return analysisCache;
+}
+
+ipcMain.handle('cache:get', (_e, dirPath) => {
+  try {
+    const cache = getAnalysisCache();
+    const entries = cache.get('entries', {});
+    return entries[dirPath] || null;
+  } catch { return null; }
+});
+
+ipcMain.handle('cache:set', (_e, dirPath, entry) => {
+  try {
+    const cache = getAnalysisCache();
+    const entries = cache.get('entries', {});
+    entries[dirPath] = entry;
+    cache.set('entries', entries);
+    return { success: true };
+  } catch (err) { return { error: true, message: err.message }; }
+});
+
+ipcMain.handle('cache:list', () => {
+  try {
+    const cache = getAnalysisCache();
+    const entries = cache.get('entries', {});
+    return Object.values(entries).map(e => ({
+      path: e.path, label: e.label, analyzedAt: e.analyzedAt,
+      fileCount: e.fileCount, passes: e.passes, fingerprint: e.fingerprint,
+    }));
+  } catch { return []; }
+});
+
+ipcMain.handle('cache:clear', (_e, dirPath) => {
+  try {
+    const cache = getAnalysisCache();
+    if (dirPath) {
+      const entries = cache.get('entries', {});
+      delete entries[dirPath];
+      cache.set('entries', entries);
+    } else {
+      cache.set('entries', {});
+    }
+    return { success: true };
+  } catch (err) { return { error: true, message: err.message }; }
 });
 
 // ═══════════════════════════════════════════════════

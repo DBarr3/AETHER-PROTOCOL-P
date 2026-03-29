@@ -41,6 +41,12 @@ contextBridge.exposeInMainWorld('aether', {
     getPath:       () => ipcRenderer.invoke('vault:getPath'),
     requestAccess: () => ipcRenderer.invoke('vault:requestAccess'),
   },
+  cache: {
+    get:   (dirPath) => ipcRenderer.invoke('cache:get', dirPath),
+    set:   (dirPath, entry) => ipcRenderer.invoke('cache:set', dirPath, entry),
+    list:  () => ipcRenderer.invoke('cache:list'),
+    clear: (dirPath) => ipcRenderer.invoke('cache:clear', dirPath),
+  },
 });
 
 // ═══════════════════════════════════════════════════
