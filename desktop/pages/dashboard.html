@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AetherCloud-L</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
   :root {
     --bg: #0a0a0a;
@@ -246,18 +246,40 @@
   .sb-chat-preview { font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .sb-file-entry {
-    display: flex; align-items: center; gap: 6px;
-    padding: 5px 4px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
     cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.1s;
-    font-size: 10px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
   }
-  .sb-file-entry:hover { background: var(--bg-3); }
-  .sb-file-entry.selected { background: var(--accent-dim); border-left: 2px solid var(--accent); }
-  .sb-file-icon { font-size: 9px; color: var(--accent); width: 14px; text-align: center; flex-shrink: 0; }
-  .sb-file-name { flex: 1; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sb-file-time { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); flex-shrink: 0; }
+  .sb-file-entry:hover { 
+    background: rgba(255, 255, 255, 0.05); 
+    border-color: rgba(0, 212, 255, 0.2);
+    transform: translateX(4px);
+  }
+  .sb-file-entry.selected { 
+    background: rgba(0, 212, 255, 0.08); 
+    border-color: var(--accent);
+  }
+  .sb-file-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sb-file-name { 
+    flex: 1; color: var(--text-secondary); 
+    font-family: 'IBM Plex Mono', monospace; 
+    font-size: 10px; letter-spacing: -0.2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sb-file-meta { 
+    font-family: 'JetBrains Mono', monospace; 
+    font-size: 8px; color: var(--text-muted); 
+    flex-shrink: 0; opacity: 0.6; 
+  }
   .sb-file-sort { display: flex; gap: 4px; margin-bottom: 6px; }
   .sb-sort-btn {
     background: none; border: 1px solid var(--border-2);
@@ -1405,7 +1427,6 @@
     border-top-color: var(--accent); border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
   .sched-qopc-bar {
     display: flex; align-items: center; gap: 4px; margin-top: 2px;
     font-size: 7px; font-family: 'JetBrains Mono', monospace;
@@ -2560,7 +2581,6 @@ async function attemptReLogin() {
       _tokenHydrated = true;
       localStorage.setItem('aether_session', result.session_token);
       await window.aetherAPI?.authSet({ ...auth, sessionToken: result.session_token });
-      console.log('[AetherAgent] Re-login successful, new token obtained');
       return result.session_token;
     }
     console.warn('[AetherAgent] Re-login failed:', result?.message || 'unknown');
@@ -2629,36 +2649,30 @@ const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, 
 
 // Hardened color system — bright, always visible, extension-based
 const TYPE_COLORS = {
-  Python:'#00FF00', JavaScript:'#00DD00', TypeScript:'#00CC00', JSX:'#00FF00', CPP:'#00BB00',
-  HTML:'#00EE44', CSS:'#00EE44', Go:'#00BB44', Rust:'#00AA33', Ruby:'#00CC55', Java:'#00BB33',
-  JSON:'#FFA500', CSV:'#FFA500', SQL:'#FFA500', YAML:'#FFA500', XML:'#FF8800',
-  Markdown:'#0088FF', PDF:'#0088FF', Text:'#FFFF00', DOCX:'#0088FF',
-  Config:'#CCCCCC', Env:'#CCCCCC', TOML:'#CCCCCC', INI:'#CCCCCC',
-  Binary:'#FF00FF', Image:'#FF00FF', EXE:'#FF00FF', DLL:'#FF00FF',
-  Log:'#AAAAAA', Shell:'#00DD00',
-  directory:'#00FFFF'
+  Python:'#06b6d4', JavaScript:'#a78bfa', TypeScript:'#a78bfa', JSX:'#a78bfa',
+  HTML:'#10b981', CSS:'#10b981', JSON:'#f59e0b', YAML:'#f59e0b', Env:'#f59e0b',
+  Markdown:'#6b7280', Text:'#6b7280',
+  directory:'#3b82f6',
+  Image:'#ec4899', Binary:'#374151',
+  agentActive:'#ffffff'
 };
 // Extension-based color lookup (fallback to TYPE_COLORS)
 const EXT_COLORS = {
-  '.py':'#00FF00','.js':'#00DD00','.ts':'#00CC00','.jsx':'#00FF00','.tsx':'#00CC00',
-  '.cpp':'#00BB00','.c':'#00BB00','.h':'#00BB00','.rs':'#00AA33','.go':'#00BB44',
-  '.rb':'#00CC55','.java':'#00BB33','.sh':'#00DD00','.bash':'#00DD00',
-  '.html':'#00EE44','.css':'#00EE44','.scss':'#00EE44',
-  '.json':'#FFA500','.csv':'#FFA500','.sql':'#FFA500','.yaml':'#FFA500','.yml':'#FFA500','.xml':'#FF8800',
-  '.md':'#0088FF','.pdf':'#0088FF','.txt':'#FFFF00','.docx':'#0088FF','.doc':'#0088FF',
-  '.env':'#CCCCCC','.conf':'#CCCCCC','.cfg':'#CCCCCC','.ini':'#CCCCCC','.toml':'#CCCCCC','.rules':'#CCCCCC',
-  '.png':'#FF00FF','.jpg':'#FF00FF','.jpeg':'#FF00FF','.gif':'#FF00FF','.svg':'#FF00FF','.ico':'#FF00FF',
-  '.bin':'#FF00FF','.exe':'#FF00FF','.dll':'#FF00FF','.so':'#FF00FF',
-  '.log':'#AAAAAA','.lock':'#888888',
+  '.py':'#06b6d4', '.js':'#a78bfa', '.ts':'#a78bfa', '.tsx':'#a78bfa', '.jsx':'#a78bfa',
+  '.json':'#f59e0b', '.yaml':'#f59e0b', '.yml':'#f59e0b', '.env':'#f59e0b',
+  '.md':'#6b7280', '.txt':'#6b7280',
+  '.html':'#10b981', '.css':'#10b981',
+  '.png':'#ec4899', '.jpg':'#ec4899', '.svg':'#ec4899',
 };
-function typeColor(type) { return TYPE_COLORS[type] || '#888888'; }
+function typeColor(type) { return TYPE_COLORS[type] || '#64748b'; }
 function extColor(name) {
   const ext = '.' + (name.split('.').pop() || '').toLowerCase();
   return EXT_COLORS[ext] || null;
 }
 function nodeColor(n) {
-  if (n.dir) return '#00FFFF';
-  return extColor(n.name) || typeColor(n.type) || '#888888';
+  if (n.agentActive) return TYPE_COLORS.agentActive;
+  if (n.dir) return TYPE_COLORS.directory;
+  return extColor(n.name) || typeColor(n.type) || TYPE_COLORS.Binary;
 }
 
 function initCircuit() {
@@ -2792,12 +2806,12 @@ function handleHover(e) {
 
   // Check hit: square for root, circle for others
   for (const n of CS.nodes) {
-    const dx = mx - n.cx, dy = my - n.cy;
+    const dx = mx - (n.cx + (n.driftX || 0)), dy = my - (n.cy + (n.driftY || 0));
     if (n.isRoot) {
-      const halfW = n.r * 1.4 + 2;
-      if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfW) { found = n; break; }
+      const bound = 32; // Root hit box
+      if (Math.abs(dx) <= bound && Math.abs(dy) <= bound) { found = n; break; }
     } else {
-      if (Math.sqrt(dx*dx + dy*dy) <= n.r + 2) { found = n; break; }
+      if (Math.sqrt(dx*dx + dy*dy) <= n.r + 6) { found = n; break; }
     }
   }
 
@@ -2835,11 +2849,10 @@ function getPathToRoot(node) {
 
 // ── Radial Layout Engine + Force Simulation ──────────
 // Phase 1: Radial placement in concentric rings
-// Phase 2: Force simulation (300 ticks) for zero-overlap guarantee
+// Phase 2: Force simulation (50 iterations) for zero-overlap guarantee
 function radialLayout(nodes, edges) {
   if (!nodes.length) return;
 
-  // Build adjacency: parent → children
   const childMap = {};
   nodes.forEach(n => { childMap[n.id] = []; });
   edges.forEach(e => { if (childMap[e.from]) childMap[e.from].push(e.to); });
@@ -2851,148 +2864,77 @@ function radialLayout(nodes, edges) {
 
   CS.cx = centerX; CS.cy = centerY;
 
-  // Assign depth via BFS
-  const depthMap = {}; depthMap[root.id] = 0;
-  const queue = [root.id];
-  while (queue.length) {
-    const pid = queue.shift();
-    (childMap[pid] || []).forEach(cid => {
-      if (depthMap[cid] === undefined) {
-        depthMap[cid] = depthMap[pid] + 1;
-        queue.push(cid);
-      }
-    });
-  }
-  const maxDepth = Math.max(...Object.values(depthMap), 1);
-
-  // Ring radii scale with node count for 600+ node graphs
-  const nodeCount = nodes.length;
-  const scaleFactor = nodeCount > 200 ? 1 + (nodeCount - 200) / 800 : 1;
-  const baseRadii = [0, 160, 310, 440, 560, 670, 770];
-  const ringRadius = baseRadii.map(r => r * scaleFactor);
-
-  // Node sizes per depth (slightly smaller for dense graphs)
-  const densityScale = nodeCount > 300 ? Math.max(0.6, 1 - (nodeCount - 300) / 1500) : 1;
-  const baseNodeSizes = [32, 20, 13, 10, 8, 7, 6];
-  const nodeSizes = baseNodeSizes.map(s => Math.max(4, Math.round(s * densityScale)));
-
-  // Subtree weight for angular allocation
-  const stCache = {};
-  function subtreeSize(nid) {
-    if (stCache[nid] !== undefined) return stCache[nid];
-    const kids = childMap[nid] || [];
-    if (kids.length === 0) { stCache[nid] = 1; return 1; }
-    let s = 0;
-    kids.forEach(k => { s += subtreeSize(k); });
-    stCache[nid] = Math.max(s, 1);
-    return stCache[nid];
-  }
-
-  // ── Phase 1: Radial angular placement ──────────────
-  function place(nid, angleStart, angleEnd, depth) {
+  function place(nid, px, py, depth, angleStart, angleEnd) {
     const node = nodes.find(n => n.id === nid);
     if (!node) return;
 
-    const angle = (angleStart + angleEnd) / 2;
-    const rIdx = Math.min(depth, ringRadius.length - 1);
-    const radius = ringRadius[rIdx] || (depth * 120 * scaleFactor);
-    const r = nodeSizes[Math.min(depth, nodeSizes.length - 1)] || 4;
-
-    node.cx = centerX + Math.cos(angle) * radius;
-    node.cy = centerY + Math.sin(angle) * radius;
-    node.r = r;
     node.depth = depth;
+    node.driftX = 0; node.driftY = 0;
+    node.phaseX = Math.random() * Math.PI * 2;
+    node.phaseY = Math.random() * Math.PI * 2;
+
+    if (depth === 0) {
+      node.r = 28;
+      node.cx = px; node.cy = py;
+    } else {
+      const angle = (angleStart + angleEnd) / 2;
+      let dist;
+      if (depth === 1) {
+        dist = 280 + Math.random() * 100;
+        node.r = 7;
+      } else {
+        const isDir = node.dir || node.type === 'directory';
+        node.r = isDir ? 5 : 3.5;
+        dist = isDir ? (80 + Math.random() * 60) : (50 + Math.random() * 40);
+      }
+      node.cx = px + Math.cos(angle) * dist;
+      node.cy = py + Math.sin(angle) * dist;
+    }
 
     const kids = childMap[nid] || [];
     if (kids.length === 0) return;
 
-    // Ensure minimum angular span per child so small clusters don't collapse
-    const totalWeight = kids.reduce((s, kid) => s + subtreeSize(kid), 0);
-    const availableSpan = angleEnd - angleStart;
-    const minChildSpan = Math.min(0.15, availableSpan / kids.length);
-    let curAngle = angleStart;
+    // Progressive rendering for large dirs
+    if (kids.length > 50 && depth > 0) {
+      node.isLargeDir = true;
+      node.totalChildrenCount = kids.length;
+      return; 
+    }
 
-    kids.forEach(kid => {
-      const weight = subtreeSize(kid) / totalWeight;
-      const span = Math.max(minChildSpan, availableSpan * weight);
-      place(kid, curAngle, curAngle + span, depth + 1);
+    const availableSpan = angleEnd - angleStart;
+    let curAngle = angleStart;
+    kids.forEach(kidId => {
+      const span = availableSpan / kids.length;
+      place(kidId, node.cx, node.cy, depth + 1, curAngle, curAngle + span);
       curAngle += span;
     });
   }
 
-  // Root at center
-  root.cx = centerX; root.cy = centerY;
-  root.r = nodeSizes[0]; root.depth = 0;
+  place(root.id, centerX, centerY, 0, 0, Math.PI * 2);
 
-  // Place tier 1+ with full 360° spread
-  const rootKids = childMap[root.id] || [];
-  const totalWeight = rootKids.reduce((s, kid) => s + subtreeSize(kid), 0);
-  let curAngle = -Math.PI * 0.6;
-  const fullSpan = Math.PI * 2;
-
-  rootKids.forEach(kid => {
-    const weight = subtreeSize(kid) / totalWeight;
-    const span = fullSpan * weight;
-    place(kid, curAngle, curAngle + span, 1);
-    curAngle += span;
-  });
-
-  // ── Phase 2: Force simulation — 300 ticks ─────────
-  // Collision repulsion + edge tension + radial constraint
-  const TICKS = Math.min(300, Math.max(100, 400 - nodes.length * 0.3));
-  const alpha0 = 0.3;
-
-  for (let tick = 0; tick < TICKS; tick++) {
-    const alpha = alpha0 * (1 - tick / TICKS);
-    if (alpha < 0.001) break;
-
-    // ─ Collision force: push overlapping nodes apart
+  // Phase 2: Force relaxation (50 iterations)
+  for (let iter = 0; iter < 50; iter++) {
+    const alpha = (1 - iter / 50) * 0.5;
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j];
-        const dx = b.cx - a.cx, dy = b.cy - a.cy;
-        const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
-        const minDist = a.r + b.r + 16;
-        if (dist < minDist) {
-          const push = (minDist - dist) * 0.5 * alpha;
-          const nx = dx/dist, ny = dy/dist;
-          if (!a.isRoot) { a.cx -= nx * push; a.cy -= ny * push; }
-          if (!b.isRoot) { b.cx += nx * push; b.cy += ny * push; }
+        if (a.isRoot || b.isRoot) continue;
+        const dx = b.cx - a.cx;
+        const dy = b.cy - a.cy;
+        const distSq = dx*dx + dy*dy;
+        const minDist = 28;
+        if (distSq < minDist * minDist) {
+          const dist = Math.sqrt(distSq) || 0.1;
+          const push = (minDist - dist) * alpha;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          a.cx -= nx * push; a.cy -= ny * push;
+          b.cx += nx * push; b.cy += ny * push;
         }
       }
     }
-
-    // ─ Edge tension: pull connected nodes toward ideal distance
-    for (const e of edges) {
-      const from = nodes.find(n => n.id === e.from);
-      const to = nodes.find(n => n.id === e.to);
-      if (!from || !to) continue;
-      const dx = to.cx - from.cx, dy = to.cy - from.cy;
-      const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
-      const idealDist = ringRadius[Math.min((to.depth||1), ringRadius.length-1)] - ringRadius[Math.min((from.depth||0), ringRadius.length-1)];
-      if (idealDist <= 0) continue;
-      const delta = (dist - idealDist) * 0.02 * alpha;
-      const nx = dx/dist, ny = dy/dist;
-      if (!to.isRoot) { to.cx -= nx * delta; to.cy -= ny * delta; }
-      if (!from.isRoot) { from.cx += nx * delta * 0.3; from.cy += ny * delta * 0.3; }
-    }
-
-    // ─ Radial constraint: nudge nodes back toward their ring
-    for (const n of nodes) {
-      if (n.isRoot) continue;
-      const dx = n.cx - centerX, dy = n.cy - centerY;
-      const dist = Math.sqrt(dx*dx + dy*dy) || 0.1;
-      const targetR = ringRadius[Math.min(n.depth || 1, ringRadius.length - 1)] || dist;
-      const drift = (dist - targetR) * 0.03 * alpha;
-      n.cx -= (dx/dist) * drift;
-      n.cy -= (dy/dist) * drift;
-    }
   }
 
-  // Pin root
-  root.cx = centerX; root.cy = centerY;
-
-  // Build lookup maps
   buildEdgeMaps();
 }
 
@@ -3003,11 +2945,12 @@ function drawCircuit() {
   const w = canvas.width / devicePixelRatio;
   const h = canvas.height / devicePixelRatio;
 
+  const time = Date.now() / 1000;
+
   ctx.save();
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // Subtle radial grid rings
   ctx.translate(CS.panX, CS.panY);
   ctx.scale(CS.zoom, CS.zoom);
 
@@ -3019,20 +2962,12 @@ function drawCircuit() {
   [160, 310, 440, 560, 670].forEach(r => {
     ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.stroke();
   });
-  // Crosshair at center
+  
   ctx.strokeStyle = 'rgba(0,212,255,0.06)';
   const crossLen = 700;
   ctx.beginPath(); ctx.moveTo(gx - crossLen, gy); ctx.lineTo(gx + crossLen, gy); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(gx, gy - crossLen); ctx.lineTo(gx, gy + crossLen); ctx.stroke();
 
-  // Zoom-tier label visibility:
-  // <0.5: no labels at all (full structure view)
-  // 0.5-0.8: root + directories only
-  // 0.8-1.2: dirs + path-highlighted files
-  // 1.2+: all files get labels
-  const zoomTier = CS.zoom < 0.5 ? 0 : CS.zoom < 0.8 ? 1 : CS.zoom < 1.2 ? 2 : 3;
-
-  // Viewport margin for culling (in screen pixels, converted to world)
   const cullMargin = 120 / CS.zoom;
   const vpLeft = -CS.panX / CS.zoom - cullMargin;
   const vpRight = (w - CS.panX) / CS.zoom + cullMargin;
@@ -3040,196 +2975,98 @@ function drawCircuit() {
   const vpBottom = (h - CS.panY) / CS.zoom + cullMargin;
 
   function inView(n) {
-    return n.cx >= vpLeft && n.cx <= vpRight && n.cy >= vpTop && n.cy <= vpBottom;
+    const nx = n.cx + (n.driftX || 0);
+    const ny = n.cy + (n.driftY || 0);
+    return nx >= vpLeft && nx <= vpRight && ny >= vpTop && ny <= vpBottom;
   }
 
-  // ── Draw edges (cull both endpoints) ───────────
+  // ── Update Drift & Draw Edges ───────────────
+  for (const n of CS.nodes) {
+    if (!n.isRoot) {
+      n.driftX = Math.sin(time + (n.phaseX || 0)) * 2;
+      n.driftY = Math.cos(time + (n.phaseY || 0)) * 2;
+    } else {
+      n.driftX = 0; n.driftY = 0;
+    }
+  }
+
   for (const e of CS.edges) {
     const from = CS.nodeById[e.from];
     const to = CS.nodeById[e.to];
     if (!from || !to) continue;
-    // Cull if both endpoints offscreen
     if (!inView(from) && !inView(to)) continue;
 
     const isPath = CS.highlightPath.includes(e.from) && CS.highlightPath.includes(e.to);
     const isConnected = CS.hoveredNode && (CS.connectedSet.has(e.from) || CS.connectedSet.has(e.to)) && (CS.hoveredNode.id === e.from || CS.hoveredNode.id === e.to);
-    const isH = CS.hoveredNode && (CS.hoveredNode === from || CS.hoveredNode === to);
-    const isS = CS.selectedNode && (CS.selectedNode === from || CS.selectedNode === to);
-
-    const depth = to.depth || 1;
-    if (isPath) {
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8;
-      ctx.setLineDash([]);
-    } else if (isConnected) {
-      ctx.strokeStyle = 'rgba(0,212,255,0.7)';
-      ctx.lineWidth = 2;
-      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 4;
-      ctx.setLineDash([]);
-    } else if (isS || isH) {
-      ctx.strokeStyle = 'rgba(0,212,255,0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-      ctx.setLineDash([]);
-    } else if (depth <= 1) {
-      ctx.strokeStyle = 'rgba(0,212,255,0.25)';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-      ctx.setLineDash([6, 4]);
-    } else if (depth === 2) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = 1;
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-      ctx.setLineDash([]);
-    } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = 0.5;
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-      ctx.setLineDash([2, 3]);
-    }
-
+    
+    ctx.strokeStyle = isPath ? 'rgba(0,212,255,0.8)' : isConnected ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = isPath ? 2 : 1;
+    
     ctx.beginPath();
-    ctx.moveTo(from.cx, from.cy);
-    ctx.lineTo(to.cx, to.cy);
+    ctx.moveTo(from.cx + from.driftX, from.cy + from.driftY);
+    ctx.lineTo(to.cx + to.driftX, to.cy + to.driftY);
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-
-    // Junction dot on highlighted paths
-    if (isPath) {
-      ctx.fillStyle = '#00d4ff';
-      const mx = (from.cx + to.cx) / 2, my = (from.cy + to.cy) / 2;
-      ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI * 2); ctx.fill();
-    }
   }
 
-  // ── Draw nodes (viewport-culled) ───────────────
+  // ── Draw Nodes ───────────────
   for (const n of CS.nodes) {
-    if (!inView(n)) continue; // VIEWPORT CULL
+    if (!inView(n)) continue;
 
     const isH = CS.hoveredNode === n;
     const isS = CS.selectedNode === n;
-    const isOnPath = CS.highlightPath.includes(n.id);
-    const isConnected = CS.connectedSet.has(n.id);
-    const isRoot = n.isRoot;
-
     const color = nodeColor(n);
+    const nx = n.cx + n.driftX, ny = n.cy + n.driftY;
 
-    if (isRoot) {
-      // ── VAULT ROOT: Square with lock icon ──────────
-      const halfW = n.r * 1.4;
-      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 24;
-
-      ctx.fillStyle = 'rgba(0,212,255,0.15)';
-      const rx = 4;
-      ctx.beginPath();
-      ctx.moveTo(n.cx - halfW + rx, n.cy - halfW);
-      ctx.lineTo(n.cx + halfW - rx, n.cy - halfW);
-      ctx.quadraticCurveTo(n.cx + halfW, n.cy - halfW, n.cx + halfW, n.cy - halfW + rx);
-      ctx.lineTo(n.cx + halfW, n.cy + halfW - rx);
-      ctx.quadraticCurveTo(n.cx + halfW, n.cy + halfW, n.cx + halfW - rx, n.cy + halfW);
-      ctx.lineTo(n.cx - halfW + rx, n.cy + halfW);
-      ctx.quadraticCurveTo(n.cx - halfW, n.cy + halfW, n.cx - halfW, n.cy + halfW - rx);
-      ctx.lineTo(n.cx - halfW, n.cy - halfW + rx);
-      ctx.quadraticCurveTo(n.cx - halfW, n.cy - halfW, n.cx - halfW + rx, n.cy - halfW);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-
-      // Lock icon inside
-      const lockSize = Math.max(16, n.r * 0.9);
-      ctx.font = `${lockSize}px sans-serif`;
+    if (n.isRoot) {
+      ctx.shadowColor = 'rgba(0, 212, 255, 0.8)'; ctx.shadowBlur = 20;
+      ctx.fillStyle = 'rgba(0, 212, 255, 0.2)';
+      ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.font = '22px sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#00d4ff';
-      ctx.fillText('\u{1F512}', n.cx, n.cy);
-
-      // Label below square
-      ctx.font = '500 11px JetBrains Mono';
+      ctx.fillText('\u{1F512}', nx, ny);
+      ctx.font = '500 11px "IBM Plex Mono", monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillStyle = '#00d4ff';
-      ctx.fillText(n.name, n.cx, n.cy + halfW + 6);
-
+      ctx.fillText(n.name.toUpperCase(), nx, ny + 34);
     } else {
-      // ── Regular nodes: circles ─────────────────────
-      // Glow for interactive states
-      if (isS) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14; }
-      else if (isH) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
-      else if (isConnected && CS.hoveredNode) { ctx.shadowColor = color; ctx.shadowBlur = 6; }
-
-      // Fill — hardened colors always visible
-      const alpha = isS ? 0.35 : isH ? 0.3 : isConnected && CS.hoveredNode ? 0.25 : isOnPath ? 0.18 : 0.12;
-      ctx.fillStyle = n.dir
-        ? `rgba(0,255,255,${alpha})`
-        : hexToRGBA(color, alpha);
-      ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.fill();
-
-      // Border — always colored, 2px stroke
-      ctx.strokeStyle = isS ? '#00d4ff' : isH ? color : isConnected && CS.hoveredNode ? color : isOnPath ? 'rgba(0,212,255,0.6)' : color;
-      ctx.lineWidth = isS ? 2.5 : isH ? 2 : isConnected && CS.hoveredNode ? 1.8 : 1.5;
-      ctx.globalAlpha = isS || isH || isConnected || isOnPath ? 1 : 0.7;
-      ctx.beginPath(); ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
-
-      // Inner dot for small nodes
-      if (n.r <= 10) {
-        ctx.fillStyle = isH || isS || isOnPath || isConnected ? color : 'rgba(255,255,255,0.2)';
-        ctx.beginPath(); ctx.arc(n.cx, n.cy, 2, 0, Math.PI * 2); ctx.fill();
+      let radius = n.r;
+      let finalColor = color;
+      if (n.agentActive) {
+        finalColor = '#ffffff';
+        radius += 4 + Math.sin(time * 5) * 2;
+        ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 12;
+      } else {
+        ctx.shadowColor = hexToRGBA(color, 0.8); ctx.shadowBlur = 6;
       }
 
-      // ── Labels: zoom-tier aware ────────────────────
-      // zoomTier 0 (<0.5x): no labels
-      // zoomTier 1 (0.5-0.8x): directories only
-      // zoomTier 2 (0.8-1.2x): dirs + path/hovered/selected files
-      // zoomTier 3 (1.2x+): ALL nodes labeled
-      const shouldLabel =
-        isH || isS ||
-        (zoomTier >= 1 && n.dir) ||
-        (zoomTier >= 2 && (isOnPath || isConnected)) ||
-        (zoomTier >= 3);
+      ctx.fillStyle = hexToRGBA(finalColor, 0.9);
+      ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = finalColor; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
 
-      if (shouldLabel) {
-        const fontSize = n.dir ? Math.max(8, Math.min(10, 7 + n.r * 0.15)) : Math.max(7, Math.min(9, 6 + n.r * 0.15));
-        ctx.font = `${n.dir ? '500 ' : ''}${fontSize}px JetBrains Mono`;
+      if (CS.zoom > 0.6 || isH || isS) {
+        ctx.font = '11px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-
-        if (isS) ctx.fillStyle = '#00d4ff';
-        else if (isH) ctx.fillStyle = '#efefef';
-        else if (isConnected && CS.hoveredNode) ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        else if (isOnPath) ctx.fillStyle = 'rgba(0,212,255,0.9)';
-        else if (n.dir) ctx.fillStyle = 'rgba(0,212,255,0.7)';
-        else ctx.fillStyle = 'rgba(255,255,255,0.55)';
-
-        const maxLen = isH || isS ? 22 : 16;
+        ctx.fillStyle = (isS || isH) ? '#ffffff' : 'rgba(239,239,239,0.8)';
+        const maxLen = 18;
         const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
-
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
-        ctx.fillText(label, n.cx, n.cy + n.r + 4);
-        ctx.restore();
-      }
-
-      // Always show label on hover even when zoomed out
-      if (isH && !shouldLabel) {
-        ctx.save();
-        ctx.font = '8px JetBrains Mono';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
-        ctx.fillStyle = '#efefef';
-        const label = n.name.length > 24 ? n.name.slice(0, 21) + '...' : n.name;
-        ctx.fillText(label, n.cx, n.cy + n.r + 3);
-        ctx.restore();
+        ctx.fillText(label, nx, ny + radius + 6);
+        
+        if (n.isLargeDir) {
+          ctx.font = '9px "IBM Plex Mono", monospace';
+          ctx.fillStyle = 'rgba(0, 212, 255, 0.6)';
+          ctx.fillText(`${n.totalChildrenCount} files`, nx, ny + radius + 20);
+        }
       }
     }
   }
 
   if (window.activityLayer) activityLayer.drawActive(ctx);
-
   ctx.restore();
 }
 
@@ -3469,13 +3306,16 @@ function renderRecentFiles() {
   else if (fileSortBy === 'size') sorted.sort((a,b) => (b.size||0) - (a.size||0));
 
   if (!sorted.length) { c.innerHTML = '<div style="font-size:10px;color:var(--text-muted);">No files — open a local folder to browse</div>'; return; }
-  c.innerHTML = sorted.slice(0, 40).map(f => `
-    <div class="sb-file-entry${CS.selectedNode?.name===f.name?' selected':''}" onclick="selectFileByName('${esc(f.name)}')">
-      <span class="sb-file-icon">${fileIcon(f.type)}</span>
-      <span class="sb-file-name">${escH(f.name)}</span>
-      <span class="sb-file-time">${fmtSize(f.size||0)}</span>
-    </div>
-  `).join('');
+  c.innerHTML = sorted.slice(0, 60).map(f => {
+    const color = extColor(f.name) || (f.type === 'directory' ? TYPE_COLORS.directory : TYPE_COLORS.Binary);
+    return `
+      <div class="sb-file-entry${CS.selectedNode?.name===f.name?' selected':''}" onclick="selectFileByName('${esc(f.name)}')">
+        <div class="sb-file-dot" style="background:${color}; box-shadow: 0 0 6px ${hexToRGBA(color, 0.5)};"></div>
+        <span class="sb-file-name">${escH(f.name)}</span>
+        <span class="sb-file-meta">${fmtSize(f.size||0)}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function buildFilterChips() {
@@ -3743,10 +3583,8 @@ async function getCachedAnalysis(dirPath, currentFingerprint) {
     const entry = await window.aether.cache.get(dirPath);
     if (!entry) return null;
     if (entry.fingerprint !== currentFingerprint) {
-      console.log('[Cache] Fingerprint mismatch — stale cache for', dirPath);
       return null; // directory changed
     }
-    console.log('[Cache] Hit for', dirPath, '— analyzed', entry.analyzedAt);
     return entry;
   } catch { return null; }
 }
@@ -3766,7 +3604,6 @@ async function saveCachedAnalysis(dirPath, label, summary, fileMeta, passes) {
     };
     await window.aether.cache.set(dirPath, entry);
     _analysisCacheMap[dirPath] = entry;
-    console.log('[Cache] Saved analysis for', dirPath);
   } catch (e) {
     console.warn('[Cache] Save failed:', e);
   }
@@ -3869,6 +3706,18 @@ async function analyzeDirectoryProgressive(dirPath, dirName, userQuery) {
 
     try {
       const fileList = chunk.map(f => f.relPath);
+      
+      // Live Zoom Hook: Mark nodes as active and zoom to them
+      const activeNodes = [];
+      for (const relPath of fileList) {
+        const node = CS.nodes.find(n => n.path && n.path.endsWith(relPath));
+        if (node) {
+          node.agentActive = true;
+          activeNodes.push(node);
+          zoomToNode(node);
+        }
+      }
+
       const ctx = await window.aether.readDirectoryContext(dirPath, { specificFiles: fileList, maxFiles: chunk.length });
 
       if (ctx && !ctx.error && ctx.fileContents.length > 0) {
@@ -3889,6 +3738,10 @@ async function analyzeDirectoryProgressive(dirPath, dirName, userQuery) {
           analysisAccumulator += `[CHUNK ${i + 1}: ${shortNames}] (analysis error — skipped)\n\n`;
         }
       }
+
+      // Cleanup agentActive status
+      activeNodes.forEach(n => n.agentActive = false);
+
     } catch (e) {
       console.warn(`[Progressive] Chunk ${i + 1} failed:`, e.message);
       analysisAccumulator += `[CHUNK ${i + 1}] Error: ${e.message}\n\n`;
@@ -4438,7 +4291,6 @@ async function sendMessage() {
   let vaultFileCount = 0;
 
   if (currentVaultPath && window.aether?.readDirectoryContext) {
-    console.log('[AetherAgent] Injecting local context from:', currentVaultPath);
     const treeMeta = await window.aether.readDirectoryContext(currentVaultPath, { treeOnly: true });
     if (treeMeta && !treeMeta.error) {
       const textFiles = (treeMeta.fileMeta || []).filter(f => f.isText);
