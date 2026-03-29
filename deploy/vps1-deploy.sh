@@ -3,7 +3,7 @@
 # AetherCloud-L — VPS1 Deployment Script
 # Server:  143.198.162.111
 # Purpose: AETHER-SCRAMBLER Ghost Protocol + Nginx reverse proxy
-# Proxy:   0.0.0.0:8080 → 198.211.115.41:8080 (VPS2 backend)
+# Proxy:   0.0.0.0:443 → WireGuard → 10.8.0.3:8080 (VPS3 relay) → 10.8.0.2:8080 (VPS2 dark)
 #
 # Usage:   ssh root@143.198.162.111
 #          bash vps1-deploy.sh
@@ -25,14 +25,14 @@ COMMIT="1c63637"
 SERVICE_NAME="aether-scrambler"
 SCRAMBLER_PORT=8077
 NGINX_LISTEN_PORT=8080
-VPS2_UPSTREAM="198.211.115.41:8080"
+VPS3_RELAY="10.8.0.3:8080"  # Ghost relay WireGuard IP
 PYTHON_MIN="3.10"
 
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  AETHER-SCRAMBLER — VPS1 Deployment"
 echo "  Server: 143.198.162.111"
-echo "  Proxy:  :${NGINX_LISTEN_PORT} → ${VPS2_UPSTREAM}"
+echo "  Proxy:  :${NGINX_LISTEN_PORT} → ${VPS3_RELAY} → 10.8.0.2:8080 (dark)"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
@@ -183,8 +183,8 @@ cat > /etc/nginx/sites-available/aether-proxy << 'NGXEOF'
 # Listens on :8080, proxies to VPS2 (198.211.115.41:8080)
 # Also serves local SCRAMBLER terminal on /terminal
 
-upstream vps2_backend {
-    server 198.211.115.41:8080;
+upstream vps3_relay {
+    server 10.8.0.3:8080;
     keepalive 16;
 }
 
@@ -240,7 +240,7 @@ server {
 
     # ── VPS2 Backend Proxy (all other routes) ─────
     location / {
-        proxy_pass http://vps2_backend;
+        proxy_pass http://vps3_relay;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -270,7 +270,7 @@ server {
     error_page 502 503 504 /50x.html;
     location = /50x.html {
         internal;
-        return 502 '{"error":"upstream_unavailable","node":"vps1","upstream":"198.211.115.41:8080"}';
+        return 502 '{"error":"upstream_unavailable","node":"vps1","relay":"10.8.0.3:8080","dark":"10.8.0.2:8080"}';
         add_header Content-Type application/json;
     }
 }

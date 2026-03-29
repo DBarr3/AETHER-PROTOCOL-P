@@ -1,0 +1,44 @@
+// AETHER MANAGEMENT PLANE — Tailscale ACL Policy
+// Purpose: Restrict Tailscale to SSH/admin only.
+//          App traffic (8080, 8077) is BLOCKED through Tailscale.
+//          All app traffic must use raw WireGuard (wg0).
+{
+  "tagOwners": {
+    "tag:aether-vps":   ["autogroup:admin"],
+    "tag:aether-admin": ["autogroup:admin"]
+  },
+
+  "acls": [
+    // Admin laptops can SSH to any VPS
+    {
+      "action": "accept",
+      "src":    ["tag:aether-admin"],
+      "dst":    ["tag:aether-vps:22"]
+    },
+    // VPS nodes can SSH to each other (for ops)
+    {
+      "action": "accept",
+      "src":    ["tag:aether-vps"],
+      "dst":    ["tag:aether-vps:22"]
+    },
+    // ICMP health pings between all Aether nodes
+    {
+      "action": "accept",
+      "src":    ["tag:aether-vps", "tag:aether-admin"],
+      "dst":    ["tag:aether-vps:*"],
+      "proto":  "icmp"
+    }
+    // Port 8080 and 8077 are NOT listed here.
+    // Tailscale default-deny blocks them automatically.
+    // App traffic MUST use wg0 raw WireGuard.
+  ],
+
+  "ssh": [
+    {
+      "action": "accept",
+      "src":    ["tag:aether-admin"],
+      "dst":    ["tag:aether-vps"],
+      "users":  ["root", "autogroup:nonroot"]
+    }
+  ]
+}

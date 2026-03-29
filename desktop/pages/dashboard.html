@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AetherCloud-L</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
   :root {
     --bg: #0a0a0a;
@@ -14,9 +14,9 @@
     --bg-4: #222222;
     --border: #2a2a2a;
     --border-2: #333333;
-    --text-primary: #efefef;
-    --text-secondary: #888888;
-    --text-muted: #444444;
+    --text-primary: #FFFFFF;
+    --text-secondary: #F5F0E8;
+    --text-muted: #CCCCCC;
     --accent: #00d4ff;
     --accent-dim: rgba(0,212,255,0.08);
     --accent-glow: rgba(0,212,255,0.2);
@@ -26,14 +26,17 @@
     --amber-dim: rgba(245,158,11,0.1);
     --red: #ef4444;
     --red-dim: rgba(239,68,68,0.1);
-    --sidebar-w: 250px;
+    --sidebar-w: 280px;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: var(--bg);
     color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
+    font-size: 14px;
     height: 100vh;
     overflow: hidden;
     display: flex;
@@ -51,8 +54,9 @@
     z-index: 200;
   }
   .titlebar-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 11px;
     color: var(--text-muted);
     padding-left: 12px;
     letter-spacing: 0.5px;
@@ -84,8 +88,8 @@
   .menu-trigger {
     background: none; border: none;
     color: var(--text-secondary);
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
+    font-family: var(--font-sans);
+    font-size: 13px;
     padding: 4px 10px;
     cursor: pointer;
     transition: background 0.1s, color 0.1s;
@@ -102,20 +106,20 @@
   .menu-dropdown.open { display: block; }
   .menu-option {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 14px; font-size: 11px;
+    padding: 8px 14px; font-size: 13px;
     color: var(--text-secondary); cursor: pointer;
     transition: background 0.1s, color 0.1s;
   }
   .menu-option:hover { background: var(--accent-dim); color: var(--text-primary); }
-  .menu-option .shortcut { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); }
+  .menu-option .shortcut { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
   .menu-sep { height: 1px; background: var(--border); margin: 4px 8px; }
 
   /* Breadcrumb */
   .breadcrumb-bar {
     display: flex; align-items: center; gap: 4px;
     padding: 0 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-family: var(--font-sans);
+    font-size: 12px;
     -webkit-app-region: no-drag;
     margin-left: 8px;
     overflow: hidden;
@@ -132,8 +136,8 @@
 
   .agent-status {
     display: flex; align-items: center; gap: 6px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 12px; color: var(--text-muted);
     padding-right: 8px;
     -webkit-app-region: no-drag;
     flex-shrink: 0;
@@ -169,8 +173,8 @@
     border-bottom: 1px solid var(--border);
   }
   .sb-header {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500;
+    font-family: var(--font-sans);
+    font-size: 11px; font-weight: 600;
     color: var(--text-muted);
     letter-spacing: 1px; text-transform: uppercase;
     margin-bottom: 8px;
@@ -187,8 +191,8 @@
 
   .agent-log { display: flex; flex-direction: column; gap: 3px; }
   .agent-log-entry {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 13px; color: var(--text-secondary);
     display: flex; align-items: center; gap: 6px;
   }
   .log-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
@@ -221,29 +225,29 @@
     background: var(--bg-3);
     border: 1px solid var(--border-2);
     color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    padding: 5px 8px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    padding: 8px 10px;
     outline: none;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     transition: border-color 0.15s;
   }
   .sb-search:focus { border-color: var(--accent); }
-  .sb-search::placeholder { color: var(--text-muted); }
+  .sb-search::placeholder { color: #666; }
 
   .sb-chat-entry {
-    padding: 6px 4px;
+    padding: 10px 8px;
     cursor: pointer;
     border-bottom: 1px solid var(--border);
     transition: background 0.1s;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 10px;
   }
   .sb-chat-entry:hover { background: var(--bg-3); }
   .sb-chat-entry.active { background: var(--accent-dim); border-left: 2px solid var(--accent); }
-  .sb-chat-icon { width: 14px; height: 14px; font-size: 8px; color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sb-chat-icon { width: 14px; height: 14px; font-size: 10px; color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .sb-chat-info { flex: 1; overflow: hidden; }
-  .sb-chat-time { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
-  .sb-chat-preview { font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-chat-time { font-family: var(--font-sans); font-size: 11px; color: var(--text-muted); }
+  .sb-chat-preview { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .sb-file-entry {
     display: flex; align-items: center; gap: 10px;
@@ -579,29 +583,54 @@
   }
 
   .input-bar {
-    padding: 8px 16px 10px;
+    padding: 12px 16px;
     border-top: 1px solid var(--border);
     background: var(--bg);
-    display: flex; gap: 6px;
+    display: flex; align-items: center; gap: 12px;
   }
+  .input-bar-toggles { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .input-bar-toggle { 
+    display: flex; align-items: center; gap: 6px; cursor: pointer; 
+    font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 500;
+    transition: color 0.15s;
+  }
+  .input-bar-toggle:hover { color: var(--text-primary); }
+  .input-bar-toggle .toggle-switch {
+    width: 24px; height: 12px;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .input-bar-toggle .toggle-switch::after {
+    content: ''; position: absolute; top: 1px; left: 1px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #666; transition: all 0.2s;
+  }
+  .input-bar-toggle.on .toggle-switch { background: var(--accent-dim); border-color: var(--accent); }
+  .input-bar-toggle.on .toggle-switch::after { transform: translateX(12px); background: var(--accent); }
+  .input-bar-toggle.on.danger .toggle-switch { background: var(--red-dim); border-color: var(--red); }
+  .input-bar-toggle.on.danger .toggle-switch::after { background: var(--red); }
+
   .input-bar input {
     flex: 1;
     background: var(--bg-2);
     border: 1px solid var(--border-2);
     color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-    font-size: 12px; padding: 8px 12px;
+    font-family: var(--font-sans);
+    font-size: 14px; padding: 10px 14px;
     outline: none;
     transition: border-color 0.15s;
   }
   .input-bar input:focus { border-color: var(--accent); }
-  .input-bar input::placeholder { color: var(--text-muted); }
+  .input-bar input::placeholder { color: #555; }
   .send-btn {
     background: var(--accent);
     color: var(--bg); border: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 11px; font-weight: 600;
-    padding: 8px 16px; cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 13px; font-weight: 600;
+    padding: 10px 20px; cursor: pointer;
     transition: opacity 0.15s;
   }
   .send-btn:hover { opacity: 0.9; }
@@ -620,15 +649,15 @@
   /* ═══ RIGHT SIDEBAR (Preview) ═════════════════════ */
   .right-panel {
     width: 0;
-    background: var(--bg-2);
+    background: var(--bg);
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     flex-shrink: 0;
-    transition: width 0.25s;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .right-panel.open { width: 300px; }
+  .right-panel.open { width: 400px; }
   .rp-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 12px;
@@ -636,9 +665,10 @@
     flex-shrink: 0;
   }
   .rp-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 12px; font-weight: 600; color: var(--text-primary);
     letter-spacing: 0.5px;
+    text-transform: uppercase;
   }
   .rp-close {
     background: none; border: none;
@@ -1947,116 +1977,14 @@
         </div>
       </div>
 
-      <!-- CONVERSATIONS -->
-      <div class="sb-section" style="flex:1;">
-        <div class="sb-header">
-          CONVERSATIONS
-          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="handleNewConversation()" title="New Conversation">+</span>
-        </div>
-        <input type="text" class="sb-search" id="chat-search" placeholder="Search conversations..." oninput="filterConversations()">
-        <div id="chat-history"></div>
+    <!-- CONVERSATIONS -->
+    <div class="sb-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="sb-header">
+        CONVERSATIONS
+        <span style="cursor:pointer; color:var(--accent); font-size:14px; font-weight:bold;" onclick="handleNewConversation()" title="New Conversation">+</span>
       </div>
-
-      <!-- LOCAL FILES / CLOUD VAULT TABS -->
-      <div class="sb-section">
-        <div class="sb-tab-bar">
-          <button class="sb-tab active" id="tab-view-files" onclick="switchFileTab('view')">LOCAL FILES</button>
-          <button class="sb-tab" id="tab-file-vault" onclick="switchFileTab('vault')">CLOUD VAULT &#9729; <span onclick="event.stopPropagation();loadVaultFilesList()" style="cursor:pointer;margin-left:2px;" title="Refresh">&#8635;</span></button>
-        </div>
-
-        <!-- LOCAL FILES panel (local directory browser) -->
-        <div id="panel-view-files">
-          <div id="local-vault-status" style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-muted);padding:2px 0 4px;display:none;"></div>
-          <div class="sb-nav-bar">
-            <button class="sb-nav-btn" id="nav-back" onclick="historyBack()" disabled title="Undo (Ctrl+Z)">&#8592;</button>
-            <button class="sb-nav-btn" id="nav-fwd" onclick="historyForward()" disabled title="Redo (Ctrl+Y)">&#8594;</button>
-            <span class="sb-nav-breadcrumb" id="nav-breadcrumb">No history</span>
-          </div>
-          <div class="sb-file-sort">
-            <button class="sb-sort-btn active" onclick="sortFiles('name',this)">Name</button>
-            <button class="sb-sort-btn" onclick="sortFiles('date',this)">Date</button>
-            <button class="sb-sort-btn" onclick="sortFiles('size',this)">Size</button>
-          </div>
-          <div class="sb-filter-row" id="filter-row"></div>
-          <div id="recent-files"></div>
-        </div>
-
-        <!-- FILE VAULT panel (cloud uploads) -->
-        <div id="panel-file-vault" style="display:none;">
-          <div id="vault-dropzone" class="vault-dropzone" onclick="document.getElementById('vault-file-input').click()">
-            <div class="vault-dropzone-icon">&#128230;</div>
-            <div class="vault-dropzone-label">Drop files here or click to upload</div>
-            <div class="vault-dropzone-sub">Your DO Spaces backup</div>
-          </div>
-          <input type="file" id="vault-file-input" multiple style="display:none;" onchange="handleVaultUpload(this.files)">
-          <div id="vault-uploaded-files" class="vault-uploaded-list"></div>
-        </div>
-      </div>
-
-      <!-- SCHEDULED TASKS -->
-      <div class="sb-section">
-        <div class="sb-header">
-          SCHEDULED TASKS
-          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openScheduledTaskModal()" title="Add Task">+</span>
-        </div>
-        <div id="scheduled-tasks-list" style="display:flex;flex-direction:column;"></div>
-      </div>
-
-      <!-- AGENTS -->
-      <div class="sb-section">
-        <div class="sb-header">
-          AGENTS
-          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openSpawnModal()" title="Spawn Agent">+</span>
-        </div>
-        <div class="sb-agent-list" id="sb-agent-list">
-          <button class="sb-agent-btn" onclick="openPromptOptimizer()">
-            <span class="agent-icon">&#9889;</span>
-            <span>Prompt Optimizer</span>
-          </button>
-          <button class="sb-agent-btn" onclick="menuOpen()">
-            <span class="agent-icon">&#128193;</span>
-            <span>Open Local Folder</span>
-          </button>
-        </div>
-        <div id="spawned-agents-list" style="margin-top:6px;"></div>
-      </div>
-
-      <!-- ADMIN: LICENSES (admin only) -->
-      <div class="sb-section" id="sb-admin-licenses" style="display:none;">
-        <div class="sb-header">
-          LICENSES
-          <span style="cursor:pointer; color:var(--accent); font-size:11px; font-weight:bold;" onclick="openIssueLicenseModal()" title="Issue License">+</span>
-        </div>
-        <div id="license-overview-stats" style="font-size:10px;color:var(--muted);padding:2px 8px;"></div>
-        <div class="sb-agent-list">
-          <button class="sb-agent-btn" onclick="showLicensePanel('scrambler')">
-            <span class="agent-icon">🔐</span>
-            <span>Scrambler Keys</span>
-          </button>
-          <button class="sb-agent-btn" onclick="showLicensePanel('cloud')">
-            <span class="agent-icon">☁</span>
-            <span>Cloud Licenses</span>
-          </button>
-          <button class="sb-agent-btn" onclick="showLicensePanel('apikeys')">
-            <span class="agent-icon">🔑</span>
-            <span>API Keys</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- BOTTOM CONTROLS -->
-    <div class="sb-controls">
-      <div class="sb-toggle" id="toggle-bypass" onclick="toggleBypass()">
-        <div class="sb-toggle-switch"></div>
-        <span class="sb-toggle-label">Bypass Permissions</span>
-      </div>
-      <div class="sb-toggle-hint" id="bypass-hint">Restricted mode</div>
-      <div class="sb-toggle" id="toggle-plan" onclick="togglePlanMode()">
-        <div class="sb-toggle-switch"></div>
-        <span class="sb-toggle-label">Plan Mode</span>
-      </div>
-      <div class="sb-toggle-hint" id="plan-hint">Agent executes immediately</div>
+      <input type="text" class="sb-search" id="chat-search" placeholder="Search conversations..." oninput="filterConversations()">
+      <div id="chat-history" style="flex:1; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -2187,6 +2115,16 @@
     </div>
     <div id="tool-indicator"></div>
     <div class="input-bar">
+      <div class="input-bar-toggles">
+        <div class="input-bar-toggle" id="toggle-plan" onclick="togglePlanMode()" title="Plan Mode: Agent executes immediately">
+          <div class="toggle-switch"></div>
+          <span>Plan</span>
+        </div>
+        <div class="input-bar-toggle danger" id="toggle-bypass" onclick="toggleBypass()" title="Bypass Permissions: Restricted mode disabled">
+          <div class="toggle-switch"></div>
+          <span>Bypass</span>
+        </div>
+      </div>
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
       <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
@@ -2196,18 +2134,11 @@
   <!-- RIGHT PANEL (File Preview) -->
   <div class="right-panel" id="right-panel">
     <div class="rp-header">
-      <span class="rp-title" id="rp-title">FILE PREVIEW</span>
+      <span class="rp-title">AGENT RESPONSE</span>
       <button class="rp-close" onclick="closeRightPanel()">&#10005;</button>
     </div>
-    <div class="rp-meta" id="rp-meta">
-      <div class="rp-meta-row"><span class="rp-meta-label">NAME</span><span id="rp-name">—</span></div>
-      <div class="rp-meta-row"><span class="rp-meta-label">TYPE</span><span id="rp-type">—</span></div>
-      <div class="rp-meta-row"><span class="rp-meta-label">SIZE</span><span id="rp-size">—</span></div>
-      <div class="rp-meta-row"><span class="rp-meta-label">PATH</span><span id="rp-path" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">—</span></div>
-      <div class="rp-meta-row"><span class="rp-meta-label">ENCODING</span><span id="rp-encoding">—</span></div>
-    </div>
-    <div class="rp-preview" id="rp-preview">
-      <div class="preview-placeholder">Select a file to preview</div>
+    <div class="rp-preview" id="rp-preview" style="padding: 16px; scroll-behavior: smooth;">
+      <div id="rp-response-text" class="resp-text" style="font-size: 14px; color: #FFFFFF; line-height: 1.6; white-space: pre-wrap; font-family: var(--font-sans);">AETHER AI response will appear here...</div>
     </div>
   </div>
 </div>
@@ -2489,7 +2420,7 @@
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
-const API_BASE = 'https://143.198.162.111/cloud';
+const API_BASE = 'https://api.aethersystems.io/cloud';
 let sessionToken = localStorage.getItem('aether_session') || '';
 let username = localStorage.getItem('aether_user') || 'user';
 

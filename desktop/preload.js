@@ -13,7 +13,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ELECTRON IPC BRIDGE
 // ═══════════════════════════════════════════════════
 contextBridge.exposeInMainWorld('aether', {
-  apiBase: 'https://143.198.162.111/cloud',
+  apiBase: 'https://api.aethersystems.io/cloud',
   navigate:     (page) => ipcRenderer.send('navigate', page),
   minimize:     () => ipcRenderer.send('window:minimize'),
   maximize:     () => ipcRenderer.send('window:maximize'),
@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld('aether', {
 // ═══════════════════════════════════════════════════
 // VPS BACKEND API CLIENT (via VPS1 HTTPS proxy)
 // ═══════════════════════════════════════════════════
-const API_BASE = 'https://143.198.162.111/cloud';
+const API_BASE = 'https://api.aethersystems.io/cloud';
 
 // Cache token from electron-store so every apiFetch has it
 let _cachedToken = null;
