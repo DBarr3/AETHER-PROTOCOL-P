@@ -2870,8 +2870,10 @@ function radialLayout(nodes, edges) {
 
     node.depth = depth;
     node.driftX = 0; node.driftY = 0;
-    node.phaseX = Math.random() * Math.PI * 2;
-    node.phaseY = Math.random() * Math.PI * 2;
+    node.floatAngle  = Math.random() * Math.PI * 2;
+    node.floatSpeed  = 0.00018 + Math.random() * 0.00022;
+    node.floatRadius = 1.2 + Math.random() * 2.0;
+    node.floatPhase  = Math.random() * Math.PI * 2;
 
     if (depth === 0) {
       node.r = 28;
@@ -2879,13 +2881,41 @@ function radialLayout(nodes, edges) {
     } else {
       const angle = (angleStart + angleEnd) / 2;
       let dist;
+      const _ext = (node.name.split('.').pop() || '').toLowerCase();
+      const _isDir = node.dir || node.type === 'directory';
       if (depth === 1) {
-        dist = 280 + Math.random() * 100;
-        node.r = 7;
+        if (_isDir) {
+          // LAYER 1: top-level directories — 160-200px ±15px organic jitter
+          node.r = 7;
+          dist = 180 + (Math.random() * 40 - 20) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * 15;
+        } else if (['py','js','ts','jsx','tsx'].includes(_ext)) {
+          // LAYER 2: code files — 270-320px
+          node.r = 3.5;
+          dist = 270 + Math.random() * 50;
+        } else if (['md','txt','json','yaml','yml','env','toml','cfg','ini'].includes(_ext)) {
+          // LAYER 3: docs and config — 360-420px
+          node.r = 3.5;
+          dist = 360 + Math.random() * 60;
+        } else if (['png','jpg','jpeg','svg','gif','pdf','exe','zip','dmg','ico'].includes(_ext)) {
+          // LAYER 4: media and binary — 440-500px (outermost)
+          node.r = 3.5;
+          dist = 440 + Math.random() * 60;
+        } else {
+          // default: between code and docs
+          node.r = 3.5;
+          dist = 320 + Math.random() * 40;
+        }
       } else {
-        const isDir = node.dir || node.type === 'directory';
-        node.r = isDir ? 5 : 3.5;
-        dist = isDir ? (80 + Math.random() * 60) : (50 + Math.random() * 40);
+        node.r = _isDir ? 5 : 3.5;
+        if (_isDir) {
+          dist = 80 + Math.random() * 30;
+        } else if (['py','js','ts','jsx','tsx'].includes(_ext)) {
+          dist = 70 + Math.random() * 30; // code children closer to parent
+        } else if (['png','jpg','jpeg','svg','gif','pdf','exe','zip'].includes(_ext)) {
+          dist = 90 + Math.random() * 20; // media/binary children further
+        } else {
+          dist = 80 + Math.random() * 30;
+        }
       }
       node.cx = px + Math.cos(angle) * dist;
       node.cy = py + Math.sin(angle) * dist;
@@ -2980,11 +3010,13 @@ function drawCircuit() {
     return nx >= vpLeft && nx <= vpRight && ny >= vpTop && ny <= vpBottom;
   }
 
-  // ── Update Drift & Draw Edges ───────────────
+  // ── Update Float Animation (figure-8 drift) ──
   for (const n of CS.nodes) {
     if (!n.isRoot) {
-      n.driftX = Math.sin(time + (n.phaseX || 0)) * 2;
-      n.driftY = Math.cos(time + (n.phaseY || 0)) * 2;
+      n.floatAngle = (n.floatAngle || 0) + (n.floatSpeed || 0.0003);
+      const fa = n.floatAngle, fr = n.floatRadius || 1.5, fp = n.floatPhase || 0;
+      n.driftX = Math.cos(fa) * fr + Math.sin(fa * 0.7 + fp) * (fr * 0.4);
+      n.driftY = Math.sin(fa) * fr + Math.cos(fa * 0.7 + fp) * (fr * 0.4);
     } else {
       n.driftX = 0; n.driftY = 0;
     }
@@ -2999,8 +3031,9 @@ function drawCircuit() {
     const isPath = CS.highlightPath.includes(e.from) && CS.highlightPath.includes(e.to);
     const isConnected = CS.hoveredNode && (CS.connectedSet.has(e.from) || CS.connectedSet.has(e.to)) && (CS.hoveredNode.id === e.from || CS.hoveredNode.id === e.to);
     
-    ctx.strokeStyle = isPath ? 'rgba(0,212,255,0.8)' : isConnected ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.06)';
-    ctx.lineWidth = isPath ? 2 : 1;
+    const _eo = isPath ? 0.8 : isConnected ? 0.4 : 0.18 + Math.sin(time * 0.8 + (from.floatPhase || 0)) * 0.08;
+    ctx.strokeStyle = isPath ? `rgba(0,212,255,${_eo})` : isConnected ? `rgba(0,212,255,${_eo})` : `rgba(255,255,255,${_eo})`;
+    ctx.lineWidth = isPath ? 2 : 0.8;
     
     ctx.beginPath();
     ctx.moveTo(from.cx + from.driftX, from.cy + from.driftY);
@@ -3049,25 +3082,91 @@ function drawCircuit() {
       ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
 
-      if (CS.zoom > 0.6 || isH || isS) {
-        ctx.font = '11px "IBM Plex Mono", monospace';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillStyle = (isS || isH) ? '#ffffff' : 'rgba(239,239,239,0.8)';
-        const maxLen = 18;
-        const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
-        ctx.fillText(label, nx, ny + radius + 6);
-        
-        if (n.isLargeDir) {
-          ctx.font = '9px "IBM Plex Mono", monospace';
-          ctx.fillStyle = 'rgba(0, 212, 255, 0.6)';
-          ctx.fillText(`${n.totalChildrenCount} files`, nx, ny + radius + 20);
-        }
-      }
     }
   }
 
+  drawLabels(CS.nodes, ctx);
   if (window.activityLayer) activityLayer.drawActive(ctx);
   ctx.restore();
+}
+
+// ── Label collision-avoiding batch renderer ────────
+function drawLabels(nodes, ctx) {
+  if (CS.zoom < 0.55) return;
+  const showAll = CS.zoom > 0.75;
+  const placedBoxes = [];
+
+  const sorted = [...nodes].filter(n => !n.isRoot).sort((a, b) => {
+    const aHigh = (CS.selectedNode === a || CS.hoveredNode === a) ? 1 : 0;
+    const bHigh = (CS.selectedNode === b || CS.hoveredNode === b) ? 1 : 0;
+    if (aHigh !== bHigh) return bHigh - aHigh;
+    const ad = a.dir || a.type === 'directory', bd = b.dir || b.type === 'directory';
+    if (ad && !bd) return -1;
+    if (!ad && bd) return 1;
+    return (b.size || 0) - (a.size || 0);
+  });
+
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  for (const n of sorted) {
+    const isH = CS.hoveredNode === n;
+    const isS = CS.selectedNode === n;
+    const isDir = n.dir || n.type === 'directory';
+    if (!isH && !isS && !showAll && !isDir) continue;
+
+    const nx = n.cx + (n.driftX || 0);
+    const ny = n.cy + (n.driftY || 0);
+    const radius = n.r || 3.5;
+    const color = nodeColor(n);
+
+    const maxLen = 18;
+    const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
+    const lw = ctx.measureText(label).width;
+    const lh = 11;
+
+    const defaultLx = nx - lw / 2;
+    const defaultLy = ny + radius + 6;
+
+    const candidates = [
+      [defaultLx,      defaultLy],
+      [nx - lw / 2,    ny - radius - lh - 2],
+      [nx + radius + 4, ny - lh / 2],
+      [nx - lw - radius - 4, ny - lh / 2],
+      [defaultLx + 14, defaultLy + 6],
+      [defaultLx - 14, defaultLy + 6],
+      [defaultLx + 14, ny - radius - lh - 2],
+      [defaultLx - 14, ny - radius - lh - 2],
+    ];
+
+    let placed = false;
+    for (const [lx, ly] of candidates) {
+      const box = { x: lx - 2, y: ly - 2, w: lw + 4, h: lh + 4 };
+      const overlaps = !isH && !isS && placedBoxes.some(b => rectsOverlap(box, b));
+      if (!overlaps) {
+        placedBoxes.push(box);
+        ctx.fillStyle = (isS || isH) ? '#ffffff' : hexToRGBA(color, 0.8);
+        ctx.fillText(label, lx, ly);
+        if (n.isLargeDir) {
+          ctx.font = '9px "IBM Plex Mono", monospace';
+          ctx.fillStyle = 'rgba(0,212,255,0.6)';
+          ctx.fillText(`${n.totalChildrenCount} files`, lx, ly + lh + 2);
+          ctx.font = '10px "IBM Plex Mono", monospace';
+        }
+        placed = true;
+        break;
+      }
+    }
+    if (!placed && (isH || isS)) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(label, defaultLx, defaultLy);
+    }
+  }
+}
+
+function rectsOverlap(a, b) {
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
 }
 
 function hexToRGBA(hex, alpha) {
