@@ -36,6 +36,7 @@ import uvicorn
 
 from config.settings import (
     APP_NAME, APP_VERSION, DEFAULT_VAULT_ROOT, DEFAULT_AUDIT_DIR,
+    MCP_WORKER_URL,
 )
 from config.storage import (
     ensure_system_dirs, ensure_user_dirs,
@@ -234,6 +235,52 @@ _protocol_c_cache: dict = {
 }
 
 security = HTTPBearer(auto_error=False)
+
+# ── VPS5 MCP Worker Dispatcher ────────────────────
+# Lazily initialized — only loads keys if they exist on disk.
+# VPS2 signs outbound requests with its Ed25519 private key;
+# VPS5 verifies using VPS2's public key (mutual auth).
+_vps2_node_auth = None
+
+def _get_vps2_node_auth():
+    global _vps2_node_auth
+    if _vps2_node_auth is None:
+        try:
+            from mcp_worker.node_auth import NodeAuth
+            _vps2_node_auth = NodeAuth(
+                node_id="VPS2",
+                private_key_path=os.environ.get("VPS2_NODE_KEY_PATH", "/opt/aether-mcp/certs/VPS2.key"),
+                trusted_peers={},
+            )
+        except Exception as e:
+            log.warning("VPS2 NodeAuth init failed — MCP tasks will call Anthropic directly: %s", e)
+    return _vps2_node_auth
+
+
+async def _dispatch_to_vps5(task: dict) -> dict:
+    """Sign and POST an MCP task to VPS5. Falls back to None on failure."""
+    import httpx
+    import json as _json
+    body = _json.dumps(task).encode()
+    auth = _get_vps2_node_auth()
+    headers = {"content-type": "application/json"}
+    if auth and auth._private_key:
+        try:
+            headers.update(auth.sign_request(body))
+        except Exception as e:
+            log.warning("VPS5 request signing failed: %s", e)
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                f"{MCP_WORKER_URL}/agent/execute",
+                headers=headers,
+                content=body,
+            )
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        log.warning("VPS5 dispatch failed: %s", e)
+        return None
 
 
 def _init_services():
@@ -964,66 +1011,80 @@ async def agent_mcp_chat(
     token: str = Depends(get_session_token),
 ):
     """
-    MCP-enabled agent endpoint. Attaches MCP servers to Claude API call
-    so Claude can autonomously use external tools (Gmail, Calendar, etc.).
+    MCP-enabled agent endpoint. Routes to VPS5 MCP worker over Tailscale
+    for isolated execution. Falls back to direct Anthropic call if VPS5
+    is unreachable.
     """
     import httpx
     from agent.mcp_registry import detect_required_servers
 
-    api_key = get_anthropic_key()
     username = get_username_from_token(token)
-
     system = _build_mcp_system_prompt(req.vault_context, username)
-
-    messages = list(req.conversation_history or [])
-    messages.append({"role": "user", "content": req.query})
-
-    payload = {
-        "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
-        "max_tokens": req.max_tokens,
-        "system": system,
-        "messages": messages,
-    }
-
-    # Auto-detect MCP servers from query if none explicitly provided
     mcp_servers = req.mcp_servers or detect_required_servers(req.query)
-    if mcp_servers:
-        payload["mcp_servers"] = mcp_servers
 
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    # ── Route to VPS5 MCP worker ──────────────────
+    task = {
+        "task_id": str(uuid.uuid4()),
+        "client_id": username,
+        "agent_type": "mcp",
+        "prompt": req.query,
+        "context": system,
+        "mcp_server_url": mcp_servers[0]["url"] if mcp_servers else "",
     }
-    if mcp_servers:
-        headers["anthropic-beta"] = "mcp-client-2025-04-04"
+    vps5_result = await _dispatch_to_vps5(task)
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except Exception as e:
-        log.warning("MCP agent call failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"Agent error: {str(e)}")
+    if vps5_result and not vps5_result.get("error"):
+        response_text = vps5_result.get("result", "")
+        tools_used = vps5_result.get("tools_used", [])
+        commitment_hash = vps5_result.get("protocol_c_post", _commitment_hash(response_text))
+        log.info("MCP task completed via VPS5 — tools=%s", tools_used)
+    else:
+        # ── Fallback: call Anthropic directly from VPS2 ─
+        if vps5_result and vps5_result.get("error"):
+            log.warning("VPS5 returned error — falling back to direct: %s", vps5_result["error"])
 
-    # Extract text and tool use from response content blocks
-    response_text = ""
-    tools_used = []
-    for block in data.get("content", []):
-        btype = block.get("type", "")
-        if btype == "text":
-            response_text += block.get("text", "")
-        elif btype in ("tool_use", "mcp_tool_use"):
-            tools_used.append(block.get("name", "unknown"))
+        api_key = get_anthropic_key()
+        messages = list(req.conversation_history or [])
+        messages.append({"role": "user", "content": req.query})
+        payload = {
+            "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
+            "max_tokens": req.max_tokens,
+            "system": system,
+            "messages": messages,
+        }
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        if mcp_servers:
+            payload["mcp_servers"] = mcp_servers
+            headers["anthropic-beta"] = "mcp-client-2025-04-04"
 
-    commitment_hash = _commitment_hash(response_text)
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json=payload,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as e:
+            log.warning("MCP agent fallback call failed: %s", e)
+            raise HTTPException(status_code=502, detail=f"Agent error: {str(e)}")
 
-    # Audit log
+        response_text = ""
+        tools_used = []
+        for block in data.get("content", []):
+            btype = block.get("type", "")
+            if btype == "text":
+                response_text += block.get("text", "")
+            elif btype in ("tool_use", "mcp_tool_use"):
+                tools_used.append(block.get("name", "unknown"))
+        commitment_hash = _commitment_hash(response_text)
+
+    # ── Audit log ─────────────────────────────────
     if svc.audit_log:
         try:
             svc.audit_log.append_commitment(
@@ -1034,6 +1095,7 @@ async def agent_mcp_chat(
                     "query_hash": hashlib.sha256(req.query.encode()).hexdigest()[:16],
                     "tools_used": tools_used,
                     "mcp_servers": [s.get("name") for s in mcp_servers],
+                    "routed_via": "VPS5" if vps5_result and not vps5_result.get("error") else "direct",
                 },
                 commitment_hash=commitment_hash,
             )
