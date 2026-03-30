@@ -27,8 +27,16 @@
       "src":    ["tag:aether-vps", "tag:aether-admin"],
       "dst":    ["tag:aether-vps:*"],
       "proto":  "icmp"
+    },
+    // VPS2 (backend) → VPS5 (MCP worker) on port 8095 only
+    // App traffic uses Tailscale here because VPS5 is MCP-isolated,
+    // not on the wg0 data plane.
+    {
+      "action": "accept",
+      "src":    ["tag:aether-vps"],
+      "dst":    ["tag:aether-vps:8095"]
     }
-    // Port 8080 and 8077 are NOT listed here.
+    // Ports 8080 and 8077 are NOT listed here.
     // Tailscale default-deny blocks them automatically.
     // App traffic MUST use wg0 raw WireGuard.
   ],
