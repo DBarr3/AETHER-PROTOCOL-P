@@ -39,6 +39,13 @@ AGENT_SYSTEM_PROMPT = AETHER_AGENT_SYSTEM_PROMPT
 HARDENED_AGENT_ENABLED = os.getenv("AETHER_HARDENED_AGENT", "true").lower() == "true"
 RFC3161_ENABLED = os.getenv("AETHER_RFC3161_ENABLED", "true").lower() == "true"
 
+# ─── MCP Worker (VPS5) ────────────────────────────────
+# VPS5 is reachable only via Tailscale management plane (100.84.205.12)
+# Port 8095 is blocked on the public interface — Tailscale only
+MCP_WORKER_HOST = os.getenv("MCP_WORKER_HOST", "100.84.205.12")
+MCP_WORKER_PORT = int(os.getenv("MCP_WORKER_PORT", "8095"))
+MCP_WORKER_URL = f"http://{MCP_WORKER_HOST}:{MCP_WORKER_PORT}"
+
 # ─── Legacy (kept for backward compat) ─────────────────
 DEFAULT_OLLAMA_MODEL = os.getenv("AETHER_OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
