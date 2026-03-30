@@ -228,7 +228,7 @@ def _get_task_qopc(username: str) -> TaskQOPC:
         _task_qopcs[username] = TaskQOPC(username)
     return _task_qopcs[username]
 _PROTOCOL_VARIANT = os.environ.get("AETHER_PROTOCOL_VARIANT", "C")
-_ibm_status_cache: dict = {
+_protocol_c_cache: dict = {
     "value": "CSPRNG" if _PROTOCOL_VARIANT == "C" else "OS_URANDOM",
     "expires": 0.0,
 }
@@ -496,13 +496,12 @@ class LicenseStatus(BaseModel):
 
 
 class StatusResponse(BaseModel):
-    protocol_l: str
+    protocol_c: str
     watcher: str
     agent: str
     read_detector: str = "INACTIVE"
     session_active: bool
     vault_root: str
-    ibm_status: str
     uptime: float
     version: str
     needs_setup: bool = False
@@ -1757,19 +1756,19 @@ async def status():
 
     session_active = bool(svc.session_mgr and svc.session_mgr.active_count > 0)
 
-    # IBM Quantum / CSPRNG status — cached with 30s TTL
+    # Protocol-C status — cached with 30s TTL
     now = time.time()
-    if now > _ibm_status_cache["expires"]:
+    if now > _protocol_c_cache["expires"]:
         if _PROTOCOL_VARIANT == "C":
-            _ibm_status_cache["value"] = "CSPRNG"
+            _protocol_c_cache["value"] = "CSPRNG"
         else:
             try:
                 from aether_protocol.quantum_crypto import get_quantum_seed
                 _, method = get_quantum_seed()
-                _ibm_status_cache["value"] = method
+                _protocol_c_cache["value"] = method
             except Exception:
-                _ibm_status_cache["value"] = "OS_URANDOM"
-        _ibm_status_cache["expires"] = now + 30.0
+                _protocol_c_cache["value"] = "OS_URANDOM"
+        _protocol_c_cache["expires"] = now + 30.0
 
     # Check if setup is needed (no credentials file or only dev user)
     creds_path = STORAGE_CREDENTIALS_FILE
@@ -1798,13 +1797,12 @@ async def status():
         pass
 
     return StatusResponse(
-        protocol_l="ACTIVE",
+        protocol_c="ACTIVE",
         watcher=watcher_status,
         agent=agent_status,
         read_detector=read_detector_status,
         session_active=session_active,
         vault_root=str(DEFAULT_VAULT_ROOT),
-        ibm_status=_ibm_status_cache["value"],
         uptime=round(time.time() - _start_time, 1),
         version=APP_VERSION,
         needs_setup=needs_setup,
@@ -1823,9 +1821,8 @@ async def routing_check():
         "server": "VPS2",
         "ip": "198.211.115.41",
         "port": int(os.environ.get("AETHER_BIND_PORT", 8080)),
-        "protocol_l": "ACTIVE",
+        "protocol_c": "ACTIVE",
         "anthropic_key_set": bool(get_anthropic_key()),
-        "ibm_token_set": bool(get_ibm_token()),
         "timestamp": datetime.now().isoformat(),
     }
 

@@ -86,7 +86,7 @@ class TestStatus:
 
     def test_status_has_required_fields(self, client):
         data = client.get("/status").json()
-        assert "protocol_l" in data
+        assert "protocol_c" in data
         assert "watcher" in data
         assert "agent" in data
         assert "session_active" in data
@@ -94,9 +94,9 @@ class TestStatus:
         assert "uptime" in data
         assert "version" in data
 
-    def test_status_protocol_l_active(self, client):
+    def test_status_protocol_c_active(self, client):
         data = client.get("/status").json()
-        assert data["protocol_l"] == "ACTIVE"
+        assert data["protocol_c"] == "ACTIVE"
 
     def test_status_version_matches(self, client):
         from config.settings import APP_VERSION
@@ -106,10 +106,6 @@ class TestStatus:
     def test_status_uptime_positive(self, client):
         data = client.get("/status").json()
         assert data["uptime"] >= 0
-
-    def test_status_ibm_status_present(self, client):
-        data = client.get("/status").json()
-        assert data["ibm_status"] in ["IBM_QUANTUM", "AER_SIMULATOR", "OS_URANDOM", "CSPRNG", "SIMULATOR"]
 
 
 # ═══════════════════════════════════════════════════
@@ -467,4 +463,4 @@ class TestFullFlow:
 
         # Status should reflect active session
         status = client.get("/status").json()
-        assert status["protocol_l"] == "ACTIVE"
+        assert status["protocol_c"] == "ACTIVE"

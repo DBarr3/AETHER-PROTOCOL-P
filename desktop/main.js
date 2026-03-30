@@ -112,7 +112,7 @@ async function waitForBackend(maxRetries = 15, delayMs = 2000) {
         });
       });
 
-      console.log(`[AetherCloud] Backend connected — Protocol-C: ${data.protocol_l || data.protocol_c || 'ACTIVE'}, Agent: ${data.agent}`);
+      console.log(`[AetherCloud] Backend connected — Protocol-C: ${data.protocol_c || 'ACTIVE'}, Agent: ${data.agent}`);
 
       if (data.needs_setup) {
         console.warn('[AetherCloud] First-time setup required');
