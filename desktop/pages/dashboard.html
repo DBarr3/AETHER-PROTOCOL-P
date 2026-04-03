@@ -1895,7 +1895,7 @@
 
 <!-- TITLE BAR -->
 <div class="titlebar">
-  <span class="titlebar-label">AetherCloud-L v0.9.2</span>
+  <span class="titlebar-label">AetherCloud-L v0.9.3</span>
   <div class="titlebar-controls">
     <button class="titlebar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="titlebar-btn" onclick="window.aether?.maximize()">&#9633;</button>
@@ -1987,6 +1987,7 @@
       <div id="chat-history" style="flex:1; overflow-y:auto;"></div>
     </div>
   </div>
+</div>
 
   <!-- MAIN PANEL -->
   <div class="main-panel">
@@ -2134,8 +2135,17 @@
   <!-- RIGHT PANEL (File Preview) -->
   <div class="right-panel" id="right-panel">
     <div class="rp-header">
-      <span class="rp-title">AGENT RESPONSE</span>
+      <span class="rp-title" id="rp-title">AGENT RESPONSE</span>
       <button class="rp-close" onclick="closeRightPanel()">&#10005;</button>
+    </div>
+    <div style="padding: 8px 16px; border-bottom: 1px solid var(--border-color); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">
+      <div id="rp-name" style="color: var(--text-primary); font-size: 11px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+      <div style="display:flex; gap: 12px;">
+        <span id="rp-type"></span>
+        <span id="rp-size"></span>
+        <span id="rp-encoding"></span>
+      </div>
+      <div id="rp-path" style="margin-top: 2px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
     </div>
     <div class="rp-preview" id="rp-preview" style="padding: 16px; scroll-behavior: smooth;">
       <div id="rp-response-text" class="resp-text" style="font-size: 14px; color: #FFFFFF; line-height: 1.6; white-space: pre-wrap; font-family: var(--font-sans);">AETHER AI response will appear here...</div>
@@ -2420,7 +2430,7 @@
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
-const API_BASE = 'https://api.aethersystems.io/cloud';
+const API_BASE = 'https://api.aethersystems.net/cloud';
 let sessionToken = localStorage.getItem('aether_session') || '';
 let username = localStorage.getItem('aether_user') || 'user';
 
@@ -2606,90 +2616,228 @@ function nodeColor(n) {
   return extColor(n.name) || typeColor(n.type) || TYPE_COLORS.Binary;
 }
 
+// ── Ripple / click-burst FX ──────────────────────────
+const _ripples = [];
+function spawnRipple(x, y, color) {
+  _ripples.push({ x, y, r: 0, maxR: 60, alpha: 1, color: color || '#00d4ff', t: Date.now() });
+}
+
+// ── Convert screen coords → canvas draw coords ───────
+function screenToCanvas(clientX, clientY) {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const cx = (clientX - rect.left - CS.panX) / CS.zoom;
+  const cy = (clientY - rect.top  - CS.panY) / CS.zoom;
+  return { cx, cy };
+}
+
+// ── Hit-test: find node under canvas draw coords ─────
+function hitTestNode(cx, cy) {
+  if (!CS.nodes || !CS.nodes.length) return null;
+  // Larger hit radius for comfortable clicking
+  for (const n of CS.nodes) {
+    const nx = n.cx + (n.driftX || 0);
+    const ny = n.cy + (n.driftY || 0);
+    const dx = cx - nx, dy = cy - ny;
+    const hitR = n.isRoot ? 36 : (n.r || 5) + 10;
+    if (dx*dx + dy*dy <= hitR*hitR) return n;
+  }
+  return null;
+}
+
 function initCircuit() {
   const canvas = document.getElementById('circuit-canvas');
-  const wrap = document.getElementById('canvas-wrap');
+  const wrap   = document.getElementById('canvas-wrap');
 
-  function resize() {
-    canvas.width = wrap.clientWidth * devicePixelRatio;
-    canvas.height = wrap.clientHeight * devicePixelRatio;
-    canvas.style.width = wrap.clientWidth + 'px';
-    canvas.style.height = wrap.clientHeight + 'px';
+  // Ensure canvas fills wrap, called on resize or scan
+  function resizeCanvas() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (w > 0 && h > 0) {
+      canvas.width  = w * devicePixelRatio;
+      canvas.height = h * devicePixelRatio;
+      canvas.style.width  = w + 'px';
+      canvas.style.height = h + 'px';
+    }
     drawCircuit();
   }
-  window.addEventListener('resize', resize);
-  resize();
+  window.resizeCanvas = resizeCanvas; // expose for buildVaultFromScan
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
 
-  // Pan
-  wrap.addEventListener('mousedown', (e) => {
-    if (e.button === 2 || e.target !== canvas) return;
-    CS.dragging = true;
-    CS.dsx = e.clientX - CS.panX;
-    CS.dsy = e.clientY - CS.panY;
+  // ── Ensure canvas sits above all overlays for events ──
+  canvas.style.zIndex = '1';
+  canvas.style.pointerEvents = 'auto';
+
+  // ─── PAN ──────────────────────────────────────────
+  let _lastMouse = { x: 0, y: 0 };
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    CS.dragging  = true;
+    CS.didDrag   = false;
+    CS._dragOriX = e.clientX;
+    CS._dragOriY = e.clientY;
+    CS._panSX    = CS.panX;
+    CS._panSY    = CS.panY;
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
   });
+
   window.addEventListener('mousemove', (e) => {
-    if (CS.dragging) { CS.panX = e.clientX - CS.dsx; CS.panY = e.clientY - CS.dsy; drawCircuit(); }
-    handleHover(e);
-  });
-  window.addEventListener('mouseup', () => { CS.dragging = false; });
+    _lastMouse = { x: e.clientX, y: e.clientY };
 
-  // Click — view-mode aware
-  canvas.addEventListener('click', (e) => {
-    // Close project actions if clicking elsewhere
-    if (!CS.hoveredNode) { document.getElementById('project-actions').classList.remove('visible'); return; }
+    if (CS.dragging) {
+      const dx = e.clientX - CS._dragOriX;
+      const dy = e.clientY - CS._dragOriY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) CS.didDrag = true;
+      CS.panX = CS._panSX + dx;
+      CS.panY = CS._panSY + dy;
+      drawCircuit();
+      return;
+    }
 
-    CS.selectedNode = CS.hoveredNode;
-    CS.highlightPath = getPathToRoot(CS.hoveredNode);
-    drawCircuit();
-    updateBreadcrumb(CS.hoveredNode);
-
-    if (currentViewMode === 'project' && CS.hoveredNode.isRoot) {
-      document.getElementById('project-actions').classList.add('visible');
-    } else if (currentViewMode === 'agent' && CS.hoveredNode.isRoot) {
-      openSpawnModal();
-    } else if (currentViewMode === 'agent' && CS.hoveredNode.agentId) {
-      // Show agent detail panel
-      showAgentDetail(CS.hoveredNode.agentId);
-    } else if (currentViewMode === 'agent' && CS.hoveredNode.taskId) {
-      viewTaskResults(CS.hoveredNode.taskId);
-    } else {
-      document.getElementById('project-actions').classList.remove('visible');
-      document.getElementById('agent-detail').classList.remove('visible');
-      if (!CS.hoveredNode.dir) analyzeNode(CS.hoveredNode);
-      else showToast(`${CS.hoveredNode.name} — ${CS.hoveredNode.children||0} items`, 'info');
+    // Hover hit-test on every move
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const found = hitTestNode(cx, cy);
+    if (found !== CS.hoveredNode) {
+      CS.hoveredNode  = found;
+      CS.connectedSet = getConnected(found);
+      canvas.style.cursor = found ? 'pointer' : 'grab';
+      const tt = document.getElementById('node-tooltip');
+      if (found) {
+        tt.classList.add('visible');
+        document.getElementById('tt-name').textContent = found.name;
+        document.getElementById('tt-type').textContent = 'TYPE: ' + (found.type || (found.dir ? 'Directory' : 'File'));
+        document.getElementById('tt-size').textContent = found.dir ? `ITEMS: ${found.children||0}` : 'SIZE: ' + fmtSize(found.size||0);
+        document.getElementById('tt-modified').textContent = found.dir ? '' : '';
+        document.getElementById('tt-path').textContent = found.path || '';
+      } else {
+        tt.classList.remove('visible');
+      }
+      drawCircuit();
+    }
+    if (found) {
+      const tt = document.getElementById('node-tooltip');
+      tt.style.left = Math.min(e.clientX + 16, window.innerWidth  - 320) + 'px';
+      tt.style.top  = Math.min(e.clientY + 16, window.innerHeight - 130) + 'px';
     }
   });
 
-  // Right-click
+  window.addEventListener('mouseup', (e) => {
+    if (!CS.dragging) return;
+    CS.dragging = false;
+    canvas.style.cursor = CS.hoveredNode ? 'pointer' : 'grab';
+  });
+
+  // ─── CLICK ────────────────────────────────────────
+  canvas.addEventListener('click', (e) => {
+    if (CS.didDrag) { CS.didDrag = false; return; }
+    document.getElementById('project-actions').classList.remove('visible');
+
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const node = hitTestNode(cx, cy) || CS.hoveredNode;
+
+    if (!node) return;
+
+    // Spawn visual ripple at node screen position
+    const wrect = wrap.getBoundingClientRect();
+    spawnRipple(
+      node.cx * CS.zoom + CS.panX + wrect.left,
+      node.cy * CS.zoom + CS.panY + wrect.top,
+      node.isRoot ? '#00d4ff' : node.dir ? '#3b82f6' : '#a78bfa'
+    );
+
+    CS.selectedNode  = node;
+    CS.highlightPath = getPathToRoot(node);
+    updateBreadcrumb(node);
+    drawCircuit();
+
+    if (currentViewMode === 'project' && node.isRoot) {
+      document.getElementById('project-actions').classList.add('visible');
+    } else if (currentViewMode === 'agent' && node.isRoot) {
+      openSpawnModal();
+    } else if (currentViewMode === 'agent' && node.agentId) {
+      showAgentDetail(node.agentId);
+    } else if (currentViewMode === 'agent' && node.taskId) {
+      viewTaskResults(node.taskId);
+    } else if (node.dir && !node.isRoot) {
+      const kids = CS.edgeFromMap[node.id] || [];
+      CS.highlightPath = [node.id, ...kids];
+      drawCircuit();
+      zoomToNode(node);
+      showToast(`📁 ${node.name} — ${kids.length} items  •  dbl-click to drill in`, 'info');
+    } else if (!node.dir) {
+      analyzeNode(node);
+    }
+  });
+
+  // ─── DOUBLE-CLICK (drill into directory) ──────────
+  canvas.addEventListener('dblclick', (e) => {
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const node = hitTestNode(cx, cy) || CS.hoveredNode;
+    if (!node || !node.dir || node.isRoot) return;
+
+    spawnRipple(e.clientX, e.clientY, '#10b981');
+
+    if (window.aether?.scanDirectory) {
+      const dirPath = node.path || node.name;
+      showToast(`🔍 Drilling into ${node.name}…`, 'info');
+      (async () => {
+        try {
+          showLoading('Scanning ' + node.name + '…', 30);
+          const data = await window.aether.scanDirectory(dirPath, 3);
+          if (data && data.children) {
+            buildVaultFromScan(data.children, node.name.toUpperCase(), dirPath);
+            pushHistory('Dir: ' + node.name);
+          } else { showToast('Cannot drill into ' + node.name, 'error'); }
+        } catch(err) { showToast('Scan error: ' + err.message, 'error'); }
+        finally { hideLoading(); }
+      })();
+    } else {
+      // Deep zoom when no local scan available
+      const tw = wrap.clientWidth, th = wrap.clientHeight;
+      const tz = Math.min(3, CS.zoom * 2.5);
+      const tx = tw/2 - node.cx * tz, ty = th/2 - node.cy * tz;
+      const sx = CS.panX, sy = CS.panY, sz = CS.zoom;
+      let s = 0;
+      (function a() {
+        s++; const t = s/30, ease = t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+        CS.panX=sx+(tx-sx)*ease; CS.panY=sy+(ty-sy)*ease; CS.zoom=sz+(tz-sz)*ease;
+        updateZoom(); drawCircuit(); if(s<30) requestAnimationFrame(a);
+      })();
+    }
+  });
+
+  // ─── RIGHT-CLICK ──────────────────────────────────
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (CS.hoveredNode) {
-      ctxNode = CS.hoveredNode;
-      CS.selectedNode = CS.hoveredNode;
-      CS.highlightPath = getPathToRoot(CS.hoveredNode);
-      drawCircuit();
-      const cm = document.getElementById('context-menu');
-      cm.style.left = e.clientX + 'px';
-      cm.style.top = e.clientY + 'px';
-      // Hide "Upload to Vault" for root node
-      const uploadOpt = document.getElementById('ctx-upload-vault');
-      if (uploadOpt) uploadOpt.style.display = CS.hoveredNode.isRoot ? 'none' : 'flex';
-      cm.classList.add('open');
-    }
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const node = hitTestNode(cx, cy) || CS.hoveredNode;
+    if (!node) return;
+    ctxNode = node;
+    CS.selectedNode  = node;
+    CS.highlightPath = getPathToRoot(node);
+    drawCircuit();
+    const cm = document.getElementById('context-menu');
+    cm.style.left = e.clientX + 'px';
+    cm.style.top  = e.clientY + 'px';
+    const up = document.getElementById('ctx-upload-vault');
+    if (up) up.style.display = node.isRoot ? 'none' : 'flex';
+    cm.classList.add('open');
   });
 
-  // Zoom — clamped 0.3x - 3x, centered on cursor
+  // ─── SCROLL ZOOM ──────────────────────────────────
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const d = e.deltaY > 0 ? 0.92 : 1.08;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const newZoom = Math.max(0.3, Math.min(3, CS.zoom * d));
-    const factor = newZoom / CS.zoom;
-    CS.panX = mx - (mx - CS.panX) * factor;
-    CS.panY = my - (my - CS.panY) * factor;
-    CS.zoom = newZoom;
+    const rect  = wrap.getBoundingClientRect();
+    const mx    = e.clientX - rect.left;
+    const my    = e.clientY - rect.top;
+    const d     = e.deltaY < 0 ? 1.10 : 0.91;
+    const nz    = Math.max(0.15, Math.min(4, CS.zoom * d));
+    const f     = nz / CS.zoom;
+    CS.panX     = mx - (mx - CS.panX) * f;
+    CS.panY     = my - (my - CS.panY) * f;
+    CS.zoom     = nz;
     updateZoom();
     drawCircuit();
   }, { passive: false });
@@ -2727,45 +2875,8 @@ function isInViewport(n, w, h, margin) {
   return sx > -margin && sx < w + margin && sy > -margin && sy < h + margin;
 }
 
-// ── Hit detection for radial nodes ───────────────────
-function handleHover(e) {
-  const canvas = document.getElementById('circuit-canvas');
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-  const my = (e.clientY - rect.top - CS.panY) / CS.zoom;
-  let found = null;
-
-  // Check hit: square for root, circle for others
-  for (const n of CS.nodes) {
-    const dx = mx - (n.cx + (n.driftX || 0)), dy = my - (n.cy + (n.driftY || 0));
-    if (n.isRoot) {
-      const bound = 32; // Root hit box
-      if (Math.abs(dx) <= bound && Math.abs(dy) <= bound) { found = n; break; }
-    } else {
-      if (Math.sqrt(dx*dx + dy*dy) <= n.r + 6) { found = n; break; }
-    }
-  }
-
-  if (found !== CS.hoveredNode) {
-    CS.hoveredNode = found;
-    CS.connectedSet = getConnected(found);
-    drawCircuit();
-    const tt = document.getElementById('node-tooltip');
-    if (found) {
-      tt.classList.add('visible');
-      document.getElementById('tt-name').textContent = found.name;
-      document.getElementById('tt-type').textContent = 'TYPE: ' + (found.type || 'unknown');
-      document.getElementById('tt-size').textContent = found.dir ? `ITEMS: ${found.children||0}` : 'SIZE: ' + fmtSize(found.size||0);
-      document.getElementById('tt-modified').textContent = found.dir ? `TOTAL: ${fmtSize(found.totalSize||0)}` : '';
-      document.getElementById('tt-path').textContent = found.path || '';
-    } else { tt.classList.remove('visible'); }
-  }
-  if (found) {
-    const tt = document.getElementById('node-tooltip');
-    tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 310) + 'px';
-    tt.style.top = Math.min(e.clientY + 14, window.innerHeight - 120) + 'px';
-  }
-}
+// ── Legacy handleHover (kept as no-op; new logic is inside initCircuit) ──
+function handleHover(e) { /* handled by mousemove in initCircuit */ }
 
 function getPathToRoot(node) {
   const path = [node.id];
@@ -2790,8 +2901,9 @@ function radialLayout(nodes, edges) {
 
   const root = nodes.find(n => n.isRoot) || nodes[0];
   const wrap = document.getElementById('canvas-wrap');
-  const centerX = (wrap?.clientWidth || 900) / 2 / CS.zoom;
-  const centerY = (wrap?.clientHeight || 600) / 2 / CS.zoom;
+  // Always place nodes at zoom=1 coordinates; pan/zoom centering happens after layout
+  const centerX = (wrap?.clientWidth || 900) / 2;
+  const centerY = (wrap?.clientHeight || 600) / 2;
 
   CS.cx = centerX; CS.cy = centerY;
 
@@ -2821,23 +2933,23 @@ function radialLayout(nodes, edges) {
           dist = 180 + (Math.random() * 40 - 20) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * 15;
         } else if (['py','js','ts','jsx','tsx'].includes(_ext)) {
           // LAYER 2: code files — 270-320px
-          node.r = 3.5;
+          node.r = 5;
           dist = 270 + Math.random() * 50;
         } else if (['md','txt','json','yaml','yml','env','toml','cfg','ini'].includes(_ext)) {
           // LAYER 3: docs and config — 360-420px
-          node.r = 3.5;
+          node.r = 5;
           dist = 360 + Math.random() * 60;
         } else if (['png','jpg','jpeg','svg','gif','pdf','exe','zip','dmg','ico'].includes(_ext)) {
           // LAYER 4: media and binary — 440-500px (outermost)
-          node.r = 3.5;
+          node.r = 5;
           dist = 440 + Math.random() * 60;
         } else {
           // default: between code and docs
-          node.r = 3.5;
+          node.r = 5;
           dist = 320 + Math.random() * 40;
         }
       } else {
-        node.r = _isDir ? 5 : 3.5;
+        node.r = _isDir ? 6 : 5;
         if (_isDir) {
           dist = 80 + Math.random() * 30;
         } else if (['py','js','ts','jsx','tsx'].includes(_ext)) {
@@ -2982,43 +3094,93 @@ function drawCircuit() {
     const nx = n.cx + n.driftX, ny = n.cy + n.driftY;
 
     if (n.isRoot) {
-      ctx.shadowColor = 'rgba(0, 212, 255, 0.8)'; ctx.shadowBlur = 20;
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.2)';
+      // Pulsing outer ring on root
+      const pulse = 0.6 + 0.4 * Math.sin(time * 2);
+      ctx.shadowColor = `rgba(0,212,255,${pulse})`; ctx.shadowBlur = 30;
+      ctx.strokeStyle = `rgba(0,212,255,${pulse * 0.4})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(nx, ny, 38 + Math.sin(time * 1.5) * 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
       ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = isH ? 2 : 1.5;
       ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.font = '22px sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#00d4ff';
       ctx.fillText('\u{1F512}', nx, ny);
-      ctx.font = '500 11px "IBM Plex Mono", monospace';
+      ctx.font = `${isH ? 600 : 500} 11px "IBM Plex Mono", monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = '#00d4ff';
+      ctx.fillStyle = isH ? '#ffffff' : '#00d4ff';
       ctx.fillText(n.name.toUpperCase(), nx, ny + 34);
     } else {
       let radius = n.r;
       let finalColor = color;
+
       if (n.agentActive) {
         finalColor = '#ffffff';
         radius += 4 + Math.sin(time * 5) * 2;
-        ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 12;
+        ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 16;
+      } else if (isS) {
+        // Selected: bright glow + larger
+        radius += 4;
+        ctx.shadowColor = finalColor; ctx.shadowBlur = 20;
+        // Outer selection ring
+        ctx.strokeStyle = hexToRGBA(finalColor, 0.5);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(nx, ny, radius + 6 + Math.sin(time * 3) * 2, 0, Math.PI * 2); ctx.stroke();
+      } else if (isH) {
+        // Hovered: medium glow
+        radius += 2.5;
+        ctx.shadowColor = finalColor; ctx.shadowBlur = 18;
       } else {
-        ctx.shadowColor = hexToRGBA(color, 0.8); ctx.shadowBlur = 6;
+        ctx.shadowColor = hexToRGBA(color, 0.5); ctx.shadowBlur = 4;
       }
 
-      ctx.fillStyle = hexToRGBA(finalColor, 0.9);
+      ctx.fillStyle = hexToRGBA(finalColor, isH || isS ? 1.0 : 0.85);
       ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = finalColor; ctx.lineWidth = 1;
+      ctx.strokeStyle = isH || isS ? finalColor : hexToRGBA(finalColor, 0.7);
+      ctx.lineWidth = isH || isS ? 1.5 : 0.8;
       ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
-
     }
   }
 
   drawLabels(CS.nodes, ctx);
   if (window.activityLayer) activityLayer.drawActive(ctx);
   ctx.restore();
+
+  // ── Ripple overlays (drawn in screen space, outside transform) ──
+  if (_ripples.length) {
+    const rctx = canvas.getContext('2d');
+    const now = Date.now();
+    for (let i = _ripples.length - 1; i >= 0; i--) {
+      const rp = _ripples[i];
+      const age = (now - rp.t) / 400; // 400ms life
+      if (age >= 1) { _ripples.splice(i, 1); continue; }
+      const r   = rp.maxR * age;
+      const alpha = (1 - age) * 0.7;
+      rctx.save();
+      rctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      const wrap = document.getElementById('canvas-wrap');
+      const wrect = wrap.getBoundingClientRect();
+      const rx = rp.x - wrect.left, ry = rp.y - wrect.top;
+      rctx.beginPath();
+      rctx.arc(rx, ry, r, 0, Math.PI * 2);
+      rctx.strokeStyle = rp.color;
+      rctx.lineWidth = 2 * (1 - age);
+      rctx.globalAlpha = alpha;
+      rctx.stroke();
+      rctx.beginPath();
+      rctx.arc(rx, ry, r * 0.5, 0, Math.PI * 2);
+      rctx.strokeStyle = rp.color;
+      rctx.lineWidth = 1;
+      rctx.globalAlpha = alpha * 0.5;
+      rctx.stroke();
+      rctx.restore();
+    }
+    if (_ripples.length) requestAnimationFrame(drawCircuit);
+  }
 }
 
 // ── Label collision-avoiding batch renderer ────────
@@ -3153,9 +3315,17 @@ function buildDemoVault() {
   CS.nodes = N; CS.edges = E;
   radialLayout(N, E); // includes buildEdgeMaps()
 
-  // Center view on root
+  // Center view on root after layout
   const wrap = document.getElementById('canvas-wrap');
-  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
+  {
+    let dmnX=Infinity,dmxX=-Infinity,dmnY=Infinity,dmxY=-Infinity;
+    N.forEach(n => { dmnX=Math.min(dmnX,n.cx-n.r); dmxX=Math.max(dmxX,n.cx+n.r); dmnY=Math.min(dmnY,n.cy-n.r); dmxY=Math.max(dmxY,n.cy+n.r); });
+    const dvw = wrap?.clientWidth||900, dvh = wrap?.clientHeight||600;
+    const dspX = dmxX-dmnX+80, dspY = dmxY-dmnY+80;
+    CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(dvw/dspX, dvh/dspY)));
+    CS.panX = dvw/2 - ((dmnX+dmxX)/2)*CS.zoom;
+    CS.panY = dvh/2 - ((dmnY+dmxY)/2)*CS.zoom;
+  }
   document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
   updateZoom();
 
@@ -3166,6 +3336,9 @@ function buildDemoVault() {
 }
 
 function buildVaultFromScan(tree, rootName, rootPath) {
+  // Always sync canvas size to current canvas-wrap before layout
+  if (window.resizeCanvas) window.resizeCanvas();
+
   const N = [], E = [];
   let id = 0;
 
@@ -3193,6 +3366,7 @@ function buildVaultFromScan(tree, rootName, rootPath) {
 
   CS.nodes = N; CS.edges = E;
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+  buildEdgeMaps();
 
   radialLayout(N, E);
 
@@ -3200,9 +3374,12 @@ function buildVaultFromScan(tree, rootName, rootPath) {
   let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
   N.forEach(n => { minX=Math.min(minX,n.cx-n.r); maxX=Math.max(maxX,n.cx+n.r); minY=Math.min(minY,n.cy-n.r); maxY=Math.max(maxY,n.cy+n.r); });
   const wrap = document.getElementById('canvas-wrap');
+  const vw = wrap?.clientWidth || 900, vh = wrap?.clientHeight || 600;
   const spanX = maxX - minX + 80, spanY = maxY - minY + 80;
-  CS.zoom = Math.max(0.3, Math.min(1.5, Math.min((wrap?.clientWidth||900)/spanX, (wrap?.clientHeight||600)/spanY)));
-  CS.panX = 0; CS.panY = 0;
+  CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(vw/spanX, vh/spanY)));
+  // Center the bounding box in the viewport
+  CS.panX = vw / 2 - ((minX + maxX) / 2) * CS.zoom;
+  CS.panY = vh / 2 - ((minY + maxY) / 2) * CS.zoom;
 
   document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
   updateZoom();
@@ -3231,7 +3408,19 @@ function fmtSize(b) {
 function circuitZoomIn() { CS.zoom=Math.min(3,CS.zoom*1.2); updateZoom(); drawCircuit(); closeMenus(); }
 function circuitZoomOut() { CS.zoom=Math.max(0.3,CS.zoom*0.8); updateZoom(); drawCircuit(); closeMenus(); }
 function circuitResetView() {
-  CS.zoom=1; CS.panX=0; CS.panY=0; CS.selectedNode=null; CS.highlightPath=[];
+  CS.selectedNode=null; CS.highlightPath=[];
+  if (CS.nodes && CS.nodes.length > 0) {
+    let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
+    CS.nodes.forEach(n => { mnX=Math.min(mnX,n.cx-n.r); mxX=Math.max(mxX,n.cx+n.r); mnY=Math.min(mnY,n.cy-n.r); mxY=Math.max(mxY,n.cy+n.r); });
+    const rw = document.getElementById('canvas-wrap');
+    const rvw = rw?.clientWidth||900, rvh = rw?.clientHeight||600;
+    const rspX = mxX-mnX+80, rspY = mxY-mnY+80;
+    CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(rvw/rspX, rvh/rspY)));
+    CS.panX = rvw/2 - ((mnX+mxX)/2)*CS.zoom;
+    CS.panY = rvh/2 - ((mnY+mxY)/2)*CS.zoom;
+  } else {
+    CS.zoom=1; CS.panX=0; CS.panY=0;
+  }
   updateZoom(); drawCircuit(); closeMenus();
   updateBreadcrumbPath(currentVaultPath || 'Home');
 }
@@ -3319,9 +3508,12 @@ function restoreHistory() {
   showToast('Restored: ' + h.label, 'info');
 }
 function updateHistoryUI() {
-  document.getElementById('nav-back').disabled = historyIndex <= 0;
-  document.getElementById('nav-fwd').disabled = historyIndex >= analysisHistory.length - 1;
-  document.getElementById('nav-breadcrumb').textContent = analysisHistory.length === 0 ? 'No history' : `Step ${historyIndex+1} of ${analysisHistory.length}: ${analysisHistory[historyIndex].label}`;
+  const navBack = document.getElementById('nav-back');
+  const navFwd = document.getElementById('nav-fwd');
+  const navBreadcrumb = document.getElementById('nav-breadcrumb');
+  if (navBack) navBack.disabled = historyIndex <= 0;
+  if (navFwd) navFwd.disabled = historyIndex >= analysisHistory.length - 1;
+  if (navBreadcrumb) navBreadcrumb.textContent = analysisHistory.length === 0 ? 'No history' : `Step ${historyIndex+1} of ${analysisHistory.length}: ${analysisHistory[historyIndex].label}`;
 }
 
 // ════════════════════════════════════════════════════
@@ -3329,6 +3521,7 @@ function updateHistoryUI() {
 // ════════════════════════════════════════════════════
 function renderRecentFiles() {
   const c = document.getElementById('recent-files');
+  if (!c) return;
   let sorted = [...recentFiles];
   if (fileTypeFilter) sorted = sorted.filter(f => f.type === fileTypeFilter);
   if (fileSortBy === 'name') sorted.sort((a,b) => a.name.localeCompare(b.name));
@@ -3351,6 +3544,7 @@ function renderRecentFiles() {
 function buildFilterChips() {
   const types = [...new Set(recentFiles.map(f => f.type))].sort();
   const row = document.getElementById('filter-row');
+  if (!row) return;
   row.innerHTML = `<button class="sb-filter-chip${!fileTypeFilter?' active':''}" onclick="filterByType(null,this)">All</button>` +
     types.map(t => `<button class="sb-filter-chip${fileTypeFilter===t?' active':''}" onclick="filterByType('${t}',this)">${t}</button>`).join('');
 }
@@ -4985,6 +5179,8 @@ function renderAgentOrbitPanel() {
 
 // Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
 function buildAgentOrbitVault() {
+  if (window.resizeCanvas) window.resizeCanvas();
+
   const N = [], E = [];
   let id = 0;
 
@@ -4994,7 +5190,6 @@ function buildAgentOrbitVault() {
   // Only show branches for agents user has CREATED
   spawnedAgents.forEach(a => {
     const aid = id++;
-    // Color based on status
     const statusType = a.status === 'active' ? 'Python' : a.status === 'processing' ? 'JSON' : a.status === 'error' ? 'Binary' : 'Config';
     N.push({
       id:aid, name:a.name, dir:false, type:statusType,
@@ -5016,10 +5211,22 @@ function buildAgentOrbitVault() {
 
   CS.nodes = N; CS.edges = E;
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+  buildEdgeMaps();
   radialLayout(N, E);
-  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
+
+  // Fit and center agent orbit
+  let aMinX=Infinity, aMaxX=-Infinity, aMinY=Infinity, aMaxY=-Infinity;
+  N.forEach(n => { aMinX=Math.min(aMinX,n.cx-n.r); aMaxX=Math.max(aMaxX,n.cx+n.r); aMinY=Math.min(aMinY,n.cy-n.r); aMaxY=Math.max(aMaxY,n.cy+n.r); });
+  const _aw = document.getElementById('canvas-wrap');
+  const avw = _aw?.clientWidth||900, avh = _aw?.clientHeight||600;
+  const aspX = aMaxX-aMinX+80, aspY = aMaxY-aMinY+80;
+  CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(avw/aspX, avh/aspY)));
+  CS.panX = avw/2 - ((aMinX+aMaxX)/2)*CS.zoom;
+  CS.panY = avh/2 - ((aMinY+aMaxY)/2)*CS.zoom;
+
   document.getElementById('status-nodes').textContent = `AGENTS: ${agentCount}`;
   updateZoom();
+  drawCircuit();
 }
 
 // Build project-mode circuit: PROJECT center with LLM-inferred branches
@@ -5087,10 +5294,21 @@ function buildProjectVault() {
 
   CS.nodes = N; CS.edges = E;
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
+  buildEdgeMaps();
+  if (window.resizeCanvas) window.resizeCanvas();
   radialLayout(N, E);
-  CS.panX = 0; CS.panY = 0; CS.zoom = 1.0;
+  // Fit and center project view
+  let pMinX=Infinity, pMaxX=-Infinity, pMinY=Infinity, pMaxY=-Infinity;
+  N.forEach(n => { pMinX=Math.min(pMinX,n.cx-n.r); pMaxX=Math.max(pMaxX,n.cx+n.r); pMinY=Math.min(pMinY,n.cy-n.r); pMaxY=Math.max(pMaxY,n.cy+n.r); });
+  const _pw = document.getElementById('canvas-wrap');
+  const pvw = _pw?.clientWidth||900, pvh = _pw?.clientHeight||600;
+  const pspX = pMaxX-pMinX+80, pspY = pMaxY-pMinY+80;
+  CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(pvw/pspX, pvh/pspY)));
+  CS.panX = pvw/2 - ((pMinX+pMaxX)/2)*CS.zoom;
+  CS.panY = pvh/2 - ((pMinY+pMaxY)/2)*CS.zoom;
   document.getElementById('status-nodes').textContent = `MODULES: ${N.length}`;
   updateZoom();
+  drawCircuit();
 }
 
 // ════════════════════════════════════════════════════

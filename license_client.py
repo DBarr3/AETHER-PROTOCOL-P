@@ -144,6 +144,12 @@ class CloudLicenseClient:
             }
             with open(cache_file, "w") as f:
                 json.dump(cache_data, f, indent=2)
+            # Restrict permissions to owner-only (prevents info disclosure)
+            try:
+                import os as _os
+                cache_file.chmod(0o600)
+            except Exception:
+                pass  # Windows may not support chmod — acceptable
         except Exception as e:
             logger.warning("Failed to save license cache: %s", e)
 

@@ -6,11 +6,14 @@ Aether Systems LLC — Patent Pending
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import time
 from pathlib import Path
 from typing import Optional
+
+log = logging.getLogger("aethercloud.vault")
 
 from aether_protocol.audit import AuditLog
 from aether_protocol.quantum_crypto import QuantumSeedCommitment
@@ -49,12 +52,20 @@ class AetherVault:
         return self._root
 
     def _resolve_path(self, path: Optional[str]) -> Path:
-        """Resolve a path relative to vault root, ensuring it stays within."""
+        """Resolve a path relative to vault root, ensuring it stays within.
+        Uses Path.is_relative_to() (Python 3.9+) for symlink-safe containment.
+        """
         if path is None:
             return self._root
         resolved = (self._root / path).resolve()
-        if not str(resolved).startswith(str(self._root)):
-            raise ValueError(f"Path escapes vault root: {path}")
+        try:
+            # Python 3.9+ — handles symlinks and case normalization correctly
+            if resolved != self._root and not resolved.is_relative_to(self._root):
+                raise ValueError(f"Path escapes vault root: {path}")
+        except AttributeError:
+            # Python < 3.9 fallback
+            if not str(resolved).startswith(str(self._root) + os.sep) and resolved != self._root:
+                raise ValueError(f"Path escapes vault root: {path}")
         return resolved
 
     def _hash_file(self, path: Path) -> str:
@@ -98,8 +109,8 @@ class AetherVault:
 
         try:
             self._audit_log.append_commitment(audit_entry, signature)
-        except Exception:
-            pass
+        except Exception as _ae:
+            log.warning("Vault audit log write failed for %s: %s", event_type, _ae)
 
         return commitment_hash
 

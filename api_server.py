@@ -1324,10 +1324,10 @@ async def download_proof(filename: str, token: str = Depends(get_session_token))
 async def scan_vault(request: VaultScanRequest):
     """
     Scan a real filesystem path and return structured vault data.
-    No auth required (same as /vault/browse) so it works during initial setup.
+    No auth required so it works during initial setup —
+    but path is restricted to vault root or user's home subtree.
     """
-    vault_path = request.vault_path
-    path = Path(vault_path)
+    path = _safe_browse_path(request.vault_path)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Vault path does not exist")
@@ -1424,6 +1424,36 @@ async def scan_vault(request: VaultScanRequest):
 
 
 # ── Browse (scan any directory — no auth, localhost only) ──
+def _safe_browse_path(raw_path: str) -> Path:
+    """
+    Resolve and validate a path for browse/scan endpoints.
+    Restricts access to vault data dir and user's home directory subtree.
+    Uses Path.is_relative_to() for cross-platform path containment (Python 3.9+).
+    Raises HTTPException 400 if path traversal attempt is detected.
+    """
+    resolved = Path(raw_path).resolve()
+    allowed_roots = [
+        DEFAULT_VAULT_ROOT.resolve(),
+        Path.home().resolve(),
+    ]
+    try:
+        contained = any(resolved == root or resolved.is_relative_to(root) for root in allowed_roots)
+    except AttributeError:
+        # Python < 3.9 fallback — use string comparison with OS-appropriate separator
+        import os as _os
+        contained = any(
+            str(resolved).lower().startswith(str(root).lower() + _os.sep)
+            or str(resolved).lower() == str(root).lower()
+            for root in allowed_roots
+        )
+    if not contained:
+        raise HTTPException(
+            status_code=400,
+            detail="Access denied: path must be within vault root or home directory",
+        )
+    return resolved
+
+
 @app.get("/vault/browse")
 async def vault_browse(
     path: str = Query(default=None, description="Directory path to scan"),
@@ -1432,12 +1462,13 @@ async def vault_browse(
     Scan a directory and return its structure for the vault graph.
     Only names, sizes, extensions, modified dates — no file contents.
     """
-    vault_root = path or os.getenv("AETHER_VAULT_ROOT", str(DEFAULT_VAULT_ROOT))
-    vault_path = Path(vault_root)
+    raw_root = path or os.getenv("AETHER_VAULT_ROOT", str(DEFAULT_VAULT_ROOT))
+    vault_path = _safe_browse_path(raw_root)
 
     if not vault_path.exists():
         return {"error": "Path does not exist", "folders": [], "files": [],
                 "stats": {"total_files": 0, "total_folders": 0}}
+    vault_root = str(vault_path)
     if not vault_path.is_dir():
         return {"error": "Path is not a directory", "folders": [], "files": [],
                 "stats": {"total_files": 0, "total_folders": 0}}

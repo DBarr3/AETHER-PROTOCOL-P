@@ -6,10 +6,13 @@ Aether Systems LLC — Patent Pending
 
 import hashlib
 import json
+import logging
 import time
 import os
 from pathlib import Path
 from typing import Optional
+
+log = logging.getLogger("aethercloud.auth")
 
 import bcrypt
 
@@ -61,7 +64,7 @@ class AetherCloudAuth:
         """Register a new user with bcrypt-hashed password."""
         if username in self._credentials:
             return False
-        salt = bcrypt.gensalt()
+        salt = bcrypt.gensalt(rounds=14)  # Explicit work factor (higher than default 12)
         hashed = bcrypt.hashpw(password.encode(), salt).decode()
         self._credentials[username] = {"password_hash": hashed}
         self._save_credentials()
@@ -203,8 +206,11 @@ class AetherCloudAuth:
 
         try:
             self._audit_log.append_commitment(audit_entry, signature)
-        except Exception:
-            pass  # Audit failure should not block auth
+        except Exception as _audit_err:
+            log.warning(
+                "Auth audit log write failed — event=%s audit_id=%s: %s",
+                reason, audit_id, _audit_err,
+            )
 
         return {
             "authenticated": authenticated,
@@ -249,8 +255,8 @@ class AetherCloudAuth:
 
         try:
             self._audit_log.append_commitment(audit_entry, signature)
-        except Exception:
-            pass
+        except Exception as _ae:
+            log.warning("Logout audit log write failed for %s: %s", username or "unknown", _ae)
 
         return {
             "logged_out": True,

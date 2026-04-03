@@ -14,10 +14,11 @@ DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 CREDENTIALS_FILE = DEFAULT_CONFIG_DIR / "credentials.json"
 
 # ─── Auth ───────────────────────────────────────────────
-SESSION_TIMEOUT_HOURS = int(os.getenv("AETHER_SESSION_TIMEOUT", "8"))
+_raw_timeout = int(os.getenv("AETHER_SESSION_TIMEOUT", "8"))
+SESSION_TIMEOUT_HOURS = max(1, min(24, _raw_timeout))   # Clamp: 1h–24h
 SESSION_TIMEOUT_SECONDS = SESSION_TIMEOUT_HOURS * 3600
-MAX_LOGIN_ATTEMPTS = int(os.getenv("AETHER_MAX_LOGIN_ATTEMPTS", "5"))
-LOCKOUT_DURATION_SECONDS = int(os.getenv("AETHER_LOCKOUT_DURATION", "900"))
+MAX_LOGIN_ATTEMPTS = max(3, min(20, int(os.getenv("AETHER_MAX_LOGIN_ATTEMPTS", "5"))))
+LOCKOUT_DURATION_SECONDS = max(60, int(os.getenv("AETHER_LOCKOUT_DURATION", "900")))  # Min 60s
 
 # ─── Vault ──────────────────────────────────────────────
 AUDIT_LOG_MAX_SIZE_MB = int(os.getenv("AETHER_AUDIT_MAX_MB", "100"))
@@ -60,7 +61,7 @@ CATEGORIES = frozenset({
 
 # ─── UI ─────────────────────────────────────────────────
 APP_NAME = "AetherCloud-L"
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.9.4"
 APP_BANNER = f"""
 ╔══════════════════════════════════════════════╗
 ║   AETHER CLOUD-L  v{APP_VERSION}                     ║

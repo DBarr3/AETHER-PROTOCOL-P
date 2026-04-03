@@ -210,7 +210,7 @@
 <body>
 
 <div class="title-bar">
-  <span class="title-bar-text">AetherCloud-L v0.9.2</span>
+  <span class="title-bar-text">AetherCloud-L v0.9.3</span>
   <div class="title-bar-controls">
     <button class="title-bar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="title-bar-btn close" onclick="window.aether?.close()">&#10005;</button>
@@ -284,7 +284,7 @@ async function fetchWithTimeout(url, timeoutMs, options = {}) {
 // Resolve API base — try IPC first, fallback to VPS1 HTTPS proxy
 async function getApiBase() {
   if (window.aether?.apiBase) return window.aether.apiBase;
-  return 'https://143.198.162.111/cloud';
+  return 'https://api.aethersystems.net/cloud';
 }
 
 async function handleLogin() {
