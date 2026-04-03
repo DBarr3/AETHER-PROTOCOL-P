@@ -2110,20 +2110,6 @@
         <div class="patch-panel-body" id="patch-profile-view" style="display:none;"></div>
       </div>
     </div>
-    <!-- Graph Legend -->
-    <div id="graph-legend">
-      <div class="legend-title" onclick="this.closest('#graph-legend').classList.toggle('collapsed')">
-        <span>LEGEND</span><span id="legend-toggle">▲</span>
-      </div>
-      <div class="legend-body">
-        <div class="legend-row"><div class="legend-shape"><div class="ls-circle" style="border-radius:3px;"></div></div>Folder</div>
-        <div class="legend-row"><div class="legend-shape"><div class="ls-code"></div></div>Code file</div>
-        <div class="legend-row"><div class="legend-shape"><div class="ls-config"></div></div>Config / JSON</div>
-        <div class="legend-row"><div class="legend-shape"><div class="ls-media"></div></div>Image / Media</div>
-        <div class="legend-row"><div class="legend-shape"><div class="ls-agent"></div></div>Agent</div>
-        <div class="legend-row" style="margin-top:6px;color:rgba(100,120,140,0.7);font-size:8px;">Drag nodes to reposition<br>Double-click folder to drill<br>Right-click for actions<br>0 = fit all · +/- = zoom</div>
-      </div>
-    </div>
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
       <div class="logs-toolbar">
@@ -2822,74 +2808,65 @@ function initCircuit() {
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // ── Canvas is the sole event receiver ──────────────────────
-  canvas.style.cursor = 'grab';
+  // ── ALL events on window — guaranteed to fire in Electron ──
+  wrap.style.cursor = 'grab';
   let _isPanning = false, _dragStart = { x: 0, y: 0 };
-  let _prevView = null; // stores {panX, panY, zoom} before node-focus zoom
-
-  // ─── PAN ──────────────────────────────────────────
+  let _prevView = null;
   let _lastMouse = { x: 0, y: 0 };
 
-  canvas.addEventListener('mousedown', (e) => {
+  function _canvasRect() { return canvas.getBoundingClientRect(); }
+  function _inCanvas(e) {
+    const r = _canvasRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  }
+  function _toWorld(e) {
+    const r = _canvasRect();
+    return { wx: (e.clientX - r.left - CS.panX) / CS.zoom,
+             wy: (e.clientY - r.top  - CS.panY) / CS.zoom };
+  }
+  function _setCursor(cur) { wrap.style.cursor = cur; canvas.style.cursor = cur; }
+
+  window.addEventListener('mousedown', (e) => {
+    if (!_inCanvas(e)) return;
     if (e.button !== 0 && e.button !== 1) return;
     document.getElementById('context-menu').classList.remove('open');
     document.getElementById('canvas-context-menu').classList.remove('open');
-    const rect = canvas.getBoundingClientRect();
-    const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-    const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+    const { wx, wy } = _toWorld(e);
     const hitNode = hitTestNodeW(wx, wy);
     if (e.button === 1) {
-      // Middle mouse pan
       _isPanning = true; CS.didDrag = false;
       _dragStart = { x: e.clientX - CS.panX, y: e.clientY - CS.panY };
-      canvas.style.cursor = 'grabbing';
-      e.preventDefault(); return;
+      _setCursor('grabbing'); e.preventDefault(); return;
     }
     if (hitNode && !CS.pinnedNodes.has(hitNode.id)) {
-      CS.draggingNode = hitNode;
-      CS.didDrag = false;
-      canvas.style.cursor = 'move';
+      CS.draggingNode = hitNode; CS.didDrag = false; _setCursor('move');
     } else {
-      CS.draggingNode = null;
-      _isPanning = true;
-      CS.didDrag = false;
+      CS.draggingNode = null; _isPanning = true; CS.didDrag = false;
       _dragStart = { x: e.clientX - CS.panX, y: e.clientY - CS.panY };
-      canvas.style.cursor = 'grabbing';
+      _setCursor('grabbing');
     }
     e.preventDefault();
-  });
+  }, true);
 
   window.addEventListener('mousemove', (e) => {
     _lastMouse = { x: e.clientX, y: e.clientY };
-    const rect = canvas.getBoundingClientRect();
-
     if (CS.draggingNode) {
-      const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-      const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+      const { wx, wy } = _toWorld(e);
       CS.draggingNode.cx = wx - (CS.draggingNode.driftX || 0);
       CS.draggingNode.cy = wy - (CS.draggingNode.driftY || 0);
-      CS.didDrag = true;
-      drawCircuit();
-      return;
+      CS.didDrag = true; drawCircuit(); return;
     }
     if (_isPanning) {
       CS.panX = e.clientX - _dragStart.x;
       CS.panY = e.clientY - _dragStart.y;
-      if (Math.abs(e.clientX - (_dragStart.x + CS.panX)) > 2 ||
-          Math.abs(e.clientY - (_dragStart.y + CS.panY)) > 2) CS.didDrag = true;
-      CS.didDrag = true;
-      drawCircuit();
-      return;
+      CS.didDrag = true; drawCircuit(); return;
     }
-
-    // Hover hit-test
-    const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-    const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+    if (!_inCanvas(e)) return;
+    const { wx, wy } = _toWorld(e);
     const found = hitTestNodeW(wx, wy);
     if (found !== CS.hoveredNode) {
-      CS.hoveredNode  = found;
-      CS.connectedSet = getConnected(found);
-      canvas.style.cursor = found ? 'pointer' : 'grab';
+      CS.hoveredNode = found; CS.connectedSet = getConnected(found);
+      _setCursor(found ? 'pointer' : 'grab');
       const tt = document.getElementById('node-tooltip');
       if (found) {
         tt.classList.add('visible');
@@ -2898,27 +2875,25 @@ function initCircuit() {
         document.getElementById('tt-size').textContent = found.dir ? `ITEMS: ${found.children||0}` : 'SIZE: ' + fmtSize(found.size||0);
         document.getElementById('tt-modified').textContent = '';
         document.getElementById('tt-path').textContent = found.path || '';
-      } else {
-        tt.classList.remove('visible');
-      }
+      } else { tt.classList.remove('visible'); }
       drawCircuit();
     }
     if (found) {
       const tt = document.getElementById('node-tooltip');
-      tt.style.left = Math.min(e.clientX + 16, window.innerWidth  - 320) + 'px';
+      tt.style.left = Math.min(e.clientX + 16, window.innerWidth - 320) + 'px';
       tt.style.top  = Math.min(e.clientY + 16, window.innerHeight - 130) + 'px';
     }
   });
 
-  window.addEventListener('mouseup', (e) => {
-    if (CS.draggingNode) { CS.draggingNode = null; canvas.style.cursor = CS.hoveredNode ? 'pointer' : 'grab'; return; }
-    _isPanning = false;
-    CS.dragging = false;
-    canvas.style.cursor = CS.hoveredNode ? 'pointer' : 'grab';
+  window.addEventListener('mouseup', () => {
+    if (CS.draggingNode) { CS.draggingNode = null; _setCursor(CS.hoveredNode ? 'pointer' : 'grab'); return; }
+    _isPanning = false; CS.dragging = false;
+    _setCursor(CS.hoveredNode ? 'pointer' : 'grab');
   });
 
   // ─── CLICK ────────────────────────────────────────
-  canvas.addEventListener('click', (e) => {
+  window.addEventListener('click', (e) => {
+    if (!_inCanvas(e)) return;
     if (CS.didDrag) { CS.didDrag = false; return; }
     document.getElementById('project-actions').classList.remove('visible');
 
@@ -2983,7 +2958,8 @@ function initCircuit() {
   });
 
   // ─── DOUBLE-CLICK (drill into directory) ──────────
-  canvas.addEventListener('dblclick', (e) => {
+  window.addEventListener('dblclick', (e) => {
+    if (!_inCanvas(e)) return;
     const rect = canvas.getBoundingClientRect();
     const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
     const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
@@ -3031,7 +3007,8 @@ function initCircuit() {
   });
 
   // ─── RIGHT-CLICK (node + empty canvas, unified) ───
-  canvas.addEventListener('contextmenu', (e) => {
+  window.addEventListener('contextmenu', (e) => {
+    if (!_inCanvas(e)) return;
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
@@ -3067,9 +3044,10 @@ function initCircuit() {
   });
 
   // ─── SCROLL ZOOM ──────────────────────────────────
-  canvas.addEventListener('wheel', (e) => {
+  window.addEventListener('wheel', (e) => {
+    if (!_inCanvas(e)) return;
     e.preventDefault();
-    const rect  = canvas.getBoundingClientRect();
+    const rect  = _canvasRect();
     const mx    = e.clientX - rect.left;
     const my    = e.clientY - rect.top;
     const factor = e.deltaY < 0 ? 1.12 : 0.90;
@@ -3080,7 +3058,7 @@ function initCircuit() {
     CS.zoom     = nz;
     updateZoom();
     drawCircuit();
-  }, { passive: false });
+  }, { passive: false, capture: true });
 
 
   // ─── KEYBOARD SHORTCUTS ───────────────────────────
@@ -3587,7 +3565,6 @@ function drawCircuit() {
   ctx.restore();
 
   drawHUD(canvas, w, h, visibleCount);
-  drawMinimap(canvas, w, h);
 
   if (_ripples.length) {
     const rctx = canvas.getContext('2d');
