@@ -436,9 +436,14 @@
     position: relative;
     overflow: hidden;
     cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .canvas-wrap:active { cursor: grabbing; }
-  .canvas-wrap canvas { position: absolute; top: 0; left: 0; }
+  .canvas-wrap canvas {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none; /* wrap receives all mouse events */
+  }
 
   /* Loading overlay */
   .loading-overlay {
@@ -2164,14 +2169,20 @@
 
 <!-- Right-click context menu -->
 <div class="context-menu" id="context-menu">
+  <div class="ctxmenu-option" id="ctx-node-label" style="font-size:9px;color:var(--accent);padding:5px 14px 3px;cursor:default;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;"></div>
+  <div class="ctx-sep" style="margin-top:0;"></div>
   <div class="ctxmenu-option" onclick="ctxOpenExplorer()"><span class="ctx-icon">&#128194;</span>Open in Explorer</div>
-  <div class="ctxmenu-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze this file</div>
+  <div class="ctxmenu-option" id="ctx-open-file" onclick="ctxOpenFile()"><span class="ctx-icon">&#128065;</span>Open file</div>
+  <div class="ctxmenu-option" onclick="ctxZoomTo()"><span class="ctx-icon">&#8982;</span>Zoom to node</div>
+  <div class="ctx-sep"></div>
+  <div class="ctxmenu-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze with AI</div>
+  <div class="ctxmenu-option" id="ctx-drill" onclick="ctxDrillIn()"><span class="ctx-icon">&#128448;</span>Drill into folder</div>
   <div class="ctxmenu-option" id="ctx-upload-vault" onclick="ctxUploadToVault()"><span class="ctx-icon">&#9729;</span>Upload to Cloud Vault</div>
   <div class="ctx-sep"></div>
-  <div class="ctxmenu-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
-  <div class="ctxmenu-option" onclick="ctxMoveTo()"><span class="ctx-icon">&#10132;</span>Move to...</div>
+  <div class="ctxmenu-option" onclick="ctxCopyName()"><span class="ctx-icon">&#128221;</span>Copy filename</div>
+  <div class="ctxmenu-option" onclick="ctxCopyPath()"><span class="ctx-icon">&#128203;</span>Copy full path</div>
   <div class="ctx-sep"></div>
-  <div class="ctxmenu-option" onclick="ctxCopyPath()"><span class="ctx-icon">&#128203;</span>Copy path</div>
+  <div class="ctxmenu-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
 </div>
 
 <!-- Toast container -->
@@ -2542,6 +2553,12 @@ let currentVaultPath = '';
 let ctxNode = null;
 let currentViewMode = 'vault'; // 'vault' | 'project' | 'agent'
 
+// Close context menu on any click outside it
+document.addEventListener('click', (e) => {
+  const cm = document.getElementById('context-menu');
+  if (cm && !cm.contains(e.target)) cm.classList.remove('open');
+}, true);
+
 // ════════════════════════════════════════════════════
 // SPAWNED AGENTS SYSTEM
 // ════════════════════════════════════════════════════
@@ -2664,22 +2681,24 @@ function initCircuit() {
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // ── Ensure canvas sits above all overlays for events ──
-  canvas.style.zIndex = '1';
-  canvas.style.pointerEvents = 'auto';
+  // ── wrap receives all pointer events; canvas is display-only ──
+  canvas.style.zIndex = '0';
+  wrap.style.zIndex   = '1';
+  wrap.style.pointerEvents = 'auto';
 
   // ─── PAN ──────────────────────────────────────────
   let _lastMouse = { x: 0, y: 0 };
 
-  canvas.addEventListener('mousedown', (e) => {
+  wrap.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    document.getElementById('context-menu').classList.remove('open');
     CS.dragging  = true;
     CS.didDrag   = false;
     CS._dragOriX = e.clientX;
     CS._dragOriY = e.clientY;
     CS._panSX    = CS.panX;
     CS._panSY    = CS.panY;
-    canvas.style.cursor = 'grabbing';
+    wrap.style.cursor = 'grabbing';
     e.preventDefault();
   });
 
@@ -2702,7 +2721,7 @@ function initCircuit() {
     if (found !== CS.hoveredNode) {
       CS.hoveredNode  = found;
       CS.connectedSet = getConnected(found);
-      canvas.style.cursor = found ? 'pointer' : 'grab';
+      wrap.style.cursor = found ? 'pointer' : 'grab';
       const tt = document.getElementById('node-tooltip');
       if (found) {
         tt.classList.add('visible');
@@ -2726,11 +2745,11 @@ function initCircuit() {
   window.addEventListener('mouseup', (e) => {
     if (!CS.dragging) return;
     CS.dragging = false;
-    canvas.style.cursor = CS.hoveredNode ? 'pointer' : 'grab';
+    wrap.style.cursor = CS.hoveredNode ? 'pointer' : 'grab';
   });
 
   // ─── CLICK ────────────────────────────────────────
-  canvas.addEventListener('click', (e) => {
+  wrap.addEventListener('click', (e) => {
     if (CS.didDrag) { CS.didDrag = false; return; }
     document.getElementById('project-actions').classList.remove('visible');
 
@@ -2809,7 +2828,7 @@ function initCircuit() {
   });
 
   // ─── RIGHT-CLICK ──────────────────────────────────
-  canvas.addEventListener('contextmenu', (e) => {
+  wrap.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
     const node = hitTestNode(cx, cy) || CS.hoveredNode;
@@ -2819,10 +2838,20 @@ function initCircuit() {
     CS.highlightPath = getPathToRoot(node);
     drawCircuit();
     const cm = document.getElementById('context-menu');
-    cm.style.left = e.clientX + 'px';
-    cm.style.top  = e.clientY + 'px';
-    const up = document.getElementById('ctx-upload-vault');
-    if (up) up.style.display = node.isRoot ? 'none' : 'flex';
+    // Clamp so menu doesn't go off-screen
+    const cmW = 200, cmH = 280;
+    cm.style.left = Math.min(e.clientX, window.innerWidth  - cmW) + 'px';
+    cm.style.top  = Math.min(e.clientY, window.innerHeight - cmH) + 'px';
+    // Populate header label
+    const lbl = document.getElementById('ctx-node-label');
+    if (lbl) lbl.textContent = node.isRoot ? '/ ROOT' : node.name;
+    // Show/hide context-specific options
+    const up   = document.getElementById('ctx-upload-vault');
+    const drll = document.getElementById('ctx-drill');
+    const opn  = document.getElementById('ctx-open-file');
+    if (up)   up.style.display   = node.isRoot ? 'none' : 'flex';
+    if (drll) drll.style.display = (node.dir && !node.isRoot) ? 'flex' : 'none';
+    if (opn)  opn.style.display  = (!node.dir) ? 'flex' : 'none';
     cm.classList.add('open');
   });
 
@@ -2983,7 +3012,28 @@ function radialLayout(nodes, edges) {
     });
   }
 
-  place(root.id, centerX, centerY, 0, 0, Math.PI * 2);
+  // ── Pre-sort root's direct children into type sectors ──
+  // Sorted children placed sequentially = angular clusters by type
+  const _rootKids = childMap[root.id];
+  if (_rootKids && _rootKids.length > 1) {
+    const _typeRank = n => {
+      if (!n) return 99;
+      if (n.dir || n.type === 'directory') return 0;
+      const _e = (n.name.split('.').pop() || '').toLowerCase();
+      if (['py','js','ts','jsx','tsx','go','rs','cpp','c','h','java','rb','php','swift','kt','cs'].includes(_e)) return 1;
+      if (['json','yaml','yml','env','toml','cfg','ini','xml','properties'].includes(_e)) return 2;
+      if (['md','txt','rst','log'].includes(_e)) return 3;
+      if (['png','jpg','jpeg','svg','gif','ico','mp4','mp3','wav','webp','pdf'].includes(_e)) return 4;
+      return 5;
+    };
+    _rootKids.sort((a, b) => {
+      const na = nodes.find(n => n.id === a);
+      const nb = nodes.find(n => n.id === b);
+      return _typeRank(na) - _typeRank(nb);
+    });
+  }
+
+  place(root.id, centerX, centerY, 0, -Math.PI / 2, Math.PI * 2 + (-Math.PI / 2));
 
   // Phase 2: Force relaxation (50 iterations)
   for (let iter = 0; iter < 50; iter++) {
@@ -3595,6 +3645,44 @@ function ctxMoveTo() { showToast('Move to... (coming soon)', 'info'); }
 function ctxCopyPath() {
   if (!ctxNode) return;
   navigator.clipboard.writeText(ctxNode.path || ctxNode.name).then(() => showToast('Path copied', 'success'));
+}
+function ctxCopyName() {
+  if (!ctxNode) return;
+  navigator.clipboard.writeText(ctxNode.name).then(() => showToast('Filename copied: ' + ctxNode.name, 'success'));
+}
+function ctxOpenFile() {
+  if (!ctxNode || ctxNode.dir) return;
+  if (window.aether?.openFile && ctxNode.path) window.aether.openFile(ctxNode.path);
+  else showToast('Cannot open: ' + ctxNode.name, 'info');
+}
+function ctxZoomTo() {
+  if (!ctxNode) return;
+  const wrap = document.getElementById('canvas-wrap');
+  const tw = wrap?.clientWidth || 900, th = wrap?.clientHeight || 600;
+  CS.zoom = ctxNode.isRoot ? 1.0 : 1.6;
+  const nx = ctxNode.cx + (ctxNode.driftX || 0);
+  const ny = ctxNode.cy + (ctxNode.driftY || 0);
+  CS.panX = tw / 2 - nx * CS.zoom;
+  CS.panY = th / 2 - ny * CS.zoom;
+  updateZoom();
+  drawCircuit();
+  showToast('Zoomed to ' + ctxNode.name, 'info');
+}
+function ctxDrillIn() {
+  if (!ctxNode || ctxNode.isRoot) return;
+  if (!ctxNode.dir) return;
+  const kids = CS.edgeFromMap[ctxNode.id] || [];
+  CS.highlightPath = [ctxNode.id, ...kids];
+  const wrap = document.getElementById('canvas-wrap');
+  const tw = wrap?.clientWidth || 900, th = wrap?.clientHeight || 600;
+  CS.zoom = 2.2;
+  const nx = ctxNode.cx + (ctxNode.driftX || 0);
+  const ny = ctxNode.cy + (ctxNode.driftY || 0);
+  CS.panX = tw / 2 - nx * CS.zoom;
+  CS.panY = th / 2 - ny * CS.zoom;
+  updateZoom();
+  drawCircuit();
+  showToast(`\uD83D\uDCC1 ${ctxNode.name} — ${kids.length} items`, 'info');
 }
 function ctxUploadToVault() {
   if (!ctxNode || !ctxNode.path) return;
