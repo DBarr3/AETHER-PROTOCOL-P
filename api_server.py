@@ -417,7 +417,7 @@ app = FastAPI(
 
 # CORS: allow Electron renderer (file://), localhost, and VPS origins.
 # Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
-# Example: AETHER_ALLOWED_ORIGINS="198.211.115.41 143.198.162.111"
+# Example: AETHER_ALLOWED_ORIGINS="<VPS2_IP> <VPS1_IP>"
 _cors_base = r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)"
 _extra_ips = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
 _cors_parts = [_cors_base] + [rf"|http://{re.escape(ip)}(:\d+)?" for ip in _extra_ips]
@@ -2006,7 +2006,7 @@ async def routing_check():
     """
     return {
         "server": "VPS2",
-        "ip": "198.211.115.41",
+        "ip": os.environ.get("AETHER_VPS2_IP", "unknown"),
         "port": int(os.environ.get("AETHER_BIND_PORT", 8080)),
         "protocol_c": "ACTIVE",
         "anthropic_key_set": bool(get_anthropic_key()),

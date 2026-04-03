@@ -40,8 +40,11 @@ ibm_credentials.json
 *.crt
 *.cer
 env.py
-*.env
+*.env*
 !.env.example
+
+# Claude Code local state (worktrees, session data) — never commit
+.claude/
 secrets.json
 *_secret*
 *_private*

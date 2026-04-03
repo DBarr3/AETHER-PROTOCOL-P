@@ -15,7 +15,7 @@ logger = logging.getLogger("aether.mcp.breach")
 
 class BreachAlerter:
     def __init__(self, node_auth=None):
-        self.vps2_url = os.getenv("VPS2_ALERT_ENDPOINT", "http://198.211.115.41/agent/breach-alert")
+        self.vps2_url = os.getenv("VPS2_ALERT_ENDPOINT", "")  # Must be set in env — no default IP
         self.alert_key = os.getenv("MCP_ALERT_KEY", "")
         self._node_auth = node_auth
 
