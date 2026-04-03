@@ -17,11 +17,22 @@ const path     = require('path');
 const fs       = require('fs');
 
 // ── Encryption key derivation ────────────────────────
-// Derive a deterministic encryption key from the machine-specific userData path.
-// This ties the encrypted store to this machine's user profile.
+// Derive a deterministic encryption key using the hardware machine ID
+// (same source as auth-store.js) mixed with the app's userData path.
+// This ties the encrypted store to both the machine AND the user profile.
 function deriveEncryptionKey() {
-  const seed = app.getPath('userData');
-  return crypto.createHash('sha256').update(seed).digest('hex');
+  try {
+    const { machineIdSync } = require('node-machine-id');
+    const machineId = machineIdSync({ original: true });
+    const userData  = app.getPath('userData');
+    return crypto.createHash('sha256')
+      .update(machineId + ':' + userData)
+      .digest('hex');
+  } catch (_) {
+    // Fallback if node-machine-id is unavailable (should not happen in packaged app)
+    const userData = app.getPath('userData');
+    return crypto.createHash('sha256').update(userData).digest('hex');
+  }
 }
 
 // ── Lazy-init store (electron-store requires app to be ready) ──

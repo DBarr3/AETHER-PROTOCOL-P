@@ -87,30 +87,17 @@ async function apiFetch(endpoint, options = {}) {
   try {
     let resp = await fetch(url, { ...options, headers });
 
-    // Auto re-login on 401 (server session expired / process restarted)
+    // On 401: clear cached token and redirect to login (never store/replay passwords)
     if (resp.status === 401 && !endpoint.includes('/auth/login')) {
-      console.warn('[apiFetch] 401 received, attempting re-login...');
+      console.warn('[apiFetch] 401 — session expired, redirecting to login');
+      _cachedToken = null;
+      localStorage.removeItem('aether_session');
+      sessionStorage.removeItem('aether_session');
       try {
-        const auth = await ipcRenderer.invoke('auth:get');
-        if (auth?.userId && auth?.accessKey) {
-          const loginResp = await fetch(`${API_BASE}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: auth.userId, password: auth.accessKey }),
-          });
-          const loginResult = await loginResp.json();
-          if (loginResult.authenticated && loginResult.session_token) {
-            _cachedToken = loginResult.session_token;
-            localStorage.setItem('aether_session', loginResult.session_token);
-            await ipcRenderer.invoke('auth:set', { ...auth, sessionToken: loginResult.session_token });
-            headers['Authorization'] = `Bearer ${loginResult.session_token}`;
-            console.log('[apiFetch] Re-login successful, retrying request...');
-            resp = await fetch(url, { ...options, headers });
-          }
-        }
-      } catch (reLoginErr) {
-        console.error('[apiFetch] Re-login failed:', reLoginErr.message);
-      }
+        // Clear stored session token so restore attempt doesn't loop
+        await ipcRenderer.invoke('auth:set', { sessionToken: null });
+      } catch (_) { /* ignore */ }
+      ipcRenderer.send('navigate', 'login');
     }
 
     if (!resp.ok) {

@@ -22,6 +22,8 @@ const authStore = new Store({
         serverUrl: { type: 'string' },
         licenseKey: { type: 'string' },
         plan: { type: 'string' },
+        // NOTE: accessKey (password) is intentionally NOT stored — passwords are never persisted.
+        // Session renewal is handled by redirecting to login on 401.
     },
 });
 

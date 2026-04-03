@@ -283,7 +283,27 @@ ipcMain.handle('browse-folder', async () => {
 });
 
 // ── IPC: Shell ───────────────────────────────────────
-ipcMain.on('shell:openExternal', (_e, url) => shell.openExternal(url));
+// Whitelist external URLs — only allow known Aether Systems domains
+const ALLOWED_EXTERNAL_HOSTS = new Set([
+  'aethersystems.net',
+  'aethersystems.io',
+  'aethersecurity.net',
+]);
+function isSafeExternalUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return [...ALLOWED_EXTERNAL_HOSTS].some(h => host === h || host.endsWith('.' + h));
+  } catch { return false; }
+}
+ipcMain.on('shell:openExternal', (_e, url) => {
+  if (isSafeExternalUrl(url)) {
+    shell.openExternal(url);
+  } else {
+    console.warn('[AetherCloud] Blocked external URL (not in allowlist):', url);
+  }
+});
 ipcMain.handle('open-file', async (_e, filePath) => {
   try { await shell.openPath(filePath); return { success: true }; }
   catch (err) { return { success: false, error: err.message }; }
@@ -669,7 +689,16 @@ ipcMain.handle('cache:clear', (_e, dirPath) => {
 const LICENSE_SERVER = process.env.AETHER_LICENSE_SERVER || 'https://license.aethersystems.net/api/license';
 const ADMIN_KEY = process.env.AETHER_ADMIN_KEY || '';
 
+// Guard: admin calls require a non-empty ADMIN_KEY configured on this machine.
+// ADMIN_KEY is only available in process.env (main process) — never sent to renderer.
+function assertAdminKeySet() {
+  if (!ADMIN_KEY) {
+    throw new Error('Admin operations require AETHER_ADMIN_KEY to be set in the environment.');
+  }
+}
+
 async function adminFetch(endpoint, options = {}) {
+  assertAdminKeySet();
   const url = `${LICENSE_SERVER}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',

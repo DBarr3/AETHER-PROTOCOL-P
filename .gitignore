@@ -29,29 +29,60 @@ data/
 vault_data/
 *.db
 
-# Credentials & Secrets
+# Credentials & Secrets — never commit these
 config/credentials.json
 ibm_credentials.json
 *.pem
 *.key
+*.p12
+*.pfx
+*.der
+*.crt
+*.cer
 env.py
 *.env
 !.env.example
+secrets.json
+*_secret*
+*_private*
 
 # WireGuard keys — never commit
 deploy/wg/mesh-keys.txt
 deploy/wg/*.private
 deploy/wg/*.public
+deploy/wg/*.conf
 
 # PyInstaller backend build output
 desktop/backend/
 
 # Electron release builds
 desktop/release/
+desktop/dist/
 
 # Audit / crypto runtime data
 crypto/
 
-# OS
+# Python logs
+*.log
+logs/
+
+# Tailscale / VPN state
+tailscale-state/
+
+# macOS / OS
 .DS_Store
 Thumbs.db
+
+# Test user vault data — never commit real user data
+vault/alice/
+vault/bob/
+vault/carol/
+vault/dave/
+vault/testuser/
+vault/victim/
+
+# node_modules (belt-and-suspenders; desktop/.gitignore also covers this)
+desktop/node_modules/
+
+# electron-store encrypted data files
+*.json.locked

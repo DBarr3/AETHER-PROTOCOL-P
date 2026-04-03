@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AetherCloud-L</title>
+<title>Aether AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -270,7 +270,7 @@
 </div>
 
 <div class="title-bar">
-  <span class="title-bar-text" id="title-bar-version">AetherCloud-L</span>
+  <span class="title-bar-text" id="title-bar-version">Aether AI</span>
   <div class="title-bar-controls">
     <button class="title-bar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="title-bar-btn close" onclick="window.aether?.close()">&#10005;</button>
@@ -287,11 +287,18 @@
         <line x1="16" y1="23" x2="16" y2="26" stroke="#00d4ff" stroke-width="1.5"/>
       </svg>
     </div>
-    <div class="app-title">AetherCloud-L</div>
+    <div class="app-title">Aether AI</div>
     <div class="app-tagline">Quantum-secured file intelligence</div>
   </div>
 
   <div class="login-form">
+    <!-- License key field — shown on first-time setup; hidden after first successful auth -->
+    <div class="field" id="license-field" style="display:none;">
+      <label>License Key</label>
+      <input type="text" id="license-key" placeholder="AETH-CLD-XXXX-XXXX-XXXX" autocomplete="off"
+             style="font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;font-size:12px;"
+             onkeydown="if(event.key==='Enter')handleLogin()">
+    </div>
     <div class="field">
       <label>Vault Identifier</label>
       <input type="text" id="username" placeholder="Enter username" autocomplete="off">
@@ -303,7 +310,7 @@
     </div>
     <div class="field-row">
       <label class="remember-check">
-        <input type="checkbox"> Keep session active
+        <input type="checkbox" id="remember-me" checked> Keep session active
       </label>
       <span class="forgot-link">Reset key</span>
     </div>
@@ -321,10 +328,7 @@
 </div>
 
 <script>
-// ── DEV MODE — set to false for production ───────
-const DEV_MODE = false;
-
-// Helper: fetch with explicit timeout
+// ── Helper: fetch with explicit timeout ──────────
 async function fetchWithTimeout(url, timeoutMs, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -334,9 +338,7 @@ async function fetchWithTimeout(url, timeoutMs, options = {}) {
     return res;
   } catch (err) {
     clearTimeout(timeout);
-    if (err.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeoutMs}ms`);
-    }
+    if (err.name === 'AbortError') throw new Error(`Request timed out after ${timeoutMs}ms`);
     throw err;
   }
 }
@@ -347,28 +349,26 @@ async function getApiBase() {
   return 'https://api.aethersystems.net/cloud';
 }
 
-async function handleLogin() {
-  // Dev mode: skip VPS, store fake token, auto-navigate
-  if (DEV_MODE) {
-    const devUser = document.getElementById('username').value.trim() || 'dev';
-    localStorage.setItem('aether_session', 'dev-token-' + Date.now());
-    localStorage.setItem('aether_commitment', 'dev-mode');
-    localStorage.setItem('aether_user', devUser);
-    showStatus('DEV MODE — BYPASSING AUTH', 'ok');
-    await new Promise(r => setTimeout(r, 300));
-    if (window.aether?.navigate) {
-      window.aether.navigate('dashboard');
-    } else {
-      window.location.href = 'dashboard.html';
-    }
-    return;
-  }
+// ── Whether license key field is currently visible (first-time setup) ──
+let _firstTimeSetup = false;
 
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
+async function handleLogin() {
+  const username    = document.getElementById('username').value.trim();
+  const password    = document.getElementById('password').value;
+  const rememberMe  = document.getElementById('remember-me').checked;
+  const licenseKey  = _firstTimeSetup
+    ? document.getElementById('license-key').value.trim()
+    : (await window.aetherAPI?.authGet?.())?.licenseKey || '';
 
   if (!username || !password) {
     showStatus('VAULT IDENTIFIER AND ACCESS KEY REQUIRED', 'error');
+    return;
+  }
+
+  // On first-time setup, license key is mandatory
+  if (_firstTimeSetup && !licenseKey) {
+    showStatus('LICENSE KEY REQUIRED FOR FIRST-TIME SETUP', 'error');
+    document.getElementById('license-key').focus();
     return;
   }
 
@@ -379,13 +379,16 @@ async function handleLogin() {
 
   try {
     let result;
+    const payload = { username, password };
+    if (licenseKey) payload.license_key = licenseKey;
+
     if (window.aetherAPI?.login) {
       result = await window.aetherAPI.login(username, password);
     } else {
       const r = await fetchWithTimeout(`${API_BASE}/auth/login`, 10000, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(payload),
       });
       result = await r.json();
     }
@@ -397,19 +400,28 @@ async function handleLogin() {
     }
 
     if (result.authenticated && result.session_token) {
-      // Persist to electron-store (survives window navigation)
+      // Persist to electron-store — NEVER store the plaintext password
       if (window.aetherAPI?.authSet) {
         await window.aetherAPI.authSet({
-          sessionToken: result.session_token,
-          userId: username,
-          accessKey: password,
-          lastLogin: new Date().toISOString(),
+          sessionToken: rememberMe ? result.session_token : null,
+          userId:       rememberMe ? username : null,
+          rememberMe,
+          lastLogin:    new Date().toISOString(),
+          licenseKey:   licenseKey || undefined,
+          plan:         result.plan || undefined,
         });
       }
-      // Also keep localStorage for same-window fallback
-      localStorage.setItem('aether_session', result.session_token);
+      // Keep localStorage for same-window session (cleared on tab/window close if !rememberMe)
+      if (rememberMe) {
+        localStorage.setItem('aether_session', result.session_token);
+        localStorage.setItem('aether_user', username);
+      } else {
+        sessionStorage.setItem('aether_session', result.session_token);
+        sessionStorage.setItem('aether_user', username);
+        localStorage.removeItem('aether_session');
+        localStorage.removeItem('aether_user');
+      }
       localStorage.setItem('aether_commitment', result.commitment_hash || '');
-      localStorage.setItem('aether_user', username);
 
       showStatus('SESSION AUTHENTICATED — LOADING VAULT', 'ok');
       await new Promise(r => setTimeout(r, 500));
@@ -422,9 +434,11 @@ async function handleLogin() {
     } else {
       const reason = result.reason || result.detail || 'INVALID CREDENTIALS';
       let msg = 'AUTHENTICATION FAILED';
-      if (reason === 'USER_NOT_FOUND') msg = 'USER NOT FOUND — CHECK VAULT IDENTIFIER';
+      if (reason === 'USER_NOT_FOUND')      msg = 'USER NOT FOUND — CHECK VAULT IDENTIFIER';
       else if (reason === 'INVALID_PASSWORD') msg = 'INVALID ACCESS KEY';
-      else if (reason === 'ACCOUNT_LOCKED') msg = 'ACCOUNT LOCKED — TOO MANY ATTEMPTS';
+      else if (reason === 'ACCOUNT_LOCKED')   msg = 'ACCOUNT LOCKED — TOO MANY ATTEMPTS';
+      else if (reason === 'LICENSE_INVALID')  msg = 'INVALID LICENSE KEY';
+      else if (reason === 'LICENSE_EXPIRED')  msg = 'LICENSE EXPIRED — RENEW AT aethersystems.io';
       else msg += ' — ' + reason;
       showStatus(msg, 'error');
       setLoading(false);
@@ -450,26 +464,54 @@ function showStatus(msg, type) {
   el.textContent = msg;
 }
 
-// ── Init: auth health check ─────────────────────
+// ── Session restore — if rememberMe was set and token still valid, skip login ──
+async function tryRestoreSession() {
+  try {
+    if (!window.aetherAPI?.authGet) return false;
+    const auth = await window.aetherAPI.authGet();
+    if (!auth?.rememberMe || !auth?.sessionToken || !auth?.userId) return false;
+
+    showStatus('Restoring session...', 'info');
+    const API_BASE = await getApiBase();
+    const r = await fetchWithTimeout(`${API_BASE}/auth/verify`, 5000, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.sessionToken}` },
+      body: JSON.stringify({ session_token: auth.sessionToken }),
+    });
+    const result = await r.json();
+    if (result.valid) {
+      localStorage.setItem('aether_session', auth.sessionToken);
+      localStorage.setItem('aether_user', auth.userId);
+      showStatus('SESSION RESTORED — LOADING VAULT', 'ok');
+      await new Promise(res => setTimeout(res, 400));
+      if (window.aether?.navigate) window.aether.navigate('dashboard');
+      else window.location.href = 'dashboard.html';
+      return true;
+    }
+    // Token expired — clear it silently so user re-authenticates
+    await window.aetherAPI.authSet({ sessionToken: null });
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ── Init: connection health check ───────────────
 async function initLoginScreen() {
   const API_BASE = await getApiBase();
-  const dot = document.getElementById('dot-vps');
+  const dot     = document.getElementById('dot-vps');
   const dotAuth = document.getElementById('dot-auth');
 
-  // Dev mode auto-login
-  if (DEV_MODE) {
-    showStatus('DEV MODE ACTIVE — AUTO-LOGIN', 'info');
-    await new Promise(r => setTimeout(r, 400));
-    handleLogin();
-    return;
-  }
+  showStatus('Connecting to Aether AI...', 'info');
 
-  showStatus('Connecting to AetherCloud...', 'info');
+  // First try to restore a remembered session before showing the form
+  const restored = await tryRestoreSession();
+  if (restored) return;
 
   // Step 1: Check auth health endpoint
   try {
     const healthRes = await fetchWithTimeout(`${API_BASE}/auth/health`, 8000);
-    const health = await healthRes.json();
+    const health    = await healthRes.json();
 
     if (dot) dot.style.background = '#22c55e';
 
@@ -481,8 +523,11 @@ async function initLoginScreen() {
 
     if (dotAuth) dotAuth.style.background = '#22c55e';
 
+    // First-time setup: require license key
     if (health.needs_setup) {
-      showStatus('FIRST-TIME SETUP — CREATE AN ACCOUNT', 'info');
+      _firstTimeSetup = true;
+      document.getElementById('license-field').style.display = '';
+      showStatus('FIRST-TIME SETUP — LICENSE KEY REQUIRED', 'info');
       return;
     }
 
@@ -491,42 +536,33 @@ async function initLoginScreen() {
   } catch (err) {
     if (dot) dot.style.background = '#ef4444';
     if (dotAuth) dotAuth.style.background = '#ef4444';
-
     // Fallback: try /status endpoint
     try {
       const statusRes = await fetchWithTimeout(`${API_BASE}/status`, 5000);
-      const status = await statusRes.json();
+      const status    = await statusRes.json();
       if (status && !status.error) {
         if (dot) dot.style.background = '#22c55e';
         showStatus('Connected — enter credentials', '');
         return;
       }
     } catch {}
-
     showStatus('CANNOT REACH BACKEND — CHECK CONNECTION', 'error');
   }
 }
 
-// ── Update banner check ─────────────────────────────
+// ── Update banner check ─────────────────────────
 async function checkUpdateBanner() {
   try {
     if (!window.aether?.getUpdateInfo) return;
     const info = await window.aether.getUpdateInfo();
     if (!info) return;
-
-    // Always set the live version in the title bar
     const titleEl = document.getElementById('title-bar-version');
-    if (titleEl && info.currentVersion) {
-      titleEl.textContent = `AetherCloud-L v${info.currentVersion}`;
-    }
-
+    if (titleEl && info.currentVersion) titleEl.textContent = `Aether AI v${info.currentVersion}`;
     if (!info.updateAvailable) return;
-
     const curEl = document.getElementById('update-current-ver');
     const latEl = document.getElementById('update-latest-ver');
     if (curEl) curEl.textContent = `v${info.currentVersion}`;
     if (latEl) latEl.textContent = `v${info.latestVersion}`;
-
     const banner = document.getElementById('update-banner');
     if (banner) banner.classList.add('visible');
   } catch (_) { /* non-fatal */ }

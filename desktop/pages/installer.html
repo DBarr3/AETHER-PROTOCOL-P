@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AetherCloud-L Installer</title>
+<title>Aether AI Installer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -483,7 +483,7 @@
 
 <!-- Electron title bar -->
 <div class="title-bar" id="title-bar">
-  <span class="title-bar-text">AetherCloud-L Installer</span>
+  <span class="title-bar-text">Aether AI Installer</span>
   <div class="title-bar-controls">
     <button class="title-bar-btn" onclick="window.aether?.minimize()">&#x2500;</button>
     <button class="title-bar-btn close" onclick="window.aether?.close()">&#x2715;</button>
@@ -494,8 +494,8 @@
   <!-- Header -->
   <div class="header">
     <div class="logo-mark"></div>
-    <span class="app-name">AetherCloud-L</span>
-    <span class="app-version">v0.7.0</span>
+    <span class="app-name">Aether AI</span>
+    <span class="app-version">v0.9.4</span>
   </div>
 
   <!-- Steps -->
@@ -579,7 +579,7 @@
       <div class="panel">
         <div class="panel-label">Install Location</div>
         <div class="location-row">
-          <input class="location-input" id="install-path" value="C:\Program Files\AetherCloud-L" type="text">
+          <input class="location-input" id="install-path" value="C:\Program Files\Aether AI" type="text">
           <button class="browse-btn" onclick="browsePath()">Browse</button>
         </div>
         <div class="space-info">
@@ -593,13 +593,13 @@
           <div class="req-item done">
             <span class="req-icon">&#x2713;</span>
             <span class="req-name">Core Application</span>
-            <span class="req-version">v0.7.0</span>
+            <span class="req-version">v0.9.4</span>
             <span class="req-size">12 MB</span>
           </div>
           <div class="req-item done">
             <span class="req-icon">&#x2713;</span>
             <span class="req-name">Protocol-C Engine</span>
-            <span class="req-version">v0.7.0</span>
+            <span class="req-version">v0.9.4</span>
             <span class="req-size">8 MB</span>
           </div>
           <div class="req-item pending">
@@ -682,7 +682,7 @@
         <div class="complete-center">
           <div class="complete-checkmark">&#x2713;</div>
           <div class="complete-title">Installation Complete</div>
-          <div class="complete-sub">AetherCloud-L v0.7.0 installed successfully.</div>
+          <div class="complete-sub">Aether AI v0.9.4 installed successfully.</div>
           <div class="complete-checks">
             <div><span>&#x2713;</span> Protocol-C engine active</div>
             <div><span>&#x2713;</span> 410 tests verified</div>
@@ -796,7 +796,7 @@ function showPage(n) {
 
 async function handleNext() {
   if (currentPage === 4) {
-    addLog('Launching AetherCloud-L...', 'info');
+    addLog('Launching Aether AI...', 'info');
     if (window.aether) { window.aether.navigate('login'); } else { window.location.href = 'login.html'; }
     return;
   }
@@ -827,7 +827,7 @@ function showPermissionDenied() {
     var msg = document.createElement('div');
     msg.id = 'permission-msg';
     msg.style.cssText = 'font-size:11px;color:var(--red);text-align:center;margin-top:8px;font-family:Inter,sans-serif;';
-    msg.textContent = 'AetherCloud-L requires file access to function. Click Install and allow access.';
+    msg.textContent = 'Aether AI requires file access to function. Click Install and allow access.';
     document.getElementById('btn-next').parentNode.appendChild(msg);
   }
 }
@@ -905,6 +905,20 @@ async function startInstall() {
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+// ── Load live version from Electron IPC ─────────
+(async function loadVersion() {
+  try {
+    if (!window.aether?.getVersion) return;
+    const v = await window.aether.getVersion();
+    if (!v) return;
+    var vStr = 'v' + v;
+    var appVerEl = document.querySelector('.app-version');
+    if (appVerEl) appVerEl.textContent = vStr;
+    var subEl = document.querySelector('.complete-sub');
+    if (subEl) subEl.textContent = 'Aether AI ' + vStr + ' installed successfully.';
+  } catch (_) { /* non-fatal fallback */ }
+})();
 </script>
 </body>
 </html>
