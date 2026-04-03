@@ -705,68 +705,71 @@
     font-size: 9px; color: var(--text-muted);
   }
 
-  /* ═══ RIGHT SIDEBAR (Preview) ═════════════════════ */
-  .right-panel {
-    width: 0;
-    background: var(--bg);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
+  /* ═══ AGENT HUD (top-right canvas overlay) ═════════ */
+  #agent-hud {
+    position: absolute;
+    top: 12px; right: 12px;
+    z-index: 30;
+    pointer-events: none;
+    min-width: 210px; max-width: 268px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .hud-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: rgba(0,212,255,0.55);
+    padding: 0 2px 3px 2px;
+  }
+  .hud-card {
+    background: rgba(6,6,12,0.88);
+    border: 1px solid rgba(0,212,255,0.18);
+    border-left: 2px solid rgba(0,212,255,0.55);
+    padding: 6px 10px;
+    pointer-events: auto;
+    position: relative;
     overflow: hidden;
-    flex-shrink: 0;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .right-panel.open { width: 400px; }
-  .rp-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .rp-title {
-    font-family: var(--font-sans);
-    font-size: 12px; font-weight: 600; color: var(--text-primary);
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-  .rp-close {
-    background: none; border: none;
-    color: var(--text-muted); font-size: 12px;
-    cursor: pointer;
-    transition: color 0.15s;
-  }
-  .rp-close:hover { color: var(--text-primary); }
-  .rp-meta {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .rp-meta-row {
-    display: flex; justify-content: space-between;
+  .hud-card.status-running { border-left-color: #00d4ff; }
+  .hud-card.status-waiting  { border-left-color: #f5a623; }
+  .hud-card.status-error    { border-left-color: #ef4444; }
+  .hud-card.status-done     { border-left-color: #22c55e; opacity: 0; transition: opacity 3s; }
+  .hud-card.status-ready    { border-left-color: rgba(0,212,255,0.35); }
+  .hud-card-name {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; color: var(--text-secondary);
-    padding: 3px 0;
+    font-size: 9px; color: rgba(180,200,220,0.9);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 170px;
   }
-  .rp-meta-label { color: var(--text-muted); }
-  .rp-preview {
+  .hud-card-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 2px;
+  }
+  .hud-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px; letter-spacing: 0.5px; font-weight: 600;
+    padding: 1px 5px; border-radius: 1px;
+    flex-shrink: 0;
+  }
+  .hud-badge.running { background: rgba(0,212,255,0.15); color: #00d4ff; animation: hudPulse 1.2s ease-in-out infinite; }
+  .hud-badge.waiting { background: rgba(245,166,35,0.15); color: #f5a623; }
+  .hud-badge.error   { background: rgba(239,68,68,0.15);  color: #ef4444; }
+  .hud-badge.done    { background: rgba(34,197,94,0.15);  color: #22c55e; }
+  .hud-badge.ready   { background: rgba(100,120,140,0.12); color: rgba(180,200,220,0.5); }
+  .hud-task {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; color: rgba(140,170,195,0.7);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     flex: 1;
-    overflow: auto;
-    padding: 10px 12px;
   }
-  .rp-preview pre {
+  .hud-elapsed {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    line-height: 1.5;
-    color: var(--text-secondary);
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
+    font-size: 7px; color: rgba(100,130,160,0.6);
+    flex-shrink: 0;
   }
-  .rp-preview .preview-placeholder {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-muted);
-    font-size: 11px;
+  .hud-card.collapsed { padding: 4px 10px; }
+  .hud-card.collapsed .hud-card-row,
+  .hud-card.collapsed .hud-elapsed { display: none; }
+  @keyframes hudPulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.45; }
   }
 
   /* Modal */
@@ -2113,6 +2116,8 @@
         <!-- QOPC Profile (hidden by default) -->
         <div class="patch-panel-body" id="patch-profile-view" style="display:none;"></div>
       </div>
+      <!-- Agent HUD: floating top-right overlay, pointer-events:none on container -->
+      <div id="agent-hud"></div>
       <!-- Event-capture canvas: transparent overlay, sits above render canvas (z:1), below loading-overlay (z:50) -->
       <canvas id="circuit-interact" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:auto;cursor:grab;background:transparent;"></canvas>
     </div>
@@ -2193,25 +2198,6 @@
     </div>
   </div>
 
-  <!-- RIGHT PANEL (File Preview) -->
-  <div class="right-panel" id="right-panel">
-    <div class="rp-header">
-      <span class="rp-title" id="rp-title">AGENT RESPONSE</span>
-      <button class="rp-close" onclick="closeRightPanel()">&#10005;</button>
-    </div>
-    <div style="padding: 8px 16px; border-bottom: 1px solid var(--border-color); font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono);">
-      <div id="rp-name" style="color: var(--text-primary); font-size: 11px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
-      <div style="display:flex; gap: 12px;">
-        <span id="rp-type"></span>
-        <span id="rp-size"></span>
-        <span id="rp-encoding"></span>
-      </div>
-      <div id="rp-path" style="margin-top: 2px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
-    </div>
-    <div class="rp-preview" id="rp-preview" style="padding: 16px; scroll-behavior: smooth;">
-      <div id="rp-response-text" class="resp-text" style="font-size: 14px; color: #FFFFFF; line-height: 1.6; white-space: pre-wrap; font-family: var(--font-sans);">AETHER AI response will appear here...</div>
-    </div>
-  </div>
 </div>
 
 <!-- Tooltip -->
@@ -3277,6 +3263,19 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
   if (n.agentActive) {
     radius += 4 + Math.sin(time * 5) * 2;
     ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 16;
+    // Rotating outer ring in agent status color
+    const _agentStatusColor = '#00d4ff'; // Could be parameterised per-agent
+    const _rRing = radius + 8;
+    ctx.save();
+    ctx.strokeStyle = `rgba(0,212,255,0.6)`;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(0,212,255,0.5)'; ctx.shadowBlur = 6;
+    const _rotAngle = time * 1.8; // rotate 1.8 rad/s
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -(_rotAngle * _rRing);
+    ctx.beginPath(); ctx.arc(nx, ny, _rRing, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]); ctx.shadowBlur = 0;
+    ctx.restore();
   } else if (isS || isF) {
     ctx.shadowColor = finalColor; ctx.shadowBlur = 18;
     ctx.strokeStyle = hexToRGBA(finalColor, 0.35);
@@ -3325,6 +3324,75 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
     ctx.fillText('⚑', nx + radius * 0.8, ny - radius * 1.4);
   }
   ctx.shadowBlur = 0;
+
+  // ── Vault state icon (padlock) ────────────────────
+  // Only draw icon when zoomed in enough; below threshold show a 2px tinted dot
+  const _vs = n.vaultState; // 'vaulted' | 'uploading' | 'local_only' | undefined
+  if (_vs && _vs !== 'uploading' && !n.isRoot) {
+    const _iconColor = _vs === 'vaulted' ? '#00d4ff' : '#f5a623';
+    if (CS.zoom >= 0.8) {
+      // Draw padlock icon above-right of node
+      const _sz = Math.max(5, Math.min(9, radius * 0.9)); // icon half-size in world px
+      const _ix = nx + radius * 0.7 + _sz * 0.6;
+      const _iy = ny - radius * 0.7 - _sz * 0.6;
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = _iconColor;
+      ctx.fillStyle   = _iconColor;
+      ctx.lineWidth   = Math.max(0.8, _sz * 0.22);
+      ctx.lineCap = 'round';
+      // Lock body (rectangle)
+      const _bw = _sz * 1.2, _bh = _sz * 0.9, _br = _sz * 0.15;
+      const _bx = _ix - _bw / 2, _by = _iy;
+      ctx.beginPath();
+      ctx.moveTo(_bx + _br, _by);
+      ctx.lineTo(_bx + _bw - _br, _by);
+      ctx.arcTo(_bx + _bw, _by, _bx + _bw, _by + _br, _br);
+      ctx.lineTo(_bx + _bw, _by + _bh - _br);
+      ctx.arcTo(_bx + _bw, _by + _bh, _bx + _bw - _br, _by + _bh, _br);
+      ctx.lineTo(_bx + _br, _by + _bh);
+      ctx.arcTo(_bx, _by + _bh, _bx, _by + _bh - _br, _br);
+      ctx.lineTo(_bx, _by + _br);
+      ctx.arcTo(_bx, _by, _bx + _br, _by, _br);
+      ctx.closePath();
+      ctx.globalAlpha = 0.82;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Shackle (arc)
+      const _sr = _sz * 0.52;
+      const _scx = _ix, _scy = _by;
+      if (_vs === 'vaulted') {
+        // Closed shackle — full U sitting on top of body
+        ctx.beginPath();
+        ctx.arc(_scx, _scy, _sr, Math.PI, 0);
+        ctx.stroke();
+      } else {
+        // Open shackle — right side lifted off body
+        ctx.beginPath();
+        ctx.arc(_scx, _scy - _sr * 0.3, _sr, Math.PI * 0.85, Math.PI * 1.7);
+        ctx.stroke();
+      }
+      // Glow for vaulted
+      if (_vs === 'vaulted') {
+        ctx.shadowColor = 'rgba(0,212,255,0.5)';
+        ctx.shadowBlur  = 6;
+        ctx.beginPath();
+        ctx.arc(_scx, _scy, _sr, Math.PI, 0);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    } else {
+      // Dot indicator at top-right corner of node
+      const _dx = nx + radius * 0.65, _dy = ny - radius * 0.65;
+      ctx.save();
+      ctx.fillStyle = _iconColor;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(_dx, _dy, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
 
   // ── Upload progress ring overlay ──────────────────
   const _ups = _nodeUploadStates.get(n.id);
@@ -3385,6 +3453,25 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('✕', nx + ringR * 0.62, ny - ringR * 0.62);
     }
+    ctx.restore();
+  } else if (n.vaultState === 'uploading') {
+    // No _nodeUploadStates entry — draw time-based animated arc for uploading nodes
+    const ringR = radius + (isDir ? 9 : 6);
+    ctx.save();
+    ctx.setLineDash([]);
+    // Track ring
+    ctx.strokeStyle = 'rgba(0,212,255,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(nx, ny, ringR, 0, Math.PI * 2); ctx.stroke();
+    // Animated arc — cycles from 0→1 over 2.4s, looping
+    const _prog = (time % 2.4) / 2.4;
+    ctx.strokeStyle = `rgba(0,212,255,${0.65 + Math.sin(time * 3) * 0.25})`;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(0,212,255,0.55)'; ctx.shadowBlur = 5;
+    const _sa = -Math.PI / 2;
+    ctx.beginPath(); ctx.arc(nx, ny, ringR, _sa, _sa + _prog * Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.restore();
   }
 }
@@ -3484,28 +3571,93 @@ function drawCircuit() {
     } else { n.driftX=0; n.driftY=0; }
   }
 
-  const hasFocus = !!CS.focusedNode;
-  const baseEdgeAlpha = Math.min(0.22, Math.max(0.025, z * 0.22));
+  const hasFocus    = !!CS.focusedNode;
+  const hasHover    = !!CS.hoveredNode;
+  const hasSelected = !!CS.selectedNode;
+  // Track when selection changes for pulse timing
+  if (CS.selectedNode && CS._lastSelectedId !== CS.selectedNode.id) {
+    CS._lastSelectedId = CS.selectedNode.id;
+    CS._selectionTime  = time;
+  } else if (!CS.selectedNode) {
+    CS._lastSelectedId = null;
+    CS._selectionTime  = null;
+  }
+  // Two-hop set from selected node (neighbours of neighbours)
+  let twoHopSet = null;
+  if (hasSelected) {
+    twoHopSet = new Set();
+    const direct = CS.connectedSet; // already computed when node was clicked
+    for (const nid of direct) {
+      (CS.edgeFromMap[nid] || []).forEach(id => twoHopSet.add(id));
+      if (CS.edgeToMap[nid] !== undefined) twoHopSet.add(CS.edgeToMap[nid]);
+    }
+    // Remove direct connections (they're handled separately)
+    for (const nid of direct) twoHopSet.delete(nid);
+    if (CS.selectedNode) twoHopSet.delete(CS.selectedNode.id);
+  }
 
   for (const e of CS.edges) {
     const from = CS.nodeById[e.from], to = CS.nodeById[e.to];
     if (!from||!to) continue;
     if (CS.collapsedNodes.has(from.id)||CS.collapsedNodes.has(to.id)) continue;
     if (!inView(from)&&!inView(to)) continue;
-    const isPath = CS.highlightPath.includes(e.from)&&CS.highlightPath.includes(e.to);
-    const isConn = CS.hoveredNode&&(CS.connectedSet.has(e.from)||CS.connectedSet.has(e.to))&&(CS.hoveredNode.id===e.from||CS.hoveredNode.id===e.to);
-    const isFocConn = hasFocus&&(CS.focusedNode.id===e.from||CS.focusedNode.id===e.to);
-    let alpha;
-    if (isPath) alpha = 0.85;
-    else if (isConn) alpha = 0.55;
-    else if (hasFocus) alpha = isFocConn ? 0.55 : baseEdgeAlpha*0.15;
-    else alpha = baseEdgeAlpha + Math.sin(time*0.8+(from.floatPhase||0))*0.008;
-    ctx.strokeStyle = (isPath||isConn||isFocConn) ? `rgba(0,212,255,${alpha})` : `rgba(140,170,195,${alpha})`;
-    ctx.lineWidth = (isPath ? 1.5 : 0.45) * Math.max(0.3, Math.min(1, 1/z*0.4));
-    ctx.beginPath();
-    ctx.moveTo(from.cx+from.driftX, from.cy+from.driftY);
-    ctx.lineTo(to.cx+to.driftX, to.cy+to.driftY);
-    ctx.stroke();
+
+    const fromX = from.cx+from.driftX, fromY = from.cy+from.driftY;
+    const toX   = to.cx+to.driftX,   toY   = to.cy+to.driftY;
+
+    // Classify edge
+    const isSelectedConn = hasSelected && (CS.connectedSet.has(e.from)||CS.connectedSet.has(e.to))
+                           && (CS.selectedNode.id===e.from||CS.selectedNode.id===e.to);
+    const isTwoHop = hasSelected && twoHopSet &&
+                     (twoHopSet.has(e.from)||twoHopSet.has(e.to)) && !isSelectedConn;
+    const isHoverConn = hasHover && !isSelectedConn &&
+                        (CS.hoveredNode.id===e.from||CS.hoveredNode.id===e.to);
+    const isFocConn = hasFocus && (CS.focusedNode.id===e.from||CS.focusedNode.id===e.to);
+
+    let alpha, color;
+    if (isSelectedConn) {
+      alpha = 0.9; color = '0,212,255';
+    } else if (isTwoHop) {
+      alpha = 0.4; color = '0,102,255';
+    } else if (isHoverConn) {
+      // Lerp toward 0.7 — instant here; real lerp would need per-edge state
+      alpha = 0.7; color = '0,212,255';
+    } else if (hasFocus) {
+      alpha = isFocConn ? 0.55 : 0.03; color = isFocConn ? '0,212,255' : '255,255,255';
+    } else if (hasHover) {
+      // Unconnected edges dim to 0.05 on hover
+      alpha = 0.05; color = '255,255,255';
+    } else {
+      alpha = 0.12; color = '255,255,255';
+    }
+
+    ctx.strokeStyle = `rgba(${color},${alpha})`;
+    ctx.lineWidth   = (isSelectedConn ? 1.2 : 0.45) * Math.max(0.3, Math.min(1, 1/z*0.4));
+    if (isSelectedConn) {
+      ctx.shadowColor = 'rgba(0,212,255,0.35)'; ctx.shadowBlur = 4;
+    } else { ctx.shadowBlur = 0; }
+    ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ── Traveling pulse on selected-connected edges ──
+    if (isSelectedConn && CS._selectionTime !== null) {
+      const cycle = 1.2; // seconds per full traversal
+      const elapsed = time - CS._selectionTime;
+      // Multiple pulses: one per cycle
+      for (let pi = 0; pi < 3; pi++) {
+        const tParam = ((elapsed / cycle) + pi / 3) % 1;
+        // Only show pulses traveling away from selected node
+        const fromSelected = CS.selectedNode.id === e.from;
+        const t = fromSelected ? tParam : (1 - tParam);
+        const px = fromX + (toX - fromX) * t;
+        const py = fromY + (toY - fromY) * t;
+        const pAlpha = 0.9 - tParam * 0.4;
+        ctx.fillStyle = `rgba(0,212,255,${pAlpha})`;
+        ctx.shadowColor = 'rgba(0,212,255,0.8)'; ctx.shadowBlur = 5;
+        ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
   }
 
   let visibleCount = 0;
@@ -3550,6 +3702,7 @@ function drawCircuit() {
   if (window.activityLayer) activityLayer.drawActive(ctx);
   ctx.restore();
 
+  drawAgentConnections(ctx, w, h, canvas);
   drawHUD(canvas, w, h, visibleCount);
 
   if (_ripples.length) {
@@ -3576,8 +3729,8 @@ function drawCircuit() {
 // ── Label collision-avoiding batch renderer ────────
 function drawLabels(nodes, ctx) {
   if (CS.zoom < 0.45) return;
-  const showAll = CS.zoom > 1.2;   // All labels only at 120%+ zoom
-  const showDirs = CS.zoom > 0.65; // Directory labels at 65%+ zoom
+  const showAll  = CS.zoom > 1.2;  // All labels only at 120%+ zoom
+  const showDirs = CS.zoom > 1.2;  // Directory labels also gated at 120% now
   const placedBoxes = [];
 
   const sorted = [...nodes].filter(n => !n.isRoot).sort((a, b) => {
@@ -3630,8 +3783,27 @@ function drawLabels(nodes, ctx) {
       const overlaps = !isH && !isS && placedBoxes.some(b => rectsOverlap(box, b));
       if (!overlaps) {
         placedBoxes.push(box);
-        ctx.fillStyle = (isS || isH) ? '#ffffff' : hexToRGBA(color, 0.8);
+        // Color: active > selected/hovered > vault-state
+        let lblColor;
+        if (n.agentActive) {
+          lblColor = '#ffffff';
+          ctx.shadowColor = 'rgba(0,212,255,0.5)'; ctx.shadowBlur = 4;
+        } else if (isS || isH) {
+          lblColor = '#ffffff';
+          ctx.shadowBlur = 0;
+        } else if (n.vaultState === 'vaulted') {
+          lblColor = '#00d4ff';
+          ctx.shadowBlur = 0;
+        } else if (n.vaultState === 'local_only') {
+          lblColor = '#888888';
+          ctx.shadowBlur = 0;
+        } else {
+          lblColor = hexToRGBA(color, 0.8);
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = lblColor;
         ctx.fillText(label, lx, ly);
+        ctx.shadowBlur = 0;
         if (n.isLargeDir) {
           ctx.font = '9px "IBM Plex Mono", monospace';
           ctx.fillStyle = 'rgba(0,212,255,0.6)';
@@ -3665,41 +3837,41 @@ function buildDemoVault() {
   const N = [], E = [];
   let id = 0;
 
-  N.push({ id:id++, name:'VAULT ROOT', dir:true, type:'directory', children:5, isRoot:true, totalSize:4800000, cx:0, cy:0, r:30 });
+  N.push({ id:id++, name:'VAULT ROOT', dir:true, type:'directory', children:5, isRoot:true, totalSize:4800000, cx:0, cy:0, r:30, vaultState:'vaulted' });
 
   const dirs = [
-    { name:'patents/', children:3, totalSize:291000 },
-    { name:'trading/', children:2, totalSize:164900 },
-    { name:'security/', children:4, totalSize:125300 },
-    { name:'models/', children:2, totalSize:4203400 },
-    { name:'config/', children:3, totalSize:4350 },
+    { name:'patents/',  children:3, totalSize:291000,  vaultState:'vaulted'    },
+    { name:'trading/',  children:2, totalSize:164900,  vaultState:'vaulted'    },
+    { name:'security/', children:4, totalSize:125300,  vaultState:'uploading'  },
+    { name:'models/',   children:2, totalSize:4203400, vaultState:'local_only' },
+    { name:'config/',   children:3, totalSize:4350,    vaultState:'local_only' },
   ];
   dirs.forEach(d => {
     const did = id++;
-    N.push({ id:did, name:d.name, dir:true, type:'directory', children:d.children, totalSize:d.totalSize, cx:0, cy:0, r:18 });
+    N.push({ id:did, name:d.name, dir:true, type:'directory', children:d.children, totalSize:d.totalSize, cx:0, cy:0, r:18, vaultState:d.vaultState });
     E.push({ from:0, to:did });
   });
 
   const files = [
-    {p:1,name:'patent_64010131.pdf',size:245000,type:'PDF'},
-    {p:1,name:'claims_draft.md',size:12800,type:'Markdown'},
-    {p:1,name:'prior_art.json',size:34200,type:'JSON'},
-    {p:2,name:'strategy_v3.py',size:8900,type:'Python'},
-    {p:2,name:'backtest_log.csv',size:156000,type:'CSV'},
-    {p:3,name:'threat_model.md',size:6700,type:'Markdown'},
-    {p:3,name:'vuln_scan.json',size:28400,type:'JSON'},
-    {p:3,name:'firewall.rules',size:1200,type:'Config'},
-    {p:3,name:'audit_2026.log',size:89000,type:'Log'},
-    {p:4,name:'qopc_weights.bin',size:4200000,type:'Binary'},
-    {p:4,name:'training_cfg.yaml',size:3400,type:'YAML'},
-    {p:5,name:'settings.json',size:2100,type:'JSON'},
-    {p:5,name:'.env',size:450,type:'Env'},
-    {p:5,name:'credentials.json',size:1800,type:'JSON'},
+    {p:1,name:'patent_64010131.pdf',size:245000,type:'PDF',       vs:'vaulted'   },
+    {p:1,name:'claims_draft.md',    size:12800, type:'Markdown',   vs:'vaulted'   },
+    {p:1,name:'prior_art.json',     size:34200, type:'JSON',       vs:'vaulted'   },
+    {p:2,name:'strategy_v3.py',     size:8900,  type:'Python',     vs:'vaulted'   },
+    {p:2,name:'backtest_log.csv',   size:156000,type:'CSV',        vs:'vaulted'   },
+    {p:3,name:'threat_model.md',    size:6700,  type:'Markdown',   vs:'uploading' },
+    {p:3,name:'vuln_scan.json',     size:28400, type:'JSON',       vs:'uploading' },
+    {p:3,name:'firewall.rules',     size:1200,  type:'Config',     vs:'local_only'},
+    {p:3,name:'audit_2026.log',     size:89000, type:'Log',        vs:'local_only'},
+    {p:4,name:'qopc_weights.bin',   size:4200000,type:'Binary',   vs:'local_only'},
+    {p:4,name:'training_cfg.yaml',  size:3400,  type:'YAML',       vs:'local_only'},
+    {p:5,name:'settings.json',      size:2100,  type:'JSON',       vs:'local_only'},
+    {p:5,name:'.env',               size:450,   type:'Env',        vs:'local_only'},
+    {p:5,name:'credentials.json',   size:1800,  type:'JSON',       vs:'local_only'},
   ];
   files.forEach(f => {
     const fid = id++;
     const parentNode = N[f.p];
-    N.push({ id:fid, name:f.name, dir:false, type:f.type, size:f.size, path:`vault/${parentNode.name}${f.name}`, cx:0, cy:0, r:10 });
+    N.push({ id:fid, name:f.name, dir:false, type:f.type, size:f.size, path:`vault/${parentNode.name}${f.name}`, cx:0, cy:0, r:10, vaultState:f.vs });
     E.push({ from:f.p, to:fid });
   });
 
@@ -3745,7 +3917,8 @@ function buildVaultFromScan(tree, rootName, rootPath) {
       isRoot:pid===null,
       path:(item.path||item.name),
       totalSize:0,
-      cx:0, cy:0, r:0
+      cx:0, cy:0, r:0,
+      vaultState: item.vaultState || 'local_only'
     });
     if (pid !== null) E.push({ from:pid, to:nid });
     if (isDir && item.children) {
@@ -5373,62 +5546,10 @@ function copyVar(btn) {
   });
 }
 
-// ════════════════════════════════════════════════════
-// RIGHT PANEL (File Preview)
-// ════════════════════════════════════════════════════
-function openRightPanel(node) {
-  const rp = document.getElementById('right-panel');
-  rp.classList.add('open');
-  document.getElementById('rp-name').textContent = node.name;
-  document.getElementById('rp-type').textContent = node.type || 'unknown';
-  document.getElementById('rp-size').textContent = fmtSize(node.size || 0);
-  document.getElementById('rp-path').textContent = node.path || '—';
-  document.getElementById('rp-path').title = node.path || '';
-  document.getElementById('rp-encoding').textContent = '...';
-
-  // Directory nodes get a listing, not a file read
-  if (node.dir || node.type === 'directory') {
-    document.getElementById('rp-title').textContent = 'DIRECTORY';
-    document.getElementById('rp-encoding').textContent = '—';
-    const childCount = node.children || 0;
-    document.getElementById('rp-preview').innerHTML =
-      `<div class="preview-placeholder">Folder — ${childCount} item${childCount !== 1 ? 's' : ''}</div>`;
-    setTimeout(resizeCanvas, 300);
-    return;
-  }
-
-  document.getElementById('rp-title').textContent = 'FILE PREVIEW';
-  document.getElementById('rp-preview').innerHTML = '<div class="preview-placeholder">Loading preview...</div>';
-
-  // Try to load file preview via IPC
-  if (window.aether?.readFilePreview && node.path) {
-    window.aether.readFilePreview(node.path, 80).then(result => {
-      if (result.error) {
-        document.getElementById('rp-preview').innerHTML = `<div class="preview-placeholder" style="color:var(--red);">${escH(result.message)}</div>`;
-        document.getElementById('rp-encoding').textContent = '—';
-      } else {
-        document.getElementById('rp-encoding').textContent = result.binary ? 'binary' : 'utf-8';
-        if (result.binary) {
-          document.getElementById('rp-preview').innerHTML = `<div class="preview-placeholder">${escH(result.preview)}</div>`;
-        } else {
-          document.getElementById('rp-preview').innerHTML = `<pre>${escH(result.preview)}</pre>`;
-          if (result.totalLines) document.getElementById('rp-title').textContent = `PREVIEW (${result.lines}/${result.totalLines} lines)`;
-        }
-      }
-    });
-  } else {
-    document.getElementById('rp-encoding').textContent = '—';
-    document.getElementById('rp-preview').innerHTML = '<div class="preview-placeholder">Preview requires local file path</div>';
-  }
-
-  // Resize canvas after panel opens
-  setTimeout(resizeCanvas, 300);
-}
-
-function closeRightPanel() {
-  document.getElementById('right-panel').classList.remove('open');
-  setTimeout(resizeCanvas, 300);
-}
+// Right panel removed — canvas now fills full width.
+// Stub kept so existing call-sites don't throw.
+function openRightPanel(node) { /* no-op: right panel removed */ }
+function closeRightPanel()     { /* no-op: right panel removed */ }
 
 function resizeCanvas() {
   const wrap = document.getElementById('canvas-wrap');
@@ -5650,9 +5771,144 @@ function runAgentTask(agentId) {
   })();
 }
 
+// ════════════════════════════════════════════════════
+// AGENT HUD — floating canvas-top-right overlay
+// ════════════════════════════════════════════════════
+
+// Each entry: { agentId, nodeId } — drawn as animated dashed lines on canvas
+const _agentConnections = [];
+
+function setAgentNodeConnection(agentId, nodeId) {
+  const idx = _agentConnections.findIndex(c => c.agentId === agentId);
+  if (nodeId == null) {
+    if (idx >= 0) _agentConnections.splice(idx, 1);
+  } else {
+    if (idx >= 0) _agentConnections[idx].nodeId = nodeId;
+    else _agentConnections.push({ agentId, nodeId, startTime: Date.now() });
+  }
+}
+
+function _hudStatusClass(a) {
+  const s = (a.status || '').toLowerCase();
+  if (s === 'active' || s === 'running') return 'running';
+  if (s === 'processing' || s === 'working') return 'running';
+  if (s === 'waiting' || s === 'scheduled') return 'waiting';
+  if (s === 'error' || s === 'failed') return 'error';
+  if (s === 'done' || s === 'complete') return 'done';
+  return 'ready';
+}
+
+function _hudElapsed(a) {
+  if (!a.startedAt) return '';
+  const ms = Date.now() - a.startedAt;
+  const s = Math.floor(ms / 1000) % 60;
+  const m = Math.floor(ms / 60000);
+  return m ? `${m}m ${s}s` : `${s}s`;
+}
+
+function renderAgentHUD() {
+  const hud = document.getElementById('agent-hud');
+  if (!hud) return;
+  const active = spawnedAgents.filter(a => {
+    const s = (a.status || '').toLowerCase();
+    return s !== 'idle' && s !== 'paused';
+  });
+  if (!active.length) { hud.innerHTML = ''; return; }
+
+  const collapse = active.length > 4;
+  let html = `<div class="hud-header">AGENTS&nbsp;&nbsp;<span style="color:rgba(0,212,255,0.8);">${active.length} ACTIVE</span></div>`;
+  active.slice(0, 8).forEach(a => {
+    const sc = _hudStatusClass(a);
+    const badge = sc.toUpperCase();
+    const task = (a.task || '').slice(0, 40) + (a.task?.length > 40 ? '…' : '');
+    const elapsed = _hudElapsed(a);
+    html += `<div class="hud-card status-${sc}${collapse ? ' collapsed' : ''}" data-agent="${a.id}">
+      <div class="hud-card-name">${escH(a.name)}</div>
+      <div class="hud-card-row">
+        <span class="hud-badge ${sc}">${badge}</span>
+        <span class="hud-task">${escH(task)}</span>
+        ${elapsed ? `<span class="hud-elapsed">${elapsed}</span>` : ''}
+      </div>
+    </div>`;
+  });
+  hud.innerHTML = html;
+
+  // Expand-on-hover for collapsed cards
+  if (collapse) {
+    hud.querySelectorAll('.hud-card.collapsed').forEach(card => {
+      card.addEventListener('mouseenter', () => card.classList.remove('collapsed'));
+      card.addEventListener('mouseleave', () => card.classList.add('collapsed'));
+    });
+  }
+  // Fade-out done cards
+  hud.querySelectorAll('.hud-card.status-done').forEach(el => {
+    requestAnimationFrame(() => { el.style.opacity = '0'; });
+  });
+}
+
+// ── Draw agent→node dashed connection lines on canvas ──
+function drawAgentConnections(ctx, w, h, canvas) {
+  if (!_agentConnections.length) return;
+  const hudEl = document.getElementById('agent-hud');
+  if (!hudEl) return;
+  const hudRect = hudEl.getBoundingClientRect();
+  const wrapRect = document.getElementById('canvas-wrap').getBoundingClientRect();
+  const time = Date.now() / 1000;
+
+  for (const conn of _agentConnections) {
+    const node = CS.nodeById[conn.nodeId];
+    if (!node) continue;
+    const agent = spawnedAgents.find(a => a.id === conn.agentId);
+    if (!agent) continue;
+
+    const sc = _hudStatusClass(agent);
+    let lineColor;
+    if (sc === 'running')  lineColor = [0,212,255];
+    else if (sc === 'waiting') lineColor = [245,166,35];
+    else if (sc === 'error')   lineColor = [239,68,68];
+    else continue;
+
+    // Agent panel edge (left-center of HUD)
+    const ax = hudRect.left - wrapRect.left;
+    const ay = hudRect.top  - wrapRect.top + hudRect.height * 0.5;
+
+    // Node screen position
+    const nx_s = (node.cx + (node.driftX||0)) * CS.zoom + CS.panX;
+    const ny_s = (node.cy + (node.driftY||0)) * CS.zoom + CS.panY;
+
+    ctx.save();
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.strokeStyle = `rgba(${lineColor.join(',')},0.55)`;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 4]);
+    ctx.lineDashOffset = -(time * 28) % 9;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.bezierCurveTo(ax - 60, ay, nx_s + 60, ny_s, nx_s, ny_s);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Animated traveling dot
+    const _tp = (time * 0.7) % 1;
+    const _bx = _bezierPoint(ax, ax - 60, nx_s + 60, nx_s, _tp);
+    const _by = _bezierPoint(ay, ay, ny_s, ny_s, _tp);
+    ctx.fillStyle = `rgba(${lineColor.join(',')},0.9)`;
+    ctx.shadowColor = `rgba(${lineColor.join(',')},0.7)`;
+    ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.arc(_bx, _by, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+}
+
+function _bezierPoint(p0, p1, p2, p3, t) {
+  const mt = 1 - t;
+  return mt*mt*mt*p0 + 3*mt*mt*t*p1 + 3*mt*t*t*p2 + t*t*t*p3;
+}
+
 function renderSpawnedAgentsSidebar() {
   const c = document.getElementById('spawned-agents-list');
-  if (!spawnedAgents.length) { c.innerHTML = ''; return; }
+  if (!c) { renderAgentHUD(); return; }
+  if (!spawnedAgents.length) { c.innerHTML = ''; renderAgentHUD(); return; }
   c.innerHTML = spawnedAgents.map(a => `
     <div class="sb-file-entry" style="gap:4px;" title="${escH(a.task)}">
       <span class="sb-file-icon" style="font-size:11px;">${a.icon}</span>
@@ -5660,6 +5916,7 @@ function renderSpawnedAgentsSidebar() {
       <span class="sb-badge ${a.status==='active'?'green':a.status==='error'?'red':a.status==='processing'?'amber':'blue'}" style="font-size:7px;">${a.status.toUpperCase()}</span>
     </div>
   `).join('');
+  renderAgentHUD();
 }
 
 function renderAgentOrbitPanel() {
@@ -7246,8 +7503,8 @@ showAgentDetail = showAgentDetailEnhanced;
 const _origRenderSidebar = renderSpawnedAgentsSidebar;
 function renderSpawnedAgentsSidebarEnhanced() {
   const c = document.getElementById('spawned-agents-list');
-  if (!c) return;
-  if (!spawnedAgents.length) { c.innerHTML = ''; return; }
+  if (!c) { renderAgentHUD(); return; }
+  if (!spawnedAgents.length) { c.innerHTML = ''; renderAgentHUD(); return; }
   c.innerHTML = spawnedAgents.map(a => {
     const profile = toneProfiles[a.id];
     const trainedBadge = profile && profile.sampleSize > 0 ? '<span class="tone-trained-badge">TRAINED</span>' : `<span class="tone-untrained-badge" onclick="event.stopPropagation();openToneWizard(${a.id})">TRAIN</span>`;
@@ -7258,6 +7515,7 @@ function renderSpawnedAgentsSidebarEnhanced() {
       <span class="sb-badge ${a.status==='active'?'green':a.status==='error'?'red':a.status==='processing'?'amber':'blue'}" style="font-size:7px;">${a.status.toUpperCase()}</span>
     </div>`;
   }).join('');
+  renderAgentHUD();
 }
 
 // Override renderSpawnedAgentsSidebar
