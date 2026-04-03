@@ -205,12 +205,72 @@
   .protocol-dot.on { background: var(--green); }
   .protocol-dot.amber { background: var(--amber); }
   .protocol-dot.quantum { background: var(--accent); }
+
+  /* ── Update banner ───────────────────────────────── */
+  #update-banner {
+    display: none;
+    position: fixed;
+    top: 32px; left: 0; right: 0;
+    z-index: 100;
+    background: linear-gradient(90deg, #1a1200, #1a0a00);
+    border-bottom: 1px solid var(--amber);
+    padding: 7px 16px;
+    align-items: center;
+    gap: 10px;
+  }
+  #update-banner.visible { display: flex; }
+  .update-banner-icon {
+    width: 14px; height: 14px; flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--amber);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .update-banner-text {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.3px;
+  }
+  .update-banner-text strong { color: #fcd34d; }
+  .update-banner-btn {
+    background: var(--amber);
+    color: #0a0a0a;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    padding: 4px 10px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .update-banner-btn:hover { opacity: 0.85; }
+  .update-banner-dismiss {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 14px;
+    cursor: pointer; padding: 0 2px; line-height: 1;
+    transition: color 0.15s;
+  }
+  .update-banner-dismiss:hover { color: var(--text-secondary); }
 </style>
 </head>
 <body>
 
+<!-- Update banner — shown when running an outdated version -->
+<div id="update-banner">
+  <div class="update-banner-icon"></div>
+  <div class="update-banner-text">
+    <strong>UPDATE AVAILABLE</strong> &mdash;
+    You are running <span id="update-current-ver">v?</span>,
+    latest is <span id="update-latest-ver">v?</span>
+  </div>
+  <button class="update-banner-btn" onclick="window.aether?.openDownload()">DOWNLOAD NOW</button>
+  <button class="update-banner-dismiss" title="Dismiss" onclick="document.getElementById('update-banner').classList.remove('visible')">&#10005;</button>
+</div>
+
 <div class="title-bar">
-  <span class="title-bar-text">AetherCloud-L v0.9.2</span>
+  <span class="title-bar-text" id="title-bar-version">AetherCloud-L</span>
   <div class="title-bar-controls">
     <button class="title-bar-btn" onclick="window.aether?.minimize()">&#8212;</button>
     <button class="title-bar-btn close" onclick="window.aether?.close()">&#10005;</button>
@@ -447,7 +507,35 @@ async function initLoginScreen() {
   }
 }
 
-window.addEventListener('load', initLoginScreen);
+// ── Update banner check ─────────────────────────────
+async function checkUpdateBanner() {
+  try {
+    if (!window.aether?.getUpdateInfo) return;
+    const info = await window.aether.getUpdateInfo();
+    if (!info) return;
+
+    // Always set the live version in the title bar
+    const titleEl = document.getElementById('title-bar-version');
+    if (titleEl && info.currentVersion) {
+      titleEl.textContent = `AetherCloud-L v${info.currentVersion}`;
+    }
+
+    if (!info.updateAvailable) return;
+
+    const curEl = document.getElementById('update-current-ver');
+    const latEl = document.getElementById('update-latest-ver');
+    if (curEl) curEl.textContent = `v${info.currentVersion}`;
+    if (latEl) latEl.textContent = `v${info.latestVersion}`;
+
+    const banner = document.getElementById('update-banner');
+    if (banner) banner.classList.add('visible');
+  } catch (_) { /* non-fatal */ }
+}
+
+window.addEventListener('load', () => {
+  checkUpdateBanner();
+  initLoginScreen();
+});
 </script>
 </body>
 </html>
