@@ -3076,36 +3076,6 @@ function initCircuit() {
   buildDemoVault();
   drawCircuit();
 
-  // ── Self-diagnostic: run 500ms after init to report element stack ──
-  setTimeout(() => {
-    const r = interact.getBoundingClientRect();
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    const stack = document.elementsFromPoint(cx, cy);
-    const topEl = stack[0];
-    const isInteract = topEl === interact;
-    console.group('[AetherCloud] Canvas event diagnostic');
-    console.log('interact rect:', JSON.stringify({w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left), top: Math.round(r.top)}));
-    console.log('top element at canvas center:', topEl?.tagName, topEl?.id, topEl?.className?.toString().slice(0,60));
-    console.log('is interact topmost?', isInteract);
-    stack.slice(0,5).forEach((el,i) => {
-      const cs = getComputedStyle(el);
-      console.log(`  [${i}] ${el.tagName}#${el.id}.${el.className?.toString().slice(0,30)} pe=${cs.pointerEvents} z=${cs.zIndex}`);
-    });
-    console.groupEnd();
-    if (!isInteract) {
-      const blocker = topEl;
-      const bcs = getComputedStyle(blocker);
-      showToast(`EVENT BLOCKER: <${blocker.tagName}> #${blocker.id} .${blocker.className?.toString().slice(0,20)} pe=${bcs.pointerEvents} z=${bcs.zIndex}`, 'error');
-    } else {
-      showToast('Canvas events: OK — interact is topmost', 'success');
-      // Fire a synthetic click to confirm listener fires
-      interact.addEventListener('click', function _test() {
-        interact.removeEventListener('click', _test);
-        console.log('[AetherCloud] Synthetic click confirmed — events working');
-      }, { once: true });
-      interact.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    }
-  }, 500);
 }
 
 // ── Build edge lookup maps for O(1) neighbor queries ──
@@ -7276,6 +7246,7 @@ showAgentDetail = showAgentDetailEnhanced;
 const _origRenderSidebar = renderSpawnedAgentsSidebar;
 function renderSpawnedAgentsSidebarEnhanced() {
   const c = document.getElementById('spawned-agents-list');
+  if (!c) return;
   if (!spawnedAgents.length) { c.innerHTML = ''; return; }
   c.innerHTML = spawnedAgents.map(a => {
     const profile = toneProfiles[a.id];
@@ -7532,6 +7503,7 @@ async function fetchTaskQopc(taskId) {
 
 function renderScheduledTasks() {
   const list = document.getElementById('scheduled-tasks-list');
+  if (!list) return;
   if (!scheduledTasks.length) {
     list.innerHTML = '<div style="font-size:9px;color:var(--text-muted);padding:6px 4px;font-family:JetBrains Mono,monospace;">No scheduled tasks</div>';
     return;
@@ -8742,15 +8714,16 @@ window.addEventListener('load', async () => {
   if (localStorage.getItem('sidebar_collapsed') === 'true') {
     document.getElementById('sidebar').classList.add('collapsed');
   }
-  ensureActiveConversation();
-  renderConversations();
-  renderSpawnedAgentsSidebar();
-  renderScheduledTasks();
-  startSchedTaskPolling();
-  startLogsPolling();
+  // Guard: non-critical UI renders must never block initCircuit
+  try { ensureActiveConversation(); } catch(e) { console.warn('ensureActiveConversation:', e); }
+  try { renderConversations(); } catch(e) { console.warn('renderConversations:', e); }
+  try { renderSpawnedAgentsSidebar(); } catch(e) { console.warn('renderSpawnedAgentsSidebar:', e); }
+  try { renderScheduledTasks(); } catch(e) { console.warn('renderScheduledTasks:', e); }
+  try { startSchedTaskPolling(); } catch(e) { console.warn('startSchedTaskPolling:', e); }
+  try { startLogsPolling(); } catch(e) { console.warn('startLogsPolling:', e); }
   initCircuit();
-  pushHistory('Initial vault');
-  initAdminLicenses();
+  try { pushHistory('Initial vault'); } catch(e) { console.warn('pushHistory:', e); }
+  try { initAdminLicenses(); } catch(e) { console.warn('initAdminLicenses:', e); }
   showToast('AetherCloud-L ready', 'success');
 });
 
