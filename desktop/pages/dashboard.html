@@ -487,13 +487,17 @@
     display: none;
   }
   #canvas-context-menu.open { display: block; }
-  .canvas-wrap:active { cursor: default; }
-  .canvas-wrap canvas {
+  #circuit-canvas {
     position: absolute; top: 0; left: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  #circuit-interact {
+    position: absolute; top: 0; left: 0;
+    z-index: 2;
     pointer-events: auto;
     cursor: grab;
   }
-  .canvas-wrap canvas:active { cursor: grabbing; }
 
   /* Loading overlay */
   .loading-overlay {
@@ -2109,6 +2113,8 @@
         <!-- QOPC Profile (hidden by default) -->
         <div class="patch-panel-body" id="patch-profile-view" style="display:none;"></div>
       </div>
+      <!-- Event-capture canvas: transparent overlay, sits above render canvas (z:1), below loading-overlay (z:50) -->
+      <canvas id="circuit-interact" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:auto;cursor:grab;background:transparent;"></canvas>
     </div>
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
@@ -2790,10 +2796,11 @@ function animatePanZoom(targetX, targetY, targetZoom, steps) {
 }
 
 function initCircuit() {
-  const canvas = document.getElementById('circuit-canvas');
-  const wrap   = document.getElementById('canvas-wrap');
+  const canvas   = document.getElementById('circuit-canvas');
+  const interact = document.getElementById('circuit-interact');
+  const wrap     = document.getElementById('canvas-wrap');
 
-  // Ensure canvas fills wrap, called on resize or scan
+  // Resize BOTH canvases together
   function resizeCanvas() {
     const w = wrap.clientWidth, h = wrap.clientHeight;
     if (w > 0 && h > 0) {
@@ -2801,53 +2808,58 @@ function initCircuit() {
       canvas.height = h * devicePixelRatio;
       canvas.style.width  = w + 'px';
       canvas.style.height = h + 'px';
+      interact.width  = w * devicePixelRatio;
+      interact.height = h * devicePixelRatio;
+      interact.style.width  = w + 'px';
+      interact.style.height = h + 'px';
     }
     drawCircuit();
   }
-  window.resizeCanvas = resizeCanvas; // expose for buildVaultFromScan
+  window.resizeCanvas = resizeCanvas;
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // ── ALL events on window — guaranteed to fire in Electron ──
-  wrap.style.cursor = 'grab';
-  let _isPanning = false, _dragStart = { x: 0, y: 0 };
-  let _prevView = null;
-  let _lastMouse = { x: 0, y: 0 };
+  // ── Clean event system: all on interact canvas, drag continues on window ──
+  let _isPanning = false, _panStart = null, _prevView = null, _lastMouse = { x:0, y:0 };
 
-  function _canvasRect() { return canvas.getBoundingClientRect(); }
-  function _inCanvas(e) {
-    const r = _canvasRect();
-    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-  }
+  function _rect() { return interact.getBoundingClientRect(); }
   function _toWorld(e) {
-    const r = _canvasRect();
+    const r = _rect();
     return { wx: (e.clientX - r.left - CS.panX) / CS.zoom,
              wy: (e.clientY - r.top  - CS.panY) / CS.zoom };
   }
-  function _setCursor(cur) { wrap.style.cursor = cur; canvas.style.cursor = cur; }
+  function _cur(c) { interact.style.cursor = c; }
 
-  window.addEventListener('mousedown', (e) => {
-    if (!_inCanvas(e)) return;
+  // WHEEL — zoom centered on cursor
+  interact.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = _rect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const factor = e.deltaY < 0 ? 1.08 : 0.93;
+    const nz = Math.min(Math.max(CS.zoom * factor, 0.05), 12);
+    CS.panX = mx - (mx - CS.panX) * (nz / CS.zoom);
+    CS.panY = my - (my - CS.panY) * (nz / CS.zoom);
+    CS.zoom = nz;
+    updateZoom(); drawCircuit();
+  }, { passive: false });
+
+  // MOUSEDOWN — start pan or node drag
+  interact.addEventListener('mousedown', (e) => {
     if (e.button !== 0 && e.button !== 1) return;
     document.getElementById('context-menu').classList.remove('open');
     document.getElementById('canvas-context-menu').classList.remove('open');
     const { wx, wy } = _toWorld(e);
-    const hitNode = hitTestNodeW(wx, wy);
-    if (e.button === 1) {
+    const hit = hitTestNodeW(wx, wy);
+    if (e.button === 1 || !hit) {
       _isPanning = true; CS.didDrag = false;
-      _dragStart = { x: e.clientX - CS.panX, y: e.clientY - CS.panY };
-      _setCursor('grabbing'); e.preventDefault(); return;
-    }
-    if (hitNode && !CS.pinnedNodes.has(hitNode.id)) {
-      CS.draggingNode = hitNode; CS.didDrag = false; _setCursor('move');
-    } else {
-      CS.draggingNode = null; _isPanning = true; CS.didDrag = false;
-      _dragStart = { x: e.clientX - CS.panX, y: e.clientY - CS.panY };
-      _setCursor('grabbing');
+      _panStart = { mx: e.clientX, my: e.clientY, tx: CS.panX, ty: CS.panY };
+      _cur('grabbing');
+    } else if (!CS.pinnedNodes.has(hit.id)) {
+      CS.draggingNode = hit; CS.didDrag = false; _cur('move');
     }
     e.preventDefault();
-  }, true);
+  });
 
+  // MOUSEMOVE — pan or drag, runs on window so drag works outside canvas
   window.addEventListener('mousemove', (e) => {
     _lastMouse = { x: e.clientX, y: e.clientY };
     if (CS.draggingNode) {
@@ -2856,17 +2868,19 @@ function initCircuit() {
       CS.draggingNode.cy = wy - (CS.draggingNode.driftY || 0);
       CS.didDrag = true; drawCircuit(); return;
     }
-    if (_isPanning) {
-      CS.panX = e.clientX - _dragStart.x;
-      CS.panY = e.clientY - _dragStart.y;
+    if (_isPanning && _panStart) {
+      CS.panX = _panStart.tx + (e.clientX - _panStart.mx);
+      CS.panY = _panStart.ty + (e.clientY - _panStart.my);
       CS.didDrag = true; drawCircuit(); return;
     }
-    if (!_inCanvas(e)) return;
+    // Hover (only when over interact canvas)
+    const r = _rect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
     const { wx, wy } = _toWorld(e);
     const found = hitTestNodeW(wx, wy);
     if (found !== CS.hoveredNode) {
       CS.hoveredNode = found; CS.connectedSet = getConnected(found);
-      _setCursor(found ? 'pointer' : 'grab');
+      _cur(found ? 'pointer' : 'grab');
       const tt = document.getElementById('node-tooltip');
       if (found) {
         tt.classList.add('visible');
@@ -2885,25 +2899,21 @@ function initCircuit() {
     }
   });
 
+  // MOUSEUP — stop pan/drag
   window.addEventListener('mouseup', () => {
-    if (CS.draggingNode) { CS.draggingNode = null; _setCursor(CS.hoveredNode ? 'pointer' : 'grab'); return; }
-    _isPanning = false; CS.dragging = false;
-    _setCursor(CS.hoveredNode ? 'pointer' : 'grab');
+    if (CS.draggingNode) { CS.draggingNode = null; _cur(CS.hoveredNode ? 'pointer' : 'grab'); return; }
+    _isPanning = false; _panStart = null; CS.dragging = false;
+    _cur(CS.hoveredNode ? 'pointer' : 'grab');
   });
 
   // ─── CLICK ────────────────────────────────────────
-  window.addEventListener('click', (e) => {
-    if (!_inCanvas(e)) return;
+  interact.addEventListener('click', (e) => {
     if (CS.didDrag) { CS.didDrag = false; return; }
     document.getElementById('project-actions').classList.remove('visible');
-
-    const rect = canvas.getBoundingClientRect();
-    const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-    const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+    const { wx, wy } = _toWorld(e);
     const node = hitTestNodeW(wx, wy) || CS.hoveredNode;
 
     if (!node) {
-      // Click on empty canvas — restore previous view if any
       if (_prevView) {
         const pv = _prevView; _prevView = null;
         CS.focusedNode = null; CS.selectedNode = null;
@@ -2914,7 +2924,7 @@ function initCircuit() {
     }
 
     // Spawn visual ripple at node screen position
-    const crect = canvas.getBoundingClientRect();
+    const crect = _rect();
     spawnRipple(
       node.cx * CS.zoom + CS.panX + crect.left,
       node.cy * CS.zoom + CS.panY + crect.top,
@@ -2958,18 +2968,12 @@ function initCircuit() {
   });
 
   // ─── DOUBLE-CLICK (drill into directory) ──────────
-  window.addEventListener('dblclick', (e) => {
-    if (!_inCanvas(e)) return;
-    const rect = canvas.getBoundingClientRect();
-    const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-    const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+  interact.addEventListener('dblclick', (e) => {
+    const { wx, wy } = _toWorld(e);
     const node = hitTestNodeW(wx, wy) || CS.hoveredNode;
     if (!node) {
-      // Double-click empty: zoom in 1.5x centered on cursor
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const nz = Math.min(4, CS.zoom * 1.5);
-      const f = nz / CS.zoom;
+      const r = _rect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      const nz = Math.min(8, CS.zoom * 1.5), f = nz / CS.zoom;
       animatePanZoom(mx - (mx - CS.panX) * f, my - (my - CS.panY) * f, nz, 18);
       return;
     }
@@ -3007,12 +3011,9 @@ function initCircuit() {
   });
 
   // ─── RIGHT-CLICK (node + empty canvas, unified) ───
-  window.addEventListener('contextmenu', (e) => {
-    if (!_inCanvas(e)) return;
+  interact.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const wx = (e.clientX - rect.left - CS.panX) / CS.zoom;
-    const wy = (e.clientY - rect.top  - CS.panY) / CS.zoom;
+    const { wx, wy } = _toWorld(e);
     const node = hitTestNodeW(wx, wy) || CS.hoveredNode;
     if (node) {
       ctxNode = node;
@@ -3043,22 +3044,6 @@ function initCircuit() {
     }
   });
 
-  // ─── SCROLL ZOOM ──────────────────────────────────
-  window.addEventListener('wheel', (e) => {
-    if (!_inCanvas(e)) return;
-    e.preventDefault();
-    const rect  = _canvasRect();
-    const mx    = e.clientX - rect.left;
-    const my    = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.12 : 0.90;
-    const nz    = Math.max(0.1, Math.min(8, CS.zoom * factor));
-    const f     = nz / CS.zoom;
-    CS.panX     = mx - (mx - CS.panX) * f;
-    CS.panY     = my - (my - CS.panY) * f;
-    CS.zoom     = nz;
-    updateZoom();
-    drawCircuit();
-  }, { passive: false, capture: true });
 
 
   // ─── KEYBOARD SHORTCUTS ───────────────────────────
