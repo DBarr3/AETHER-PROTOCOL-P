@@ -2685,6 +2685,40 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, focusedNode:null, prevView:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{}, pinnedNodes:new Set(), collapsedNodes:new Set(), draggingNode:null };
 
+// ════════════════════════════════════════════════════
+// NODE UPLOAD STATE — progress rings on canvas nodes
+// ════════════════════════════════════════════════════
+const _nodeUploadStates = new Map(); // nodeId → { state:'pending'|'uploading'|'done'|'failed', progress:0-1 }
+
+function setNodeUploadState(nodeId, state, progress = 0) {
+  if (!nodeId) return;
+  const existing = _nodeUploadStates.get(nodeId) || {};
+  _nodeUploadStates.set(nodeId, { state, progress: existing.progress || progress });
+  if (state === 'done' || state === 'failed') {
+    setTimeout(() => _nodeUploadStates.delete(nodeId), 3500);
+  }
+}
+
+function _tickFakeProgress(nodeId, startMs, durationMs) {
+  const st = _nodeUploadStates.get(nodeId);
+  if (!st || st.state !== 'uploading') return;
+  const elapsed = Date.now() - startMs;
+  st.progress = Math.min(0.88, elapsed / durationMs);
+  requestAnimationFrame(() => _tickFakeProgress(nodeId, startMs, durationMs));
+}
+
+function startUploadProgressAnimation(nodeId, durationMs = 1800) {
+  const st = _nodeUploadStates.get(nodeId);
+  if (st) st.progress = 0;
+  _tickFakeProgress(nodeId, Date.now(), durationMs);
+}
+
+function finishUploadProgress(nodeId, success) {
+  const st = _nodeUploadStates.get(nodeId);
+  if (st) st.progress = 1;
+  setNodeUploadState(nodeId, success ? 'done' : 'failed', 1);
+}
+
 // Hardened color system — bright, always visible, extension-based
 const TYPE_COLORS = {
   Python:'#06b6d4', JavaScript:'#a78bfa', TypeScript:'#a78bfa', JSX:'#a78bfa',
@@ -3275,6 +3309,68 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
     ctx.fillText('⚑', nx + radius * 0.8, ny - radius * 1.4);
   }
   ctx.shadowBlur = 0;
+
+  // ── Upload progress ring overlay ──────────────────
+  const _ups = _nodeUploadStates.get(n.id);
+  if (_ups) {
+    const ringR = radius + (isDir ? 9 : 6);
+    ctx.save();
+    ctx.setLineDash([]);
+    if (_ups.state === 'pending') {
+      // Amber dashed spinning ring
+      ctx.strokeStyle = `rgba(245,158,11,${0.55 + Math.sin(time * 4) * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -(time * 24) % 9;
+      ctx.beginPath(); ctx.arc(nx, ny, ringR, 0, Math.PI * 2); ctx.stroke();
+    } else if (_ups.state === 'uploading') {
+      // Track ring (dim cyan)
+      ctx.strokeStyle = 'rgba(0,212,255,0.15)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(nx, ny, ringR, 0, Math.PI * 2); ctx.stroke();
+      // Progress arc (cyan)
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(0,212,255,0.6)'; ctx.shadowBlur = 6;
+      const startA = -Math.PI / 2;
+      const endA = startA + (_ups.progress * Math.PI * 2);
+      ctx.beginPath(); ctx.arc(nx, ny, ringR, startA, endA); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Progress text inside
+      const pct = Math.round((_ups.progress || 0) * 100);
+      ctx.fillStyle = 'rgba(0,212,255,0.85)';
+      ctx.font = `bold ${Math.max(6, radius * 0.7)}px monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (radius > 5) ctx.fillText(pct + '%', nx, ny);
+    } else if (_ups.state === 'done') {
+      // Green complete ring
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(34,197,94,0.5)'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(nx, ny, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Checkmark badge
+      ctx.fillStyle = '#22c55e';
+      ctx.font = `bold ${Math.max(8, radius * 0.9)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✓', nx + ringR * 0.62, ny - ringR * 0.62);
+    } else if (_ups.state === 'failed') {
+      // Flashing red ring
+      const alpha = 0.45 + Math.sin(time * 9) * 0.45;
+      ctx.strokeStyle = `rgba(239,68,68,${alpha})`;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = 'rgba(239,68,68,0.6)'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(nx, ny, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // X badge
+      ctx.fillStyle = '#ef4444';
+      ctx.font = `bold ${Math.max(8, radius * 0.9)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✕', nx + ringR * 0.62, ny - ringR * 0.62);
+    }
+    ctx.restore();
+  }
 }
 
 let _minimapVisible = true;
@@ -3975,10 +4071,12 @@ function canvasCtxAddFolder() {
 }
 function ctxUploadToVault() {
   if (!ctxNode || !ctxNode.path) return;
+  const nodeId = ctxNode.id;
+  setNodeUploadState(nodeId, 'pending');
   if (ctxNode.dir || ctxNode.type === 'directory') {
-    uploadDirectoryToVault(ctxNode.path, ctxNode.name);
+    uploadDirectoryToVault(ctxNode.path, ctxNode.name, nodeId);
   } else {
-    uploadLocalFileToVault(ctxNode.path, ctxNode.name);
+    uploadLocalFileToVault(ctxNode.path, ctxNode.name, nodeId);
   }
 }
 
@@ -4594,15 +4692,17 @@ async function loadVaultFilesList() {
 }
 
 // Upload a local file (from vault tree) to DO Spaces
-async function uploadLocalFileToVault(filePath, fileName) {
+async function uploadLocalFileToVault(filePath, fileName, nodeId = null) {
   if (!filePath || !window.aether?.readFilePreview) return;
   const token = await getSessionToken();
 
   showToast(`Uploading ${fileName} to vault...`, 'info');
+  if (nodeId) { setNodeUploadState(nodeId, 'uploading'); startUploadProgressAnimation(nodeId, 2200); }
   try {
     // Read the file via IPC — get raw content
     const preview = await window.aether.readFilePreview(filePath, 99999);
     if (preview.error || preview.binary) {
+      if (nodeId) finishUploadProgress(nodeId, false);
       showToast(`Cannot upload ${fileName}: ${preview.binary ? 'binary file' : preview.message}`, 'error');
       return;
     }
@@ -4617,55 +4717,71 @@ async function uploadLocalFileToVault(filePath, fileName) {
     });
     const result = await safeJson(resp);
     if (!resp.ok || result.error) {
+      if (nodeId) finishUploadProgress(nodeId, false);
       showToast(`Upload failed: ${result.detail || result.message}`, 'error');
       return;
     }
-    showToast(`${fileName} uploaded to vault`, 'success');
+    if (nodeId) finishUploadProgress(nodeId, true);
+    showToast(`${fileName} uploaded to vault ✓`, 'success');
     // Refresh list if vault tab is visible
     if (document.getElementById('tab-file-vault')?.classList.contains('active')) {
       loadVaultFilesList();
     }
   } catch (e) {
+    if (nodeId) finishUploadProgress(nodeId, false);
     showToast(`Upload error: ${e.message}`, 'error');
   }
 }
 
 // Upload an entire directory to vault
-async function uploadDirectoryToVault(dirPath, dirName) {
+async function uploadDirectoryToVault(dirPath, dirName, nodeId = null) {
   if (!dirPath || !window.aether?.readDirectoryContext) return;
   const token = await getSessionToken();
 
   const ctx = await window.aether.readDirectoryContext(dirPath, 50);
   if (!ctx || ctx.error) {
+    if (nodeId) finishUploadProgress(nodeId, false);
     showToast(`Cannot read directory: ${ctx?.message || 'unknown error'}`, 'error');
     return;
   }
 
   const files = ctx.fileContents || [];
   if (files.length === 0) {
+    if (nodeId) setNodeUploadState(nodeId, 'failed');
     showToast('No readable files in directory', 'error');
     return;
   }
 
-  if (!confirm(`Upload entire folder to vault?\n${files.length} file(s) will be uploaded.`)) return;
+  if (!confirm(`Upload entire folder to vault?\n${files.length} file(s) will be uploaded.`)) {
+    if (nodeId) _nodeUploadStates.delete(nodeId);
+    return;
+  }
 
-  let uploaded = 0;
+  if (nodeId) { setNodeUploadState(nodeId, 'uploading', 0); }
+  let uploaded = 0, failed = 0;
   for (const f of files) {
     showToast(`Uploading ${++uploaded} of ${files.length}: ${f.relPath}`, 'info');
+    if (nodeId) {
+      const st = _nodeUploadStates.get(nodeId);
+      if (st) st.progress = (uploaded - 1) / files.length;
+    }
     try {
       const blob = new Blob([f.content], { type: 'text/plain' });
       const formData = new FormData();
       formData.append('file', blob, f.relPath.replace(/\//g, '_'));
 
-      await fetch(`${API_BASE}/vault/spaces/upload`, {
+      const resp = await fetch(`${API_BASE}/vault/spaces/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
-    } catch { /* continue with next file */ }
+      if (!resp.ok) failed++;
+    } catch { failed++; }
   }
 
-  showToast(`${uploaded} file(s) uploaded to vault`, 'success');
+  if (nodeId) finishUploadProgress(nodeId, failed === 0);
+  const msg = failed > 0 ? `${uploaded - failed} of ${files.length} files uploaded (${failed} failed)` : `${uploaded} file(s) uploaded to vault ✓`;
+  showToast(msg, failed > 0 ? 'error' : 'success');
   if (document.getElementById('tab-file-vault')?.classList.contains('active')) {
     loadVaultFilesList();
   }
