@@ -8,6 +8,7 @@ Aether Systems LLC — Patent Pending
 
 import json
 import os
+import re
 import sys
 import time
 import hashlib
@@ -414,10 +415,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: allow Electron renderer (file://), localhost, and VPS origins
+# CORS: allow Electron renderer (file://), localhost, and VPS origins.
+# Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
+# Example: AETHER_ALLOWED_ORIGINS="198.211.115.41 143.198.162.111"
+_cors_base = r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)"
+_extra_ips = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
+_cors_parts = [_cors_base] + [rf"|http://{re.escape(ip)}(:\d+)?" for ip in _extra_ips]
+_cors_regex = "".join(_cors_parts) + r"$"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?|http://143\.198\.162\.111(:\d+)?|http://198\.211\.115\.41(:\d+)?)$",
+    allow_origin_regex=_cors_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -709,12 +717,12 @@ async def verify_session(req: VerifyRequest):
 
 
 @app.post("/auth/logout", response_model=LogoutResponse)
-async def logout(req: LogoutRequest):
-    """Terminate session and log event."""
+async def logout(token: str = Depends(get_session_token)):
+    """Terminate session and log event. Token extracted from Authorization header."""
     if not svc.auth:
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
-    result = svc.auth.logout(req.session_token)
+    result = svc.auth.logout(token)
     return LogoutResponse(
         success=result.get("success", True),
         audit_id=result.get("audit_id"),
@@ -723,9 +731,23 @@ async def logout(req: LogoutRequest):
 
 @app.post("/auth/setup")
 async def setup_first_user(request: SetupRequest):
-    """Create initial admin user. Only works once."""
+    """Create initial admin user. Only works once. Requires a valid license."""
     if not svc.auth:
         raise HTTPException(status_code=503, detail="Auth service not initialized")
+
+    # Require a valid (or grace-mode) license before allowing account creation
+    try:
+        from license_client import get_license_info
+        _li = get_license_info()
+        if _li and not _li.get("valid") and not _li.get("grace_mode"):
+            raise HTTPException(
+                status_code=403,
+                detail="LICENSE_INVALID — a valid AetherCloud license is required to set up this system",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # license check failure is non-blocking if module unavailable
 
     # Check if non-dev users already exist
     creds_file = STORAGE_CREDENTIALS_FILE
@@ -839,7 +861,7 @@ async def vault_spaces_upload(
         raise HTTPException(status_code=413, detail=str(exc))
     except Exception as exc:
         log.error("Vault upload failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+        raise HTTPException(status_code=500, detail="Upload failed — check server logs for details")
 
 
 @app.get("/vault/spaces/list")
@@ -875,7 +897,7 @@ async def vault_spaces_download(
         )
     except Exception as exc:
         log.error("Vault download failed: %s", exc)
-        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+        raise HTTPException(status_code=404, detail="File not found or unavailable")
 
 
 @app.get("/vault/spaces/content/{filename:path}")
@@ -935,7 +957,7 @@ async def agent_chat(req: ChatRequest, token: str = Depends(get_session_token)):
         response_text = svc.agent.chat(query)
     except Exception as e:
         log.warning("agent.chat failed: %s", e)
-        response_text = f"Agent error: {str(e)}"
+        response_text = "Agent encountered an error — please try again."
 
     verified = hasattr(svc.agent, 'is_hardened') and svc.agent.is_hardened
 
@@ -1144,7 +1166,7 @@ async def agent_mcp_chat(
                 data = resp.json()
         except Exception as e:
             log.warning("MCP agent fallback call failed: %s", e)
-            raise HTTPException(status_code=502, detail=f"Agent error: {str(e)}")
+            raise HTTPException(status_code=502, detail="Agent worker unavailable — check MCP worker status")
 
         response_text = ""
         tools_used = []
