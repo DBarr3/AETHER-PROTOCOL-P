@@ -11,7 +11,9 @@
     "dev": "electron . --dev",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
-    "dist": "electron-builder --win --publish never"
+    "dist": "electron-builder --win --publish never",
+    "dist:signed": "electron-builder --win --publish never",
+    "dist:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish never"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
@@ -25,9 +27,17 @@
     "appId": "com.aethersystems.aethercloud",
     "productName": "AetherCloud-L",
     "copyright": "Copyright 2026 Aether Systems LLC",
+
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-machine-id/**"
+    ],
+
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "assets"
     },
+
     "files": [
       "main.js",
       "preload.js",
@@ -35,30 +45,39 @@
       "auth-store.js",
       "analysis-cache.js",
       "pages/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "!assets/icon.icns",
+      "!assets/icon.png",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/test*",
+      "!**/spec*",
+      "!**/.git/**",
+      "!**/node_modules/.cache/**"
     ],
-    "extraResources": [],
+
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.ico",
       "publisherName": "Aether Systems LLC",
+      "artifactName": "AetherCloud-L-Setup-${version}.exe",
       "signAndEditExecutable": false,
       "sign": null
     },
+
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AetherCloud-L",
-      "uninstallDisplayName": "AetherCloud-L",
+      "uninstallDisplayName": "AetherCloud-L v${version}",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
@@ -66,13 +85,19 @@
       "menuCategory": "Aether Systems LLC",
       "license": "assets/license.txt",
       "runAfterFinish": true,
-      "perMachine": false
+      "perMachine": false,
+      "installerLanguages": ["en_US"],
+      "warningsAsErrors": false
     },
+
     "mac": {
       "target": "dmg",
       "icon": "assets/icon.icns",
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
+
     "linux": {
       "target": "AppImage",
       "icon": "assets/icon.png",

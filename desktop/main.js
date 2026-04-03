@@ -1,5 +1,5 @@
 /**
- * AetherCloud-L v0.9.3 — Electron Main Process
+ * AetherCloud-L v0.9.4 — Electron Main Process
  * Aether Systems LLC · Patent Pending
  *
  * All traffic routes through VPS1 HTTPS proxy → VPS2 private mesh
