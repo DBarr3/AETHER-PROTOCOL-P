@@ -439,6 +439,54 @@
     user-select: none;
     -webkit-user-select: none;
   }
+
+  /* ── Graph legend ─────────────────────────────────── */
+  #graph-legend {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    background: rgba(8,8,14,0.88);
+    border: 1px solid rgba(0,212,255,0.25);
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    z-index: 10;
+    min-width: 130px;
+    pointer-events: auto;
+  }
+  #graph-legend.collapsed .legend-body { display: none; }
+  .legend-title {
+    color: rgba(0,212,255,0.7); font-size: 8px;
+    letter-spacing: 0.5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .legend-row {
+    display: flex; align-items: center; gap: 7px;
+    color: rgba(180,200,220,0.7); margin-bottom: 4px;
+  }
+  .legend-shape {
+    width: 14px; height: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  /* Canvas-based legend shapes drawn via CSS fallback */
+  .ls-circle { width:10px;height:10px;border-radius:50%;background:#3b82f6; }
+  .ls-code   { width:10px;height:10px;border-radius:50%;background:#06b6d4; }
+  .ls-config { width:10px;height:10px;transform:rotate(45deg);background:#f59e0b; }
+  .ls-media  { width:10px;height:10px;border-radius:50%;background:#ec4899; }
+  .ls-agent  { width:10px;height:10px;border-radius:50%;background:#ffffff; }
+
+  /* ── Empty-canvas context menu ────────────────────── */
+  #canvas-context-menu {
+    position: fixed;
+    background: rgba(10,10,15,0.92);
+    border: 1px solid rgba(0,212,255,0.2);
+    backdrop-filter: blur(8px);
+    min-width: 200px; z-index: 600;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    display: none;
+  }
+  #canvas-context-menu.open { display: block; }
   .canvas-wrap:active { cursor: grabbing; }
   .canvas-wrap canvas {
     position: absolute; top: 0; left: 0;
@@ -2060,6 +2108,20 @@
         <div class="patch-panel-body" id="patch-profile-view" style="display:none;"></div>
       </div>
     </div>
+    <!-- Graph Legend -->
+    <div id="graph-legend">
+      <div class="legend-title" onclick="this.closest('#graph-legend').classList.toggle('collapsed')">
+        <span>LEGEND</span><span id="legend-toggle">▲</span>
+      </div>
+      <div class="legend-body">
+        <div class="legend-row"><div class="legend-shape"><div class="ls-circle" style="border-radius:3px;"></div></div>Folder</div>
+        <div class="legend-row"><div class="legend-shape"><div class="ls-code"></div></div>Code file</div>
+        <div class="legend-row"><div class="legend-shape"><div class="ls-config"></div></div>Config / JSON</div>
+        <div class="legend-row"><div class="legend-shape"><div class="ls-media"></div></div>Image / Media</div>
+        <div class="legend-row"><div class="legend-shape"><div class="ls-agent"></div></div>Agent</div>
+        <div class="legend-row" style="margin-top:6px;color:rgba(100,120,140,0.7);font-size:8px;">Drag nodes to reposition<br>Double-click folder to drill<br>Right-click for actions<br>0 = fit all · +/- = zoom</div>
+      </div>
+    </div>
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
       <div class="logs-toolbar">
@@ -2167,22 +2229,40 @@
   <div class="tt-path" id="tt-path"></div>
 </div>
 
-<!-- Right-click context menu -->
+<!-- Right-click context menu (nodes) -->
 <div class="context-menu" id="context-menu">
   <div class="ctxmenu-option" id="ctx-node-label" style="font-size:9px;color:var(--accent);padding:5px 14px 3px;cursor:default;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;"></div>
   <div class="ctx-sep" style="margin-top:0;"></div>
   <div class="ctxmenu-option" onclick="ctxOpenExplorer()"><span class="ctx-icon">&#128194;</span>Open in Explorer</div>
   <div class="ctxmenu-option" id="ctx-open-file" onclick="ctxOpenFile()"><span class="ctx-icon">&#128065;</span>Open file</div>
   <div class="ctxmenu-option" onclick="ctxZoomTo()"><span class="ctx-icon">&#8982;</span>Zoom to node</div>
+  <div class="ctxmenu-option" onclick="ctxFocusNode()"><span class="ctx-icon">&#9678;</span>Focus / dim others</div>
   <div class="ctx-sep"></div>
   <div class="ctxmenu-option" onclick="ctxAnalyze()"><span class="ctx-icon">&#128269;</span>Analyze with AI</div>
+  <div class="ctxmenu-option" onclick="ctxSendToAgent()"><span class="ctx-icon">&#129302;</span>Send to Agent</div>
   <div class="ctxmenu-option" id="ctx-drill" onclick="ctxDrillIn()"><span class="ctx-icon">&#128448;</span>Drill into folder</div>
+  <div class="ctxmenu-option" id="ctx-collapse" onclick="ctxCollapseExpand()"><span class="ctx-icon">&#8644;</span>Collapse / Expand</div>
   <div class="ctxmenu-option" id="ctx-upload-vault" onclick="ctxUploadToVault()"><span class="ctx-icon">&#9729;</span>Upload to Cloud Vault</div>
   <div class="ctx-sep"></div>
+  <div class="ctxmenu-option" onclick="ctxPinNode()"><span class="ctx-icon">&#9913;</span>Pin / Unpin node</div>
   <div class="ctxmenu-option" onclick="ctxCopyName()"><span class="ctx-icon">&#128221;</span>Copy filename</div>
   <div class="ctxmenu-option" onclick="ctxCopyPath()"><span class="ctx-icon">&#128203;</span>Copy full path</div>
   <div class="ctx-sep"></div>
   <div class="ctxmenu-option" onclick="ctxViewMeta()"><span class="ctx-icon">&#9881;</span>View metadata</div>
+</div>
+
+<!-- Right-click context menu (empty canvas) -->
+<div class="context-menu" id="canvas-context-menu">
+  <div class="ctxmenu-option" style="font-size:9px;color:var(--accent);padding:5px 14px 3px;cursor:default;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;">CANVAS</div>
+  <div class="ctx-sep" style="margin-top:0;"></div>
+  <div class="ctxmenu-option" onclick="canvasCtxFitAll()"><span class="ctx-icon">&#8689;</span>Fit all nodes</div>
+  <div class="ctxmenu-option" onclick="circuitZoomIn()"><span class="ctx-icon">&#43;</span>Zoom in</div>
+  <div class="ctxmenu-option" onclick="circuitZoomOut()"><span class="ctx-icon">&#8722;</span>Zoom out</div>
+  <div class="ctx-sep"></div>
+  <div class="ctxmenu-option" onclick="canvasCtxResetLayout()"><span class="ctx-icon">&#8635;</span>Reset layout</div>
+  <div class="ctxmenu-option" onclick="canvasCtxAddFolder()"><span class="ctx-icon">&#128193;</span>Add folder to scan</div>
+  <div class="ctx-sep"></div>
+  <div class="ctxmenu-option" onclick="canvasCtxScreenshot()"><span class="ctx-icon">&#128247;</span>Screenshot graph</div>
 </div>
 
 <!-- Toast container -->
@@ -2603,7 +2683,7 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 // CIRCUIT GRAPH ENGINE — Radial Quantum Layout
 // ════════════════════════════════════════════════════
-const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{} };
+const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, focusedNode:null, prevView:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{}, pinnedNodes:new Set(), collapsedNodes:new Set(), draggingNode:null };
 
 // Hardened color system — bright, always visible, extension-based
 const TYPE_COLORS = {
@@ -2690,21 +2770,41 @@ function initCircuit() {
   let _lastMouse = { x: 0, y: 0 };
 
   wrap.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.button !== 1) return;
     document.getElementById('context-menu').classList.remove('open');
-    CS.dragging  = true;
-    CS.didDrag   = false;
-    CS._dragOriX = e.clientX;
-    CS._dragOriY = e.clientY;
-    CS._panSX    = CS.panX;
-    CS._panSY    = CS.panY;
-    wrap.style.cursor = 'grabbing';
+    document.getElementById('canvas-context-menu').classList.remove('open');
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const hitNode = hitTestNode(cx, cy);
+    if (hitNode && e.button === 0 && !CS.pinnedNodes.has(hitNode.id)) {
+      // Node drag
+      CS.draggingNode = hitNode;
+      CS.didDrag = false;
+      wrap.style.cursor = 'move';
+    } else {
+      // Canvas pan
+      CS.draggingNode = null;
+      CS.dragging  = true;
+      CS.didDrag   = false;
+      CS._dragOriX = e.clientX;
+      CS._dragOriY = e.clientY;
+      CS._panSX    = CS.panX;
+      CS._panSY    = CS.panY;
+      wrap.style.cursor = 'grabbing';
+    }
     e.preventDefault();
   });
 
   window.addEventListener('mousemove', (e) => {
     _lastMouse = { x: e.clientX, y: e.clientY };
 
+    if (CS.draggingNode) {
+      const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+      CS.draggingNode.cx = cx - (CS.draggingNode.driftX || 0);
+      CS.draggingNode.cy = cy - (CS.draggingNode.driftY || 0);
+      CS.didDrag = true;
+      drawCircuit();
+      return;
+    }
     if (CS.dragging) {
       const dx = e.clientX - CS._dragOriX;
       const dy = e.clientY - CS._dragOriY;
@@ -2743,6 +2843,7 @@ function initCircuit() {
   });
 
   window.addEventListener('mouseup', (e) => {
+    if (CS.draggingNode) { CS.draggingNode = null; wrap.style.cursor = 'grab'; return; }
     if (!CS.dragging) return;
     CS.dragging = false;
     wrap.style.cursor = CS.hoveredNode ? 'pointer' : 'grab';
@@ -2791,7 +2892,7 @@ function initCircuit() {
   });
 
   // ─── DOUBLE-CLICK (drill into directory) ──────────
-  canvas.addEventListener('dblclick', (e) => {
+  wrap.addEventListener('dblclick', (e) => {
     const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
     const node = hitTestNode(cx, cy) || CS.hoveredNode;
     if (!node || !node.dir || node.isRoot) return;
@@ -2852,6 +2953,8 @@ function initCircuit() {
     if (up)   up.style.display   = node.isRoot ? 'none' : 'flex';
     if (drll) drll.style.display = (node.dir && !node.isRoot) ? 'flex' : 'none';
     if (opn)  opn.style.display  = (!node.dir) ? 'flex' : 'none';
+    const clps = document.getElementById('ctx-collapse');
+    if (clps) clps.style.display = node.dir ? 'flex' : 'none';
     cm.classList.add('open');
   });
 
@@ -2870,6 +2973,56 @@ function initCircuit() {
     updateZoom();
     drawCircuit();
   }, { passive: false });
+
+  // ─── MIDDLE MOUSE PAN ─────────────────────────────
+  wrap.addEventListener('mousedown', (e) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    CS.dragging = true; CS.didDrag = false;
+    CS._dragOriX = e.clientX; CS._dragOriY = e.clientY;
+    CS._panSX = CS.panX; CS._panSY = CS.panY;
+    wrap.style.cursor = 'grabbing';
+  });
+
+  // ─── EMPTY CANVAS RIGHT-CLICK ─────────────────────
+  wrap.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const { cx, cy } = screenToCanvas(e.clientX, e.clientY);
+    const node = hitTestNode(cx, cy) || CS.hoveredNode;
+    if (node) return; // handled by node contextmenu handler above
+    const cm = document.getElementById('canvas-context-menu');
+    const cmW = 210, cmH = 220;
+    cm.style.left = Math.min(e.clientX, window.innerWidth  - cmW) + 'px';
+    cm.style.top  = Math.min(e.clientY, window.innerHeight - cmH) + 'px';
+    cm.classList.add('open');
+  }, { capture: false });
+
+  // ─── KEYBOARD SHORTCUTS ───────────────────────────
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const wrap = document.getElementById('canvas-wrap');
+    const ww = wrap?.clientWidth || 900, wh = wrap?.clientHeight || 600;
+    switch (e.key) {
+      case '+': case '=':
+        CS.zoom = Math.min(4, CS.zoom * 1.15);
+        updateZoom(); drawCircuit(); e.preventDefault(); break;
+      case '-':
+        CS.zoom = Math.max(0.1, CS.zoom * 0.87);
+        updateZoom(); drawCircuit(); e.preventDefault(); break;
+      case '0':
+        circuitResetView(); e.preventDefault(); break;
+      case 'Escape':
+        CS.focusedNode = null; CS.selectedNode = null;
+        CS.highlightPath = []; CS.connectedSet = new Set();
+        document.getElementById('context-menu').classList.remove('open');
+        document.getElementById('canvas-context-menu').classList.remove('open');
+        drawCircuit(); break;
+      case 'ArrowLeft':  CS.panX += 60; drawCircuit(); e.preventDefault(); break;
+      case 'ArrowRight': CS.panX -= 60; drawCircuit(); e.preventDefault(); break;
+      case 'ArrowUp':    CS.panY += 60; drawCircuit(); e.preventDefault(); break;
+      case 'ArrowDown':  CS.panY -= 60; drawCircuit(); e.preventDefault(); break;
+    }
+  });
 
   buildDemoVault();
   drawCircuit();
@@ -3061,172 +3214,248 @@ function radialLayout(nodes, edges) {
   buildEdgeMaps();
 }
 
-// ── Draw Engine (viewport-culled, 600+ node ready) ───
+function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
+  const isDir = n.dir || n.type === 'directory';
+  const ext = (n.name.split('.').pop() || '').toLowerCase();
+  const isConfig = ['json','yaml','yml','env','toml','cfg','ini','xml','properties'].includes(ext);
+  const isPinned = CS.pinnedNodes.has(n.id);
+  const isCollapsed = CS.collapsedNodes.has(n.id) && isDir;
+  let radius = n.r || 5;
+  if (isH) radius += 2.5;
+  if (isS || isF) radius += 3;
+  const finalColor = n.agentActive ? '#ffffff' : color;
+  if (n.agentActive) {
+    radius += 4 + Math.sin(time * 5) * 2;
+    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 16;
+  } else if (isS || isF) {
+    ctx.shadowColor = finalColor; ctx.shadowBlur = 18;
+    ctx.strokeStyle = hexToRGBA(finalColor, 0.35);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(nx, ny, radius + 6 + Math.sin(time * 3) * 2, 0, Math.PI * 2); ctx.stroke();
+  } else if (isH) {
+    ctx.shadowColor = finalColor; ctx.shadowBlur = 12;
+  } else {
+    ctx.shadowColor = hexToRGBA(finalColor, 0.35); ctx.shadowBlur = 3;
+  }
+  ctx.fillStyle = hexToRGBA(finalColor, (isH || isS || isF) ? 1.0 : 0.85);
+  ctx.strokeStyle = (isH || isS || isF) ? finalColor : hexToRGBA(finalColor, 0.65);
+  ctx.lineWidth = (isH || isS || isF) ? 1.4 : 0.7;
+  if (isDir) {
+    const rw = radius * 2.4, rh = radius * 1.6, corner = radius * 0.4;
+    const rx_ = nx - rw/2, ry_ = ny - rh/2;
+    ctx.beginPath();
+    ctx.moveTo(rx_ + corner, ry_); ctx.lineTo(rx_ + rw - corner, ry_);
+    ctx.arcTo(rx_ + rw, ry_, rx_ + rw, ry_ + corner, corner);
+    ctx.lineTo(rx_ + rw, ry_ + rh - corner);
+    ctx.arcTo(rx_ + rw, ry_ + rh, rx_ + rw - corner, ry_ + rh, corner);
+    ctx.lineTo(rx_ + corner, ry_ + rh);
+    ctx.arcTo(rx_, ry_ + rh, rx_, ry_ + rh - corner, corner);
+    ctx.lineTo(rx_, ry_ + corner);
+    ctx.arcTo(rx_, ry_, rx_ + corner, ry_, corner);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (isCollapsed) {
+      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(0,212,255,0.9)';
+      ctx.font = `${Math.max(6, radius * 0.85)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('▶', nx, ny);
+    }
+  } else if (isConfig) {
+    const d = radius * 1.5;
+    ctx.beginPath(); ctx.moveTo(nx, ny - d); ctx.lineTo(nx + d, ny);
+    ctx.lineTo(nx, ny + d); ctx.lineTo(nx - d, ny); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
+    ctx.stroke();
+  }
+  if (isPinned) {
+    ctx.shadowBlur = 0; ctx.fillStyle = '#f59e0b';
+    ctx.font = `${Math.max(7, radius)}px sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('⚑', nx + radius * 0.8, ny - radius * 1.4);
+  }
+  ctx.shadowBlur = 0;
+}
+
+let _minimapVisible = true;
+function drawMinimap(canvas, w, h) {
+  if (!_minimapVisible || CS.nodes.length < 15) return;
+  const ctx = canvas.getContext('2d');
+  const MW = 160, MH = 96, MX = w - MW - 12, MY = h - MH - 12, PAD = 6;
+  let mnX=Infinity, mxX=-Infinity, mnY=Infinity, mxY=-Infinity;
+  CS.nodes.forEach(n => { mnX=Math.min(mnX,n.cx); mxX=Math.max(mxX,n.cx); mnY=Math.min(mnY,n.cy); mxY=Math.max(mxY,n.cy); });
+  if (mnX === Infinity) return;
+  const bw = mxX-mnX||1, bh = mxY-mnY||1;
+  const sc = Math.min((MW-PAD*2)/bw, (MH-PAD*2)/bh);
+  const offX = MX+PAD+(MW-PAD*2-bw*sc)/2, offY = MY+PAD+(MH-PAD*2-bh*sc)/2;
+  ctx.save();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.fillStyle = 'rgba(8,8,14,0.88)'; ctx.strokeStyle = 'rgba(0,212,255,0.28)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.rect(MX, MY, MW, MH); ctx.fill(); ctx.stroke();
+  for (const n of CS.nodes) {
+    const mx = offX+(n.cx-mnX)*sc, my = offY+(n.cy-mnY)*sc;
+    ctx.fillStyle = n.isRoot ? '#00d4ff' : nodeColor(n);
+    ctx.globalAlpha = (n===CS.selectedNode||n===CS.hoveredNode) ? 1 : 0.55;
+    ctx.beginPath(); ctx.arc(mx, my, n.isRoot ? 3 : 1.1, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const wrap2 = document.getElementById('canvas-wrap');
+  const ww2=wrap2?.clientWidth||900, wh2=wrap2?.clientHeight||600;
+  const vpL=offX+(-CS.panX/CS.zoom-mnX)*sc, vpT=offY+(-CS.panY/CS.zoom-mnY)*sc;
+  const vpW=(ww2/CS.zoom)*sc, vpH=(wh2/CS.zoom)*sc;
+  ctx.strokeStyle='rgba(0,212,255,0.7)'; ctx.lineWidth=0.8;
+  ctx.strokeRect(Math.max(MX,vpL), Math.max(MY,vpT), Math.min(vpW,MW-(Math.max(MX,vpL)-MX)), Math.min(vpH,MH-(Math.max(MY,vpT)-MY)));
+  ctx.fillStyle='rgba(0,212,255,0.45)'; ctx.font='7px "IBM Plex Mono",monospace';
+  ctx.textAlign='left'; ctx.fillText('MAP', MX+4, MY+MH-6);
+  ctx.restore();
+}
+
+function drawHUD(canvas, w, h, visibleCount) {
+  const ctx = canvas.getContext('2d');
+  const total = CS.nodes.length;
+  if (!total) return;
+  ctx.save();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const lbl = `${visibleCount} / ${total} nodes`;
+  ctx.font = '9px "IBM Plex Mono",monospace';
+  const lw = ctx.measureText(lbl).width;
+  ctx.fillStyle = 'rgba(8,8,14,0.72)';
+  ctx.fillRect(w - lw - 22, 8, lw + 16, 17);
+  ctx.fillStyle = CS.zoom < 0.5 ? '#f59e0b' : 'rgba(0,212,255,0.65)';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.fillText(lbl, w - 10, 17);
+  ctx.restore();
+}
+
 function drawCircuit() {
   const canvas = document.getElementById('circuit-canvas');
   const ctx = canvas.getContext('2d');
   const w = canvas.width / devicePixelRatio;
   const h = canvas.height / devicePixelRatio;
-
   const time = Date.now() / 1000;
+  const z = CS.zoom;
 
   ctx.save();
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, w, h);
-
   ctx.translate(CS.panX, CS.panY);
-  ctx.scale(CS.zoom, CS.zoom);
+  ctx.scale(z, z);
 
   if (window.activityLayer) activityLayer.drawIdle(ctx);
 
   const gx = CS.cx || w/2, gy = CS.cy || h/2;
-  ctx.strokeStyle = 'rgba(0,212,255,0.04)';
-  ctx.lineWidth = 0.5;
-  [160, 310, 440, 560, 670].forEach(r => {
-    ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.stroke();
-  });
-  
-  ctx.strokeStyle = 'rgba(0,212,255,0.06)';
-  const crossLen = 700;
-  ctx.beginPath(); ctx.moveTo(gx - crossLen, gy); ctx.lineTo(gx + crossLen, gy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(gx, gy - crossLen); ctx.lineTo(gx, gy + crossLen); ctx.stroke();
+  if (z > 0.2) {
+    ctx.strokeStyle = 'rgba(0,212,255,0.04)'; ctx.lineWidth = 0.5/z;
+    [160,310,440,560,670].forEach(r => { ctx.beginPath(); ctx.arc(gx,gy,r,0,Math.PI*2); ctx.stroke(); });
+    ctx.strokeStyle = 'rgba(0,212,255,0.03)';
+    const cl = 700;
+    ctx.beginPath(); ctx.moveTo(gx-cl,gy); ctx.lineTo(gx+cl,gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx,gy-cl); ctx.lineTo(gx,gy+cl); ctx.stroke();
+  }
 
-  const cullMargin = 120 / CS.zoom;
-  const vpLeft = -CS.panX / CS.zoom - cullMargin;
-  const vpRight = (w - CS.panX) / CS.zoom + cullMargin;
-  const vpTop = -CS.panY / CS.zoom - cullMargin;
-  const vpBottom = (h - CS.panY) / CS.zoom + cullMargin;
-
+  const cullMargin = Math.max(80, 200/z);
+  const vpLeft  = -CS.panX/z - cullMargin, vpRight  = (w-CS.panX)/z + cullMargin;
+  const vpTop   = -CS.panY/z - cullMargin, vpBottom = (h-CS.panY)/z + cullMargin;
   function inView(n) {
-    const nx = n.cx + (n.driftX || 0);
-    const ny = n.cy + (n.driftY || 0);
-    return nx >= vpLeft && nx <= vpRight && ny >= vpTop && ny <= vpBottom;
+    const nx=n.cx+(n.driftX||0), ny=n.cy+(n.driftY||0);
+    return nx>=vpLeft&&nx<=vpRight&&ny>=vpTop&&ny<=vpBottom;
   }
 
-  // ── Update Float Animation (figure-8 drift) ──
+  const driftScale = Math.min(1, z * 2);
   for (const n of CS.nodes) {
-    if (!n.isRoot) {
-      n.floatAngle = (n.floatAngle || 0) + (n.floatSpeed || 0.0003);
-      const fa = n.floatAngle, fr = n.floatRadius || 1.5, fp = n.floatPhase || 0;
-      n.driftX = Math.cos(fa) * fr + Math.sin(fa * 0.7 + fp) * (fr * 0.4);
-      n.driftY = Math.sin(fa) * fr + Math.cos(fa * 0.7 + fp) * (fr * 0.4);
-    } else {
-      n.driftX = 0; n.driftY = 0;
-    }
+    if (n === CS.draggingNode) continue;
+    if (!n.isRoot && !CS.pinnedNodes.has(n.id)) {
+      n.floatAngle = (n.floatAngle||0) + (n.floatSpeed||0.0003)*driftScale;
+      const fa=n.floatAngle, fr=(n.floatRadius||1.5)*driftScale, fp=n.floatPhase||0;
+      n.driftX = Math.cos(fa)*fr + Math.sin(fa*0.7+fp)*(fr*0.4);
+      n.driftY = Math.sin(fa)*fr + Math.cos(fa*0.7+fp)*(fr*0.4);
+    } else { n.driftX=0; n.driftY=0; }
   }
+
+  const hasFocus = !!CS.focusedNode;
+  const baseEdgeAlpha = Math.min(0.22, Math.max(0.025, z * 0.22));
 
   for (const e of CS.edges) {
-    const from = CS.nodeById[e.from];
-    const to = CS.nodeById[e.to];
-    if (!from || !to) continue;
-    if (!inView(from) && !inView(to)) continue;
-
-    const isPath = CS.highlightPath.includes(e.from) && CS.highlightPath.includes(e.to);
-    const isConnected = CS.hoveredNode && (CS.connectedSet.has(e.from) || CS.connectedSet.has(e.to)) && (CS.hoveredNode.id === e.from || CS.hoveredNode.id === e.to);
-    
-    const _eo = isPath ? 0.8 : isConnected ? 0.4 : 0.18 + Math.sin(time * 0.8 + (from.floatPhase || 0)) * 0.08;
-    ctx.strokeStyle = isPath ? `rgba(0,212,255,${_eo})` : isConnected ? `rgba(0,212,255,${_eo})` : `rgba(255,255,255,${_eo})`;
-    ctx.lineWidth = isPath ? 2 : 0.8;
-    
+    const from = CS.nodeById[e.from], to = CS.nodeById[e.to];
+    if (!from||!to) continue;
+    if (CS.collapsedNodes.has(from.id)||CS.collapsedNodes.has(to.id)) continue;
+    if (!inView(from)&&!inView(to)) continue;
+    const isPath = CS.highlightPath.includes(e.from)&&CS.highlightPath.includes(e.to);
+    const isConn = CS.hoveredNode&&(CS.connectedSet.has(e.from)||CS.connectedSet.has(e.to))&&(CS.hoveredNode.id===e.from||CS.hoveredNode.id===e.to);
+    const isFocConn = hasFocus&&(CS.focusedNode.id===e.from||CS.focusedNode.id===e.to);
+    let alpha;
+    if (isPath) alpha = 0.85;
+    else if (isConn) alpha = 0.55;
+    else if (hasFocus) alpha = isFocConn ? 0.55 : baseEdgeAlpha*0.15;
+    else alpha = baseEdgeAlpha + Math.sin(time*0.8+(from.floatPhase||0))*0.008;
+    ctx.strokeStyle = (isPath||isConn||isFocConn) ? `rgba(0,212,255,${alpha})` : `rgba(140,170,195,${alpha})`;
+    ctx.lineWidth = (isPath ? 1.5 : 0.45) * Math.max(0.3, Math.min(1, 1/z*0.4));
     ctx.beginPath();
-    ctx.moveTo(from.cx + from.driftX, from.cy + from.driftY);
-    ctx.lineTo(to.cx + to.driftX, to.cy + to.driftY);
+    ctx.moveTo(from.cx+from.driftX, from.cy+from.driftY);
+    ctx.lineTo(to.cx+to.driftX, to.cy+to.driftY);
     ctx.stroke();
   }
 
-  // ── Draw Nodes ───────────────
+  let visibleCount = 0;
   for (const n of CS.nodes) {
+    if (CS.collapsedNodes.has(n.id)&&!n.isRoot) continue;
     if (!inView(n)) continue;
-
-    const isH = CS.hoveredNode === n;
-    const isS = CS.selectedNode === n;
+    visibleCount++;
+    const isH = CS.hoveredNode===n, isS = CS.selectedNode===n, isF = CS.focusedNode===n;
+    const isFConn = hasFocus&&CS.connectedSet.has(n.id);
     const color = nodeColor(n);
-    const nx = n.cx + n.driftX, ny = n.cy + n.driftY;
-
-    if (n.isRoot) {
-      // Pulsing outer ring on root
-      const pulse = 0.6 + 0.4 * Math.sin(time * 2);
-      ctx.shadowColor = `rgba(0,212,255,${pulse})`; ctx.shadowBlur = 30;
-      ctx.strokeStyle = `rgba(0,212,255,${pulse * 0.4})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(nx, ny, 38 + Math.sin(time * 1.5) * 3, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
-      ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = isH ? 2 : 1.5;
-      ctx.beginPath(); ctx.arc(nx, ny, 28, 0, Math.PI * 2); ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.font = '22px sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#00d4ff';
-      ctx.fillText('\u{1F512}', nx, ny);
-      ctx.font = `${isH ? 600 : 500} 11px "IBM Plex Mono", monospace`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = isH ? '#ffffff' : '#00d4ff';
-      ctx.fillText(n.name.toUpperCase(), nx, ny + 34);
-    } else {
-      let radius = n.r;
-      let finalColor = color;
-
-      if (n.agentActive) {
-        finalColor = '#ffffff';
-        radius += 4 + Math.sin(time * 5) * 2;
-        ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 16;
-      } else if (isS) {
-        // Selected: bright glow + larger
-        radius += 4;
-        ctx.shadowColor = finalColor; ctx.shadowBlur = 20;
-        // Outer selection ring
-        ctx.strokeStyle = hexToRGBA(finalColor, 0.5);
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(nx, ny, radius + 6 + Math.sin(time * 3) * 2, 0, Math.PI * 2); ctx.stroke();
-      } else if (isH) {
-        // Hovered: medium glow
-        radius += 2.5;
-        ctx.shadowColor = finalColor; ctx.shadowBlur = 18;
-      } else {
-        ctx.shadowColor = hexToRGBA(color, 0.5); ctx.shadowBlur = 4;
-      }
-
-      ctx.fillStyle = hexToRGBA(finalColor, isH || isS ? 1.0 : 0.85);
-      ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = isH || isS ? finalColor : hexToRGBA(finalColor, 0.7);
-      ctx.lineWidth = isH || isS ? 1.5 : 0.8;
-      ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.stroke();
-      ctx.shadowBlur = 0;
+    const nx = n.cx+n.driftX, ny = n.cy+n.driftY;
+    const dimmed = hasFocus&&!isF&&!isFConn&&!n.isRoot;
+    ctx.globalAlpha = dimmed ? 0.12 : 1.0;
+    if (z < 0.32 && !isH && !isS && !n.isRoot) {
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(nx, ny, Math.max(1, n.r*0.45), 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1; continue;
     }
+    if (n.isRoot) {
+      const pulse = 0.6+0.4*Math.sin(time*2);
+      ctx.shadowColor=`rgba(0,212,255,${pulse})`; ctx.shadowBlur=30;
+      ctx.strokeStyle=`rgba(0,212,255,${pulse*0.4})`; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(nx,ny,38+Math.sin(time*1.5)*3,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='rgba(0,212,255,0.15)';
+      ctx.beginPath(); ctx.arc(nx,ny,28,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#00d4ff'; ctx.lineWidth=isH?2:1.5;
+      ctx.beginPath(); ctx.arc(nx,ny,28,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle='#00d4ff'; ctx.fillText('\u{1F512}',nx,ny);
+      ctx.font=`${isH?600:500} 11px "IBM Plex Mono",monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillStyle=isH?'#ffffff':'#00d4ff';
+      ctx.fillText(n.name.toUpperCase(),nx,ny+34);
+    } else {
+      drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time);
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawLabels(CS.nodes, ctx);
   if (window.activityLayer) activityLayer.drawActive(ctx);
   ctx.restore();
 
-  // ── Ripple overlays (drawn in screen space, outside transform) ──
+  drawHUD(canvas, w, h, visibleCount);
+  drawMinimap(canvas, w, h);
+
   if (_ripples.length) {
     const rctx = canvas.getContext('2d');
     const now = Date.now();
-    for (let i = _ripples.length - 1; i >= 0; i--) {
-      const rp = _ripples[i];
-      const age = (now - rp.t) / 400; // 400ms life
-      if (age >= 1) { _ripples.splice(i, 1); continue; }
-      const r   = rp.maxR * age;
-      const alpha = (1 - age) * 0.7;
+    for (let i=_ripples.length-1;i>=0;i--) {
+      const rp=_ripples[i];
+      const age=(now-rp.t)/400;
+      if (age>=1){_ripples.splice(i,1);continue;}
       rctx.save();
-      rctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      const wrap = document.getElementById('canvas-wrap');
-      const wrect = wrap.getBoundingClientRect();
-      const rx = rp.x - wrect.left, ry = rp.y - wrect.top;
+      rctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      const wrap3=document.getElementById('canvas-wrap');
+      const wrect=wrap3.getBoundingClientRect();
       rctx.beginPath();
-      rctx.arc(rx, ry, r, 0, Math.PI * 2);
-      rctx.strokeStyle = rp.color;
-      rctx.lineWidth = 2 * (1 - age);
-      rctx.globalAlpha = alpha;
-      rctx.stroke();
-      rctx.beginPath();
-      rctx.arc(rx, ry, r * 0.5, 0, Math.PI * 2);
-      rctx.strokeStyle = rp.color;
-      rctx.lineWidth = 1;
-      rctx.globalAlpha = alpha * 0.5;
-      rctx.stroke();
+      rctx.arc(rp.x-wrect.left,rp.y-wrect.top,rp.maxR*age,0,Math.PI*2);
+      rctx.strokeStyle=rp.color; rctx.lineWidth=2*(1-age);
+      rctx.globalAlpha=(1-age)*0.7; rctx.stroke();
       rctx.restore();
     }
     if (_ripples.length) requestAnimationFrame(drawCircuit);
@@ -3235,8 +3464,9 @@ function drawCircuit() {
 
 // ── Label collision-avoiding batch renderer ────────
 function drawLabels(nodes, ctx) {
-  if (CS.zoom < 0.55) return;
-  const showAll = CS.zoom > 0.75;
+  if (CS.zoom < 0.45) return;
+  const showAll = CS.zoom > 1.2;   // All labels only at 120%+ zoom
+  const showDirs = CS.zoom > 0.65; // Directory labels at 65%+ zoom
   const placedBoxes = [];
 
   const sorted = [...nodes].filter(n => !n.isRoot).sort((a, b) => {
@@ -3257,7 +3487,7 @@ function drawLabels(nodes, ctx) {
     const isH = CS.hoveredNode === n;
     const isS = CS.selectedNode === n;
     const isDir = n.dir || n.type === 'directory';
-    if (!isH && !isS && !showAll && !isDir) continue;
+    if (!isH && !isS && !showAll && !(isDir && showDirs)) continue;
 
     const nx = n.cx + (n.driftX || 0);
     const ny = n.cy + (n.driftY || 0);
@@ -3683,6 +3913,65 @@ function ctxDrillIn() {
   updateZoom();
   drawCircuit();
   showToast(`\uD83D\uDCC1 ${ctxNode.name} — ${kids.length} items`, 'info');
+}
+function ctxPinNode() {
+  if (!ctxNode) return;
+  if (CS.pinnedNodes.has(ctxNode.id)) {
+    CS.pinnedNodes.delete(ctxNode.id);
+    showToast('Node unpinned: ' + ctxNode.name, 'info');
+  } else {
+    CS.pinnedNodes.add(ctxNode.id);
+    showToast('Node pinned: ' + ctxNode.name, 'info');
+  }
+  drawCircuit();
+}
+function ctxCollapseExpand() {
+  if (!ctxNode || !ctxNode.dir) return;
+  if (CS.collapsedNodes.has(ctxNode.id)) {
+    CS.collapsedNodes.delete(ctxNode.id);
+    showToast('Expanded: ' + ctxNode.name, 'info');
+  } else {
+    CS.collapsedNodes.add(ctxNode.id);
+    showToast('Collapsed: ' + ctxNode.name, 'info');
+  }
+  drawCircuit();
+}
+function ctxFocusNode() {
+  if (!ctxNode) return;
+  if (CS.focusedNode === ctxNode) {
+    CS.focusedNode = null; CS.connectedSet = new Set();
+  } else {
+    CS.focusedNode = ctxNode;
+    CS.connectedSet = getConnected(ctxNode);
+  }
+  drawCircuit();
+}
+function ctxSendToAgent() {
+  if (!ctxNode) return;
+  const q = `Analyze this file for me: ${ctxNode.path || ctxNode.name}`;
+  document.getElementById('chat-input').value = q;
+  document.getElementById('chat-input').focus();
+  showToast('Sent to agent: ' + ctxNode.name, 'info');
+}
+// Empty canvas context menu actions
+function canvasCtxFitAll() { circuitResetView(); }
+function canvasCtxResetLayout() {
+  if (CS.nodes.length) { radialLayout(CS.nodes, CS.edges); circuitResetView(); }
+}
+function canvasCtxScreenshot() {
+  const canvas = document.getElementById('circuit-canvas');
+  const link = document.createElement('a');
+  link.download = 'aethercloud-vault-' + Date.now() + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('Graph screenshot saved', 'success');
+}
+function canvasCtxAddFolder() {
+  if (window.aether?.browseFolder) {
+    window.aether.browseFolder().then(path => {
+      if (path) { document.getElementById('chat-input').value = `Scan folder: ${path}`; }
+    });
+  }
 }
 function ctxUploadToVault() {
   if (!ctxNode || !ctxNode.path) return;
