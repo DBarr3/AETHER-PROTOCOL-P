@@ -383,7 +383,7 @@ async function handleLogin() {
     if (licenseKey) payload.license_key = licenseKey;
 
     if (window.aetherAPI?.login) {
-      result = await window.aetherAPI.login(username, password);
+      result = await window.aetherAPI.login(username, password, licenseKey || undefined);
     } else {
       const r = await fetchWithTimeout(`${API_BASE}/auth/login`, 10000, {
         method: 'POST',

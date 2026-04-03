@@ -124,11 +124,14 @@ async function apiFetch(endpoint, options = {}) {
 contextBridge.exposeInMainWorld('aetherAPI', {
   getStatus: () => apiFetch('/status'),
 
-  login: (username, password) =>
-    apiFetch('/auth/login', {
+  login: (username, password, licenseKey) => {
+    const body = { username, password };
+    if (licenseKey) body.license_key = licenseKey;
+    return apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
 
   chat: (query, sessionToken) =>
     apiFetch('/agent/chat', {

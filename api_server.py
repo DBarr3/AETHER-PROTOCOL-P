@@ -458,6 +458,11 @@ class SetupRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    license_key: Optional[str] = None  # Required on first-time setup; persisted to env
+
+
+class VerifyRequest(BaseModel):
+    session_token: str
 
 
 class LoginResponse(BaseModel):
@@ -466,6 +471,7 @@ class LoginResponse(BaseModel):
     commitment_hash: Optional[str] = None
     timestamp: str
     reason: Optional[str] = None
+    plan: Optional[str] = None
 
 
 class LogoutRequest(BaseModel):
@@ -625,7 +631,54 @@ async def login(req: LoginRequest):
     if not svc.auth:
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
+    # ── License key validation (first-time setup or re-supply) ──────────────
+    # If a license_key is provided, validate it before proceeding with auth.
+    # On success, persist it to the runtime env so /status reflects it.
+    if req.license_key:
+        _lk = req.license_key.strip()
+        try:
+            import license_client as _lc_mod
+            from license_client import CloudLicenseClient, KEY_PATTERN
+            if not KEY_PATTERN.match(_lk):
+                return LoginResponse(
+                    authenticated=False,
+                    timestamp=datetime.now().isoformat(),
+                    reason="LICENSE_INVALID",
+                )
+            os.environ["AETHERCLOUD_LICENSE_KEY"] = _lk
+            _lc = CloudLicenseClient()
+            _result = _lc.validate()
+            _lc_mod._license_info = _result
+            if not _result.get("valid"):
+                _reason = _result.get("reason", "")
+                if "expired" in _reason.lower():
+                    return LoginResponse(
+                        authenticated=False,
+                        timestamp=datetime.now().isoformat(),
+                        reason="LICENSE_EXPIRED",
+                    )
+                return LoginResponse(
+                    authenticated=False,
+                    timestamp=datetime.now().isoformat(),
+                    reason="LICENSE_INVALID",
+                )
+            log.info("License validated via login for key=****%s plan=%s", _lk[-4:], _result.get("plan"))
+        except Exception as _le:
+            log.warning("License validation error during login: %s", _le)
+            # Non-blocking: allow login to continue if license server is unreachable
+            # but a cached valid license exists (grace mode handled inside CloudLicenseClient)
+
     result = svc.auth.login(req.username, req.password)
+
+    # Attach plan from license info if available
+    _plan = None
+    try:
+        from license_client import get_license_info
+        _li = get_license_info()
+        if _li and _li.get("valid"):
+            _plan = _li.get("plan")
+    except Exception:
+        pass
 
     return LoginResponse(
         authenticated=result.get("authenticated", False),
@@ -633,7 +686,26 @@ async def login(req: LoginRequest):
         commitment_hash=result.get("commitment_hash") or result.get("audit_id"),
         timestamp=result.get("timestamp", datetime.now().isoformat()),
         reason=result.get("reason"),
+        plan=_plan,
     )
+
+
+@app.post("/auth/verify")
+async def verify_session(req: VerifyRequest):
+    """
+    Verify a session token is still valid without re-authenticating.
+    Called by the Electron login screen on startup to restore a remembered session.
+    Returns { valid: true, username: str } or { valid: false }.
+    """
+    if not svc.session_mgr:
+        return {"valid": False, "reason": "session_mgr not initialized"}
+
+    token = req.session_token
+    if not token or not svc.session_mgr.is_valid(token):
+        return {"valid": False}
+
+    username = svc.session_mgr.get_username(token)
+    return {"valid": True, "username": username}
 
 
 @app.post("/auth/logout", response_model=LogoutResponse)
