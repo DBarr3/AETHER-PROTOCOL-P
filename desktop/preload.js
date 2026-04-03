@@ -56,18 +56,17 @@ contextBridge.exposeInMainWorld('aether', {
 // ═══════════════════════════════════════════════════
 const API_BASE = 'https://api.aethersystems.net/cloud';
 
-// Cache token from electron-store so every apiFetch has it
+// In-memory token cache — populated from electron-store on first call.
+// We intentionally do NOT cache in localStorage: localStorage is accessible to
+// all page JS (XSS risk). The encrypted electron-store is the single source
+// of truth; memory cache avoids repeated IPC for every apiFetch call.
 let _cachedToken = null;
 async function _resolveToken() {
-  // Prefer localStorage (same-window), fall back to electron-store
-  const local = localStorage.getItem('aether_session');
-  if (local) return local;
   if (_cachedToken) return _cachedToken;
   try {
     const auth = await ipcRenderer.invoke('auth:get');
     if (auth && auth.sessionToken) {
       _cachedToken = auth.sessionToken;
-      localStorage.setItem('aether_session', auth.sessionToken);
       return auth.sessionToken;
     }
   } catch (_) { /* electron-store unavailable */ }
@@ -91,8 +90,6 @@ async function apiFetch(endpoint, options = {}) {
     if (resp.status === 401 && !endpoint.includes('/auth/login')) {
       console.warn('[apiFetch] 401 — session expired, redirecting to login');
       _cachedToken = null;
-      localStorage.removeItem('aether_session');
-      sessionStorage.removeItem('aether_session');
       try {
         // Clear stored session token so restore attempt doesn't loop
         await ipcRenderer.invoke('auth:set', { sessionToken: null });

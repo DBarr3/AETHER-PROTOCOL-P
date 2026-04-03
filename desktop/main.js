@@ -59,6 +59,7 @@ function createWindow(page) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      devTools: !app.isPackaged,  // DevTools disabled in production builds
     },
   });
 
@@ -697,8 +698,23 @@ function assertAdminKeySet() {
   }
 }
 
-async function adminFetch(endpoint, options = {}) {
+// Guard: admin IPC calls additionally require a stored session token in the auth-store.
+// This prevents unauthenticated renderer code (e.g. from XSS) from triggering admin ops
+// even on machines where AETHER_ADMIN_KEY is set.
+function assertAdminSession() {
   assertAdminKeySet();
+  try {
+    const store = getAuthStore();
+    const token = store.get('sessionToken');
+    if (!token) throw new Error('No active session — login required for admin operations.');
+  } catch (err) {
+    if (err.message.includes('login required') || err.message.includes('AETHER_ADMIN_KEY')) throw err;
+    throw new Error('Admin session check failed.');
+  }
+}
+
+async function adminFetch(endpoint, options = {}) {
+  assertAdminSession();  // requires both ADMIN_KEY env var AND a stored session token
   const url = `${LICENSE_SERVER}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',

@@ -2502,27 +2502,20 @@
 // STATE
 // ════════════════════════════════════════════════════
 const API_BASE = 'https://api.aethersystems.net/cloud';
-let sessionToken = localStorage.getItem('aether_session') || '';
-let username = localStorage.getItem('aether_user') || 'user';
+let sessionToken = '';  // populated async from electron-store (never from localStorage)
+let username = 'user';
 
-// Resolve the freshest session token from all available sources
+// Resolve the session token from electron-store (single source of truth).
+// The result is cached in-memory for the lifetime of this page.
 let _tokenHydrated = false;
 async function getSessionToken() {
-  // If already hydrated and in localStorage, use it
   if (_tokenHydrated && sessionToken) return sessionToken;
 
-  // Try electron-store (survives window navigation)
   try {
     if (window.aetherAPI?.authGet) {
       const auth = await window.aetherAPI.authGet();
-      if (auth.sessionToken) {
-        sessionToken = auth.sessionToken;
-        localStorage.setItem('aether_session', auth.sessionToken);
-      }
-      if (auth.userId) {
-        username = auth.userId;
-        localStorage.setItem('aether_user', auth.userId);
-      }
+      if (auth.sessionToken) sessionToken = auth.sessionToken;
+      if (auth.userId) username = auth.userId;
       _tokenHydrated = true;
     }
   } catch (_) { /* electron-store unavailable */ }
@@ -2577,30 +2570,14 @@ async function authFetch(url, options = {}) {
   return resp;
 }
 
-// Silent re-login using stored credentials
+// Session expired — passwords are never stored, so redirect to login.
 async function attemptReLogin() {
-  try {
-    const auth = await window.aetherAPI?.authGet();
-    if (!auth?.userId || !auth?.accessKey) {
-      console.warn('[AetherAgent] No stored credentials for re-login');
-      displayAIResponse('Session expired. Please restart the app and log in again.', false);
-      setAgentStatus('Auth Error', 'error');
-      return null;
-    }
-    const result = await window.aetherAPI.login(auth.userId, auth.accessKey);
-    if (result && !result.error && result.session_token) {
-      sessionToken = result.session_token;
-      _tokenHydrated = true;
-      localStorage.setItem('aether_session', result.session_token);
-      await window.aetherAPI?.authSet({ ...auth, sessionToken: result.session_token });
-      return result.session_token;
-    }
-    console.warn('[AetherAgent] Re-login failed:', result?.message || 'unknown');
-    return null;
-  } catch (e) {
-    console.error('[AetherAgent] Re-login error:', e.message);
-    return null;
-  }
+  console.warn('[AetherAgent] Session expired — redirecting to login');
+  sessionToken = '';
+  _tokenHydrated = false;
+  try { await window.aetherAPI?.authSet({ sessionToken: null }); } catch (_) {}
+  if (window.aether?.navigate) window.aether.navigate('login');
+  return null;
 }
 let bypassMode = false;
 let planMode = false;
