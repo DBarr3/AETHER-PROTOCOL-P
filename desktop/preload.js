@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('aether', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   browseFolder:  () => ipcRenderer.invoke('browse-folder'),
   getVersion:    () => ipcRenderer.invoke('app:version'),
+  getUpdateInfo: () => ipcRenderer.invoke('app:updateInfo'),
+  openDownload:  () => ipcRenderer.invoke('app:openDownload'),
   getApiBase:    () => ipcRenderer.invoke('api:getBase'),
   isApiReady:    () => ipcRenderer.invoke('api:isReady'),
   openExternal:  (url) => ipcRenderer.send('shell:openExternal', url),

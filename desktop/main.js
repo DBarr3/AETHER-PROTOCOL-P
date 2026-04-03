@@ -21,8 +21,12 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 });
 
 // ── Constants ────────────────────────────────────────
-const PAGES_DIR = path.join(__dirname, 'pages');
-const API_BASE  = 'https://api.aethersystems.net/cloud';
+const PAGES_DIR    = path.join(__dirname, 'pages');
+const API_BASE     = 'https://api.aethersystems.net/cloud';
+const DOWNLOAD_URL = 'https://aethersystems.io/download/latest';
+
+// ── Update tracking (shared between boot check + IPC) ──
+let _updateInfo = { currentVersion: null, latestVersion: null, updateAvailable: false, downloadUrl: DOWNLOAD_URL };
 
 let mainWindow = null;
 let appQuitting = false;
@@ -172,6 +176,50 @@ async function verifyRouting() {
   }
 }
 
+// ── Version comparison ───────────────────────────────
+// Returns >0 if a > b, <0 if a < b, 0 if equal.
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+// ── Update check ─────────────────────────────────────
+// Called after waitForBackend() — server version is the source of truth.
+async function checkForUpdates(serverVersion) {
+  const localVersion = app.getVersion();
+  _updateInfo.currentVersion = localVersion;
+  _updateInfo.latestVersion  = serverVersion || localVersion;
+
+  if (!serverVersion || compareVersions(serverVersion, localVersion) <= 0) {
+    _updateInfo.updateAvailable = false;
+    return; // up to date or server didn't report a version
+  }
+
+  _updateInfo.updateAvailable = true;
+  console.log(`[AetherCloud] Update available: ${localVersion} → ${serverVersion}`);
+
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: 'AetherCloud Update Available',
+    message: `A new version is available`,
+    detail: `You are running v${localVersion}.\nThe latest version is v${serverVersion}.\n\nDownload the update to access new features and security improvements.`,
+    buttons: ['Download Update', 'Continue Anyway'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+
+  if (response === 0) {
+    shell.openExternal(DOWNLOAD_URL);
+    // Give the browser a moment to open, then continue launching
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
 // ── App lifecycle ────────────────────────────────────
 app.whenReady().then(async () => {
   keyManager.hydrate();
@@ -179,6 +227,9 @@ app.whenReady().then(async () => {
   // Test backend connectivity before showing login
   const status = await waitForBackend();
   if (!status.ready) return;
+
+  // Check for updates using server version as source of truth
+  await checkForUpdates(status.version);
 
   // Verify routing path
   await verifyRouting();
@@ -212,6 +263,8 @@ ipcMain.on('window:close', () => {
 ipcMain.handle('api:getBase', () => API_BASE);
 ipcMain.handle('api:isReady', async () => waitForBackend(5, 1500));
 ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('app:updateInfo', () => _updateInfo);
+ipcMain.handle('app:openDownload', () => shell.openExternal(DOWNLOAD_URL));
 
 // ── IPC: Dialogs ─────────────────────────────────────
 ipcMain.handle('dialog:openDirectory', async () => {
