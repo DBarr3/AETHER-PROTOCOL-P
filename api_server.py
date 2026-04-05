@@ -28,12 +28,25 @@ load_all_keys()
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import uvicorn
+
+# Rate limiter — keyed by session token (or IP as fallback)
+def _get_session_key(request: Request) -> str:
+    """Use Bearer token as rate limit key so limits are per-user not per-IP."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:][:16]  # first 16 chars of token as key
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=_get_session_key)
 
 from config.settings import (
     APP_NAME, APP_VERSION, DEFAULT_VAULT_ROOT, DEFAULT_AUDIT_DIR,
@@ -414,6 +427,10 @@ app = FastAPI(
     description="Quantum-Secured AI File Intelligence API",
     lifespan=lifespan,
 )
+
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS: allow Electron renderer (file://), localhost, and VPS origins.
 # Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
@@ -951,7 +968,8 @@ async def vault_spaces_delete(
 
 # ── Agent ─────────────────────────────────────────
 @app.post("/agent/chat", response_model=ChatResponse)
-async def agent_chat(req: ChatRequest, token: str = Depends(get_session_token)):
+@limiter.limit("20/minute;100/hour")
+async def agent_chat(request: Request, req: ChatRequest, token: str = Depends(get_session_token)):
     """Chat with the AI agent. Response is Protocol-L committed."""
     if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
@@ -987,7 +1005,8 @@ async def agent_chat(req: ChatRequest, token: str = Depends(get_session_token)):
 
 
 @app.post("/agent/analyze", response_model=AnalyzeResponse)
-async def agent_analyze(req: AnalyzeRequest, token: str = Depends(get_session_token)):
+@limiter.limit("30/minute")
+async def agent_analyze(request: Request, req: AnalyzeRequest, token: str = Depends(get_session_token)):
     """Analyze a file and suggest renaming."""
     if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
@@ -1013,7 +1032,8 @@ async def agent_analyze(req: AnalyzeRequest, token: str = Depends(get_session_to
 
 
 @app.post("/agent/scan", response_model=ScanResponse)
-async def agent_scan(token: str = Depends(get_session_token)):
+@limiter.limit("10/minute")
+async def agent_scan(request: Request, token: str = Depends(get_session_token)):
     """Run security scan on vault."""
     if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
@@ -1117,7 +1137,9 @@ def _build_mcp_system_prompt(vault_context: Optional[dict], username: str) -> st
 
 
 @app.post("/agent/mcp-chat", response_model=MCPAgentResponse)
+@limiter.limit("20/minute;100/hour")
 async def agent_mcp_chat(
+    request: Request,
     req: MCPAgentRequest,
     token: str = Depends(get_session_token),
 ):
