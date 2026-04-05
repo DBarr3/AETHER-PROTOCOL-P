@@ -716,6 +716,23 @@ async def verify_session(req: VerifyRequest):
     return {"valid": True, "username": username}
 
 
+@app.post("/auth/refresh")
+async def refresh_session(token: str = Depends(get_session_token)):
+    """
+    Exchange a valid session token for a fresh one, resetting the timeout.
+    Called by the Electron app when the session is within 30 minutes of expiry.
+    Returns { session_token: str } or 401 if the token is expired.
+    """
+    if not svc.session_mgr:
+        raise HTTPException(status_code=503, detail="Session manager not initialized")
+
+    new_token = svc.session_mgr.refresh_token(token)
+    if not new_token:
+        raise HTTPException(status_code=401, detail="Session expired — please log in again")
+
+    return {"session_token": new_token, "timestamp": datetime.now().isoformat()}
+
+
 @app.post("/auth/logout", response_model=LogoutResponse)
 async def logout(token: str = Depends(get_session_token)):
     """Terminate session and log event. Token extracted from Authorization header."""

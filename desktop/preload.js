@@ -61,16 +61,51 @@ const API_BASE = 'https://api.aethersystems.net/cloud';
 // all page JS (XSS risk). The encrypted electron-store is the single source
 // of truth; memory cache avoids repeated IPC for every apiFetch call.
 let _cachedToken = null;
+let _tokenSetAt = null;
+const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;     // 8 hours (match backend)
+const SESSION_REFRESH_MS = 7.5 * 60 * 60 * 1000;   // refresh at 7.5h (30 min before expiry)
+
 async function _resolveToken() {
   if (_cachedToken) return _cachedToken;
   try {
     const auth = await ipcRenderer.invoke('auth:get');
     if (auth && auth.sessionToken) {
       _cachedToken = auth.sessionToken;
+      _tokenSetAt = Date.now();
       return auth.sessionToken;
     }
   } catch (_) { /* electron-store unavailable */ }
   return null;
+}
+
+// Proactively refresh the session token 30 minutes before it expires.
+// Called once after login and again after each successful refresh.
+async function _scheduleTokenRefresh() {
+  const delay = SESSION_REFRESH_MS;
+  setTimeout(async () => {
+    try {
+      const token = _cachedToken;
+      if (!token) return;
+      const resp = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.session_token) {
+          _cachedToken = data.session_token;
+          _tokenSetAt = Date.now();
+          try {
+            const auth = await ipcRenderer.invoke('auth:get');
+            if (auth?.rememberMe) {
+              await ipcRenderer.invoke('auth:set', { sessionToken: data.session_token });
+            }
+          } catch (_) {}
+          _scheduleTokenRefresh();  // schedule next refresh
+        }
+      }
+    } catch (_) { /* network error — let session expire naturally */ }
+  }, delay);
 }
 
 async function apiFetch(endpoint, options = {}) {
@@ -121,13 +156,20 @@ async function apiFetch(endpoint, options = {}) {
 contextBridge.exposeInMainWorld('aetherAPI', {
   getStatus: () => apiFetch('/status'),
 
-  login: (username, password, licenseKey) => {
+  login: async (username, password, licenseKey) => {
     const body = { username, password };
     if (licenseKey) body.license_key = licenseKey;
-    return apiFetch('/auth/login', {
+    const result = await apiFetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
     });
+    // Schedule proactive token refresh after successful login
+    if (result && result.authenticated && result.session_token) {
+      _cachedToken = result.session_token;
+      _tokenSetAt = Date.now();
+      _scheduleTokenRefresh();
+    }
+    return result;
   },
 
   chat: (query, sessionToken) =>

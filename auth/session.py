@@ -60,6 +60,27 @@ class SessionManager:
         with self._lock:
             self._sessions.pop(token, None)
 
+    def refresh_token(self, old_token: str) -> Optional[str]:
+        """
+        Extend session by issuing a new token and invalidating the old one.
+        Returns the new token, or None if the old token is invalid/expired.
+        """
+        with self._lock:
+            session = self._sessions.get(old_token)
+            if session is None:
+                return None
+            elapsed = time.time() - session["created_at"]
+            if elapsed > self._timeout:
+                del self._sessions[old_token]
+                return None
+            username = session["username"]
+            # Invalidate old token
+            del self._sessions[old_token]
+
+        # Issue new token
+        timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        return self.generate_token(username, timestamp)
+
     def get_username(self, token: str) -> Optional[str]:
         """Get the username associated with a valid session token."""
         with self._lock:
