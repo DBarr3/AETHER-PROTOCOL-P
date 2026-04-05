@@ -1390,6 +1390,53 @@ async def export_proof(
     )
 
 
+@app.get("/audit/integrity")
+async def audit_integrity(token: str = Depends(get_session_token)):
+    """
+    Verify audit log hash chain integrity and return current file hash.
+    Used to detect tampering. Compare file_sha256 against VPS5 external snapshots.
+    """
+    if not svc.audit_log:
+        raise HTTPException(status_code=503, detail="Audit log not initialized")
+
+    import hashlib as _hl
+    log_path = svc.audit_log.path
+
+    # File hash
+    h = _hl.sha256()
+    try:
+        with open(log_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        file_hash = h.hexdigest()
+        file_size = log_path.stat().st_size
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cannot read audit log")
+
+    # Chain integrity
+    chain = svc.audit_log.verify_chain_integrity()
+
+    # Last snapshot from local ledger
+    last_snapshot = None
+    try:
+        ledger = log_path.parent / "audit_snapshots.jsonl"
+        if ledger.exists():
+            with open(ledger, "rb") as f:
+                lines = [l for l in f.readlines() if l.strip()]
+                if lines:
+                    last_snapshot = json.loads(lines[-1])
+    except Exception:
+        pass
+
+    return {
+        "file_sha256": file_hash,
+        "file_size_bytes": file_size,
+        "chain_integrity": chain,
+        "last_snapshot": last_snapshot,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 @app.get("/audit/exports")
 async def list_exports(token: str = Depends(get_session_token)):
     """List all proof export packages."""

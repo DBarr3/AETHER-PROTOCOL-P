@@ -11,6 +11,7 @@ import logging
 import os
 import time
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -103,6 +104,65 @@ async def verify_vps2_request(request: Request):
 async def health():
     stats = executor.get_stats() if executor else {}
     return HealthResponse(status="ok", node="VPS5", agents=stats.get("agents", []), active_tasks=stats.get("active_tasks", 0), total_executions=stats.get("total_executions", 0))
+
+
+# ── Audit Snapshot Receiver ──────────────────────────────────────────
+# Accepts periodic audit log integrity snapshots from VPS2 over Tailscale.
+# Stores them locally so VPS2's log can be verified against an external anchor.
+
+_SNAPSHOT_STORE = Path(os.getenv("AETHER_SNAPSHOT_STORE", "/opt/aether-mcp/data/audit_snapshots.jsonl"))
+_MCP_ALERT_KEY  = os.getenv("MCP_ALERT_KEY", "")
+
+@app.post("/audit/snapshot")
+async def receive_audit_snapshot(request: Request):
+    """Receive and store an audit log integrity snapshot from VPS2."""
+    # Verify shared key
+    incoming_key = request.headers.get("X-Aether-Alert-Key", "")
+    if _MCP_ALERT_KEY and incoming_key != _MCP_ALERT_KEY:
+        raise HTTPException(status_code=403, detail="Invalid alert key")
+
+    try:
+        snapshot = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    # Add receipt timestamp
+    snapshot["received_at"] = time.time()
+    snapshot["stored_by"] = "VPS5"
+
+    # Append to local store
+    _SNAPSHOT_STORE.parent.mkdir(parents=True, exist_ok=True)
+    with open(_SNAPSHOT_STORE, "a") as f:
+        f.write(json.dumps(snapshot) + "\n")
+
+    logger.info(
+        "Audit snapshot received from VPS2 — entries=%s chain_valid=%s sha256=%s...%s",
+        snapshot.get("chain_integrity", {}).get("total_entries", "?"),
+        snapshot.get("chain_integrity", {}).get("chain_valid", "?"),
+        snapshot.get("file_sha256", "")[:8],
+        snapshot.get("file_sha256", "")[-8:],
+    )
+    return {"status": "stored", "received_at": snapshot["received_at"]}
+
+
+@app.get("/audit/snapshots")
+async def list_audit_snapshots(request: Request):
+    """Return stored audit snapshots. VPS2-only via alert key."""
+    incoming_key = request.headers.get("X-Aether-Alert-Key", "")
+    if _MCP_ALERT_KEY and incoming_key != _MCP_ALERT_KEY:
+        raise HTTPException(status_code=403, detail="Invalid alert key")
+
+    snapshots = []
+    if _SNAPSHOT_STORE.exists():
+        with open(_SNAPSHOT_STORE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        snapshots.append(json.loads(line))
+                    except Exception:
+                        continue
+    return {"count": len(snapshots), "snapshots": snapshots[-20:]}  # last 20
 
 
 @app.post("/agent/execute", response_model=ExecuteResponse)
