@@ -411,18 +411,6 @@ async function handleLogin() {
           plan:         result.plan || undefined,
         });
       }
-      // Keep localStorage for same-window session (cleared on tab/window close if !rememberMe)
-      if (rememberMe) {
-        localStorage.setItem('aether_session', result.session_token);
-        localStorage.setItem('aether_user', username);
-      } else {
-        sessionStorage.setItem('aether_session', result.session_token);
-        sessionStorage.setItem('aether_user', username);
-        localStorage.removeItem('aether_session');
-        localStorage.removeItem('aether_user');
-      }
-      localStorage.setItem('aether_commitment', result.commitment_hash || '');
-
       showStatus('SESSION AUTHENTICATED — LOADING VAULT', 'ok');
       await new Promise(r => setTimeout(r, 500));
 
@@ -480,8 +468,6 @@ async function tryRestoreSession() {
     });
     const result = await r.json();
     if (result.valid) {
-      localStorage.setItem('aether_session', auth.sessionToken);
-      localStorage.setItem('aether_user', auth.userId);
       showStatus('SESSION RESTORED — LOADING VAULT', 'ok');
       await new Promise(res => setTimeout(res, 400));
       if (window.aether?.navigate) window.aether.navigate('dashboard');

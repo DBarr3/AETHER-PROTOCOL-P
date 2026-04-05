@@ -12,6 +12,7 @@ const path = require('path');
 const https = require('https');
 const http  = require('http');
 const fs    = require('fs');
+const os    = require('os');
 
 const keyManager = require('./key-manager');
 
@@ -321,8 +322,15 @@ ipcMain.handle('keys:delete', (_e, name) => keyManager.deleteKey(name));
 ipcMain.handle('keys:validate', () => keyManager.validate());
 
 // ── IPC: Vault ───────────────────────────────────────
-ipcMain.handle('vault:hasAccess', () => false);
-ipcMain.handle('vault:getPath', () => null);
+// hasAccess: true if a session token is stored (user is authenticated)
+ipcMain.handle('vault:hasAccess', () => {
+  const store = getAuthStore();
+  return !!(store.get('sessionToken'));
+});
+// getPath: vault root from env var, falling back to ~/AetherVault
+ipcMain.handle('vault:getPath', () => {
+  return process.env.AETHER_VAULT_ROOT || path.join(os.homedir(), 'AetherVault');
+});
 ipcMain.handle('vault:requestAccess', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
