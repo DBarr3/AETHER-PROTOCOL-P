@@ -14,14 +14,41 @@ from typing import Optional
 
 logger = logging.getLogger("aether.mcp.executor")
 
+import os as _os
+
 MCP_SERVERS = {
-    "gmail": {"name": "gmail-mcp", "type": "url", "url": "https://gmail.mcp.claude.com/mcp"},
-    "gcal": {"name": "gcal-mcp", "type": "url", "url": "https://gcal.mcp.claude.com/mcp"},
+    "gmail":          {"name": "gmail-mcp",         "type": "url", "url": "https://gmail.mcp.claude.com/mcp"},
+    "gcal":           {"name": "gcal-mcp",           "type": "url", "url": "https://gcal.mcp.claude.com/mcp"},
+    "google_drive":   {"name": "gdrive-mcp",         "type": "url", "url": "https://drive.mcp.claude.com/mcp"},
+    "github":         {"name": "github-mcp",         "type": "url", "url": _os.getenv("GITHUB_MCP_URL",  "https://api.githubcopilot.com/mcp/")},
+    "slack":          {"name": "slack-mcp",          "type": "url", "url": _os.getenv("SLACK_MCP_URL",   "https://mcp.slack.com/sse")},
+    "brave_search":   {"name": "brave-search-mcp",   "type": "url", "url": _os.getenv("BRAVE_MCP_URL",   "https://api.search.brave.com/mcp")},
+    "linear":         {"name": "linear-mcp",         "type": "url", "url": _os.getenv("LINEAR_MCP_URL",  "https://mcp.linear.app/sse")},
+    "notion":         {"name": "notion-mcp",         "type": "url", "url": _os.getenv("NOTION_MCP_URL",  "https://api.notion.com/v1/mcp")},
+}
+
+# Auth tokens injected per-request from env vars (not stored in the dict above)
+MCP_AUTH_ENVS = {
+    "github":       "GITHUB_MCP_TOKEN",
+    "slack":        "SLACK_MCP_TOKEN",
+    "brave_search": "BRAVE_SEARCH_API_KEY",
+    "linear":       "LINEAR_API_KEY",
+    "notion":       "NOTION_API_KEY",
 }
 
 RATE_LIMIT_PER_MIN = 20
 EXECUTION_TIME_MULTIPLIER = 10
-NORMAL_EXECUTION_MS = {"gmail": 5000, "gcal": 3000, "mcp": 10000}
+NORMAL_EXECUTION_MS = {
+    "gmail":        5000,
+    "gcal":         3000,
+    "google_drive": 6000,
+    "github":       8000,
+    "slack":        4000,
+    "brave_search": 5000,
+    "linear":       6000,
+    "notion":       6000,
+    "mcp":          10000,
+}
 
 
 class AgentExecutor:
@@ -55,7 +82,13 @@ class AgentExecutor:
             if server_url:
                 mcp_servers.append({"type": "url", "url": server_url})
             elif agent_type in MCP_SERVERS:
-                mcp_servers.append(MCP_SERVERS[agent_type])
+                cfg = dict(MCP_SERVERS[agent_type])
+                auth_env = MCP_AUTH_ENVS.get(agent_type)
+                if auth_env:
+                    token = _os.getenv(auth_env, "")
+                    if token:
+                        cfg["authorization_token"] = token
+                mcp_servers.append(cfg)
 
             system = "You are an autonomous MCP agent. Execute tasks using available tools."
             if context:
@@ -129,7 +162,23 @@ class AgentExecutor:
 
         tools = set(result.get("tools_used", []))
         prev_tools = self._client_operations.get(client_id, set())
-        high_risk = {"gmail_send_message", "gmail_delete_message", "calendar_delete_event"}
+        high_risk = {
+            # Gmail
+            "gmail_send_message", "gmail_delete_message",
+            # Calendar
+            "calendar_delete_event",
+            # GitHub — write/delete ops
+            "create_issue", "delete_issue", "create_pull_request",
+            "merge_pull_request", "delete_repository", "push_files",
+            # Slack — send/delete
+            "slack_post_message", "slack_delete_message",
+            # Linear — create/delete
+            "linear_create_issue", "linear_delete_issue",
+            # Notion — create/delete
+            "notion_create_page", "notion_delete_block",
+            # Drive — delete/share
+            "drive_delete_file", "drive_share_file",
+        }
         if prev_tools and tools and not tools.intersection(prev_tools) and tools.intersection(high_risk) and not prev_tools.intersection(high_risk):
             return {"anomaly": True, "severity": "high", "reason": f"Unexpected high-risk operation change: {prev_tools} → {tools}", "recommend_block": True}
         if tools:
@@ -137,4 +186,13 @@ class AgentExecutor:
         return None
 
     def get_stats(self):
-        return {"active_tasks": self.active_tasks, "total_executions": self.total_executions, "agents": list(MCP_SERVERS.keys()), "recent_tasks": len(self.task_history)}
+        configured = [k for k, v in MCP_AUTH_ENVS.items() if _os.getenv(v)]
+        no_auth    = [k for k in MCP_SERVERS if k not in MCP_AUTH_ENVS]
+        return {
+            "active_tasks":      self.active_tasks,
+            "total_executions":  self.total_executions,
+            "agents":            list(MCP_SERVERS.keys()),
+            "agents_configured": no_auth + configured,
+            "agents_missing_token": [k for k in MCP_AUTH_ENVS if k not in configured],
+            "recent_tasks":      len(self.task_history),
+        }
