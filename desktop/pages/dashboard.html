@@ -3866,7 +3866,7 @@ function buildDemoVault() {
     CS.panX = dvw/2 - ((dmnX+dmxX)/2)*CS.zoom;
     CS.panY = dvh/2 - ((dmnY+dmxY)/2)*CS.zoom;
   }
-  document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
+  const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `NODES: ${N.length}`;
   updateZoom();
 
   recentFiles = files.map(f => ({ name:f.name, size:f.size, type:f.type, time:Date.now()-Math.random()*86400000 }));
@@ -3922,7 +3922,7 @@ function buildVaultFromScan(tree, rootName, rootPath) {
   CS.panX = vw / 2 - ((minX + maxX) / 2) * CS.zoom;
   CS.panY = vh / 2 - ((minY + maxY) / 2) * CS.zoom;
 
-  document.getElementById('status-nodes').textContent = `NODES: ${N.length}`;
+  const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `NODES: ${N.length}`;
   updateZoom();
 
   recentFiles = N.filter(n => !n.dir).map(n => ({ name:n.name, size:n.size, type:n.type, path:n.path, time:Date.now() }));
@@ -3965,7 +3965,7 @@ function circuitResetView() {
   updateZoom(); drawCircuit(); closeMenus();
   updateBreadcrumbPath(currentVaultPath || 'Home');
 }
-function updateZoom() { document.getElementById('status-zoom').textContent=`ZOOM: ${Math.round(CS.zoom*100)}%`; }
+function updateZoom() { const el = document.getElementById('status-zoom'); if (el) el.textContent=`ZOOM: ${Math.round(CS.zoom*100)}%`; }
 
 // Smooth zoom-to-node (radial version — centers on node.cx, node.cy)
 function zoomToNode(node) {
@@ -4002,6 +4002,7 @@ function updateBreadcrumb(node) {
     cur = edge ? CS.nodes.find(n => n.id === edge.from) : null;
   }
   const bar = document.getElementById('breadcrumb-bar');
+  if (!bar) return;
   bar.innerHTML = path.map((n,i) => {
     const cls = i === path.length - 1 ? 'breadcrumb-item current' : 'breadcrumb-item';
     return (i > 0 ? '<span class="breadcrumb-sep">/</span>' : '') +
@@ -4012,6 +4013,7 @@ function updateBreadcrumb(node) {
 function updateBreadcrumbPath(pathStr) {
   const parts = (pathStr || 'Home').replace(/\\/g, '/').split('/').filter(Boolean);
   const bar = document.getElementById('breadcrumb-bar');
+  if (!bar) return;
   bar.innerHTML = parts.map((p,i) =>
     (i > 0 ? '<span class="breadcrumb-sep">/</span>' : '') +
     `<span class="breadcrumb-item${i===parts.length-1?' current':''}">${escH(p)}</span>`
@@ -4043,7 +4045,7 @@ function restoreHistory() {
   CS.nodes = JSON.parse(JSON.stringify(h.nodes));
   CS.edges = JSON.parse(JSON.stringify(h.edges));
   CS.hoveredNode = null; CS.selectedNode = null; CS.highlightPath = [];
-  document.getElementById('status-nodes').textContent = `NODES: ${CS.nodes.length}`;
+  const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `NODES: ${CS.nodes.length}`;
   drawCircuit();
   updateHistoryUI();
   showToast('Restored: ' + h.label, 'info');
@@ -5584,7 +5586,7 @@ function switchViewMode(mode) {
       CS.panX = savedVaultState.panX;
       CS.panY = savedVaultState.panY;
       buildEdgeMaps();
-      document.getElementById('status-nodes').textContent = `NODES: ${CS.nodes.length}`;
+      const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `NODES: ${CS.nodes.length}`;
       updateZoom();
     }
   } else if (mode === 'agent') {
@@ -5966,7 +5968,7 @@ function buildAgentOrbitVault() {
   CS.panX = avw/2 - ((aMinX+aMaxX)/2)*CS.zoom;
   CS.panY = avh/2 - ((aMinY+aMaxY)/2)*CS.zoom;
 
-  document.getElementById('status-nodes').textContent = `AGENTS: ${agentCount}`;
+  const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `AGENTS: ${agentCount}`;
   updateZoom();
   drawCircuit();
 }
@@ -6048,7 +6050,7 @@ function buildProjectVault() {
   CS.zoom = Math.max(0.3, Math.min(1.5, Math.min(pvw/pspX, pvh/pspY)));
   CS.panX = pvw/2 - ((pMinX+pMaxX)/2)*CS.zoom;
   CS.panY = pvh/2 - ((pMinY+pMaxY)/2)*CS.zoom;
-  document.getElementById('status-nodes').textContent = `MODULES: ${N.length}`;
+  const _sn = document.getElementById('status-nodes'); if (_sn) _sn.textContent = `MODULES: ${N.length}`;
   updateZoom();
   drawCircuit();
 }
