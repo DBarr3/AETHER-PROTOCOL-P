@@ -6090,6 +6090,7 @@ function completeTask(taskId, results) {
 
 function renderTaskTracker() {
   const tracker = document.getElementById('task-tracker');
+  if (!tracker) return;
   if (!agentTasks.length) {
     tracker.innerHTML = '<div class="task-item" style="color:var(--text-muted);justify-content:center;">No scheduled tasks</div>';
     return;
@@ -7504,6 +7505,7 @@ renderSpawnedAgentsSidebar = renderSpawnedAgentsSidebarEnhanced;
 const _origRenderOrbit = renderAgentOrbitPanel;
 function renderAgentOrbitPanelEnhanced() {
   const panel = document.getElementById('agent-orbit-panel');
+  if (!panel) return;
   if (!spawnedAgents.length) {
     panel.innerHTML = '<div style="background:var(--bg-2);border:1px solid var(--border-2);padding:12px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-align:center;">No agents spawned<br><span style="color:var(--accent);cursor:pointer;" onclick="openSpawnModal()">+ Spawn Agent</span></div>';
     return;
@@ -8668,6 +8670,7 @@ async function loadLogsFeed() {
 
 function renderLogsFeed() {
   const feed = document.getElementById('logs-feed');
+  if (!feed) return;
   let filtered = logsEntries;
 
   // Apply type filter
