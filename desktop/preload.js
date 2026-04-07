@@ -49,6 +49,9 @@ contextBridge.exposeInMainWorld('aether', {
     list:  () => ipcRenderer.invoke('cache:list'),
     clear: (dirPath) => ipcRenderer.invoke('cache:clear', dirPath),
   },
+  // Local file plan execution — runs agent action plans on the user's machine
+  execPlan:    (actions) => ipcRenderer.invoke('fs:execPlan', actions),
+  previewPlan: (actions) => ipcRenderer.invoke('fs:previewPlan', actions),
 });
 
 // ═══════════════════════════════════════════════════

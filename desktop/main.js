@@ -321,6 +321,62 @@ ipcMain.handle('keys:has', (_e, name) => keyManager.hasKey(name));
 ipcMain.handle('keys:delete', (_e, name) => keyManager.deleteKey(name));
 ipcMain.handle('keys:validate', () => keyManager.validate());
 
+// ── IPC: Local File Plan Execution ───────────────────
+// Executes an action-plan produced by the agent.
+// Actions: { type: 'mkdir'|'move'|'rename', path, from, to, new_name }
+// Returns array of { action, success, error? } per action.
+ipcMain.handle('fs:execPlan', async (_e, actions) => {
+  if (!Array.isArray(actions)) return [];
+  const results = [];
+  for (const action of actions) {
+    try {
+      if (action.type === 'mkdir') {
+        fs.mkdirSync(action.path, { recursive: true });
+        results.push({ action, success: true });
+
+      } else if (action.type === 'move') {
+        if (!fs.existsSync(action.from)) {
+          results.push({ action, success: false, error: 'Source not found: ' + action.from });
+          continue;
+        }
+        const destDir = path.dirname(action.to);
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.renameSync(action.from, action.to);
+        results.push({ action, success: true });
+
+      } else if (action.type === 'rename') {
+        if (!fs.existsSync(action.path)) {
+          results.push({ action, success: false, error: 'File not found: ' + action.path });
+          continue;
+        }
+        const dir  = path.dirname(action.path);
+        const dest = path.join(dir, action.new_name);
+        fs.renameSync(action.path, dest);
+        results.push({ action, success: true });
+
+      } else {
+        results.push({ action, success: false, error: 'Unknown action type: ' + action.type });
+      }
+    } catch (e) {
+      results.push({ action, success: false, error: e.message });
+    }
+  }
+  return results;
+});
+
+// Preview a plan — check which sources exist without executing
+ipcMain.handle('fs:previewPlan', async (_e, actions) => {
+  if (!Array.isArray(actions)) return [];
+  return actions.map(action => {
+    let exists = true;
+    if (action.type === 'move' || action.type === 'rename') {
+      const src = action.from || action.path;
+      exists = src ? fs.existsSync(src) : false;
+    }
+    return { action, exists };
+  });
+});
+
 // ── IPC: Vault ───────────────────────────────────────
 // hasAccess: true if a session token is stored (user is authenticated)
 ipcMain.handle('vault:hasAccess', () => {

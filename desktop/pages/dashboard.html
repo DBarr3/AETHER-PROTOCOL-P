@@ -1951,6 +1951,95 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* ── Agent Action Plan Card ─────────────────────────── */
+  .aether-plan-card {
+    margin: 12px 0;
+    border: 1px solid rgba(0, 212, 255, 0.35);
+    border-radius: 6px;
+    background: rgba(0, 212, 255, 0.04);
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .aplan-header {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 14px;
+    background: rgba(0, 212, 255, 0.09);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  }
+  .aplan-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .aplan-summary {
+    font-size: 12px; color: var(--text-secondary);
+    font-family: var(--font-sans);
+    line-height: 1.4;
+  }
+  .aplan-stats {
+    font-size: 10px; color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .aplan-list {
+    padding: 8px 0;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .aplan-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 14px;
+    font-size: 11px; color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.1s;
+  }
+  .aplan-row:hover { background: rgba(255,255,255,0.03); }
+  .aplan-num {
+    width: 18px; text-align: right;
+    font-size: 10px; color: var(--text-muted); flex-shrink: 0;
+  }
+  .aplan-icon { flex-shrink: 0; font-size: 13px; }
+  .aplan-from {
+    color: var(--text-primary); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .aplan-arrow {
+    color: var(--accent); flex-shrink: 0; font-size: 11px;
+  }
+  .aplan-to {
+    color: var(--green); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .aplan-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.15);
+    border-top: 1px solid rgba(0, 212, 255, 0.15);
+  }
+  .aplan-btn-cancel {
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em;
+    padding: 5px 12px; cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .aplan-btn-cancel:hover { border-color: var(--red); color: var(--red); }
+  .aplan-btn-exec {
+    background: var(--accent);
+    border: none;
+    color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    padding: 6px 16px; cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .aplan-btn-exec:hover { background: #00f0ff; box-shadow: 0 0 12px rgba(0,212,255,0.4); }
+  .aplan-btn-exec:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -5315,13 +5404,141 @@ async function sendMessage() {
 // ════════════════════════════════════════════════════
 // AI RESPONSE PANEL
 // ════════════════════════════════════════════════════
+// ── Action-plan parser ───────────────────────────────
+// Detects ```action-plan ... ``` blocks in agent responses,
+// extracts the JSON plan, and renders an Execute card.
+function _parseActionPlan(text) {
+  const match = text.match(/```action-plan\s*([\s\S]*?)```/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1].trim());
+  } catch (_) { return null; }
+}
+
+function _stripActionPlan(text) {
+  return text.replace(/```action-plan[\s\S]*?```/g, '').trim();
+}
+
 function displayAIResponse(text, isThinking) {
   const panel = document.getElementById('ai-response-panel');
   const responseText = document.getElementById('response-text');
   responseText.className = isThinking ? 'resp-text resp-thinking' : 'resp-text';
-  responseText.textContent = text;
+
+  // Remove any existing plan cards from prior responses
+  panel.querySelectorAll('.aether-plan-card').forEach(c => c.remove());
+
+  const plan = (!isThinking) ? _parseActionPlan(text) : null;
+  if (plan && plan.actions && plan.actions.length) {
+    // Show text with the action-plan block stripped out
+    responseText.textContent = _stripActionPlan(text) || plan.summary || '';
+    _renderPlanCard(panel, plan);
+  } else {
+    responseText.textContent = text;
+  }
   panel.classList.add('visible');
   panel.scrollTop = panel.scrollHeight;
+}
+
+function _renderPlanCard(panel, plan) {
+  const card = document.createElement('div');
+  card.className = 'aether-plan-card';
+  const mkdirs  = plan.actions.filter(a => a.type === 'mkdir');
+  const moves   = plan.actions.filter(a => a.type === 'move');
+  const renames = plan.actions.filter(a => a.type === 'rename');
+
+  const rows = plan.actions.map((a, i) => {
+    let from = '', to = '', icon = '';
+    if (a.type === 'mkdir')  { icon = '📁'; from = a.path;   to = '(create folder)'; }
+    if (a.type === 'move')   { icon = '➜';  from = a.from;   to = a.to; }
+    if (a.type === 'rename') { icon = '✏️'; from = a.path;   to = a.new_name; }
+    const fname = s => (s||'').split(/[/\\]/).pop();
+    return `<div class="aplan-row">
+      <span class="aplan-num">${i+1}</span>
+      <span class="aplan-icon">${icon}</span>
+      <span class="aplan-from" title="${escH(from)}">${escH(fname(from) || from)}</span>
+      <span class="aplan-arrow">→</span>
+      <span class="aplan-to" title="${escH(to)}">${escH(fname(to) || to)}</span>
+    </div>`;
+  }).join('');
+
+  const actionsJson = escH(JSON.stringify(plan.actions));
+  card.innerHTML = `
+    <div class="aplan-header">
+      <span class="aplan-title">⚡ AGENT PLAN</span>
+      <span class="aplan-summary">${escH(plan.summary || '')}</span>
+      <span class="aplan-stats">${mkdirs.length} folders · ${moves.length} moves · ${renames.length} renames</span>
+    </div>
+    <div class="aplan-list">${rows}</div>
+    <div class="aplan-footer">
+      <button class="aplan-btn-cancel" onclick="this.closest('.aether-plan-card').remove()">DISMISS</button>
+      <button class="aplan-btn-exec" onclick="executePlan(this, '${actionsJson}')">▶ EXECUTE PLAN</button>
+    </div>`;
+  panel.appendChild(card);
+}
+
+async function executePlan(btn, actionsJson) {
+  let actions;
+  try { actions = JSON.parse(actionsJson); } catch (_) { showToast('Plan parse error', 'error'); return; }
+
+  btn.textContent = 'EXECUTING...';
+  btn.disabled = true;
+  const card = btn.closest('.aether-plan-card');
+
+  addAgentLog('Executing plan — ' + actions.length + ' actions', 'active');
+  setAgentStatus('Executing plan...', 'working');
+
+  const results = await window.aether.execPlan(actions);
+
+  const ok  = results.filter(r => r.success).length;
+  const err = results.filter(r => !r.success).length;
+
+  // Update the card to show results
+  const list = card.querySelector('.aplan-list');
+  if (list) {
+    list.innerHTML = results.map((r, i) => {
+      const a = r.action;
+      const fname = s => (s||'').split(/[/\\]/).pop();
+      const label = a.type === 'mkdir'  ? fname(a.path)
+                  : a.type === 'move'   ? `${fname(a.from)} → ${fname(a.to)}`
+                  : a.type === 'rename' ? `${fname(a.path)} → ${a.new_name}`
+                  : a.type;
+      const status = r.success
+        ? '<span style="color:var(--green);">✓</span>'
+        : `<span style="color:var(--red);" title="${escH(r.error||'')}">✗</span>`;
+      return `<div class="aplan-row">${status} <span class="aplan-from">${escH(label)}</span></div>`;
+    }).join('');
+  }
+
+  const footer = card.querySelector('.aplan-footer');
+  if (footer) footer.innerHTML = `<span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">${ok} succeeded${err ? ' · ' + err + ' failed' : ''}</span>`;
+
+  addAgentLog(`Plan complete — ${ok} ok${err ? ', ' + err + ' failed' : ''}`, ok > 0 ? 'done' : 'idle');
+  setAgentStatus('Ready', '');
+  showToast(`Plan executed: ${ok} succeeded${err ? ', ' + err + ' failed' : ''}`, err ? 'error' : 'success');
+
+  // Re-scan the vault to reflect changes
+  if (ok > 0 && currentVaultPath && window.aether?.scanDirectory) {
+    setTimeout(() => menuOpen_refresh(), 1500);
+  }
+}
+
+// Silent re-scan after plan execution (no dialog — uses currentVaultPath)
+async function menuOpen_refresh() {
+  if (!currentVaultPath) return;
+  try {
+    const data = await window.aether.scanDirectory(currentVaultPath, 2);
+    if (data && !data.error) {
+      const tree = [];
+      if (data.folders) data.folders.forEach(f => {
+        const childFiles = data.files ? data.files.filter(file => file.parent === (f.name.split('/')[0] || f.name)) : [];
+        tree.push({ name: f.name.endsWith('/') ? f.name : f.name + '/', children: childFiles.map(cf => ({ name: cf.name, size: cf.size||0, path: cf.path||'' })), size: 0, path: f.path || '' });
+      });
+      if (data.files) data.files.filter(f => !f.parent).forEach(f => tree.push({ name: f.name, size: f.size||0, path: f.path||'' }));
+      const dirName = currentVaultPath.split(/[/\\]/).pop();
+      buildVaultFromScan(tree, dirName.toUpperCase(), currentVaultPath);
+      showToast('Vault refreshed', 'success');
+    }
+  } catch (_) { /* silent */ }
 }
 
 // appendMessage removed — all responses display in single #ai-response-panel
