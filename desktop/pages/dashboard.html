@@ -1952,6 +1952,50 @@
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+  /* ── MCP Agent Status Bar ─────────────────────────────────── */
+  #mcp-agent-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 14px; min-height: 34px;
+    border-top: 1px solid rgba(255,165,0,0.12);
+    background: rgba(0,0,0,0.18);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: rgba(255,255,255,0.35);
+    overflow-x: auto; white-space: nowrap;
+    transition: background 0.3s, border-color 0.3s;
+    flex-shrink: 0;
+  }
+  #mcp-agent-bar.has-agents {
+    background: rgba(0,0,0,0.28);
+    border-top-color: rgba(255,165,0,0.28);
+  }
+  #mcp-agent-bar-label {
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(255,165,0,0.4); flex-shrink: 0;
+  }
+  #mcp-agent-bar.has-agents #mcp-agent-bar-label { color: rgba(255,165,0,0.9); }
+  #mcp-agent-slots { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .mcp-agent-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 7px 2px 4px; border-radius: 3px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: chip-in 0.18s ease forwards;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .mcp-agent-chip.done  { animation: chip-out 0.3s ease forwards; }
+  .mcp-agent-chip.error { border-color: rgba(244,67,54,0.5); background: rgba(244,67,54,0.08); }
+  @keyframes chip-in  { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes chip-out { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(0.85); } }
+  .agent-icon-wrap { width: 22px; height: 16px; image-rendering: pixelated; display:flex; align-items:center; flex-shrink:0; }
+  .agent-icon-wrap svg { width: 22px; height: 16px; }
+  .mcp-agent-chip.working .agent-icon-wrap { animation: agent-pulse 1.4s ease-in-out infinite; }
+  @keyframes agent-pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.55;transform:scale(0.9);} }
+  .agent-chip-name { font-size: 11px; color: rgba(255,255,255,0.8); max-width: 100px; overflow:hidden; text-overflow:ellipsis; }
+  .agent-chip-task { font-size: 10px; color: rgba(255,255,255,0.38); max-width: 130px; overflow:hidden; text-overflow:ellipsis; }
+  .agent-chip-sep  { color: rgba(255,255,255,0.18); font-size: 10px; }
+  #mcp-idle-text   { font-size: 10px; color: rgba(255,255,255,0.2); font-style: italic; }
+  #mcp-agent-count { margin-left: auto; font-size: 10px; color: rgba(255,165,0,0.55); flex-shrink: 0; }
+
   /* ── Agent Action Plan Card ─────────────────────────── */
   .aether-plan-card {
     margin: 12px 0;
@@ -2280,6 +2324,13 @@
           <div class="toggle-switch"></div>
           <span>Bypass</span>
         </div>
+      </div>
+      <div id="mcp-agent-bar">
+        <span id="mcp-agent-bar-label">MCP</span>
+        <div id="mcp-agent-slots">
+          <span id="mcp-idle-text">no agents active</span>
+        </div>
+        <span id="mcp-agent-count" style="display:none"></span>
       </div>
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
@@ -9659,6 +9710,100 @@ if (typeof checkInjection === 'undefined') {
     return { safe: true };
   };
 }
+
+// ── MCP Agent Status Bar ───────────────────────────────────────────────────
+(function() {
+  const AGENT_PIXELS = [
+    [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
+    [2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
+    [2,2],[4,2],[5,2],[6,2],[8,2],
+    [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+    [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+    [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+    [2,6],[4,6],[6,6],[8,6],
+    [2,7],[4,7],[6,7],[8,7],
+  ];
+  const AGENT_COLORS = { blue:'#2196F3', green:'#4CAF50', orange:'#E36C35', red:'#F44336', yellow:'#FFEB3B' };
+
+  function buildAgentSVG(color) {
+    const fill = AGENT_COLORS[color] || AGENT_COLORS.blue;
+    const rects = AGENT_PIXELS.map(([x,y]) =>
+      `<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"/>`).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" shape-rendering="crispEdges">${rects}</svg>`;
+  }
+
+  const bar      = document.getElementById('mcp-agent-bar');
+  const slots    = document.getElementById('mcp-agent-slots');
+  const idleText = document.getElementById('mcp-idle-text');
+  const countEl  = document.getElementById('mcp-agent-count');
+  if (!bar) return;
+
+  const activeAgents = new Map();
+
+  function updateBarState() {
+    const n = activeAgents.size;
+    bar.classList.toggle('has-agents', n > 0);
+    idleText.style.display = n === 0 ? '' : 'none';
+    if (n > 1) { countEl.style.display = ''; countEl.textContent = `${n} agents`; }
+    else        { countEl.style.display = 'none'; }
+  }
+
+  function trunc(s, max) { return s && s.length > max ? s.slice(0, max-1) + '…' : (s||''); }
+
+  function addAgent(agent) {
+    if (activeAgents.has(agent.agent_id)) return;
+    const chip = document.createElement('div');
+    chip.className = 'mcp-agent-chip working';
+    const icon = document.createElement('div');
+    icon.className = 'agent-icon-wrap';
+    icon.innerHTML = buildAgentSVG(agent.color || 'blue');
+    const name = document.createElement('span');
+    name.className = 'agent-chip-name';
+    name.textContent = trunc(agent.server_name, 18);
+    chip.appendChild(icon);
+    chip.appendChild(name);
+    if (agent.task) {
+      const sep = document.createElement('span'); sep.className = 'agent-chip-sep'; sep.textContent = '·';
+      const task = document.createElement('span'); task.className = 'agent-chip-task'; task.textContent = trunc(agent.task, 24);
+      chip.appendChild(sep); chip.appendChild(task);
+    }
+    slots.appendChild(chip);
+    activeAgents.set(agent.agent_id, { chip });
+    updateBarState();
+  }
+
+  function finishAgent(id, isError) {
+    const e = activeAgents.get(id); if (!e) return;
+    e.chip.classList.remove('working');
+    e.chip.classList.add(isError ? 'error' : 'done');
+    setTimeout(() => { e.chip.remove(); activeAgents.delete(id); updateBarState(); }, 350);
+  }
+
+  function removeAgent(id) {
+    const e = activeAgents.get(id); if (!e) return;
+    e.chip.remove(); activeAgents.delete(id); updateBarState();
+  }
+
+  function connectSSE() {
+    const sessionToken = (typeof store !== 'undefined' && store.get)
+      ? store.get('sessionToken') : localStorage.getItem('aether_session');
+    const baseUrl = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:8741';
+    const url = `${baseUrl}/agent/mcp-status`;
+
+    const sse = new EventSource(url);
+    sse.onmessage = (e) => {
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.type === 'snapshot') (msg.agents||[]).forEach(a => { if (a.state==='working') addAgent(a); });
+      else if (msg.type === 'agent_start')   addAgent(msg.agent);
+      else if (msg.type === 'agent_done')    finishAgent(msg.agent.agent_id, msg.agent.state==='error');
+      else if (msg.type === 'agent_removed') removeAgent(msg.agent_id);
+    };
+    sse.onerror = () => { sse.close(); setTimeout(connectSSE, 3000); };
+  }
+
+  // Connect once DOM + session ready
+  setTimeout(connectSSE, 1500);
+})();
 </script>
 </body>
 </html>

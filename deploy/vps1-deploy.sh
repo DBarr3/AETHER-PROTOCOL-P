@@ -238,6 +238,23 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
+    # ── SSE: MCP agent status stream (must be before catch-all) ──
+    location /agent/mcp-status {
+        proxy_pass http://vps3_relay;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
+        # SSE requires buffering OFF and a long read timeout
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        chunked_transfer_encoding on;
+    }
+
     # ── VPS2 Backend Proxy (all other routes) ─────
     location / {
         proxy_pass http://vps3_relay;

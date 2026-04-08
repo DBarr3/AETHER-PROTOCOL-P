@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load secure key store FIRST — before any service that needs API keys
 from config.key_manager import load_all_keys, get_anthropic_key, get_ibm_token, get_dev_key, mask
+from mcp_agent_status import status_manager
 load_all_keys()
 
 from contextlib import asynccontextmanager
@@ -295,6 +296,19 @@ async def _dispatch_to_vps5(task: dict) -> dict:
     except Exception as e:
         log.warning("VPS5 dispatch failed: %s", e)
         return None
+
+
+@app.get("/agent/mcp-status")
+async def mcp_status_stream(current_user: str = Depends(get_session_token)):
+    """SSE stream of live MCP agent activity for the dashboard."""
+    return StreamingResponse(
+        status_manager.stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 def _init_services():
@@ -1156,15 +1170,29 @@ async def agent_mcp_chat(
     mcp_servers = req.mcp_servers or detect_required_servers(req.query)
 
     # ── Route to VPS5 MCP worker ──────────────────
+    task_id = str(uuid.uuid4())
+    server_name = mcp_servers[0].get("name", "mcp") if mcp_servers else "mcp"
+    agent_id = f"{username}_{server_name}_{task_id[:8]}"
     task = {
-        "task_id": str(uuid.uuid4()),
+        "task_id": task_id,
         "client_id": username,
         "agent_type": "mcp",
         "prompt": req.query,
         "context": system,
         "mcp_server_url": mcp_servers[0]["url"] if mcp_servers else "",
     }
-    vps5_result = await _dispatch_to_vps5(task)
+
+    await status_manager.agent_start(
+        agent_id=agent_id,
+        server_name=server_name,
+        task=req.query[:60],
+    )
+    try:
+        vps5_result = await _dispatch_to_vps5(task)
+        await status_manager.agent_done(agent_id)
+    except Exception as _e:
+        await status_manager.agent_done(agent_id, error=str(_e))
+        raise
 
     if vps5_result and not vps5_result.get("error"):
         response_text = vps5_result.get("result", "")
