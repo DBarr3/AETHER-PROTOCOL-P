@@ -2789,6 +2789,8 @@ function extColor(name) {
 }
 function nodeColor(n) {
   if (n.agentActive) return TYPE_COLORS.agentActive;
+  if (n.agentDone === 'ok')  return '#51cf66';   // green flash on success
+  if (n.agentDone === 'err') return '#ff6b6b';   // red flash on failure
   if (n.dir) return TYPE_COLORS.directory;
   return extColor(n.name) || typeColor(n.type) || TYPE_COLORS.Binary;
 }
@@ -5483,19 +5485,79 @@ async function executePlan(btn, actionsJson) {
   btn.textContent = 'EXECUTING...';
   btn.disabled = true;
   const card = btn.closest('.aether-plan-card');
+  const list  = card ? card.querySelector('.aplan-list') : null;
 
   addAgentLog('Executing plan — ' + actions.length + ' actions', 'active');
   setAgentStatus('Executing plan...', 'working');
 
-  const results = await window.aether.execPlan(actions);
+  // ── Helper: find circuit node by filename ──────────────
+  function _findCircuitNode(filePath) {
+    if (!filePath || typeof CS === 'undefined' || !CS.nodes) return null;
+    const name = filePath.split(/[/\\]/).pop().toLowerCase();
+    return CS.nodes.find(n => (n.name || '').toLowerCase() === name) || null;
+  }
+
+  // ── Helper: activate a node (glow + zoom) ─────────────
+  function _activateNode(node) {
+    if (!node) return;
+    if (typeof CS !== 'undefined' && CS.nodes)
+      CS.nodes.forEach(n => { n.agentActive = false; });
+    node.agentActive = true;
+    if (typeof zoomToNode === 'function') zoomToNode(node);
+    if (typeof drawCircuit === 'function') drawCircuit();
+  }
+
+  // ── Helper: clear all active glows ────────────────────
+  function _clearActiveNodes() {
+    if (typeof CS !== 'undefined' && CS.nodes)
+      CS.nodes.forEach(n => { n.agentActive = false; });
+    if (typeof drawCircuit === 'function') drawCircuit();
+  }
+
+  // ── Execute one action at a time with circuit feedback ─
+  const results = [];
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    const srcPath = action.from || action.path;
+    const srcName = (srcPath || '').split(/[/\\]/).pop();
+
+    // Light up the node being touched
+    const node = _findCircuitNode(srcPath);
+    _activateNode(node);
+
+    // Update task tracker log
+    addAgentLog(`${i + 1}/${actions.length} — ${srcName}`, 'active');
+    if (list) {
+      const rows = list.querySelectorAll('.aplan-row');
+      if (rows[i]) rows[i].style.background = 'rgba(0,212,255,0.12)';
+    }
+
+    // Execute single action
+    const res = await window.aether.execPlan([action]);
+    results.push(...res);
+
+    // Flash green/red on result
+    if (node) {
+      node.agentActive = false;
+      node.agentDone   = res[0]?.success ? 'ok' : 'err';
+      if (typeof drawCircuit === 'function') drawCircuit();
+    }
+
+    // Brief pause so the user can see each node light up
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  // Clear all glow states
+  if (typeof CS !== 'undefined' && CS.nodes)
+    CS.nodes.forEach(n => { n.agentActive = false; n.agentDone = null; });
+  if (typeof drawCircuit === 'function') drawCircuit();
 
   const ok  = results.filter(r => r.success).length;
   const err = results.filter(r => !r.success).length;
 
-  // Update the card to show results
-  const list = card.querySelector('.aplan-list');
+  // Update card rows with final result icons
   if (list) {
-    list.innerHTML = results.map((r, i) => {
+    list.innerHTML = results.map(r => {
       const a = r.action;
       const fname = s => (s||'').split(/[/\\]/).pop();
       const label = a.type === 'mkdir'  ? fname(a.path)
@@ -5509,17 +5571,15 @@ async function executePlan(btn, actionsJson) {
     }).join('');
   }
 
-  const footer = card.querySelector('.aplan-footer');
+  const footer = card ? card.querySelector('.aplan-footer') : null;
   if (footer) footer.innerHTML = `<span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">${ok} succeeded${err ? ' · ' + err + ' failed' : ''}</span>`;
 
   addAgentLog(`Plan complete — ${ok} ok${err ? ', ' + err + ' failed' : ''}`, ok > 0 ? 'done' : 'idle');
   setAgentStatus('Ready', '');
   showToast(`Plan executed: ${ok} succeeded${err ? ', ' + err + ' failed' : ''}`, err ? 'error' : 'success');
 
-  // Re-scan the vault to reflect changes
-  if (ok > 0 && currentVaultPath && window.aether?.scanDirectory) {
+  if (ok > 0 && currentVaultPath && window.aether?.scanDirectory)
     setTimeout(() => menuOpen_refresh(), 1500);
-  }
 }
 
 // Silent re-scan after plan execution (no dialog — uses currentVaultPath)

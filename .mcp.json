@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "REPLACE_WITH_YOUR_TOKEN"
+      }
+    },
+    "desktop-commander": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@wonderwhy-er/desktop-commander"]
+    },
+    "excalidraw": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cmd8/excalidraw-mcp",
+        "--diagram",
+        "C:/Users/lilbe/aether-diagrams/aether.excalidraw"
+      ]
+    },
+    "fal-ai": {
+      "type": "http",
+      "url": "https://mcp.fal.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer 0d87fd60-4833-4ffb-92e2-51bb21830347:bd8a5e5dfa61d3cae3a482ee498b1579"
+      }
+    }
+  }
+}
