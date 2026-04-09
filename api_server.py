@@ -302,6 +302,94 @@ async def _dispatch_to_vps5(task: dict) -> dict:
         return None
 
 
+# ═══════════════════════════════════════════════════
+# APP
+# ═══════════════════════════════════════════════════
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Initialize services on startup, cleanup on shutdown."""
+    _init_services()
+
+    # Validate AetherCloud license (non-blocking — log only)
+    try:
+        from license_client import CloudLicenseClient, _license_info
+        import license_client
+        _lc = CloudLicenseClient()
+        if _lc.key:
+            _result = _lc.validate()
+            license_client._license_info = _result
+            if _result.get("valid"):
+                if _result.get("grace_mode"):
+                    log.warning("CLOUD LICENSE — grace mode (server unreachable)")
+                else:
+                    log.info(
+                        "CLOUD LICENSE VALID — plan=%s expires=%s",
+                        _result.get("plan"), _result.get("expires_at"),
+                    )
+            else:
+                log.warning("CLOUD LICENSE INVALID — %s", _result.get("reason"))
+        else:
+            log.info("No AETHERCLOUD_LICENSE_KEY set — running unlicensed")
+    except Exception as e:
+        log.warning("License validation error: %s", e)
+
+    # Wire vault_spaces into activity logger and init pipeline executor
+    _activity_mod.vault_spaces = svc.vault_spaces
+    _pipeline_mod.pipeline_executor = _pipeline_mod.PipelineExecutor(mcp_router)
+
+    yield
+
+app = FastAPI(
+    title=APP_NAME,
+    version=APP_VERSION,
+    description="Quantum-Secured AI File Intelligence API",
+    lifespan=lifespan,
+)
+
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS: allow Electron renderer (file://), localhost, and VPS origins.
+# Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
+# Example: AETHER_ALLOWED_ORIGINS="<VPS2_IP> <VPS1_IP>"
+_cors_base = r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)"
+_extra_ips = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
+_cors_parts = [_cors_base] + [rf"|http://{re.escape(ip)}(:\d+)?" for ip in _extra_ips]
+_cors_regex = "".join(_cors_parts) + r"$"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=_cors_regex,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
+# ═══════════════════════════════════════════════════
+# AUTH DEPENDENCY
+# ═══════════════════════════════════════════════════
+def get_session_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
+    """Extract and validate session token from Authorization header."""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
+    token = credentials.credentials
+    if not svc.session_mgr or not svc.session_mgr.is_valid(token):
+        raise HTTPException(status_code=401, detail="Invalid or expired session token")
+    return token
+
+
+def get_username_from_token(token: str) -> str:
+    """Resolve username from active session token."""
+    username = svc.session_mgr.get_username(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Cannot resolve user from token")
+    return username
+
+
 @app.get("/agent/mcp-status")
 async def mcp_status_stream(current_user: str = Depends(get_session_token)):
     """SSE stream of live MCP agent activity for the dashboard."""
@@ -698,94 +786,6 @@ def _init_services():
     if svc.auth.register_user("ZO", _dev_pass):
         log.info("Registered dev user: ZO")
     del _dev_pass  # scrub from memory immediately
-
-
-# ═══════════════════════════════════════════════════
-# APP
-# ═══════════════════════════════════════════════════
-@asynccontextmanager
-async def lifespan(application: FastAPI):
-    """Initialize services on startup, cleanup on shutdown."""
-    _init_services()
-
-    # Validate AetherCloud license (non-blocking — log only)
-    try:
-        from license_client import CloudLicenseClient, _license_info
-        import license_client
-        _lc = CloudLicenseClient()
-        if _lc.key:
-            _result = _lc.validate()
-            license_client._license_info = _result
-            if _result.get("valid"):
-                if _result.get("grace_mode"):
-                    log.warning("CLOUD LICENSE — grace mode (server unreachable)")
-                else:
-                    log.info(
-                        "CLOUD LICENSE VALID — plan=%s expires=%s",
-                        _result.get("plan"), _result.get("expires_at"),
-                    )
-            else:
-                log.warning("CLOUD LICENSE INVALID — %s", _result.get("reason"))
-        else:
-            log.info("No AETHERCLOUD_LICENSE_KEY set — running unlicensed")
-    except Exception as e:
-        log.warning("License validation error: %s", e)
-
-    # Wire vault_spaces into activity logger and init pipeline executor
-    _activity_mod.vault_spaces = svc.vault_spaces
-    _pipeline_mod.pipeline_executor = _pipeline_mod.PipelineExecutor(mcp_router)
-
-    yield
-
-app = FastAPI(
-    title=APP_NAME,
-    version=APP_VERSION,
-    description="Quantum-Secured AI File Intelligence API",
-    lifespan=lifespan,
-)
-
-# Rate limiter
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# CORS: allow Electron renderer (file://), localhost, and VPS origins.
-# Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
-# Example: AETHER_ALLOWED_ORIGINS="<VPS2_IP> <VPS1_IP>"
-_cors_base = r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)"
-_extra_ips = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
-_cors_parts = [_cors_base] + [rf"|http://{re.escape(ip)}(:\d+)?" for ip in _extra_ips]
-_cors_regex = "".join(_cors_parts) + r"$"
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=_cors_regex,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
-
-
-# ═══════════════════════════════════════════════════
-# AUTH DEPENDENCY
-# ═══════════════════════════════════════════════════
-def get_session_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> str:
-    """Extract and validate session token from Authorization header."""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-    token = credentials.credentials
-    if not svc.session_mgr or not svc.session_mgr.is_valid(token):
-        raise HTTPException(status_code=401, detail="Invalid or expired session token")
-    return token
-
-
-def get_username_from_token(token: str) -> str:
-    """Resolve username from active session token."""
-    username = svc.session_mgr.get_username(token)
-    if not username:
-        raise HTTPException(status_code=401, detail="Cannot resolve user from token")
-    return username
 
 
 # ═══════════════════════════════════════════════════
