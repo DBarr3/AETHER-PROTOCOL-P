@@ -9677,15 +9677,57 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ════════════════════════════════════════════════════
+// VERSION UPDATE BANNER
+// ════════════════════════════════════════════════════
+function _showUpdateBanner(installed, latest) {
+  const existing = document.getElementById('aether-update-banner');
+  if (existing) existing.remove();
+  const bar = document.createElement('div');
+  bar.id = 'aether-update-banner';
+  bar.style.cssText = [
+    'position:fixed','top:28px','left:0','right:0','z-index:99999',
+    'background:linear-gradient(90deg,#f59e0b,#fbbf24)',
+    'color:#111','font-family:Inter,sans-serif','font-size:11px',
+    'font-weight:700','letter-spacing:.05em','text-align:center',
+    'padding:5px 40px','cursor:pointer','box-shadow:0 2px 8px rgba(0,0,0,.4)',
+  ].join(';');
+  bar.innerHTML =
+    `⬆ Update available — backend v${latest} / installed v${installed}. ` +
+    `Rebuild and reinstall AetherCloud-L-Setup-${latest}.exe. ` +
+    `<span style="opacity:.6;font-weight:400;">(click to dismiss)</span>`;
+  bar.onclick = () => bar.remove();
+  document.body.appendChild(bar);
+}
+
+// ════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════
 window.addEventListener('load', async () => {
   // Ensure session token is hydrated from electron-store before anything else
   await getSessionToken();
   document.getElementById('status-user').textContent = username;
+  const CURRENT_BACKEND_VERSION = '0.9.4'; // bumped each release
+  let installerVersion = null;
   if (window.aether?.getVersion) {
-    const v = await window.aether.getVersion();
-    document.getElementById('status-version').textContent = `v${v}`;
+    installerVersion = await window.aether.getVersion();
+    document.getElementById('status-version').textContent = `v${installerVersion}`;
+    // Update title bar to reflect actual installed version
+    const tvEl = document.getElementById('title-bar-version');
+    if (tvEl) tvEl.textContent = `AetherCloud-L v${installerVersion}`;
+  }
+  // Version mismatch check — compare installer vs latest backend
+  try {
+    const _vResp = await fetch(`${API_BASE}/status`);
+    if (_vResp.ok) {
+      const _vData = await _vResp.json();
+      const backendVer = _vData.version || CURRENT_BACKEND_VERSION;
+      const installedVer = installerVersion || '0.0.0';
+      if (backendVer !== installedVer) {
+        _showUpdateBanner(installedVer, backendVer);
+      }
+    }
+  } catch (_vErr) {
+    console.warn('[version-check]', _vErr);
   }
   if (localStorage.getItem('sidebar_collapsed') === 'true') {
     document.getElementById('sidebar').classList.add('collapsed');
