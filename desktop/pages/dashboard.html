@@ -5471,6 +5471,15 @@ async function sendMessage() {
   const input = document.getElementById('chat-input');
   const query = input.value.trim();
   if (!query) return;
+
+  // Autonomous project execution — intercept broad goal queries
+  if (typeof detectProjectGoal === 'function' && detectProjectGoal(query)) {
+    input.value = '';
+    document.getElementById('send-btn').disabled = false;
+    launchProject(query);
+    return;
+  }
+
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
@@ -10650,6 +10659,179 @@ window.teamPanelInit = function() {
 };
 
 })(); // end AGENT TEAM CONFIG PANEL IIFE
+
+// ════════════════════════════════════════════════════
+// AUTONOMOUS PROJECT EXECUTION
+// ════════════════════════════════════════════════════
+
+const _PROJECT_PATTERNS = [
+  /\bbuild\s+(me\s+)?(a|an|the)\b/i,
+  /\bcreate\s+(me\s+)?(a|an|the)\b/i,
+  /\bdesign\s+(me\s+)?(a|an|the)\b/i,
+  /\bdevelop\s+(a|an|the)\b/i,
+  /\bmake\s+(me\s+)?(a|an|the)\b/i,
+  /\blaunch\s+(a|an|the)\b/i,
+  /\bship\s+(a|an|the)\b/i,
+  /\bimplement\s+(a|an|the)\b/i,
+  /\bwrite\s+(me\s+)?(a|an|the)\s+(full|complete|entire)\b/i,
+  /\b(fully|automatically)\b.{0,60}\b(build|create|develop|implement)\b/i,
+];
+const _PROJECT_MIN_WORDS = 6;
+
+function detectProjectGoal(query) {
+  if (!query || query.trim().split(/\s+/).length < _PROJECT_MIN_WORDS) return false;
+  return _PROJECT_PATTERNS.some(p => p.test(query));
+}
+
+let _activeProject = null;
+let _projectEventSource = null;
+
+async function launchProject(goal) {
+  const token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
+  if (!token) { showToast('Not logged in', 'error'); return; }
+
+  showToast('Decomposing goal\u2026', 'info', 4000);
+  switchViewMode('agents');
+
+  try {
+    const resp = await fetch('/project/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ goal }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    _activeProject = data;
+    appendMessage('assistant', data.message);
+    renderProjectBoard(data.tasks);
+    connectProjectStream(data.project_id, token);
+  } catch (e) {
+    showToast('Project launch failed: ' + e.message, 'error');
+    console.error('[project] launch error:', e);
+  }
+}
+
+function connectProjectStream(projectId, token) {
+  if (_projectEventSource) _projectEventSource.close();
+  const url = '/project/stream/' + projectId + '?token=' + encodeURIComponent(token);
+  _projectEventSource = new EventSource(url);
+  _projectEventSource.onmessage = function(e) {
+    try { handleProjectEvent(JSON.parse(e.data)); } catch (_) {}
+  };
+  _projectEventSource.onerror = function() {
+    _projectEventSource.close();
+    showToast('Project stream disconnected', 'warning', 3000);
+  };
+}
+
+function handleProjectEvent(ev) {
+  switch (ev.type) {
+    case 'task_start':
+      _setTaskStatus(ev.task_id, 'running', ev);
+      showToast('\u25b6 ' + ev.title, 'info', 1800);
+      break;
+    case 'task_done':
+      _setTaskStatus(ev.task_id, 'done', ev);
+      break;
+    case 'task_failed':
+      _setTaskStatus(ev.task_id, 'failed', ev);
+      showToast('\u2717 ' + ev.title + ' failed', 'error', 3000);
+      break;
+    case 'task_blocked':
+      _setTaskStatus(ev.task_id, 'blocked', ev);
+      break;
+    case 'project_done': {
+      if (_projectEventSource) _projectEventSource.close();
+      var ok = ev.status === 'done';
+      var msg = (ok ? '\u2705' : '\u26a0\ufe0f') + ' Project ' + ev.status + ': ' + ev.done + '/' + ev.total + ' tasks completed';
+      appendMessage('assistant', msg);
+      showToast(msg, ok ? 'success' : 'warning', 5000);
+      break;
+    }
+    case 'question':
+      renderOpenQuestion(ev);
+      break;
+  }
+}
+
+function renderProjectBoard(tasks) {
+  var panel = document.querySelector('#agents-panel, .agents-panel');
+  if (!panel) return;
+  var old = document.getElementById('project-board');
+  if (old) old.remove();
+  var roleColors = {backend:'#7c3aed',frontend:'#0ea5e9',database:'#10b981',
+                    devops:'#f59e0b',testing:'#ef4444',docs:'#6b7280',agent:'#ec4899'};
+  var board = document.createElement('div');
+  board.id = 'project-board';
+  board.style.cssText = 'padding:12px;display:flex;flex-direction:column;gap:8px;';
+  board.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+    '<span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#4fc3f7;">PROJECT ' + ((_activeProject||{}).project_id||'') + '</span>' +
+    '<span style="font-size:10px;color:#888;">' + tasks.length + ' tasks</span></div>' +
+    '<div id="project-task-grid" style="display:flex;flex-direction:column;gap:6px;">' +
+    tasks.map(function(t) {
+      return '<div id="ptask-' + t.task_id + '" style="background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:8px 10px;transition:border-color .2s;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:' + (roleColors[t.role]||'#888') + ';text-transform:uppercase;">' + t.role + '</span>' +
+        '<span class="ptask-status" style="font-size:9px;color:#666;">pending</span></div>' +
+        '<div style="font-size:11px;font-weight:600;margin:3px 0 1px;color:#eee;">' + t.title + '</div>' +
+        '<div style="font-size:10px;color:#888;">' + (t.agent_name||t.role) + '</div>' +
+        '<div class="ptask-qopc" style="font-size:9px;color:#666;margin-top:2px;"></div></div>';
+    }).join('') + '</div>';
+  panel.prepend(board);
+}
+
+function _setTaskStatus(taskId, status, ev) {
+  var card = document.getElementById('ptask-' + taskId);
+  if (!card) return;
+  var label = card.querySelector('.ptask-status');
+  if (label) label.textContent = status;
+  var colors = {running:'#f59e0b',done:'#10b981',failed:'#ef4444',blocked:'#666'};
+  card.style.borderColor = colors[status] || '#333';
+  if (ev && ev.qopc_score > 0) {
+    var q = card.querySelector('.ptask-qopc');
+    if (q) q.textContent = 'QOPC ' + (ev.qopc_score * 100).toFixed(0) + '%';
+  }
+  if (status === 'failed' && ev && ev.error) card.title = ev.error;
+}
+
+function renderOpenQuestion(question) {
+  var container = document.querySelector('#chat-output, .chat-output');
+  if (!container) return;
+  var card = document.createElement('div');
+  card.style.cssText = 'background:#1a1a2e;border:1px solid #7c3aed;border-radius:8px;padding:12px;margin:8px 0;';
+  var qid = question.question_id || '';
+  card.innerHTML = '<div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;">\uD83E\uDD14 Agent needs input (' + (question.task_id||'') + ')</div>' +
+    '<div style="font-size:12px;color:#eee;margin-bottom:8px;">' + (question.question||'') + '</div>' +
+    '<div style="display:flex;gap:6px;">' +
+    '<input id="pq-' + qid + '" type="text" placeholder="Your answer\u2026" style="flex:1;background:#111;border:1px solid #333;border-radius:4px;padding:6px 8px;color:#eee;font-size:11px;">' +
+    '<button onclick="answerProjectQuestion(\'' + question.project_id + '\',\'' + qid + '\',document.getElementById(\'pq-' + qid + '\').value)" ' +
+    'style="background:#7c3aed;border:none;border-radius:4px;padding:6px 10px;color:#fff;font-size:11px;cursor:pointer;">Answer</button></div>';
+  container.appendChild(card);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function answerProjectQuestion(projectId, questionId, answer) {
+  var token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
+  try {
+    await fetch('/project/answer', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({project_id:projectId, question_id:questionId, answer:answer}),
+    });
+  } catch(e) { console.warn('[project] answer failed:', e); }
+}
+
+async function loadProjectContext(projectId) {
+  var token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
+  try {
+    var resp = await fetch('/project/context/' + projectId + '?token=' + encodeURIComponent(token),
+      {headers: {'Authorization':'Bearer '+token}});
+    return resp.ok ? await resp.json() : null;
+  } catch(e) { return null; }
+}
 
 // Initialize ActivityLayer
 window.activityLayer = new ActivityLayer();

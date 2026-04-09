@@ -28,6 +28,10 @@ from mcp_agent_status import status_manager
 from mcp_router import mcp_router, ResolvedAgent
 import agent_activity as _activity_mod
 import agent_pipeline as _pipeline_mod
+from project_context import ProjectContextManager
+from project_orchestrator import ProjectOrchestrator
+from project_routes import project_router
+import project_routes as _proj_routes
 load_all_keys()
 
 from contextlib import asynccontextmanager
@@ -337,6 +341,12 @@ async def lifespan(application: FastAPI):
     _activity_mod.vault_spaces = svc.vault_spaces
     _pipeline_mod.pipeline_executor = _pipeline_mod.PipelineExecutor(mcp_router)
 
+    # Init autonomous project execution system
+    _ctx_manager  = ProjectContextManager(svc.vault)
+    _orchestrator = ProjectOrchestrator(mcp_router, _ctx_manager, api_key_fn=get_anthropic_key)
+    _proj_routes.ctx_manager  = _ctx_manager
+    _proj_routes.orchestrator = _orchestrator
+
     yield
 
 app = FastAPI(
@@ -365,6 +375,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+# Project execution router
+app.include_router(project_router)
 
 
 # ═══════════════════════════════════════════════════
