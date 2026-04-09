@@ -25,6 +25,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Load secure key store FIRST — before any service that needs API keys
 from config.key_manager import load_all_keys, get_anthropic_key, get_ibm_token, get_dev_key, mask
 from mcp_agent_status import status_manager
+from mcp_router import mcp_router, ResolvedAgent
+import agent_activity as _activity_mod
+import agent_pipeline as _pipeline_mod
 load_all_keys()
 
 from contextlib import asynccontextmanager
@@ -359,6 +362,8 @@ async def save_agent_team(request: Request, token: str = Depends(get_session_tok
     team_file = user_agent_team_file(username)
     team_file.parent.mkdir(parents=True, exist_ok=True)
     team_file.write_text(json.dumps(safe_agents, indent=2), encoding="utf-8")
+    # Priority 7: invalidate router cache so next query sees new config
+    mcp_router.invalidate_cache(username)
     log.info("Team config saved for %s (%d agents)", username, len(safe_agents))
     return {"ok": True, "count": len(safe_agents)}
 
@@ -468,6 +473,140 @@ async def test_agent_connection(
     except Exception as e:
         log.warning("MCP connection test failed for %s: %s", req.url, e)
         return {"ok": False, "error": str(e)}
+
+
+# ── Tool Discovery (Priority 4) ───────────────────
+
+@app.get("/agent/tools/{agent_id}")
+@limiter.limit("20/minute")
+async def get_agent_tools(
+    request: Request,
+    agent_id: str,
+    token: str = Depends(get_session_token),
+):
+    """
+    Discover tools exposed by the MCP server configured for a given agent.
+    Sends an MCP initialize + tools/list request to the server URL.
+    Returns a list of {name, description} objects.
+    """
+    import httpx
+
+    username = get_username_from_token(token)
+    agent = mcp_router.get_agent(username, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found in team config")
+
+    url = agent.get("url", "")
+    transport = agent.get("transport", "http")
+    server = agent.get("server", "")
+
+    # stdio servers — return static info from known registry
+    _KNOWN_TOOLS: dict = {
+        "excalidraw":        [{"name": "create_diagram", "description": "Create an Excalidraw diagram from a description"}],
+        "context7":          [{"name": "resolve-library-id", "description": "Resolve library docs ID"}, {"name": "get-library-docs", "description": "Fetch up-to-date library documentation"}],
+        "desktop_commander": [{"name": "execute_command", "description": "Run shell commands"}, {"name": "read_file", "description": "Read local files"}, {"name": "write_file", "description": "Write local files"}],
+    }
+    if transport == "stdio" or server in _KNOWN_TOOLS:
+        tools = _KNOWN_TOOLS.get(server, [{"name": server, "description": "stdio MCP server (local)"}])
+        return {"ok": True, "tools": tools, "source": "static"}
+
+    if not url:
+        return {"ok": False, "tools": [], "error": "No server URL configured"}
+
+    # Load vault key for auth
+    vault_key = await _load_agent_key(username, agent_id)
+    headers = {"Content-Type": "application/json"}
+    if vault_key:
+        headers["Authorization"] = f"Bearer {vault_key}"
+
+    # MCP tools/list over HTTP
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Try standard MCP tools list endpoint
+            resp = await client.post(
+                url,
+                headers=headers,
+                json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_tools = data.get("result", {}).get("tools", [])
+                tools = [
+                    {"name": t.get("name", "?"), "description": t.get("description", "")}
+                    for t in raw_tools
+                ]
+                return {"ok": True, "tools": tools, "source": "live"}
+            return {"ok": False, "tools": [], "error": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"ok": False, "tools": [], "error": str(e)}
+
+
+# ── Activity Endpoints (Priority 5) ──────────────
+
+@app.get("/agent/activity/{agent_id}")
+async def get_agent_activity(
+    agent_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    token: str = Depends(get_session_token),
+):
+    """Return per-agent activity log (most recent first)."""
+    username = get_username_from_token(token)
+    entries = await _activity_mod.get_activity(username, agent_id, limit=limit)
+    return {"agent_id": agent_id, "entries": entries, "count": len(entries)}
+
+
+@app.get("/agent/activity")
+async def get_all_agent_activity(
+    limit: int = Query(default=100, ge=1, le=500),
+    token: str = Depends(get_session_token),
+):
+    """Return activity log for all user agents, most recent first."""
+    username = get_username_from_token(token)
+    entries = await _activity_mod.get_all_activity(username, limit=limit)
+    return {"entries": entries, "count": len(entries)}
+
+
+# ── Pipeline Endpoints (Priority 6) ──────────────
+
+class PipelineRunRequest(BaseModel):
+    steps: list           # [{agent_id, prompt_template, label}]
+    initial_input: str
+    name: str = "Pipeline"
+
+
+@app.post("/agent/pipeline/run")
+@limiter.limit("5/minute")
+async def run_pipeline(
+    request: Request,
+    req: PipelineRunRequest,
+    token: str = Depends(get_session_token),
+):
+    """Execute a pipeline — run each step sequentially with output chaining."""
+    username = get_username_from_token(token)
+    api_key = get_anthropic_key()
+
+    executor = getattr(_pipeline_mod, "pipeline_executor", None)
+    if executor is None:
+        executor = _pipeline_mod.PipelineExecutor(mcp_router)
+
+    results = await executor.run(
+        user_id=username,
+        steps=req.steps,
+        initial_input=req.initial_input,
+        api_key=api_key,
+    )
+    return {
+        "name": req.name,
+        "step_count": len(req.steps),
+        "results": results,
+        "ok": all(r.get("status") == "ok" for r in results),
+    }
+
+
+@app.get("/agent/pipeline/templates")
+async def get_pipeline_templates(token: str = Depends(get_session_token)):
+    """Return the built-in pipeline templates."""
+    return {"templates": _pipeline_mod.PIPELINE_TEMPLATES}
 
 
 def _init_services():
@@ -591,6 +730,10 @@ async def lifespan(application: FastAPI):
             log.info("No AETHERCLOUD_LICENSE_KEY set — running unlicensed")
     except Exception as e:
         log.warning("License validation error: %s", e)
+
+    # Wire vault_spaces into activity logger and init pipeline executor
+    _activity_mod.vault_spaces = svc.vault_spaces
+    _pipeline_mod.pipeline_executor = _pipeline_mod.PipelineExecutor(mcp_router)
 
     yield
 
@@ -1309,6 +1452,74 @@ def _build_mcp_system_prompt(vault_context: Optional[dict], username: str) -> st
     return base
 
 
+# ── MCP Chat helpers ──────────────────────────────
+
+async def _load_agent_key(user_id: str, agent_id: str) -> Optional[str]:
+    """Read per-user API key for a configured agent."""
+    keys_file = user_agent_keys_file(user_id)
+    if not keys_file.exists():
+        return None
+    try:
+        keys = json.loads(keys_file.read_text(encoding="utf-8"))
+        return keys.get(agent_id)
+    except Exception:
+        return None
+
+
+def _build_mcp_servers(agent: Optional[ResolvedAgent], fallback: list) -> list:
+    """Convert a ResolvedAgent into the mcp_servers list for the Anthropic API."""
+    if not agent or not agent.url:
+        return fallback
+    srv: dict = {
+        "type": "url",
+        "url": agent.url,
+        "name": agent.server_name or agent.name,
+    }
+    return [srv]
+
+
+def _build_system_prompt(agent: Optional[ResolvedAgent], vault_context: Optional[dict], username: str) -> str:
+    """Build the system prompt — prefer agent's custom prompt, fall back to generic."""
+    if agent and agent.system_prompt:
+        base = agent.system_prompt + "\n\n"
+    else:
+        base = (
+            f"You are AetherCloud's autonomous agent for {username}.\n\n"
+            "You have access to external tools via MCP servers. Use them proactively.\n\n"
+            "RULES:\n"
+            "1. When asked about emails — USE the Gmail tool to actually read them.\n"
+            "2. When asked about calendar — USE the calendar tool to check actual events.\n"
+            "3. When you have vault context — use the file manifest to propose specific operations.\n"
+            "4. Always complete the full task autonomously before responding.\n"
+            "5. Format your response cleanly — the user sees your final output, not your tool calls.\n"
+            "6. After using tools, summarize what you found and what you did or propose to do.\n"
+            "7. Format rename proposals as: `old_filename` → `new_filename`\n"
+        )
+
+    if vault_context and vault_context.get("files"):
+        file_lines = "\n".join(
+            f"- {f['name']} ({f.get('size', '?')}) [{f.get('category', '?')}]"
+            for f in vault_context["files"][:50]
+        )
+        base += (
+            f"\nVAULT CONTENTS ({vault_context.get('file_count', 0)} files):\n"
+            f"{file_lines}\n\n"
+            "Use these exact filenames when proposing file operations.\n"
+        )
+    return base
+
+
+def _build_messages(history: list, query: str) -> list:
+    messages = list(history or [])
+    messages.append({"role": "user", "content": query})
+    return messages
+
+
+def _summarize_query(query: str, max_len: int = 120) -> str:
+    q = query.strip().replace("\n", " ")
+    return q[:max_len] + "…" if len(q) > max_len else q
+
+
 @app.post("/agent/mcp-chat", response_model=MCPAgentResponse)
 @limiter.limit("20/minute;100/hour")
 async def agent_mcp_chat(
@@ -1317,94 +1528,158 @@ async def agent_mcp_chat(
     token: str = Depends(get_session_token),
 ):
     """
-    MCP-enabled agent endpoint. Routes to VPS5 MCP worker over Tailscale
-    for isolated execution. Falls back to direct Anthropic call if VPS5
-    is unreachable.
+    MCP-enabled agent endpoint.
+    Priority 1: Routes to user's configured team agents by keyword match.
+    Priority 2: Status bar events (agent_start / agent_done).
+    Priority 3: Per-user vault key injection.
+    Falls back to VPS5 worker → direct Anthropic if no team agent matches.
     """
     import httpx
     from agent.mcp_registry import detect_required_servers
+    import asyncio
 
     username = get_username_from_token(token)
-    system = _build_mcp_system_prompt(req.vault_context, username)
-    mcp_servers = req.mcp_servers or detect_required_servers(req.query)
 
-    # ── Route to VPS5 MCP worker ──────────────────
-    task_id = str(uuid.uuid4())
-    server_name = mcp_servers[0].get("name", "mcp") if mcp_servers else "mcp"
-    agent_id = f"{username}_{server_name}_{task_id[:8]}"
-    task = {
-        "task_id": task_id,
-        "client_id": username,
-        "agent_type": "mcp",
-        "prompt": req.query,
-        "context": system,
-        "mcp_server_url": mcp_servers[0]["url"] if mcp_servers else "",
-    }
+    # ── Priority 1: Route to user's configured team agent ─────
+    routed_agent: Optional[ResolvedAgent] = await mcp_router.route(username, req.query)
 
+    if routed_agent:
+        # Priority 3: inject vault key into mcp_servers
+        vault_key = await _load_agent_key(username, routed_agent.agent_id)
+        mcp_servers = _build_mcp_servers(routed_agent, [])
+        if vault_key and mcp_servers:
+            mcp_servers[0]["authorization_token"] = vault_key
+        system = _build_system_prompt(routed_agent, req.vault_context, username)
+        server_name = routed_agent.server_name or routed_agent.name
+        status_agent_id = f"{username}_{routed_agent.agent_id}"
+        log.info("MCP chat routed to team agent '%s' (server=%s)", routed_agent.name, server_name)
+    else:
+        # Builtin auto-detection fallback
+        mcp_servers = req.mcp_servers or detect_required_servers(req.query)
+        system = _build_system_prompt(None, req.vault_context, username)
+        server_name = mcp_servers[0].get("name", "mcp") if mcp_servers else "mcp"
+        status_agent_id = f"{username}_{server_name}_{str(uuid.uuid4())[:8]}"
+
+    # ── Priority 2: Fire status bar event ─────────────────────
     await status_manager.agent_start(
-        agent_id=agent_id,
+        agent_id=status_agent_id,
         server_name=server_name,
         task=req.query[:60],
     )
+
+    response_text = ""
+    tools_used: list = []
+    commitment_hash = ""
+    routed_via = "direct"
+    error_str = ""
+
     try:
-        vps5_result = await _dispatch_to_vps5(task)
-        await status_manager.agent_done(agent_id)
-    except Exception as _e:
-        await status_manager.agent_done(agent_id, error=str(_e))
+        # ── Try VPS5 worker first (only for builtin/fallback path) ────
+        vps5_result = None
+        if not routed_agent:
+            task_id = str(uuid.uuid4())
+            task = {
+                "task_id": task_id,
+                "client_id": username,
+                "agent_type": "mcp",
+                "prompt": req.query,
+                "context": system,
+                "mcp_server_url": mcp_servers[0]["url"] if mcp_servers else "",
+            }
+            vps5_result = await _dispatch_to_vps5(task)
+
+        if vps5_result and not vps5_result.get("error"):
+            response_text = vps5_result.get("result", "")
+            tools_used = vps5_result.get("tools_used", [])
+            commitment_hash = vps5_result.get("protocol_c_post", _commitment_hash(response_text))
+            routed_via = "VPS5"
+            log.info("MCP task completed via VPS5 — tools=%s", tools_used)
+        else:
+            # ── Direct Anthropic call (team agent OR VPS5 fallback) ───
+            if vps5_result and vps5_result.get("error"):
+                log.warning("VPS5 error — falling back to direct: %s", vps5_result["error"])
+
+            api_key = get_anthropic_key()
+            messages = _build_messages(req.conversation_history, req.query)
+            payload: dict = {
+                "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
+                "max_tokens": req.max_tokens,
+                "system": system,
+                "messages": messages,
+            }
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            }
+            if mcp_servers:
+                payload["mcp_servers"] = mcp_servers
+                headers["anthropic-beta"] = "mcp-client-2025-04-04"
+
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers=headers,
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+            except Exception as e:
+                log.warning("MCP agent direct call failed: %s", e)
+                raise HTTPException(status_code=502, detail="Agent worker unavailable")
+
+            for block in data.get("content", []):
+                btype = block.get("type", "")
+                if btype == "text":
+                    response_text += block.get("text", "")
+                elif btype in ("tool_use", "mcp_tool_use"):
+                    tools_used.append(block.get("name", "unknown"))
+            commitment_hash = _commitment_hash(response_text)
+
+        await status_manager.agent_done(status_agent_id)
+
+    except HTTPException:
+        await status_manager.agent_done(status_agent_id, error="request failed")
+        # Fire activity log (error) then re-raise
+        asyncio.create_task(_activity_mod.log_activity(
+            user_id=username,
+            agent_id=routed_agent.agent_id if routed_agent else "direct",
+            server_name=server_name,
+            tool_name="chat",
+            query_summary=_summarize_query(req.query),
+            result_summary="",
+            status="error",
+            error="request failed",
+        ))
+        raise
+    except Exception as exc:
+        error_str = str(exc)
+        await status_manager.agent_done(status_agent_id, error=error_str)
+        asyncio.create_task(_activity_mod.log_activity(
+            user_id=username,
+            agent_id=routed_agent.agent_id if routed_agent else "direct",
+            server_name=server_name,
+            tool_name="chat",
+            query_summary=_summarize_query(req.query),
+            result_summary="",
+            status="error",
+            error=error_str,
+        ))
         raise
 
-    if vps5_result and not vps5_result.get("error"):
-        response_text = vps5_result.get("result", "")
-        tools_used = vps5_result.get("tools_used", [])
-        commitment_hash = vps5_result.get("protocol_c_post", _commitment_hash(response_text))
-        log.info("MCP task completed via VPS5 — tools=%s", tools_used)
-    else:
-        # ── Fallback: call Anthropic directly from VPS2 ─
-        if vps5_result and vps5_result.get("error"):
-            log.warning("VPS5 returned error — falling back to direct: %s", vps5_result["error"])
+    # ── Activity log (success) ─────────────────────────────────
+    asyncio.create_task(_activity_mod.log_activity(
+        user_id=username,
+        agent_id=routed_agent.agent_id if routed_agent else "direct",
+        server_name=server_name,
+        tool_name=", ".join(tools_used) or "chat",
+        query_summary=_summarize_query(req.query),
+        result_summary=response_text[:240],
+        status="ok",
+    ))
 
-        api_key = get_anthropic_key()
-        messages = list(req.conversation_history or [])
-        messages.append({"role": "user", "content": req.query})
-        payload = {
-            "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
-            "max_tokens": req.max_tokens,
-            "system": system,
-            "messages": messages,
-        }
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        if mcp_servers:
-            payload["mcp_servers"] = mcp_servers
-            headers["anthropic-beta"] = "mcp-client-2025-04-04"
-
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers=headers,
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception as e:
-            log.warning("MCP agent fallback call failed: %s", e)
-            raise HTTPException(status_code=502, detail="Agent worker unavailable — check MCP worker status")
-
-        response_text = ""
-        tools_used = []
-        for block in data.get("content", []):
-            btype = block.get("type", "")
-            if btype == "text":
-                response_text += block.get("text", "")
-            elif btype in ("tool_use", "mcp_tool_use"):
-                tools_used.append(block.get("name", "unknown"))
-        commitment_hash = _commitment_hash(response_text)
-
-    # ── Audit log ─────────────────────────────────
+    # ── Audit log ─────────────────────────────────────────────
     if svc.audit_log:
         try:
             svc.audit_log.append_commitment(
@@ -1415,7 +1690,8 @@ async def agent_mcp_chat(
                     "query_hash": hashlib.sha256(req.query.encode()).hexdigest()[:16],
                     "tools_used": tools_used,
                     "mcp_servers": [s.get("name") for s in mcp_servers],
-                    "routed_via": "VPS5" if vps5_result and not vps5_result.get("error") else "direct",
+                    "routed_via": routed_via,
+                    "team_agent": routed_agent.agent_id if routed_agent else None,
                 },
                 commitment_hash=commitment_hash,
             )

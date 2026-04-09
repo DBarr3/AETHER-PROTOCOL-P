@@ -2402,6 +2402,9 @@
           <button class="view-mode-btn" id="team-tab-registry"
             onclick="switchTeamTab('registry')"
             style="font-size:9px;padding:4px 12px;border-radius:0;">Registry</button>
+          <button class="view-mode-btn" id="team-tab-pipeline"
+            onclick="switchTeamTab('pipeline')"
+            style="font-size:9px;padding:4px 12px;border-radius:0;">Pipeline</button>
         </div>
       </div>
 
@@ -10100,6 +10103,7 @@ function teamShowEditor(agent) {
         '<div style="display:flex;align-items:center;gap:8px;">' +
           '<div class="team-vault-indicator" id="team-vault-indicator"><div class="team-vault-dot"></div><span id="team-vault-text">vault encrypted</span></div>' +
           (!isNew ? '<button class="sb-agent-btn" onclick="teamDeleteAgent()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--red);color:var(--red);">Delete</button>' : '') +
+          (!isNew ? '<button class="sb-agent-btn" onclick="teamShowActivity(\'' + escH(agent.id || '') + '\',\'' + escH((agent.name || 'Agent').replace(/'/g, "\\'")) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Activity</button>' : '') +
           '<button class="sb-agent-btn" onclick="teamCancelEdit()" style="width:auto;padding:4px 10px;font-size:9px;">Cancel</button>' +
           '<button class="sb-agent-btn" onclick="teamSaveAgent()" style="width:auto;padding:5px 12px;font-size:9px;border-color:var(--accent);color:var(--accent);">Save to Vault</button>' +
         '</div>' +
@@ -10169,6 +10173,14 @@ function teamShowEditor(agent) {
           '<span class="team-test-status" id="team-test-status">Not tested</span>' +
           '<button class="sb-agent-btn" onclick="teamTestConnection()" style="width:auto;padding:4px 10px;font-size:9px;">Test Connection</button>' +
         '</div>' +
+      '</div>' +
+
+      '<div class="team-form-section">' +
+        '<div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
+          '<button class="sb-agent-btn" id="team-tools-btn" onclick="teamLoadTools(\'' + (agent.id || teamCurrentId) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Discover Tools</button>' +
+          '<span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);">// see what this agent can do</span>' +
+        '</div>' +
+        '<div id="team-tools-panel" style="display:none;margin-bottom:10px;max-height:220px;overflow-y:auto;"></div>' +
       '</div>' +
 
       '<div class="team-form-section">' +
@@ -10392,15 +10404,241 @@ window.switchTeamTab = function(tab) {
   teamTab = tab;
   const t1 = document.getElementById('team-tab-my');
   const t2 = document.getElementById('team-tab-registry');
+  const t3 = document.getElementById('team-tab-pipeline');
   if (t1) t1.classList.toggle('active', tab === 'team');
   if (t2) t2.classList.toggle('active', tab === 'registry');
+  if (t3) t3.classList.toggle('active', tab === 'pipeline');
   if (tab === 'registry') {
     teamShowRegistry('');
+  } else if (tab === 'pipeline') {
+    teamShowPipeline();
   } else {
     if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) teamEditAgent(teamCurrentId);
     else if (teamAgents.length) teamEditAgent(teamAgents[0].id);
     else teamShowEmpty();
   }
+};
+
+// ── Tool Discovery (Priority 4) ────────────────────────────────
+window.teamLoadTools = async function(agentId) {
+  const panel = document.getElementById('team-tools-panel');
+  const btn   = document.getElementById('team-tools-btn');
+  if (!panel) return;
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:8px;">Connecting to MCP server...</div>';
+  if (btn) btn.disabled = true;
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/tools/' + encodeURIComponent(agentId), {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await r.json();
+    if (data.ok && data.tools && data.tools.length) {
+      panel.innerHTML =
+        '<div style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">' +
+        data.tools.length + ' tools available ' +
+        (data.source === 'live' ? '<span style="color:var(--green);">// live</span>' : '<span style="color:var(--text-muted);">// cached</span>') +
+        '</div>' +
+        data.tools.map(function(t) {
+          return '<div style="padding:5px 8px;margin-bottom:3px;background:var(--bg-3);border:1px solid var(--border);">' +
+            '<div style="font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--text-primary);">' + escH(t.name) + '</div>' +
+            (t.description ? '<div style="font-size:9px;color:var(--text-muted);margin-top:2px;">' + escH(t.description) + '</div>' : '') +
+            '</div>';
+        }).join('');
+    } else {
+      panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:8px;">' +
+        (data.error || 'No tools found') + '</div>';
+    }
+  } catch(e) {
+    panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);padding:8px;">Error: ' + escH(e.message) + '</div>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+// ── Activity Log (Priority 5) ──────────────────────────────────
+window.teamShowActivity = async function(agentId, agentName) {
+  teamShowMain('<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:20px;">Loading activity...</div>');
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/activity/' + encodeURIComponent(agentId) + '?limit=50', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await r.json();
+    const entries = data.entries || [];
+    if (!entries.length) {
+      teamShowMain(
+        '<div class="team-empty-state">' +
+        '<div class="team-empty-title">No activity yet for ' + escH(agentName || agentId) + '</div>' +
+        '<div class="team-empty-sub">Send a message that matches this agent\'s keywords and the call will be logged here with a Protocol-C hash.</div>' +
+        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-top:10px;width:auto;padding:6px 14px;">← Back to Config</button>' +
+        '</div>'
+      );
+      return;
+    }
+    teamShowMain(
+      '<div style="max-width:700px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+        '<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--accent);">' + escH(agentName || agentId) + ' — Activity</span>' +
+        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + entries.length + ' calls</span>' +
+        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-left:auto;width:auto;padding:4px 10px;font-size:9px;">← Config</button>' +
+      '</div>' +
+      entries.map(function(e) {
+        var statusColor = e.status === 'ok' ? 'var(--green)' : 'var(--red)';
+        var ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
+        return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + statusColor + ';">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
+            '<span style="font-family:var(--font-mono);font-size:9px;color:' + statusColor + ';text-transform:uppercase;">' + escH(e.status) + '</span>' +
+            '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + escH(e.tool_name) + '</span>' +
+            '<span style="font-size:9px;color:var(--text-muted);margin-left:auto;">' + escH(ts) + '</span>' +
+          '</div>' +
+          '<div style="font-size:10px;color:var(--text-primary);margin-bottom:3px;">' + escH(e.query_summary) + '</div>' +
+          (e.result_summary ? '<div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;">' + escH(e.result_summary.substring(0, 120)) + (e.result_summary.length > 120 ? '…' : '') + '</div>' : '') +
+          (e.error ? '<div style="font-size:9px;color:var(--red);">Error: ' + escH(e.error) + '</div>' : '') +
+          '<div style="font-family:var(--font-mono);font-size:8px;color:rgba(0,212,255,0.3);margin-top:4px;" title="Protocol-C hash">&#8984; ' + (e.hash || '').substring(0, 16) + '…</div>' +
+        '</div>';
+      }).join('') +
+      '</div>'
+    );
+  } catch(ex) {
+    teamShowMain('<div style="padding:20px;font-family:var(--font-mono);font-size:10px;color:var(--red);">Failed to load activity: ' + escH(ex.message) + '</div>');
+  }
+};
+
+// ── Pipeline Builder (Priority 6) ─────────────────────────────
+var _pipelineSteps = [];
+
+window.teamShowPipeline = async function() {
+  // Load templates in background
+  let templates = [];
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await r.json();
+    templates = d.templates || [];
+  } catch(_) {}
+
+  const agentOptions = teamAgents.map(function(a) {
+    return '<option value="' + escH(a.id) + '">' + escH(a.name) + ' (' + escH(a.server || '?') + ')</option>';
+  }).join('');
+
+  teamShowMain(
+    '<div style="max-width:700px;" id="pipeline-editor">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">' +
+      '<span style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);">Pipeline Builder</span>' +
+      '<span style="font-size:11px;color:var(--text-muted);">// chain agents sequentially</span>' +
+      '<div style="margin-left:auto;display:flex;gap:6px;">' +
+        (templates.length ? '<select class="team-select" id="pipeline-template-sel" style="font-size:9px;padding:4px 24px 4px 8px;" onchange="teamLoadTemplate(this.value)">' +
+          '<option value="">Load template…</option>' +
+          templates.map(function(t) { return '<option value="' + escH(t.id) + '">' + escH(t.name) + '</option>'; }).join('') +
+          '</select>' : '') +
+        '<button class="sb-agent-btn" onclick="teamAddPipelineStep()" style="width:auto;padding:4px 10px;font-size:9px;">+ Add Step</button>' +
+        '<button class="sb-agent-btn" id="pipeline-run-btn" onclick="teamRunPipeline()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--accent);color:var(--accent);">▶ Run</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="team-form-row single" style="margin-bottom:14px;"><div class="team-field">' +
+      '<label class="team-label">Initial Input</label>' +
+      '<textarea class="team-textarea" id="pipeline-input" placeholder="What should the first step work on?" style="min-height:50px;"></textarea>' +
+    '</div></div>' +
+    '<div id="pipeline-steps" style="display:flex;flex-direction:column;gap:8px;"></div>' +
+    '<div id="pipeline-results" style="margin-top:16px;"></div>' +
+    '</div>'
+  );
+  _pipelineSteps = [];
+  // Add one default step
+  teamAddPipelineStep();
+};
+
+window.teamAddPipelineStep = function() {
+  _pipelineSteps.push({ agent_id: '', prompt_template: '{initial_input}', label: '' });
+  teamRenumberSteps();
+};
+
+window.teamRenumberSteps = function() {
+  const container = document.getElementById('pipeline-steps');
+  if (!container) return;
+  const agentOptions = '<option value="">— select agent —</option>' + teamAgents.map(function(a) {
+    return '<option value="' + escH(a.id) + '">' + escH(a.name) + '</option>';
+  }).join('');
+
+  container.innerHTML = _pipelineSteps.map(function(step, i) {
+    return '<div style="padding:12px;background:var(--bg-3);border:1px solid var(--border);" id="pipeline-step-' + i + '">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);">STEP ' + (i + 1) + '</span>' +
+        '<input class="team-input" placeholder="Step label (optional)" value="' + escH(step.label || '') + '" style="flex:1;" oninput="_pipelineSteps[' + i + '].label=this.value">' +
+        '<button onclick="_pipelineSteps.splice(' + i + ',1);teamRenumberSteps()" style="background:none;border:1px solid var(--border-2);color:var(--text-muted);font-size:10px;padding:2px 8px;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div class="team-form-row">' +
+        '<div class="team-field"><label class="team-label">Agent</label>' +
+          '<select class="team-select" onchange="_pipelineSteps[' + i + '].agent_id=this.value">' +
+            agentOptions.replace('value="' + escH(step.agent_id) + '"', 'value="' + escH(step.agent_id) + '" selected') +
+          '</select>' +
+        '</div>' +
+        '<div class="team-field"><label class="team-label">Prompt Template</label>' +
+          '<input class="team-input" value="' + escH(step.prompt_template || '{initial_input}') + '" placeholder="{initial_input} or {previous_output}" oninput="_pipelineSteps[' + i + '].prompt_template=this.value">' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+};
+
+window.teamRunPipeline = async function() {
+  const input = (document.getElementById('pipeline-input') || {}).value || '';
+  if (!input.trim()) { alert('Enter an initial input for the pipeline.'); return; }
+  if (!_pipelineSteps.length) { alert('Add at least one step.'); return; }
+  const btn = document.getElementById('pipeline-run-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Running…'; }
+  const resultsEl = document.getElementById('pipeline-results');
+  if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">Executing pipeline…</div>';
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/pipeline/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ steps: _pipelineSteps, initial_input: input, name: 'Dashboard Pipeline' }),
+    });
+    const data = await r.json();
+    if (resultsEl) {
+      resultsEl.innerHTML =
+        '<div style="margin-bottom:8px;font-family:var(--font-mono);font-size:9px;color:' + (data.ok ? 'var(--green)' : 'var(--amber)') + ';text-transform:uppercase;">' +
+        'Pipeline ' + (data.ok ? 'Complete ✓' : 'Partial') + ' — ' + (data.step_count || 0) + ' steps</div>' +
+        (data.results || []).map(function(res) {
+          var c = res.status === 'ok' ? 'var(--green)' : 'var(--red)';
+          return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + c + ';">' +
+            '<div style="font-family:var(--font-mono);font-size:9px;color:' + c + ';margin-bottom:4px;">STEP ' + (res.step_index + 1) + ' — ' + escH(res.label || res.agent_id) + ' (' + res.duration_ms + 'ms)</div>' +
+            (res.output ? '<div style="font-size:10px;color:var(--text-primary);white-space:pre-wrap;">' + escH(res.output.substring(0, 500)) + (res.output.length > 500 ? '\n…' : '') + '</div>' : '') +
+            (res.error ? '<div style="font-size:9px;color:var(--red);margin-top:4px;">Error: ' + escH(res.error) + '</div>' : '') +
+          '</div>';
+        }).join('');
+    }
+  } catch(ex) {
+    if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);">Pipeline failed: ' + escH(ex.message) + '</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Run'; }
+  }
+};
+
+window.teamLoadTemplate = function(templateId) {
+  if (!templateId) return;
+  // Fetch from cached templates or re-request
+  getSessionToken().then(function(token) {
+    return fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var tpl = (d.templates || []).find(function(t) { return t.id === templateId; });
+    if (!tpl) return;
+    _pipelineSteps = (tpl.steps || []).map(function(s) {
+      return { agent_id: s.agent_id || '', prompt_template: s.prompt_template || '{initial_input}', label: s.label || '' };
+    });
+    // Try to auto-match steps to user agents by hint_server
+    tpl.steps.forEach(function(s, i) {
+      if (s.hint_server && !_pipelineSteps[i].agent_id) {
+        var match = teamAgents.find(function(a) { return a.server === s.hint_server; });
+        if (match) _pipelineSteps[i].agent_id = match.id;
+      }
+    });
+    teamRenumberSteps();
+    if (typeof showToast === 'function') showToast('Template "' + tpl.name + '" loaded', 'info');
+  }).catch(function() {});
 };
 
 // ── Expose init ────────────────────────────────────────────────
