@@ -11,8 +11,9 @@ class TestMFAManager:
     """Tests for MFAManager TOTP implementation."""
 
     @pytest.fixture
-    def mfa(self):
-        return MFAManager()
+    def mfa(self, tmp_path):
+        """Isolated MFAManager — uses tmp_path so tests never share disk state."""
+        return MFAManager(secrets_path=str(tmp_path / "mfa_secrets.json"))
 
     def test_mfa_creation(self, mfa):
         assert mfa is not None
