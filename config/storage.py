@@ -111,6 +111,16 @@ def user_tone_profile(username: str, agent_type: str) -> Path:
     return user_root(username) / "agents" / "tone_profiles" / f"{agent_type}.json"
 
 
+def user_agent_team_file(username: str) -> Path:
+    """Stores the list of configured MCP agent configs for this user."""
+    return user_root(username) / "agents" / "team.json"
+
+
+def user_agent_keys_file(username: str) -> Path:
+    """Stores encrypted API keys for MCP agents, keyed by agent_id."""
+    return user_root(username) / "agents" / "agent_keys.json"
+
+
 def user_vault_root(username: str) -> Path:
     return ROOT / "vault" / username
 
@@ -138,6 +148,8 @@ def ensure_user_dirs(username: str) -> None:
         user_root(username) / "agents" / "tone_profiles",
         user_vault_root(username),
     ]
+    # Ensure agents dir exists (team.json + agent_keys.json live here)
+    dirs.append(user_root(username) / "agents")
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
 

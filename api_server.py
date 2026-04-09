@@ -58,6 +58,7 @@ from config.storage import (
     CREDENTIALS_FILE as STORAGE_CREDENTIALS_FILE,
     AUDIT_LOG as STORAGE_AUDIT_LOG,
     user_tasks_file, user_task_history, user_task_qopc,
+    user_agent_team_file, user_agent_keys_file,
 )
 from auth.login import AetherCloudAuth
 from auth.session import SessionManager
@@ -309,6 +310,164 @@ async def mcp_status_stream(current_user: str = Depends(get_session_token)):
             "X-Accel-Buffering": "no",
         }
     )
+
+
+# ── Agent Team Config ─────────────────────────────
+class AgentTeamRequest(BaseModel):
+    """Pydantic placeholder so FastAPI resolves body for POST /agent/team."""
+    pass  # payload is a raw list — we'll read via Request.json()
+
+
+@app.get("/agent/team")
+async def get_agent_team(token: str = Depends(get_session_token)):
+    """Load the user's MCP agent team config from vault storage."""
+    username = get_username_from_token(token)
+    ensure_user_dirs(username)
+    team_file = user_agent_team_file(username)
+    if not team_file.exists():
+        return []
+    try:
+        return json.loads(team_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("Failed to read team config for %s: %s", username, e)
+        return []
+
+
+@app.post("/agent/team")
+async def save_agent_team(request: Request, token: str = Depends(get_session_token)):
+    """Persist the user's MCP agent team config to vault storage.
+
+    Body: JSON array of agent config objects.
+    Strips any 'keyHint' fields before writing — raw keys live in agent_keys.json.
+    """
+    username = get_username_from_token(token)
+    ensure_user_dirs(username)
+    try:
+        agents = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be a JSON array")
+    if not isinstance(agents, list):
+        raise HTTPException(status_code=400, detail="Expected a JSON array of agent objects")
+
+    # Never persist the key hint (masked display) — keys are stored separately
+    safe_agents = []
+    for a in agents:
+        if isinstance(a, dict):
+            safe = {k: v for k, v in a.items() if k != "keyHint"}
+            safe_agents.append(safe)
+
+    team_file = user_agent_team_file(username)
+    team_file.parent.mkdir(parents=True, exist_ok=True)
+    team_file.write_text(json.dumps(safe_agents, indent=2), encoding="utf-8")
+    log.info("Team config saved for %s (%d agents)", username, len(safe_agents))
+    return {"ok": True, "count": len(safe_agents)}
+
+
+class AgentKeyRequest(BaseModel):
+    key: str
+
+
+@app.post("/agent/key/{agent_id}")
+async def store_agent_key(
+    agent_id: str,
+    req: AgentKeyRequest,
+    token: str = Depends(get_session_token),
+):
+    """Store an MCP agent's API key in the user's per-user key store.
+
+    Keys are stored separately from team config and never sent back to the client.
+    """
+    username = get_username_from_token(token)
+    ensure_user_dirs(username)
+    keys_file = user_agent_keys_file(username)
+    keys_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing keys
+    keys: dict = {}
+    if keys_file.exists():
+        try:
+            keys = json.loads(keys_file.read_text(encoding="utf-8"))
+        except Exception:
+            keys = {}
+
+    keys[agent_id] = req.key.strip()
+    keys_file.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+
+    # Protect the file: chmod 600 on POSIX systems
+    try:
+        import stat
+        keys_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except Exception:
+        pass  # Windows — no chmod, file ACLs handle it
+
+    log.info("API key stored for agent %s (user: %s)", agent_id, username)
+    return {"ok": True}
+
+
+class AgentTestRequest(BaseModel):
+    server: str
+    url: str = ""
+    transport: str = "http"
+    agentId: str = "test"
+
+
+@app.post("/agent/test")
+@limiter.limit("10/minute")
+async def test_agent_connection(
+    request: Request,
+    req: AgentTestRequest,
+    token: str = Depends(get_session_token),
+):
+    """Test connectivity to an MCP server.
+
+    For HTTP transport: sends a GET request to the server URL and checks response.
+    For stdio transport: reports stdio servers as always reachable (local process).
+    Returns: { ok: bool, tools: list, error: str }
+    """
+    username = get_username_from_token(token)
+
+    # stdio servers run locally — always reachable
+    stdio_servers = {"excalidraw", "context7", "desktop_commander", "custom_stdio"}
+    if req.transport == "stdio" or req.server in stdio_servers:
+        return {"ok": True, "tools": [], "message": "stdio server (local process)"}
+
+    if not req.url:
+        raise HTTPException(status_code=400, detail="URL required for HTTP transport")
+
+    # Load stored API key for this agent if it exists
+    keys_file = user_agent_keys_file(username)
+    api_key = None
+    if keys_file.exists():
+        try:
+            keys = json.loads(keys_file.read_text(encoding="utf-8"))
+            api_key = keys.get(req.agentId)
+        except Exception:
+            pass
+
+    import httpx
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            # Standard MCP health/capabilities probe
+            resp = await client.get(req.url, headers=headers)
+            if resp.status_code in (200, 404, 405):
+                # 404/405 just means no GET endpoint — server is up
+                return {"ok": True, "tools": [], "status_code": resp.status_code}
+            return {
+                "ok": False,
+                "error": f"HTTP {resp.status_code}",
+                "status_code": resp.status_code,
+            }
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "Connection timed out (>8s)"}
+    except httpx.ConnectError as e:
+        return {"ok": False, "error": f"Connection refused: {e}"}
+    except Exception as e:
+        log.warning("MCP connection test failed for %s: %s", req.url, e)
+        return {"ok": False, "error": str(e)}
 
 
 def _init_services():
