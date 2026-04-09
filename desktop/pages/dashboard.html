@@ -2084,6 +2084,113 @@
   }
   .aplan-btn-exec:hover { background: #00f0ff; box-shadow: 0 0 12px rgba(0,212,255,0.4); }
   .aplan-btn-exec:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+  /* ── Agent Team Panel ──────────────────────────────────── */
+  .team-agent-row {
+    display:flex;align-items:center;gap:8px;
+    padding:8px 14px;cursor:pointer;
+    border-left:2px solid transparent;transition:all 0.15s;
+  }
+  .team-agent-row:hover { background:rgba(0,212,255,0.06); }
+  .team-agent-row.active {
+    background:rgba(0,212,255,0.1);border-left-color:var(--accent);
+  }
+  .team-agent-row.active .team-row-name { color:var(--accent); }
+  .team-row-name {
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    color:var(--text-primary);flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .team-row-server { font-size:9px;color:var(--text-muted); }
+  .team-status-dot { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
+  .team-status-dot.connected { background:var(--green);box-shadow:0 0 4px var(--green); }
+  .team-status-dot.disconnected { background:var(--text-muted); }
+  .team-form-section { margin-bottom:22px; }
+  .team-section-label {
+    font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;
+    text-transform:uppercase;color:var(--accent);opacity:0.7;
+    margin-bottom:10px;
+  }
+  .team-form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px; }
+  .team-form-row.single { grid-template-columns:1fr; }
+  .team-field { display:flex;flex-direction:column;gap:4px; }
+  .team-label { font-family:var(--font-mono);font-size:9px;color:var(--text-muted); }
+  .team-input, .team-select, .team-textarea {
+    background:var(--bg-3);border:1px solid var(--border-2);
+    color:var(--text-primary);font-family:var(--font-mono);
+    font-size:11px;padding:7px 9px;outline:none;
+    transition:border-color 0.15s;width:100%;
+  }
+  .team-input:focus,.team-select:focus,.team-textarea:focus { border-color:var(--accent); }
+  .team-textarea { resize:vertical;min-height:60px; }
+  .team-select {
+    appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300d4ff' opacity='.5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 8px center;
+    padding-right:24px;
+  }
+  .team-color-row { display:flex;gap:6px;align-items:center;flex-wrap:wrap; }
+  .team-color-swatch {
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    cursor:pointer;padding:5px;border:1px solid transparent;
+    transition:all 0.15s;
+  }
+  .team-color-swatch:hover { background:var(--bg-3); }
+  .team-color-swatch.selected { border-color:var(--accent);background:rgba(0,212,255,0.1); }
+  .team-color-swatch-label { font-family:var(--font-mono);font-size:8px;color:var(--text-muted);text-transform:uppercase; }
+  .team-test-row {
+    display:flex;align-items:center;gap:8px;padding:8px 10px;
+    background:var(--bg-3);border:1px solid var(--border);margin-top:4px;
+  }
+  .team-test-status { font-family:var(--font-mono);font-size:10px;color:var(--text-muted);flex:1; }
+  .team-test-status.ok { color:var(--green); }
+  .team-test-status.fail { color:var(--red); }
+  .team-test-status.testing { color:var(--accent); }
+  .team-perms-table { width:100%;border-collapse:collapse; }
+  .team-perms-table th {
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
+    text-align:left;padding:0 0 6px;
+    border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.05em;
+  }
+  .team-perms-table td { padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle; }
+  .team-perms-table tr:last-child td { border-bottom:none; }
+  .team-perm-name { font-family:var(--font-mono);font-size:10px;color:var(--text-primary); }
+  .team-perm-desc { font-size:10px;color:var(--text-muted); }
+  .team-perm-risk { font-family:var(--font-mono);font-size:9px;padding:2px 5px;text-align:center; }
+  .team-perm-risk.low { background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3); }
+  .team-perm-risk.med { background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.2); }
+  .team-perm-risk.high { background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.35); }
+  .team-vault-indicator {
+    display:flex;align-items:center;gap:5px;
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
+    transition:all 0.3s;
+  }
+  .team-vault-indicator.saving { color:var(--amber); }
+  .team-vault-indicator.saved  { color:var(--green); }
+  .team-vault-dot { width:4px;height:4px;border-radius:50%;background:currentColor; }
+  .team-registry-grid {
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;
+  }
+  .team-registry-card {
+    background:var(--bg-3);border:1px solid var(--border);
+    padding:12px;cursor:pointer;transition:all 0.15s;
+  }
+  .team-registry-card:hover { border-color:var(--border-2);background:var(--bg-4); }
+  .team-registry-card.installed { border-color:rgba(34,197,94,0.25); }
+  .team-registry-card-name { font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-primary);margin-bottom:3px; }
+  .team-registry-card-desc { font-size:10px;color:var(--text-muted);line-height:1.4;margin-bottom:8px; }
+  .team-registry-card-footer { display:flex;align-items:center;justify-content:space-between; }
+  .team-registry-card-auth { font-family:var(--font-mono);font-size:8px;color:var(--text-muted);text-transform:uppercase; }
+  .team-badge { font-family:var(--font-mono);font-size:8px;padding:2px 5px; }
+  .team-badge.installed { background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3); }
+  .team-badge.official  { background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.2); }
+  .team-badge.community { background:var(--bg-4);color:var(--text-muted);border:1px solid var(--border); }
+  .team-empty-state {
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:60px 20px;text-align:center;gap:10px;
+  }
+  .team-empty-title { font-family:var(--font-mono);font-size:12px;color:var(--text-muted); }
+  .team-empty-sub { font-size:11px;color:rgba(255,255,255,0.25);max-width:260px;line-height:1.5; }
 </style>
 </head>
 <body>
@@ -2138,6 +2245,7 @@
     <button class="view-mode-btn active" id="vm-vault" onclick="switchViewMode('vault')">VAULT</button>
     <button class="view-mode-btn" id="vm-project" onclick="switchViewMode('project')">PROJECT</button>
     <button class="view-mode-btn" id="vm-agent" onclick="switchViewMode('agent')">AGENTS</button>
+    <button class="view-mode-btn" id="vm-team" onclick="switchViewMode('team')">TEAM</button>
     <button class="view-mode-btn" id="vm-logs" onclick="switchViewMode('logs')">LOGS</button>
   </div>
 
@@ -2180,6 +2288,14 @@
       </div>
       <input type="text" class="sb-search" id="chat-search" placeholder="Search conversations..." oninput="filterConversations()">
       <div id="chat-history" style="flex:1; overflow-y:auto;"></div>
+    </div>
+    <!-- SIDEBAR CONTROLS -->
+    <div class="sb-controls">
+      <button class="sb-agent-btn" onclick="switchViewMode('team')" style="margin-bottom:8px;">
+        <span class="agent-icon">&#9881;</span>
+        Configure Agent Team
+      </button>
+      <div style="height:1px;background:var(--border);margin-bottom:8px;"></div>
     </div>
   </div>
 </div>
@@ -2254,6 +2370,74 @@
       <!-- Event-capture canvas: transparent overlay, sits above render canvas (z:1), below loading-overlay (z:50) -->
       <canvas id="circuit-interact" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:auto;cursor:grab;background:transparent;"></canvas>
     </div>
+    <!-- AGENT TEAM CONFIG PANEL -->
+    <div class="agent-team-panel" id="agent-team-panel" style="
+      position:absolute; inset:0; display:none; flex-direction:column;
+      background:var(--bg); z-index:50; overflow:hidden;
+      border-top:2px solid rgba(0,212,255,0.3);
+    ">
+      <!-- Panel header -->
+      <div style="
+        display:flex; align-items:center; gap:10px;
+        padding:0 16px; height:44px;
+        background:var(--bg-2); border-bottom:1px solid var(--border);
+        flex-shrink:0;
+      ">
+        <div style="
+          width:7px; height:7px; border-radius:50%;
+          background:var(--accent); box-shadow:0 0 6px var(--accent);
+          animation:pulse 2.4s ease-in-out infinite;
+        "></div>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
+          letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);">
+          Agent Team
+        </span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
+          // configure mcp agents
+        </span>
+        <div style="margin-left:auto;display:flex;gap:0;">
+          <button class="view-mode-btn" id="team-tab-my"
+            onclick="switchTeamTab('team')"
+            style="font-size:9px;padding:4px 12px;border-radius:0;">My Team</button>
+          <button class="view-mode-btn" id="team-tab-registry"
+            onclick="switchTeamTab('registry')"
+            style="font-size:9px;padding:4px 12px;border-radius:0;">Registry</button>
+        </div>
+      </div>
+
+      <!-- Body: sidebar + main -->
+      <div style="display:flex;flex:1;overflow:hidden;">
+
+        <!-- Agent sidebar list -->
+        <div id="team-sidebar" style="
+          width:240px; background:var(--bg-2);
+          border-right:1px solid var(--border);
+          display:flex; flex-direction:column;
+          overflow:hidden; flex-shrink:0;
+        ">
+          <div style="padding:10px 14px 6px;font-family:var(--font-mono);
+            font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
+            color:var(--text-muted);">Active Agents</div>
+          <div id="team-agent-list" style="flex:1;overflow-y:auto;"></div>
+          <div style="height:1px;background:var(--border);"></div>
+          <div onclick="teamNewAgent()" style="
+            display:flex;align-items:center;gap:8px;
+            padding:8px 14px;cursor:pointer;
+            font-family:var(--font-mono);font-size:10px;
+            color:var(--accent);opacity:0.7;transition:opacity 0.15s;
+          " onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
+            <div style="width:16px;height:16px;border:1px solid var(--accent);
+              display:flex;align-items:center;justify-content:center;font-size:14px;">+</div>
+            Add Agent
+          </div>
+        </div>
+
+        <!-- Editor / empty / registry -->
+        <div id="team-main" style="flex:1;overflow-y:auto;padding:20px;"></div>
+      </div>
+    </div>
+    <!-- END AGENT TEAM CONFIG PANEL -->
+
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
       <div class="logs-toolbar">
@@ -5886,11 +6070,18 @@ function switchViewMode(mode) {
   document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
   document.getElementById('task-tracker').classList.toggle('visible', mode === 'agent');
   document.getElementById('logs-panel').classList.toggle('visible', mode === 'logs');
+  const teamPanel = document.getElementById('agent-team-panel');
+  if (teamPanel) {
+    teamPanel.style.display = mode === 'team' ? 'flex' : 'none';
+    if (mode === 'team' && typeof teamPanelInit === 'function') { teamPanelInit(); }
+  }
 
   // When entering logs mode, load the feed
   if (mode === 'logs') {
     loadLogsFeed();
     loadRecentExports();
+  } else if (mode === 'team') {
+    if (typeof teamPanelInit === 'function') teamPanelInit();
   }
 
   // Update chat placeholder
@@ -5898,6 +6089,7 @@ function switchViewMode(mode) {
   if (mode === 'vault') input.placeholder = 'Ask AetherCloud anything...';
   else if (mode === 'project') input.placeholder = 'Describe your project or ask for analysis...';
   else if (mode === 'logs') input.placeholder = 'Search audit trail...';
+  else if (mode === 'team') input.placeholder = 'Describe the agent you want to add...';
   else input.placeholder = 'Command your agents...';
 
   // Save vault state when leaving vault
@@ -9696,6 +9888,530 @@ class ActivityLayer {
     ctx.stroke();
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT TEAM CONFIG PANEL
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+const TEAM_PIXELS = [
+  [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
+  [2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
+  [2,2],[4,2],[5,2],[6,2],[8,2],
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+  [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+  [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+  [2,6],[4,6],[6,6],[8,6],
+  [2,7],[4,7],[6,7],[8,7],
+];
+const TEAM_COLORS = { blue:'#2196F3', green:'#4CAF50', orange:'#E36C35', red:'#F44336', yellow:'#FFEB3B' };
+const TEAM_COLOR_LABELS = { blue:'Blue', green:'Green', orange:'Orange', red:'Red', yellow:'Yellow' };
+
+function teamSVG(color, w, h) {
+  w = w || 22; h = h || 16;
+  const fill = TEAM_COLORS[color] || TEAM_COLORS.blue;
+  const rects = TEAM_PIXELS.map(function(p) {
+    return '<rect x="' + p[0] + '" y="' + p[1] + '" width="1" height="1" fill="' + fill + '"/>';
+  }).join('');
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="' + w + '" height="' + h + '" shape-rendering="crispEdges">' + rects + '</svg>';
+}
+
+const SERVER_COLOR_MAP = {
+  github:'orange', slack:'green', notion:'yellow', google_drive:'blue',
+  stripe:'green', figma:'blue', fal_ai:'orange', excalidraw:'orange',
+  context7:'yellow', desktop_commander:'red', linear:'blue', postgres:'blue',
+  supabase:'green', playwright:'orange', firecrawl:'green',
+};
+
+const SERVER_PERMS = {
+  github:['read','write','auth_delegate'],
+  slack:['read','write'],
+  notion:['read','write'],
+  google_drive:['read','write','auth_delegate'],
+  stripe:['read','write','auth_delegate'],
+  figma:['read'],
+  fal_ai:['execute','network'],
+  excalidraw:['read','write'],
+  context7:['read','network'],
+  desktop_commander:['read','write','execute','file_system'],
+  default:['read','write'],
+};
+
+const PERM_CATALOG = {
+  read:         { desc:'Read data from service',       risk:'low'  },
+  write:        { desc:'Create or modify data',        risk:'med'  },
+  delete:       { desc:'Delete data',                  risk:'high' },
+  execute:      { desc:'Run commands or workflows',    risk:'high' },
+  auth_delegate:{ desc:'Authenticate on your behalf',  risk:'med'  },
+  network:      { desc:'Make outbound HTTP requests',  risk:'med'  },
+  file_system:  { desc:'Read/write local files',       risk:'high' },
+};
+
+const REGISTRY = [
+  { id:'github',            name:'GitHub',          desc:'Repos, issues, PRs, CI/CD',    auth:'api_key',  type:'official',  color:'orange', url:'https://api.githubcopilot.com/mcp' },
+  { id:'slack',             name:'Slack',            desc:'Messages, channels, search',   auth:'oauth',    type:'official',  color:'green',  url:'' },
+  { id:'notion',            name:'Notion',           desc:'Pages, databases, knowledge',  auth:'api_key',  type:'official',  color:'yellow', url:'https://api.notion.com/mcp' },
+  { id:'google_drive',      name:'Google Drive',     desc:'Docs, Sheets, file search',    auth:'oauth',    type:'official',  color:'blue',   url:'' },
+  { id:'stripe',            name:'Stripe',           desc:'Payments, subscriptions',      auth:'api_key',  type:'official',  color:'green',  url:'https://mcp.stripe.com' },
+  { id:'figma',             name:'Figma',            desc:'Design files, components',     auth:'api_key',  type:'official',  color:'blue',   url:'https://mcp.figma.com/mcp' },
+  { id:'fal_ai',            name:'fal.ai',           desc:'1000+ image/video models',     auth:'api_key',  type:'official',  color:'orange', url:'https://mcp.fal.ai/mcp' },
+  { id:'excalidraw',        name:'Excalidraw',       desc:'Diagrams from language',       auth:'none',     type:'official',  color:'orange', url:'' },
+  { id:'context7',          name:'Context7',         desc:'Live docs in prompt',          auth:'none',     type:'official',  color:'yellow', url:'' },
+  { id:'desktop_commander', name:'Desktop Commander',desc:'Terminal, file ops',           auth:'none',     type:'community', color:'red',    url:'' },
+  { id:'postgres',          name:'PostgreSQL',       desc:'Natural language SQL',         auth:'conn_str', type:'community', color:'blue',   url:'' },
+  { id:'supabase',          name:'Supabase',         desc:'Full backend access',          auth:'api_key',  type:'community', color:'green',  url:'' },
+  { id:'playwright',        name:'Playwright',       desc:'Browser automation',           auth:'none',     type:'community', color:'orange', url:'' },
+  { id:'firecrawl',         name:'Firecrawl',        desc:'Scrape + research agent',      auth:'api_key',  type:'community', color:'green',  url:'https://mcp.firecrawl.dev/mcp' },
+];
+
+let teamAgents = [];
+let teamCurrentId = null;
+let teamTab = 'team';
+
+function escH(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Load from vault ────────────────────────────────────────────
+async function teamLoadFromVault() {
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/team', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (r.ok) { teamAgents = await r.json(); teamRenderSidebar(); }
+  } catch(_) {}
+}
+
+async function teamPersistToVault(showFeedback) {
+  if (showFeedback) teamSetVaultState('saving');
+  try {
+    const token = await getSessionToken();
+    await fetch(API_BASE + '/agent/team', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify(teamAgents),
+    });
+    if (showFeedback) {
+      teamSetVaultState('saved');
+      setTimeout(function() { teamSetVaultState('idle'); }, 2200);
+    }
+  } catch(_) { if (showFeedback) teamSetVaultState('idle'); }
+}
+
+function teamSetVaultState(state) {
+  const el = document.getElementById('team-vault-indicator');
+  const txt = document.getElementById('team-vault-text');
+  if (!el || !txt) return;
+  el.className = 'team-vault-indicator ' + (state !== 'idle' ? state : '');
+  txt.textContent = state === 'saving' ? 'encrypting...' : state === 'saved' ? 'saved to vault' : 'vault encrypted';
+}
+
+// ── Sidebar ────────────────────────────────────────────────────
+function teamRenderSidebar() {
+  const list = document.getElementById('team-agent-list');
+  if (!list) return;
+  if (!teamAgents.length) {
+    list.innerHTML = '<div style="padding:8px 14px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;">No agents yet</div>';
+    return;
+  }
+  list.innerHTML = teamAgents.map(function(a) {
+    return '<div class="team-agent-row ' + (a.id === teamCurrentId ? 'active' : '') + '" onclick="teamEditAgent(\'' + a.id + '\')">' +
+      '<div style="width:22px;height:16px;image-rendering:pixelated;flex-shrink:0;">' + teamSVG(a.color||'blue',22,16) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div class="team-row-name">' + escH(a.name||'Unnamed') + '</div>' +
+        '<div class="team-row-server">' + escH(a.server||'—') + '</div>' +
+      '</div>' +
+      '<div class="team-status-dot ' + (a.connected?'connected':'disconnected') + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Main area ──────────────────────────────────────────────────
+function teamShowMain(html) {
+  const m = document.getElementById('team-main');
+  if (m) m.innerHTML = html;
+}
+
+function teamShowEmpty() {
+  teamShowMain('<div class="team-empty-state">' +
+    '<div style="width:44px;height:32px;image-rendering:pixelated;opacity:0.2;">' + teamSVG('blue',44,32) + '</div>' +
+    '<div class="team-empty-title">No agents configured</div>' +
+    '<div class="team-empty-sub">Add your first MCP agent to start building your team.</div>' +
+    '<button class="sb-agent-btn" onclick="teamNewAgent()" style="margin-top:10px;width:auto;padding:6px 16px;">+ Add First Agent</button>' +
+  '</div>');
+}
+
+// ── Color picker ───────────────────────────────────────────────
+function teamBuildColorPicker(selected) {
+  return Object.keys(TEAM_COLORS).map(function(c) {
+    return '<div class="team-color-swatch ' + (c === selected ? 'selected' : '') + '" id="team-swatch-' + c + '" onclick="teamSelectColor(\'' + c + '\')">' +
+      '<div style="width:33px;height:24px;image-rendering:pixelated;">' + teamSVG(c,33,24) + '</div>' +
+      '<div class="team-color-swatch-label">' + TEAM_COLOR_LABELS[c] + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+window.teamSelectColor = function(color) {
+  document.querySelectorAll('.team-color-swatch').forEach(function(s) { s.classList.remove('selected'); });
+  const sw = document.getElementById('team-swatch-' + color);
+  if (sw) sw.classList.add('selected');
+};
+
+// ── Permissions table ──────────────────────────────────────────
+function teamBuildPerms(serverId, existing) {
+  existing = existing || {};
+  const perms = SERVER_PERMS[serverId] || SERVER_PERMS.default;
+  return perms.map(function(p) {
+    const def = PERM_CATALOG[p]; if (!def) return '';
+    const safeDef = (p === 'delete' || p === 'execute' || p === 'file_system') ? false : true;
+    const isChecked = (p in existing) ? existing[p] : safeDef;
+    return '<tr>' +
+      '<td><span class="team-perm-name">' + p + '</span></td>' +
+      '<td><span class="team-perm-desc">' + def.desc + '</span></td>' +
+      '<td style="text-align:center"><span class="team-perm-risk ' + def.risk + '">' + def.risk + '</span></td>' +
+      '<td style="text-align:center">' +
+        '<label style="position:relative;width:30px;height:16px;display:inline-block;">' +
+          '<input type="checkbox" id="team-perm-' + p + '" ' + (isChecked?'checked':'') + ' style="opacity:0;width:0;height:0;position:absolute;">' +
+          '<div onclick="this.previousElementSibling.checked=!this.previousElementSibling.checked"' +
+            ' style="position:absolute;inset:0;background:var(--bg-3);border:1px solid var(--border-2);border-radius:8px;cursor:pointer;transition:all 0.2s;">' +
+          '</div>' +
+        '</label>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Editor ─────────────────────────────────────────────────────
+function teamShowEditor(agent) {
+  const isNew = !agent;
+  agent = agent || {};
+  const color = agent.color || 'blue';
+  const server = agent.server || '';
+  const permsHTML = teamBuildPerms(server, agent.perms);
+  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(server);
+
+  teamShowMain(
+    '<div style="max-width:700px;">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);">' +
+        '<div>' +
+          '<div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);margin-bottom:3px;" id="team-editor-title">' + (isNew ? 'New Agent' : escH(agent.name||'Agent')) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">Configure connection and permissions</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<div class="team-vault-indicator" id="team-vault-indicator"><div class="team-vault-dot"></div><span id="team-vault-text">vault encrypted</span></div>' +
+          (!isNew ? '<button class="sb-agent-btn" onclick="teamDeleteAgent()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--red);color:var(--red);">Delete</button>' : '') +
+          '<button class="sb-agent-btn" onclick="teamCancelEdit()" style="width:auto;padding:4px 10px;font-size:9px;">Cancel</button>' +
+          '<button class="sb-agent-btn" onclick="teamSaveAgent()" style="width:auto;padding:5px 12px;font-size:9px;border-color:var(--accent);color:var(--accent);">Save to Vault</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="team-form-section">' +
+        '<div class="team-section-label">Identity</div>' +
+        '<div class="team-form-row">' +
+          '<div class="team-field"><label class="team-label">Agent Name</label><input class="team-input" id="team-f-name" value="' + escH(agent.name||'') + '" placeholder="e.g. GitHub Assistant"></div>' +
+          '<div class="team-field"><label class="team-label">Role Description</label><input class="team-input" id="team-f-desc" value="' + escH(agent.desc||'') + '" placeholder="e.g. manages repos and issues"></div>' +
+        '</div>' +
+        '<div class="team-form-row single"><div class="team-field"><label class="team-label">Icon Color</label><div class="team-color-row">' + teamBuildColorPicker(color) + '</div></div></div>' +
+      '</div>' +
+
+      '<div class="team-form-section">' +
+        '<div class="team-section-label">Connection</div>' +
+        '<div class="team-form-row">' +
+          '<div class="team-field"><label class="team-label">MCP Server</label>' +
+            '<select class="team-select" id="team-f-server" onchange="teamOnServerChange()">' +
+              '<option value="">— select or custom —</option>' +
+              '<optgroup label="Official">' +
+                '<option value="github" ' + (server==='github'?'selected':'') + '>GitHub</option>' +
+                '<option value="slack" ' + (server==='slack'?'selected':'') + '>Slack</option>' +
+                '<option value="notion" ' + (server==='notion'?'selected':'') + '>Notion</option>' +
+                '<option value="google_drive" ' + (server==='google_drive'?'selected':'') + '>Google Drive</option>' +
+                '<option value="stripe" ' + (server==='stripe'?'selected':'') + '>Stripe</option>' +
+                '<option value="figma" ' + (server==='figma'?'selected':'') + '>Figma</option>' +
+              '</optgroup>' +
+              '<optgroup label="Aether Built-in">' +
+                '<option value="fal_ai" ' + (server==='fal_ai'?'selected':'') + '>fal.ai (image/video)</option>' +
+                '<option value="excalidraw" ' + (server==='excalidraw'?'selected':'') + '>Excalidraw</option>' +
+                '<option value="context7" ' + (server==='context7'?'selected':'') + '>Context7</option>' +
+                '<option value="desktop_commander" ' + (server==='desktop_commander'?'selected':'') + '>Desktop Commander</option>' +
+              '</optgroup>' +
+              '<optgroup label="Custom">' +
+                '<option value="custom_http" ' + (server==='custom_http'?'selected':'') + '>Custom HTTP Endpoint</option>' +
+                '<option value="custom_stdio" ' + (server==='custom_stdio'?'selected':'') + '>Custom stdio Server</option>' +
+              '</optgroup>' +
+            '</select>' +
+          '</div>' +
+          '<div class="team-field"><label class="team-label">Transport</label>' +
+            '<select class="team-select" id="team-f-transport">' +
+              '<option value="http" ' + ((agent.transport||'http')==='http'?'selected':'') + '>Streamable HTTP</option>' +
+              '<option value="stdio" ' + (agent.transport==='stdio'?'selected':'') + '>stdio (local)</option>' +
+              '<option value="sse" ' + (agent.transport==='sse'?'selected':'') + '>SSE (legacy)</option>' +
+            '</select>' +
+          '</div>' +
+        '</div>' +
+        '<div class="team-form-row single" id="team-url-row" ' + (isStdio?'style="display:none"':'') + '>' +
+          '<div class="team-field"><label class="team-label">Server URL</label><input class="team-input" id="team-f-url" value="' + escH(agent.url||'') + '" placeholder="https://mcp.example.com/mcp"></div>' +
+        '</div>' +
+        '<div class="team-form-row single" id="team-cmd-row" ' + (isStdio?'':'style="display:none"') + '>' +
+          '<div class="team-field"><label class="team-label">Command</label><input class="team-input" id="team-f-cmd" value="' + escH(agent.cmd||'') + '" placeholder="npx -y @org/server-name"></div>' +
+        '</div>' +
+        '<div class="team-form-row" id="team-auth-row" ' + (server&&!['excalidraw','context7','desktop_commander'].includes(server)?'':'style="display:none"') + '>' +
+          '<div class="team-field"><label class="team-label">Auth Type</label>' +
+            '<select class="team-select" id="team-f-auth-type" onchange="teamOnAuthChange()">' +
+              '<option value="bearer" ' + ((agent.authType||'bearer')==='bearer'?'selected':'') + '>Bearer / API Key</option>' +
+              '<option value="none" ' + (agent.authType==='none'?'selected':'') + '>None</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="team-field" id="team-key-field"><label class="team-label">API Key <span style="color:var(--accent);font-size:8px;">// vault encrypted</span></label>' +
+            '<input class="team-input" id="team-f-key" type="password" value="' + escH(agent.keyHint||'') + '" placeholder="sk-...">' +
+          '</div>' +
+        '</div>' +
+        '<div class="team-test-row">' +
+          '<span class="team-test-status" id="team-test-status">Not tested</span>' +
+          '<button class="sb-agent-btn" onclick="teamTestConnection()" style="width:auto;padding:4px 10px;font-size:9px;">Test Connection</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="team-form-section">' +
+        '<div class="team-section-label">Permissions</div>' +
+        '<table class="team-perms-table">' +
+          '<thead><tr>' +
+            '<th style="width:130px">Permission</th>' +
+            '<th>Description</th>' +
+            '<th style="width:55px;text-align:center">Risk</th>' +
+            '<th style="width:45px;text-align:center">Allow</th>' +
+          '</tr></thead>' +
+          '<tbody id="team-perms-body">' + permsHTML + '</tbody>' +
+        '</table>' +
+      '</div>' +
+
+      '<div class="team-form-section">' +
+        '<div class="team-section-label">Routing Hints</div>' +
+        '<div class="team-form-row single"><div class="team-field">' +
+          '<label class="team-label">Trigger Keywords <span style="color:var(--text-muted);">// comma-separated</span></label>' +
+          '<input class="team-input" id="team-f-keywords" value="' + escH(agent.keywords||'') + '" placeholder="e.g. github, repo, pull request, issue">' +
+        '</div></div>' +
+        '<div class="team-form-row single"><div class="team-field">' +
+          '<label class="team-label">System Prompt Injection <span style="color:var(--text-muted);">// added to QOPC when active</span></label>' +
+          '<textarea class="team-textarea" id="team-f-prompt" placeholder="e.g. You have access to GitHub. Use the GitHub agent for code and repo tasks.">' + escH(agent.prompt||'') + '</textarea>' +
+        '</div></div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// ── Server change ──────────────────────────────────────────────
+window.teamOnServerChange = function() {
+  const val = document.getElementById('team-f-server').value;
+  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(val);
+  const urlRow = document.getElementById('team-url-row');
+  const cmdRow = document.getElementById('team-cmd-row');
+  const authRow = document.getElementById('team-auth-row');
+  if (urlRow) urlRow.style.display = isStdio ? 'none' : '';
+  if (cmdRow) cmdRow.style.display = isStdio ? '' : 'none';
+  const noAuth = ['excalidraw','context7','desktop_commander'].includes(val);
+  if (authRow) authRow.style.display = noAuth ? 'none' : '';
+
+  const reg = REGISTRY.find(function(r) { return r.id === val; });
+  if (reg) {
+    if (reg.url) { const u = document.getElementById('team-f-url'); if (u) u.value = reg.url; }
+    teamSelectColor(reg.color || 'blue');
+  }
+
+  const body = document.getElementById('team-perms-body');
+  if (body) body.innerHTML = teamBuildPerms(val, {});
+};
+
+window.teamOnAuthChange = function() {
+  const type = document.getElementById('team-f-auth-type').value;
+  const kf = document.getElementById('team-key-field');
+  if (kf) kf.style.display = type === 'none' ? 'none' : '';
+};
+
+// ── Connection test ────────────────────────────────────────────
+window.teamTestConnection = async function() {
+  const el = document.getElementById('team-test-status');
+  if (!el) return;
+  el.className = 'team-test-status testing';
+  el.textContent = 'Testing...';
+  try {
+    const token = await getSessionToken();
+    const r = await fetch(API_BASE + '/agent/test', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({
+        server: document.getElementById('team-f-server').value,
+        url: (document.getElementById('team-f-url') || {}).value || '',
+        transport: document.getElementById('team-f-transport').value,
+        agentId: teamCurrentId || 'test',
+      }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      el.className = 'team-test-status ok';
+      el.textContent = 'Connected ✓ ' + (data.tools ? data.tools.length : 0) + ' tools';
+      const a = teamAgents.find(function(x) { return x.id === teamCurrentId; });
+      if (a) { a.connected = true; teamRenderSidebar(); }
+    } else {
+      el.className = 'team-test-status fail';
+      el.textContent = 'Failed: ' + (data.error||'connection refused');
+    }
+  } catch(e) {
+    el.className = 'team-test-status fail';
+    el.textContent = 'Error: ' + e.message;
+  }
+};
+
+// ── CRUD ───────────────────────────────────────────────────────
+window.teamNewAgent = function() {
+  teamCurrentId = 'new_' + Date.now();
+  teamShowEditor(null);
+  teamRenderSidebar();
+};
+
+window.teamEditAgent = function(id) {
+  const a = teamAgents.find(function(x) { return x.id === id; });
+  if (!a) return;
+  teamCurrentId = id;
+  teamShowEditor(a);
+  teamRenderSidebar();
+};
+
+window.teamSaveAgent = async function() {
+  const name = (document.getElementById('team-f-name') ? document.getElementById('team-f-name').value : '').trim();
+  if (!name) { const nf = document.getElementById('team-f-name'); if (nf) nf.focus(); return; }
+  const colorSwatch = document.querySelector('.team-color-swatch.selected');
+  const color = colorSwatch ? (colorSwatch.id || '').replace('team-swatch-','') : 'blue';
+  const server = (document.getElementById('team-f-server') || {}).value || '';
+  const permsObj = {};
+  (SERVER_PERMS[server]||SERVER_PERMS.default).forEach(function(p) {
+    const el = document.getElementById('team-perm-' + p);
+    if (el) permsObj[p] = el.checked;
+  });
+  const keyEl = document.getElementById('team-f-key');
+  const rawKey = keyEl ? keyEl.value : '';
+  if (rawKey && rawKey !== '••••••••') {
+    try {
+      const token = await getSessionToken();
+      await fetch(API_BASE + '/agent/key/' + teamCurrentId, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ key: rawKey }),
+      });
+    } catch(_) {}
+  }
+  const agent = {
+    id: teamCurrentId,
+    name: name,
+    desc: ((document.getElementById('team-f-desc') || {}).value||'').trim(),
+    color: color,
+    server: server,
+    transport: (document.getElementById('team-f-transport') || {}).value || 'http',
+    url: ((document.getElementById('team-f-url') || {}).value||'').trim(),
+    cmd: ((document.getElementById('team-f-cmd') || {}).value||'').trim(),
+    authType: (document.getElementById('team-f-auth-type') || {}).value || 'bearer',
+    keyHint: rawKey ? '••••••••' : '',
+    keywords: ((document.getElementById('team-f-keywords') || {}).value||'').trim(),
+    prompt: ((document.getElementById('team-f-prompt') || {}).value||'').trim(),
+    perms: permsObj,
+    connected: false,
+  };
+  const idx = teamAgents.findIndex(function(a) { return a.id === teamCurrentId; });
+  if (idx >= 0) teamAgents[idx] = agent; else teamAgents.push(agent);
+  await teamPersistToVault(true);
+  teamRenderSidebar();
+  const titleEl = document.getElementById('team-editor-title');
+  if (titleEl) titleEl.textContent = name;
+  if (typeof showToast === 'function') showToast('Agent saved to vault', 'success');
+};
+
+window.teamDeleteAgent = function() {
+  if (!teamCurrentId) return;
+  if (!confirm('Remove this agent from your team?')) return;
+  teamAgents = teamAgents.filter(function(a) { return a.id !== teamCurrentId; });
+  teamCurrentId = null;
+  teamPersistToVault(false);
+  teamRenderSidebar();
+  if (teamAgents.length) teamEditAgent(teamAgents[0].id);
+  else teamShowEmpty();
+};
+
+window.teamCancelEdit = function() {
+  if (teamAgents.length) {
+    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) return;
+    teamCurrentId = null;
+    teamEditAgent(teamAgents[0].id);
+  } else {
+    teamCurrentId = null;
+    teamShowEmpty();
+  }
+};
+
+// ── Registry ───────────────────────────────────────────────────
+function teamShowRegistry(filter) {
+  filter = (filter||'').toLowerCase();
+  const items = REGISTRY.filter(function(r) {
+    return !filter || r.name.toLowerCase().includes(filter) || r.desc.toLowerCase().includes(filter);
+  });
+  teamShowMain(
+    '<div style="max-width:700px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+        '<input class="sb-search" id="team-registry-search" placeholder="search servers..." oninput="teamShowRegistry(this.value)" style="flex:1;margin-bottom:0;">' +
+        '<button class="sb-agent-btn" onclick="switchTeamTab(\'team\')" style="width:auto;padding:5px 12px;font-size:9px;">← Back</button>' +
+      '</div>' +
+      '<div class="team-registry-grid">' +
+        items.map(function(r) {
+          const installed = teamAgents.some(function(a) { return a.server === r.id; });
+          return '<div class="team-registry-card ' + (installed?'installed':'') + '" onclick="teamInstallFromRegistry(\'' + r.id + '\')">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">' +
+              '<div style="width:22px;height:16px;image-rendering:pixelated;">' + teamSVG(r.color,22,16) + '</div>' +
+              '<span class="team-registry-card-name">' + escH(r.name) + '</span>' +
+            '</div>' +
+            '<div class="team-registry-card-desc">' + escH(r.desc) + '</div>' +
+            '<div class="team-registry-card-footer">' +
+              '<span class="team-registry-card-auth">' + r.auth + '</span>' +
+              '<span class="team-badge ' + (installed?'installed':r.type) + '">' + (installed?'installed':r.type) + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>'
+  );
+}
+
+window.teamInstallFromRegistry = function(serverId) {
+  const reg = REGISTRY.find(function(r) { return r.id === serverId; });
+  if (!reg) return;
+  switchTeamTab('team');
+  teamCurrentId = 'new_' + Date.now();
+  setTimeout(function() {
+    teamShowEditor({ server: reg.id, url: reg.url||'', name: reg.name + ' Agent', color: reg.color, keywords: reg.name.toLowerCase() });
+    teamRenderSidebar();
+  }, 50);
+};
+
+// ── Tab switching ──────────────────────────────────────────────
+window.switchTeamTab = function(tab) {
+  teamTab = tab;
+  const t1 = document.getElementById('team-tab-my');
+  const t2 = document.getElementById('team-tab-registry');
+  if (t1) t1.classList.toggle('active', tab === 'team');
+  if (t2) t2.classList.toggle('active', tab === 'registry');
+  if (tab === 'registry') {
+    teamShowRegistry('');
+  } else {
+    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) teamEditAgent(teamCurrentId);
+    else if (teamAgents.length) teamEditAgent(teamAgents[0].id);
+    else teamShowEmpty();
+  }
+};
+
+// ── Expose init ────────────────────────────────────────────────
+window.teamPanelInit = function() {
+  teamLoadFromVault();
+  if (!teamAgents.length) teamShowEmpty();
+  const t1 = document.getElementById('team-tab-my');
+  if (t1) t1.classList.add('active');
+};
+
+})(); // end AGENT TEAM CONFIG PANEL IIFE
 
 // Initialize ActivityLayer
 window.activityLayer = new ActivityLayer();
