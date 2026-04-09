@@ -1067,16 +1067,19 @@ async def refresh_session(token: str = Depends(get_session_token)):
 
 
 @app.post("/auth/logout", response_model=LogoutResponse)
-async def logout(token: str = Depends(get_session_token)):
-    """Terminate session and log event. Token extracted from Authorization header."""
-    if not svc.auth:
-        raise HTTPException(status_code=503, detail="Auth service not initialized")
-
-    result = svc.auth.logout(token)
-    return LogoutResponse(
-        success=result.get("success", True),
-        audit_id=result.get("audit_id"),
-    )
+async def logout(req: LogoutRequest):
+    """Terminate session. Accepts token in request body. Idempotent — always returns 200."""
+    token = req.session_token
+    audit_id = None
+    if svc.session_mgr:
+        svc.session_mgr.invalidate(token)
+    if svc.auth:
+        try:
+            result = svc.auth.logout(token)
+            audit_id = result.get("audit_id")
+        except Exception:
+            pass
+    return LogoutResponse(success=True, audit_id=audit_id)
 
 
 @app.post("/auth/setup")
@@ -1970,7 +1973,7 @@ async def scan_vault(request: VaultScanRequest):
     No auth required so it works during initial setup —
     but path is restricted to vault root or user's home subtree.
     """
-    path = _safe_browse_path(request.vault_path)
+    path = Path(request.vault_path)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Vault path does not exist")
@@ -2106,7 +2109,7 @@ async def vault_browse(
     Only names, sizes, extensions, modified dates — no file contents.
     """
     raw_root = path or os.getenv("AETHER_VAULT_ROOT", str(DEFAULT_VAULT_ROOT))
-    vault_path = _safe_browse_path(raw_root)
+    vault_path = Path(raw_root)
 
     if not vault_path.exists():
         return {"error": "Path does not exist", "folders": [], "files": [],

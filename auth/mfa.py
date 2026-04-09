@@ -31,7 +31,7 @@ class MFAManager:
     """
 
     TOTP_INTERVAL = 30   # seconds per code window
-    TOTP_DIGITS   = 8    # 8-digit codes for additional security (10^8 = 1 in 100 million)
+    TOTP_DIGITS   = 6    # 6-digit TOTP codes (standard RFC 6238)
 
     def __init__(self, secrets_path: Optional[str] = None):
         from config.storage import CRYPTO_ROOT
