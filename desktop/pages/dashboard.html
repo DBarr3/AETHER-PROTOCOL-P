@@ -611,34 +611,139 @@
     background: var(--bg);
     border-top: 2px solid var(--accent);
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
-    max-height: 200px;
+    padding: 0;
+    max-height: 260px;
     min-height: 0;
     overflow-y: auto;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-primary);
-    line-height: 1.6;
     display: none;
     flex-direction: column;
-    gap: 4px;
+    gap: 0;
   }
   #ai-response-panel.visible { display: flex; }
+
   #ai-response-panel .resp-label {
+    font-family: 'IBM Plex Mono', monospace;
     font-size: 9px;
     color: var(--accent);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-bottom: 2px;
+    padding: 8px 16px 0;
+    flex-shrink: 0;
   }
+
   #ai-response-panel .resp-text {
-    white-space: pre-wrap;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.65;
+    color: #e2e2e2;
+    padding: 10px 16px 14px;
+    white-space: normal;
     word-break: break-word;
-    color: var(--text-secondary);
+    flex: 1;
   }
+
   #ai-response-panel .resp-thinking {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
     color: var(--text-muted);
     font-style: italic;
+    padding: 10px 16px;
+    animation: fadeThink 1.6s ease-in-out infinite;
+  }
+  @keyframes fadeThink { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+  .resp-text h1 {
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 14px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.3;
+  }
+  .resp-text h2 {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 12px 0 5px;
+    line-height: 1.3;
+  }
+  .resp-text h3 {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #c8ccd0;
+    margin: 10px 0 4px;
+  }
+  .resp-text p { margin: 0 0 9px; }
+  .resp-text p:last-child { margin-bottom: 0; }
+  .resp-text strong, .resp-text b { font-weight: 600; color: #ffffff; }
+  .resp-text em, .resp-text i { font-style: italic; color: #c0c4cc; }
+  .resp-text hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .resp-text ul, .resp-text ol { margin: 6px 0 10px; padding-left: 20px; }
+  .resp-text ul { list-style: disc; }
+  .resp-text ol { list-style: decimal; }
+  .resp-text li { margin-bottom: 4px; color: #dde0e6; line-height: 1.55; }
+  .resp-text li strong { color: #ffffff; }
+  .resp-text code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    background: rgba(0,212,255,0.08);
+    color: #7dd3fc;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,212,255,0.15);
+  }
+  .resp-text pre {
+    background: #0d1117;
+    border: 1px solid var(--border-2, #2a2a3a);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 10px 12px;
+    margin: 8px 0 10px;
+    overflow-x: auto;
+  }
+  .resp-text pre code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: none;
+    color: #a5c8e1;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    line-height: 1.55;
+  }
+  .resp-text .op-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.18);
+    border-radius: 3px;
+    padding: 6px 10px;
+    margin: 6px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+  .resp-text .op-line .op-arrow { color: rgba(0,212,255,0.5); }
+  .resp-text .op-line .op-from  { color: #94a3b8; }
+  .resp-text .op-line .op-to    { color: #7dd3fc; }
+  .resp-text blockquote {
+    border-left: 3px solid var(--amber, #fbbf24);
+    margin: 8px 0;
+    padding: 4px 12px;
+    color: #b0b8c4;
+    font-style: italic;
+  }
+  .resp-text .section-sep {
+    height: 1px;
+    background: linear-gradient(to right, var(--accent), transparent);
+    opacity: 0.3;
+    margin: 12px 0;
   }
 
   .input-bar {
@@ -5668,22 +5773,121 @@ function _stripActionPlan(text) {
   return text.replace(/```action-plan[\s\S]*?```/g, '').trim();
 }
 
-function displayAIResponse(text, isThinking) {
-  const panel = document.getElementById('ai-response-panel');
-  const responseText = document.getElementById('response-text');
-  responseText.className = isThinking ? 'resp-text resp-thinking' : 'resp-text';
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = text;
 
-  // Remove any existing plan cards from prior responses
+  // 1. Extract code blocks before escaping
+  const codeBlocks = [];
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const langLabel = lang
+      ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--accent);opacity:0.6;margin-bottom:4px;text-transform:uppercase;">${escH(lang)}</div>`
+      : '';
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre>${langLabel}<code>${escaped}</code></pre>`);
+    return `\x00CODE${idx}\x00`;
+  });
+
+  // 2. Escape remaining HTML
+  html = html.replace(/&(?!amp;|lt;|gt;|quot;)/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // 3. Operation lines — **Operation:** `from` → `to`
+  html = html.replace(/\*\*Operation:\*\*\s*`([^`]+)`\s*[→\->]+\s*`([^`]+)`/g,
+    (_, from, to) =>
+      `<div class="op-line"><span style="font-weight:600;color:var(--accent);">Operation</span>` +
+      `<span class="op-from">${escH(from)}</span><span class="op-arrow">→</span><span class="op-to">${escH(to)}</span></div>`
+  );
+
+  // 4. Headings
+  html = html.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm,  '<h1>$1</h1>');
+
+  // 5. Bold + italic
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g,    '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g,        '<em>$1</em>');
+  html = html.replace(/_(.+?)_/g,           '<em>$1</em>');
+
+  // 6. Inline code
+  html = html.replace(/`([^`]+)`/g,'<code>$1</code>');
+
+  // 7. Horizontal rules
+  html = html.replace(/^---+$/gm,'<div class="section-sep"></div>');
+
+  // 8. Blockquotes
+  html = html.replace(/^&gt; (.+)$/gm,'<blockquote>$1</blockquote>');
+  html = html.replace(/<\/blockquote>\n<blockquote>/g,'\n');
+
+  // 9. Unordered lists
+  html = html.replace(/((?:^[-*+] .+\n?)+)/gm, block => {
+    const items = block.trim().split('\n').map(l => `<li>${l.replace(/^[-*+] /,'')}</li>`).join('');
+    return `<ul>${items}</ul>`;
+  });
+
+  // 10. Ordered lists
+  html = html.replace(/((?:^\d+\. .+\n?)+)/gm, block => {
+    const items = block.trim().split('\n').map(l => `<li>${l.replace(/^\d+\. /,'')}</li>`).join('');
+    return `<ol>${items}</ol>`;
+  });
+
+  // 11. Paragraphs
+  const blockTags = ['<h1','<h2','<h3','<ul','<ol','<pre','<blockquote','<div','<hr'];
+  const lines = html.split('\n');
+  const out = [];
+  let buf = [];
+  const flush = () => {
+    if (buf.length) { const c = buf.join(' ').trim(); if (c) out.push(`<p>${c}</p>`); buf = []; }
+  };
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { flush(); continue; }
+    if (blockTags.some(tag => t.startsWith(tag)) || t.startsWith('\x00CODE')) { flush(); out.push(t); }
+    else buf.push(t);
+  }
+  flush();
+  html = out.join('\n');
+
+  // 12. Restore code blocks
+  codeBlocks.forEach((block, idx) => {
+    html = html.replace(`\x00CODE${idx}\x00`, block);
+    html = html.replace(`<p>\x00CODE${idx}\x00</p>`, block);
+  });
+  html = html.replace(/<p>(\x00CODE\d+\x00)<\/p>/g, (_, ph) => {
+    const idx = parseInt(ph.replace(/\x00CODE(\d+)\x00/,'$1'));
+    return codeBlocks[idx] || ph;
+  });
+
+  return html;
+}
+
+function displayAIResponse(text, isThinking) {
+  const panel        = document.getElementById('ai-response-panel');
+  const responseText = document.getElementById('response-text');
+
   panel.querySelectorAll('.aether-plan-card').forEach(c => c.remove());
 
-  const plan = (!isThinking) ? _parseActionPlan(text) : null;
+  if (isThinking) {
+    responseText.className = 'resp-text resp-thinking';
+    responseText.textContent = text;
+    panel.classList.add('visible');
+    panel.scrollTop = panel.scrollHeight;
+    return;
+  }
+
+  responseText.className = 'resp-text';
+
+  const plan = typeof _parseActionPlan === 'function' ? _parseActionPlan(text) : null;
   if (plan && plan.actions && plan.actions.length) {
-    // Show text with the action-plan block stripped out
-    responseText.textContent = _stripActionPlan(text) || plan.summary || '';
+    responseText.innerHTML = renderMarkdown(
+      (typeof _stripActionPlan === 'function' ? _stripActionPlan(text) : '') || plan.summary || ''
+    );
     _renderPlanCard(panel, plan);
   } else {
-    responseText.textContent = text;
+    responseText.innerHTML = renderMarkdown(text);
   }
+
   panel.classList.add('visible');
   panel.scrollTop = panel.scrollHeight;
 }
