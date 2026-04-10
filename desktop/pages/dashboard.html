@@ -9715,20 +9715,16 @@ window.addEventListener('load', async () => {
     const tvEl = document.getElementById('title-bar-version');
     if (tvEl) tvEl.textContent = `AetherCloud-L v${installerVersion}`;
   }
-  // Version mismatch check — compare installer vs latest backend
-  try {
-    const _vResp = await fetch(`${API_BASE}/status`);
-    if (_vResp.ok) {
-      const _vData = await _vResp.json();
-      const backendVer = _vData.version || CURRENT_BACKEND_VERSION;
-      const installedVer = installerVersion || '0.0.0';
-      if (backendVer !== installedVer) {
-        _showUpdateBanner(installedVer, backendVer);
-      }
-    }
-  } catch (_vErr) {
-    console.warn('[version-check]', _vErr);
-  }
+  // Version mismatch check — fire and forget, never blocks initCircuit
+  const _installedVer = installerVersion || '0.0.0';
+  fetch(`${API_BASE}/status`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d) return;
+      const backendVer = d.version || CURRENT_BACKEND_VERSION;
+      if (backendVer !== _installedVer) _showUpdateBanner(_installedVer, backendVer);
+    })
+    .catch(() => {}); // silently ignore — don't block startup
   if (localStorage.getItem('sidebar_collapsed') === 'true') {
     document.getElementById('sidebar').classList.add('collapsed');
   }
