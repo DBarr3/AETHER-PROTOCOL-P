@@ -19,7 +19,7 @@ from config.settings import (
     CLAUDE_MAX_TOKENS,
     AGENT_SYSTEM_PROMPT,
 )
-from config.agent_prompt import TASK_SUFFIXES
+from config.agent_prompt import TASK_SUFFIXES, DAILY_PLAN_SUFFIX
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +177,31 @@ class AetherClaudeAgent:
                 for f in files
             ]
 
+    # ── Planning intent detector ─────────────────────────────────────────────
+    @staticmethod
+    def _is_planning_query(query: str) -> bool:
+        """Return True when the user is clearly requesting a daily/task plan."""
+        import re
+        q = query.lower()
+        # Explicit planning phrases
+        explicit = [
+            "plan my day", "plan my week", "make me a plan", "create a plan",
+            "build a schedule", "make a schedule", "schedule my day",
+            "help me plan", "what should i do today", "organize my day",
+        ]
+        if any(p in q for p in explicit):
+            return True
+        # "I need to X, Y, and Z" with 2+ comma-/and-separated tasks
+        if re.search(r"i need to .+(?:,|and).+", q):
+            return True
+        # "I have to / I've got to / I must" with list-like structure
+        if re.search(r"(?:i have to|i've got to|i must|i gotta).+(?:,|and).+", q):
+            return True
+        # Explicit task listing: "my tasks are", "today I need to", "things to do"
+        if re.search(r"(?:my tasks?|things? to do|to.?do list|to.?dos?|errands?)\b", q):
+            return True
+        return False
+
     def chat(self, query: str, vault_context: Optional[dict] = None) -> str:
         """
         Natural language conversation about the vault.
@@ -209,11 +234,17 @@ class AetherClaudeAgent:
 
         self.conversation_history.append({"role": "user", "content": full_query})
 
+        # Inject DAILY_PLAN_SUFFIX when user is asking for a schedule/task plan
+        active_system = self.system_prompt
+        if self._is_planning_query(query):
+            active_system = self.system_prompt + "\n\n" + DAILY_PLAN_SUFFIX
+            logger.debug("Planning intent detected — injecting DAILY_PLAN_SUFFIX")
+
         try:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=self.system_prompt,
+                system=active_system,
                 messages=self.conversation_history,
             )
 
@@ -229,6 +260,68 @@ class AetherClaudeAgent:
         except Exception as e:
             logger.error("Chat failed: %s", e)
             return f"Agent unavailable: {str(e)}\nCheck ANTHROPIC_API_KEY in .env"
+
+    # ── Daily plan — completely isolated from file-agent identity ─────────────
+    _PLANNER_SYSTEM = """You are a personal productivity assistant and daily planner.
+Your ONLY job right now is to take a list of tasks the user mentions and build a
+structured, optimized daily plan. Output ONLY raw JSON — no prose, no markdown
+fences, no explanation before or after.
+
+JSON schema (output this and nothing else):
+{
+  "type": "daily_plan",
+  "title": "<short title e.g. Today's Plan>",
+  "summary": "<one sentence>",
+  "totalTime": "<Xh Ym>",
+  "date": "<ISO date e.g. 2026-04-10>",
+  "blocks": [
+    {
+      "time": "<HH:MM AM/PM>",
+      "task": "<3-6 word task name>",
+      "duration": "<N min>",
+      "priority": "high|medium|low",
+      "note": "<one brief tip or empty string>"
+    }
+  ]
+}
+
+Rules:
+- Start at 8:00 AM or whatever time the user implies
+- Cognitively hard tasks (reports, calls, writing) → morning
+- Errands, chores, shopping → afternoon, clustered by location
+- Add 10-15 min buffer between tasks
+- Break block required for plans over 3 hours
+- Meals are blocks if plan spans mealtime
+- priority: high=urgent, medium=important, low=deferrable
+- Output ONLY the JSON. Nothing else. No "Here is your plan:". Just the JSON."""
+
+    def plan_day(self, query: str) -> str:
+        """
+        Build a structured daily plan from any task list or scheduling request.
+        Uses a pure planner system prompt — completely isolated from the
+        file-intelligence identity so no refusals occur.
+        Does NOT use conversation history (fresh call every time).
+        """
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2048,
+                system=self._PLANNER_SYSTEM,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Today's date: {today}\n\n"
+                            f"Build a daily plan for these tasks:\n{query}"
+                        ),
+                    }
+                ],
+            )
+            return response.content[0].text.strip()
+        except Exception as e:
+            logger.error("plan_day failed: %s", e)
+            return f"Planner unavailable: {str(e)}"
 
     def analyze_security_pattern(self, audit_events: list[dict]) -> dict:
         """

@@ -1298,6 +1298,26 @@ async def vault_spaces_delete(
     return {"success": True, "deleted": filename}
 
 
+# ── Daily Planner — completely isolated from file-agent identity ───────────────
+@app.post("/agent/plan-day", response_model=ChatResponse)
+@limiter.limit("20/minute;100/hour")
+async def agent_plan_day(request: Request, req: ChatRequest, token: str = Depends(get_session_token)):
+    """Build a structured daily plan. Uses pure planner system prompt — no file-agent identity."""
+    if not svc.agent:
+        raise HTTPException(status_code=503, detail="Agent not initialized")
+    try:
+        response_text = svc.agent.plan_day(req.query)
+    except Exception as e:
+        log.warning("plan_day failed: %s", e)
+        response_text = "Planner unavailable — please try again."
+    return ChatResponse(
+        response=response_text,
+        commitment_hash=_commitment_hash(response_text),
+        verified=False,
+        threat_level="NONE",
+    )
+
+
 # ── Agent ─────────────────────────────────────────
 @app.post("/agent/chat", response_model=ChatResponse)
 @limiter.limit("20/minute;100/hour")
@@ -1321,7 +1341,11 @@ async def agent_chat(request: Request, req: ChatRequest, token: str = Depends(ge
             ctx_lines.append("[END VAULT CONTEXT]")
             query = query + '\n'.join(ctx_lines)
 
-        response_text = svc.agent.chat(query)
+        # Route planning queries to the dedicated planner (no file-agent identity)
+        if svc.agent._is_planning_query(req.query):
+            response_text = svc.agent.plan_day(req.query)
+        else:
+            response_text = svc.agent.chat(query)
     except Exception as e:
         log.warning("agent.chat failed: %s", e)
         response_text = "Agent encountered an error — please try again."
