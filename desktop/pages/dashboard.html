@@ -1140,8 +1140,8 @@
     cursor: pointer;
     transition: all 0.2s;
   }
-  .view-mode-btn:first-child { border-radius: 3px 0 0 3px; }
-  .view-mode-btn:last-child { border-radius: 0 3px 3px 0; }
+  .view-mode-btn:first-child { border-radius: 6px 0 0 6px; }
+  .view-mode-btn:last-child { border-radius: 0 6px 6px 0; }
   .view-mode-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
   .view-mode-btn.active {
     background: var(--accent);
@@ -1170,8 +1170,8 @@
     cursor: pointer;
     transition: all 0.2s;
   }
-  .agent-sub-tab:first-child { border-radius: 2px 0 0 2px; }
-  .agent-sub-tab:last-child  { border-radius: 0 2px 2px 0; }
+  .agent-sub-tab:first-child { border-radius: 6px 0 0 6px; }
+  .agent-sub-tab:last-child  { border-radius: 0 6px 6px 0; }
   .agent-sub-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
   .agent-sub-tab.active {
     background: rgba(0,212,255,0.15);
@@ -1680,19 +1680,6 @@
   }
   .ctx-menu-item:hover .ctx-menu-icon { color: var(--accent); }
   .ctx-menu-item.danger:hover .ctx-menu-icon { color: var(--red); }
-
-  /* ── TERMINAL header button ─────────────────────────────────── */
-  .agent-terminal-btn {
-    margin-left: 8px;
-    border: 1px solid var(--accent) !important;
-    color: var(--accent) !important;
-    background: rgba(0,212,255,0.06) !important;
-    border-radius: 2px !important;
-    letter-spacing: 0.8px;
-  }
-  .agent-terminal-btn:hover {
-    background: rgba(0,212,255,0.18) !important;
-  }
 
   /* ── Agent Logs modal ───────────────────────────────────────── */
   .agent-logs-overlay {
@@ -3463,6 +3450,253 @@
   }
   .profile-search:focus { border-color:var(--accent); }
 
+  /* ═══════════════════════════════════════════════════════════════
+     PROFILE EDITOR REFINEMENT (Cleanup Sweep)
+     Scoped overrides: calm sans typography, rounded pill buttons,
+     larger icon tiles. All rules scoped to #profile-editor so the
+     rest of the dashboard keeps its mono HUD aesthetic.
+     ═══════════════════════════════════════════════════════════════ */
+  #profile-editor,
+  #profile-editor input,
+  #profile-editor textarea,
+  #profile-editor select,
+  #profile-editor button,
+  #profile-editor label,
+  #profile-editor span,
+  #profile-editor div,
+  #profile-editor p {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  #profile-editor .profile-section-header {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: #06b6d4;
+    text-transform: uppercase;
+  }
+
+  #profile-editor .profile-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  #profile-editor .profile-input,
+  #profile-editor .profile-select,
+  #profile-editor .profile-textarea,
+  #profile-editor .profile-search {
+    font-size: 13px;
+    color: #e2e8f0;
+    background: #12121a;
+    border: 1px solid #1e2030;
+    border-radius: 10px;
+    padding: 9px 12px;
+    line-height: 1.5;
+    transition: border-color 150ms ease;
+  }
+  #profile-editor .profile-input::placeholder,
+  #profile-editor .profile-textarea::placeholder {
+    color: #334155;
+    font-style: normal;
+  }
+  #profile-editor .profile-input:focus,
+  #profile-editor .profile-select:focus,
+  #profile-editor .profile-textarea:focus,
+  #profile-editor .profile-search:focus {
+    outline: none;
+    border-color: rgba(6,182,212,0.4);
+  }
+
+  #profile-editor .profile-char-counter,
+  #profile-editor .profile-token-counter {
+    font-size: 10px;
+    color: #475569;
+  }
+
+  /* Rounded pill buttons inside the editor (save bar, add task, templates, etc.) */
+  #profile-editor .profile-btn,
+  .profile-save-bar .profile-btn {
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 22px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    transition: all 150ms ease;
+  }
+  #profile-editor .profile-btn.primary,
+  .profile-save-bar .profile-btn.primary {
+    background: #06b6d4;
+    color: #0a0a0f;
+    border: 1px solid #06b6d4;
+  }
+  #profile-editor .profile-btn.primary:hover,
+  .profile-save-bar .profile-btn.primary:hover {
+    background: #0891b2;
+    border-color: #0891b2;
+    box-shadow: 0 0 12px rgba(6,182,212,0.35);
+  }
+  #profile-editor .profile-btn.outlined,
+  .profile-save-bar .profile-btn.outlined {
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid #1e2030;
+    padding: 8px 18px;
+  }
+  #profile-editor .profile-btn.outlined:hover,
+  .profile-save-bar .profile-btn.outlined:hover {
+    border-color: #475569;
+    color: #e2e8f0;
+  }
+  #profile-editor .profile-btn.danger,
+  .profile-save-bar .profile-btn.danger {
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239,68,68,0.35);
+  }
+  #profile-editor .profile-btn.danger:hover,
+  .profile-save-bar .profile-btn.danger:hover {
+    background: rgba(239,68,68,0.1);
+  }
+
+  /* Priority buttons — keep the segmented look but soften the corners */
+  #profile-editor .profile-priority-seg { border-radius: 999px; overflow: hidden; }
+  #profile-editor .profile-priority-btn {
+    font-size: 10px;
+    padding: 4px 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Icon grid — larger, rounder tiles to match the refinement spec */
+  #profile-editor .profile-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+  }
+  #profile-editor .profile-icon-tile {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 7px;
+    border-radius: 12px;
+    border: 1px solid #1e2030;
+    background: #12121a;
+    transition: all 100ms ease;
+  }
+  #profile-editor .profile-icon-tile:hover {
+    background: #1a1a26;
+    border-color: #2a3040;
+  }
+  #profile-editor .profile-icon-tile.selected {
+    background: rgba(6,182,212,0.08);
+    border-color: rgba(6,182,212,0.45);
+    box-shadow: 0 0 10px rgba(6,182,212,0.25);
+  }
+  #profile-editor .profile-icon-tile svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Task rows — soften corners */
+  #profile-editor .profile-task-row {
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  /* Chips, MCP rows, toggles — keep pills */
+  #profile-editor .profile-chip {
+    border-radius: 999px;
+    font-size: 10px;
+    padding: 3px 10px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     FRONTEND SWEEP (scrollbars / focus rings / text truncation)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* Styled scrollbars on common scroll containers */
+  #profile-list,
+  #profile-main,
+  .profile-collapsible,
+  #mcp-rows,
+  #skills-rows,
+  .output-body,
+  #agent-logs-body,
+  #v3-tp-agent-list,
+  #v3-tp-output,
+  #chat-history {
+    scrollbar-width: thin;
+    scrollbar-color: #1e2030 transparent;
+  }
+  #profile-list::-webkit-scrollbar,
+  #profile-main::-webkit-scrollbar,
+  .profile-collapsible::-webkit-scrollbar,
+  #mcp-rows::-webkit-scrollbar,
+  #skills-rows::-webkit-scrollbar,
+  .output-body::-webkit-scrollbar,
+  #agent-logs-body::-webkit-scrollbar,
+  #v3-tp-agent-list::-webkit-scrollbar,
+  #v3-tp-output::-webkit-scrollbar,
+  #chat-history::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  #profile-list::-webkit-scrollbar-thumb,
+  #profile-main::-webkit-scrollbar-thumb,
+  .profile-collapsible::-webkit-scrollbar-thumb,
+  #mcp-rows::-webkit-scrollbar-thumb,
+  #skills-rows::-webkit-scrollbar-thumb,
+  .output-body::-webkit-scrollbar-thumb,
+  #agent-logs-body::-webkit-scrollbar-thumb,
+  #v3-tp-agent-list::-webkit-scrollbar-thumb,
+  #v3-tp-output::-webkit-scrollbar-thumb,
+  #chat-history::-webkit-scrollbar-thumb {
+    background: #1e2030;
+    border-radius: 4px;
+  }
+  #profile-list::-webkit-scrollbar-thumb:hover,
+  #profile-main::-webkit-scrollbar-thumb:hover,
+  .profile-collapsible::-webkit-scrollbar-thumb:hover,
+  #mcp-rows::-webkit-scrollbar-thumb:hover,
+  #skills-rows::-webkit-scrollbar-thumb:hover,
+  .output-body::-webkit-scrollbar-thumb:hover,
+  #agent-logs-body::-webkit-scrollbar-thumb:hover,
+  #v3-tp-agent-list::-webkit-scrollbar-thumb:hover,
+  #v3-tp-output::-webkit-scrollbar-thumb:hover,
+  #chat-history::-webkit-scrollbar-thumb:hover {
+    background: #2a3040;
+  }
+
+  /* Visible focus rings for keyboard navigation (accessibility) */
+  #profile-editor button:focus-visible,
+  #profile-editor input:focus-visible,
+  #profile-editor textarea:focus-visible,
+  #profile-editor select:focus-visible,
+  #profile-editor .profile-icon-tile:focus-visible,
+  .view-mode-btn:focus-visible,
+  .agent-sub-tab:focus-visible,
+  .presence-card:focus-visible {
+    outline: 2px solid rgba(6,182,212,0.5);
+    outline-offset: 2px;
+  }
+
+  /* Text truncation on agent names that can get long */
+  .agent-name-label,
+  .tp-agent-name,
+  .presence-name,
+  .agent-card-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 96px;
+    display: inline-block;
+  }
+
   /* ── Aether Node Menu ────────────────────────────── */
   .aether-menu-item {
     display:flex;align-items:center;gap:10px;padding:8px 10px;
@@ -3661,7 +3895,6 @@
     <button class="agent-sub-tab active" id="asub-orbit" onclick="switchAgentSubTab('orbit')">ORBIT</button>
     <button class="agent-sub-tab" id="asub-team" onclick="switchAgentSubTab('team')">PROFILES</button>
     <button class="agent-sub-tab" id="asub-mcpskills" onclick="switchAgentSubTab('mcp-skills')">MCP & SKILLS</button>
-    <button class="agent-sub-tab agent-terminal-btn" id="asub-terminal" onclick="openTeamTerminal()" title="Team Terminal (coming soon)">&#8857; TERMINAL</button>
   </div>
 
   <div class="breadcrumb-bar" id="breadcrumb-bar">
@@ -8368,9 +8601,6 @@ function resizeCanvas() {
 // ════════════════════════════════════════════════════
 // Agent sub-tab switcher (orbit vs profiles vs mcp-skills) — only when AGENTS view is active
 function switchAgentSubTab(sub) {
-  // TERMINAL is a stub action, not a sub-tab — ignore
-  if (sub === 'terminal') return;
-
   document.querySelectorAll('.agent-sub-tab').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('asub-' + (sub === 'mcp-skills' ? 'mcpskills' : sub));
   if (btn) btn.classList.add('active');
@@ -14263,6 +14493,120 @@ window.mcpSkillsRemoveAgentChip = function(toolId, type, agentId, event) {
 };
 
 })(); // end MCP & SKILLS LIBRARY IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// QOPC INTERACTION STYLE TRACKER
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+var _lastMessageTime = 0;
+var _lastResponseLength = 0;
+
+// ── Send style signal to backend ──────────────────────────────
+function sendStyleSignal(signalType, metadata) {
+  authFetch(API_BASE + '/interaction/signal', {
+    method: 'POST',
+    body: JSON.stringify({ signal_type: signalType, metadata: metadata || {} }),
+  }).catch(function() {}); // fire-and-forget, non-critical
+}
+
+// ── Track response scroll depth ───────────────────────────────
+function trackScrollDepth() {
+  var panel = document.getElementById('ai-response-panel');
+  if (!panel) return;
+  var _scrollTimer = null;
+  panel.addEventListener('scroll', function() {
+    clearTimeout(_scrollTimer);
+    _scrollTimer = setTimeout(function() {
+      var scrollPct = panel.scrollHeight > panel.clientHeight
+        ? (panel.scrollTop + panel.clientHeight) / panel.scrollHeight
+        : 1.0;
+      if (scrollPct < 0.3 && _lastResponseLength > 500) {
+        sendStyleSignal('RESPONSE_TOO_LONG', { scrollPct: scrollPct, responseLength: _lastResponseLength });
+        sendStyleSignal('SKIMMED_RESPONSE', { scrollPct: scrollPct });
+      } else if (scrollPct > 0.8) {
+        sendStyleSignal('READ_FULL_RESPONSE', { scrollPct: scrollPct });
+      }
+    }, 3000); // Wait 3s after scroll stops
+  });
+}
+
+// ── Track copy events ─────────────────────────────────────────
+function trackCopyEvents() {
+  document.addEventListener('copy', function() {
+    var sel = window.getSelection();
+    if (!sel || !sel.toString()) return;
+    var text = sel.toString();
+    // Check if selection is inside the AI response panel
+    var node = sel.anchorNode;
+    var inResponse = false;
+    while (node) {
+      if (node.id === 'ai-response-panel' || node.id === 'response-text') { inResponse = true; break; }
+      node = node.parentNode;
+    }
+    if (!inResponse) return;
+    // Determine if code or prose was copied
+    var isCode = false;
+    var parent = sel.anchorNode?.parentElement;
+    while (parent && parent.id !== 'ai-response-panel') {
+      if (parent.tagName === 'CODE' || parent.tagName === 'PRE' || parent.classList?.contains('code-block')) {
+        isCode = true; break;
+      }
+      parent = parent.parentElement;
+    }
+    sendStyleSignal(isCode ? 'COPIED_CODE' : 'COPIED_PROSE', { textLength: text.length });
+  });
+}
+
+// ── Track message timing ──────────────────────────────────────
+function trackMessageTiming() {
+  var input = document.getElementById('chat-input');
+  if (!input) return;
+  // Record timestamp when user sends a message
+  var origSend = window._sendMessageDirect;
+  if (!origSend) return;
+  // We hook into the input's keydown rather than overriding sendMessage
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey && input.value.trim()) {
+      var now = Date.now() / 1000;
+      if (_lastMessageTime > 0) {
+        var elapsed = now - _lastMessageTime;
+        if (elapsed < 30) {
+          sendStyleSignal('RAPID_FIRE', { secondsSinceLast: elapsed });
+        } else if (elapsed > 60) {
+          sendStyleSignal('LONG_COMPOSE', { secondsSinceLast: elapsed });
+        }
+      }
+      _lastMessageTime = now;
+    }
+  });
+}
+
+// ── Track response length ─────────────────────────────────────
+// Observe when new responses are rendered to record their length
+function trackResponseLength() {
+  var responseEl = document.getElementById('response-text');
+  if (!responseEl) return;
+  var observer = new MutationObserver(function() {
+    var text = responseEl.textContent || '';
+    _lastResponseLength = text.length;
+  });
+  observer.observe(responseEl, { childList: true, subtree: true, characterData: true });
+}
+
+// ── Initialize all trackers ───────────────────────────────────
+function initStyleTracking() {
+  trackScrollDepth();
+  trackCopyEvents();
+  trackMessageTiming();
+  trackResponseLength();
+}
+
+// Start tracking after DOM is ready
+if (document.readyState === 'complete') initStyleTracking();
+else window.addEventListener('load', initStyleTracking);
+
+})(); // end QOPC INTERACTION STYLE TRACKER IIFE
 
 // ═══════════════════════════════════════════════════════════════
 // AGENT ANIMATION ENGINE
