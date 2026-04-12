@@ -10308,763 +10308,570 @@ class ActivityLayer {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AGENT TEAM CONFIG PANEL
+// AGENT PROFILE SYSTEM
 // ═══════════════════════════════════════════════════════════════
 (function() {
 
-const TEAM_PIXELS = [
-  [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
-  [2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
-  [2,2],[4,2],[5,2],[6,2],[8,2],
-  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
-  [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
-  [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
-  [2,6],[4,6],[6,6],[8,6],
-  [2,7],[4,7],[6,7],[8,7],
-];
-const TEAM_COLORS = { blue:'#2196F3', green:'#4CAF50', orange:'#E36C35', red:'#F44336', yellow:'#FFEB3B' };
-const TEAM_COLOR_LABELS = { blue:'Blue', green:'Green', orange:'Orange', red:'Red', yellow:'Yellow' };
-
-function teamSVG(color, w, h) {
-  w = w || 22; h = h || 16;
-  const fill = TEAM_COLORS[color] || TEAM_COLORS.blue;
-  const rects = TEAM_PIXELS.map(function(p) {
-    return '<rect x="' + p[0] + '" y="' + p[1] + '" width="1" height="1" fill="' + fill + '"/>';
-  }).join('');
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="' + w + '" height="' + h + '" shape-rendering="crispEdges">' + rects + '</svg>';
-}
-
-const SERVER_COLOR_MAP = {
-  github:'orange', slack:'green', notion:'yellow', google_drive:'blue',
-  stripe:'green', figma:'blue', fal_ai:'orange', excalidraw:'orange',
-  context7:'yellow', desktop_commander:'red', linear:'blue', postgres:'blue',
-  supabase:'green', playwright:'orange', firecrawl:'green',
+const TEAMS = ['Default Team', 'Research', 'Automation', 'Security'];
+const PROMPT_TEMPLATES = {
+  analyst:    'You are {NAME}, an AI analyst within AetherCloud.\n\nYour role is to interpret data, identify patterns, and produce structured analytical output.\n\nBehavior:\n- Always cite sources and evidence\n- Use tables and structured formats when presenting findings\n- Flag confidence levels for each conclusion\n- Ask clarifying questions before making assumptions',
+  executor:   'You are {NAME}, an AI executor within AetherCloud.\n\nYour role is to carry out tasks efficiently and report results.\n\nBehavior:\n- Execute tasks in order of priority\n- Report completion status after each step\n- Escalate blockers immediately\n- Minimize unnecessary communication — focus on action',
+  sentinel:   'You are {NAME}, a security sentinel within AetherCloud.\n\nYour role is to monitor, detect, and alert on security events.\n\nBehavior:\n- Continuously scan for anomalies and threats\n- Classify severity: INFO / WARN / CRITICAL\n- Never take destructive action without human approval\n- Log all observations with timestamps',
+  researcher: 'You are {NAME}, an AI researcher within AetherCloud.\n\nYour role is to investigate topics, synthesize information, and present findings.\n\nBehavior:\n- Explore multiple angles before drawing conclusions\n- Distinguish between facts, inferences, and speculation\n- Provide sources and references when available\n- Summarize key findings at the end of each investigation',
 };
 
-const SERVER_PERMS = {
-  github:['read','write','auth_delegate'],
-  slack:['read','write'],
-  notion:['read','write'],
-  google_drive:['read','write','auth_delegate'],
-  stripe:['read','write','auth_delegate'],
-  figma:['read'],
-  fal_ai:['execute','network'],
-  excalidraw:['read','write'],
-  context7:['read','network'],
-  desktop_commander:['read','write','execute','file_system'],
-  default:['read','write'],
-};
-
-const PERM_CATALOG = {
-  read:         { desc:'Read data from service',       risk:'low'  },
-  write:        { desc:'Create or modify data',        risk:'med'  },
-  delete:       { desc:'Delete data',                  risk:'high' },
-  execute:      { desc:'Run commands or workflows',    risk:'high' },
-  auth_delegate:{ desc:'Authenticate on your behalf',  risk:'med'  },
-  network:      { desc:'Make outbound HTTP requests',  risk:'med'  },
-  file_system:  { desc:'Read/write local files',       risk:'high' },
-};
-
-const REGISTRY = [
-  { id:'github',            name:'GitHub',          desc:'Repos, issues, PRs, CI/CD',    auth:'api_key',  type:'official',  color:'orange', url:'https://api.githubcopilot.com/mcp' },
-  { id:'slack',             name:'Slack',            desc:'Messages, channels, search',   auth:'oauth',    type:'official',  color:'green',  url:'' },
-  { id:'notion',            name:'Notion',           desc:'Pages, databases, knowledge',  auth:'api_key',  type:'official',  color:'yellow', url:'https://api.notion.com/mcp' },
-  { id:'google_drive',      name:'Google Drive',     desc:'Docs, Sheets, file search',    auth:'oauth',    type:'official',  color:'blue',   url:'' },
-  { id:'stripe',            name:'Stripe',           desc:'Payments, subscriptions',      auth:'api_key',  type:'official',  color:'green',  url:'https://mcp.stripe.com' },
-  { id:'figma',             name:'Figma',            desc:'Design files, components',     auth:'api_key',  type:'official',  color:'blue',   url:'https://mcp.figma.com/mcp' },
-  { id:'fal_ai',            name:'fal.ai',           desc:'1000+ image/video models',     auth:'api_key',  type:'official',  color:'orange', url:'https://mcp.fal.ai/mcp' },
-  { id:'excalidraw',        name:'Excalidraw',       desc:'Diagrams from language',       auth:'none',     type:'official',  color:'orange', url:'' },
-  { id:'context7',          name:'Context7',         desc:'Live docs in prompt',          auth:'none',     type:'official',  color:'yellow', url:'' },
-  { id:'desktop_commander', name:'Desktop Commander',desc:'Terminal, file ops',           auth:'none',     type:'community', color:'red',    url:'' },
-  { id:'postgres',          name:'PostgreSQL',       desc:'Natural language SQL',         auth:'conn_str', type:'community', color:'blue',   url:'' },
-  { id:'supabase',          name:'Supabase',         desc:'Full backend access',          auth:'api_key',  type:'community', color:'green',  url:'' },
-  { id:'playwright',        name:'Playwright',       desc:'Browser automation',           auth:'none',     type:'community', color:'orange', url:'' },
-  { id:'firecrawl',         name:'Firecrawl',        desc:'Scrape + research agent',      auth:'api_key',  type:'community', color:'green',  url:'https://mcp.firecrawl.dev/mcp' },
+const MCP_REGISTRY = [
+  { id:'github',            name:'GitHub',           desc:'Repos, issues, PRs, CI/CD',    transport:'http' },
+  { id:'slack',             name:'Slack',            desc:'Messages, channels, search',    transport:'http' },
+  { id:'notion',            name:'Notion',           desc:'Pages, databases, knowledge',   transport:'http' },
+  { id:'google_drive',      name:'Google Drive',     desc:'Docs, Sheets, file search',     transport:'http' },
+  { id:'stripe',            name:'Stripe',           desc:'Payments, subscriptions',       transport:'http' },
+  { id:'figma',             name:'Figma',            desc:'Design files, components',      transport:'http' },
+  { id:'fal_ai',            name:'fal.ai',           desc:'1000+ image/video models',      transport:'http' },
+  { id:'excalidraw',        name:'Excalidraw',       desc:'Diagrams from language',        transport:'stdio' },
+  { id:'context7',          name:'Context7',         desc:'Live docs in prompt',           transport:'stdio' },
+  { id:'desktop_commander', name:'Desktop Commander', desc:'Terminal, file ops',            transport:'stdio' },
+  { id:'postgres',          name:'PostgreSQL',       desc:'Natural language SQL',          transport:'stdio' },
+  { id:'supabase',          name:'Supabase',         desc:'Full backend access',           transport:'http' },
+  { id:'playwright',        name:'Playwright',       desc:'Browser automation',            transport:'stdio' },
+  { id:'firecrawl',         name:'Firecrawl',        desc:'Scrape + research agent',       transport:'http' },
 ];
 
-let teamAgents = [];
-let teamCurrentId = null;
-let teamTab = 'team';
+let allIcons = [];
+let allProfiles = [];
+let currentProfileId = null;
+let currentTeamFilter = 'all';
 
-function escH(str) {
-  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function genId() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+// ── Data loading ──────────────────────────────────────────────
+async function loadIcons() {
+  if (allIcons.length) return;
+  try { allIcons = await window.aether.agentLoadIcons(); } catch(e) { console.error('[profiles] loadIcons', e); }
 }
 
-// ── Load from vault ────────────────────────────────────────────
-async function teamLoadFromVault() {
+async function loadProfiles() {
+  try { allProfiles = await window.aether.agentLoadProfiles(); } catch(e) { console.error('[profiles] loadProfiles', e); allProfiles = []; }
+}
+
+async function saveProfile(profile) {
+  profile.updatedAt = new Date().toISOString();
   try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/team', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    if (r.ok) { teamAgents = await r.json(); teamRenderSidebar(); }
-  } catch(_) {}
+    await window.aether.agentSaveProfile(profile);
+    const idx = allProfiles.findIndex(p => p.id === profile.id);
+    if (idx >= 0) allProfiles[idx] = profile; else allProfiles.push(profile);
+    renderSidebar();
+    if (typeof showToast === 'function') showToast('Agent saved', 'info');
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Save failed: ' + e.message, 'error');
+  }
 }
 
-async function teamPersistToVault(showFeedback) {
-  if (showFeedback) teamSetVaultState('saving');
+async function deleteProfile(id) {
   try {
-    const token = await getSessionToken();
-    await fetch(API_BASE + '/agent/team', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify(teamAgents),
-    });
-    if (showFeedback) {
-      teamSetVaultState('saved');
-      setTimeout(function() { teamSetVaultState('idle'); }, 2200);
-    }
-  } catch(_) { if (showFeedback) teamSetVaultState('idle'); }
+    await window.aether.agentDeleteProfile(id);
+    allProfiles = allProfiles.filter(p => p.id !== id);
+    if (currentProfileId === id) { currentProfileId = null; showEmptyState(); }
+    renderSidebar();
+    if (typeof showToast === 'function') showToast('Agent deleted', 'info');
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Delete failed: ' + e.message, 'error');
+  }
 }
 
-function teamSetVaultState(state) {
-  const el = document.getElementById('team-vault-indicator');
-  const txt = document.getElementById('team-vault-text');
-  if (!el || !txt) return;
-  el.className = 'team-vault-indicator ' + (state !== 'idle' ? state : '');
-  txt.textContent = state === 'saving' ? 'encrypting...' : state === 'saved' ? 'saved to vault' : 'vault encrypted';
-}
-
-// ── Sidebar ────────────────────────────────────────────────────
-function teamRenderSidebar() {
-  const list = document.getElementById('team-agent-list');
+// ── Sidebar ───────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('profile-list');
+  const badge = document.getElementById('profile-count');
   if (!list) return;
-  if (!teamAgents.length) {
+  const filtered = currentTeamFilter === 'all' ? allProfiles : allProfiles.filter(p => p.team === currentTeamFilter);
+  if (badge) badge.textContent = filtered.length;
+
+  if (!filtered.length) {
     list.innerHTML = '<div style="padding:8px 14px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;">No agents yet</div>';
     return;
   }
-  list.innerHTML = teamAgents.map(function(a) {
-    return '<div class="team-agent-row ' + (a.id === teamCurrentId ? 'active' : '') + '" onclick="teamEditAgent(\'' + a.id + '\')">' +
-      '<div style="width:22px;height:16px;image-rendering:pixelated;flex-shrink:0;">' + teamSVG(a.color||'blue',22,16) + '</div>' +
+  list.innerHTML = filtered.map(function(p) {
+    const icon = allIcons.find(i => i.name === p.icon);
+    const thumb = icon ? '<div class="profile-card-icon">' + icon.svgContent + '</div>' : '<div class="profile-card-icon" style="background:var(--bg-4);"></div>';
+    return '<div class="profile-card ' + (p.id === currentProfileId ? 'active' : '') + '" onclick="profileEdit(\'' + p.id + '\')">' +
+      thumb +
       '<div style="flex:1;min-width:0;">' +
-        '<div class="team-row-name">' + escH(a.name||'Unnamed') + '</div>' +
-        '<div class="team-row-server">' + escH(a.server||'—') + '</div>' +
+        '<div class="profile-card-name">' + esc(p.name || 'Unnamed') + '</div>' +
+        '<div class="profile-card-desc">' + esc(p.description || '') + '</div>' +
       '</div>' +
-      '<div class="team-status-dot ' + (a.connected?'connected':'disconnected') + '"></div>' +
     '</div>';
   }).join('');
 }
 
-// ── Main area ──────────────────────────────────────────────────
-function teamShowMain(html) {
-  const m = document.getElementById('team-main');
-  if (m) m.innerHTML = html;
+// ── Empty state ───────────────────────────────────────────────
+function showEmptyState() {
+  const main = document.getElementById('profile-main');
+  if (!main) return;
+  const iconPreview = allIcons.slice(0, 8).map(function(ic) {
+    return '<div style="width:40px;height:40px;image-rendering:pixelated;opacity:0.3;">' + ic.svgContent + '</div>';
+  }).join('');
+  main.innerHTML = '<div class="profile-empty-state">' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">' + iconPreview + '</div>' +
+    '<div class="profile-empty-title">Create your first agent</div>' +
+    '<div class="profile-empty-sub">Configure an AI agent with a custom icon, system prompt, tasks, and MCP tools.</div>' +
+    '<button class="profile-btn primary" onclick="profileNew()" style="margin-top:12px;">+ NEW AGENT</button>' +
+  '</div>';
 }
 
-function teamShowEmpty() {
-  teamShowMain('<div class="team-empty-state">' +
-    '<div style="width:44px;height:32px;image-rendering:pixelated;opacity:0.2;">' + teamSVG('blue',44,32) + '</div>' +
-    '<div class="team-empty-title">No agents configured</div>' +
-    '<div class="team-empty-sub">Add your first MCP agent to start building your team.</div>' +
-    '<button class="sb-agent-btn" onclick="teamNewAgent()" style="margin-top:10px;width:auto;padding:6px 16px;">+ Add First Agent</button>' +
-  '</div>');
-}
+// ── Editor rendering ──────────────────────────────────────────
+function renderEditor(profile) {
+  const main = document.getElementById('profile-main');
+  if (!main) return;
 
-// ── Color picker ───────────────────────────────────────────────
-function teamBuildColorPicker(selected) {
-  return Object.keys(TEAM_COLORS).map(function(c) {
-    return '<div class="team-color-swatch ' + (c === selected ? 'selected' : '') + '" id="team-swatch-' + c + '" onclick="teamSelectColor(\'' + c + '\')">' +
-      '<div style="width:33px;height:24px;image-rendering:pixelated;">' + teamSVG(c,33,24) + '</div>' +
-      '<div class="team-color-swatch-label">' + TEAM_COLOR_LABELS[c] + '</div>' +
+  const selectedIcon = allIcons.find(i => i.name === profile.icon);
+  const largeIcon = selectedIcon ? selectedIcon.svgContent : '';
+
+  const iconGrid = allIcons.map(function(ic) {
+    return '<div class="profile-icon-tile ' + (ic.name === profile.icon ? 'selected' : '') + '" data-icon="' + esc(ic.name) + '" onclick="profileSelectIcon(\'' + esc(ic.name) + '\')">' + ic.svgContent + '</div>';
+  }).join('');
+
+  const tasksHtml = (profile.tasks || []).map(function(t, i) {
+    return buildTaskRow(t, i, profile.tasks.length);
+  }).join('');
+
+  const mcpChips = (profile.mcpAgents || []).map(function(id) {
+    const mcp = MCP_REGISTRY.find(m => m.id === id);
+    return '<span class="profile-chip">' + esc(mcp ? mcp.name : id) +
+      ' <span class="remove" onclick="profileRemoveMcp(\'' + esc(id) + '\')">&times;</span></span>';
+  }).join('');
+
+  const mcpList = MCP_REGISTRY.map(function(m) {
+    const isActive = (profile.mcpAgents || []).includes(m.id);
+    return '<div class="profile-mcp-item">' +
+      '<span class="profile-mcp-name">' + esc(m.name) + '</span>' +
+      '<span class="profile-mcp-desc">' + esc(m.desc) + '</span>' +
+      '<span class="profile-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'ACTIVE' : 'OFF') + '</span>' +
+      '<div class="profile-toggle ' + (isActive ? 'on' : '') + '" onclick="profileToggleMcp(\'' + esc(m.id) + '\')"></div>' +
     '</div>';
   }).join('');
-}
 
-window.teamSelectColor = function(color) {
-  document.querySelectorAll('.team-color-swatch').forEach(function(s) { s.classList.remove('selected'); });
-  const sw = document.getElementById('team-swatch-' + color);
-  if (sw) sw.classList.add('selected');
-};
-
-// ── Permissions table ──────────────────────────────────────────
-function teamBuildPerms(serverId, existing) {
-  existing = existing || {};
-  const perms = SERVER_PERMS[serverId] || SERVER_PERMS.default;
-  return perms.map(function(p) {
-    const def = PERM_CATALOG[p]; if (!def) return '';
-    const safeDef = (p === 'delete' || p === 'execute' || p === 'file_system') ? false : true;
-    const isChecked = (p in existing) ? existing[p] : safeDef;
-    return '<tr>' +
-      '<td><span class="team-perm-name">' + p + '</span></td>' +
-      '<td><span class="team-perm-desc">' + def.desc + '</span></td>' +
-      '<td style="text-align:center"><span class="team-perm-risk ' + def.risk + '">' + def.risk + '</span></td>' +
-      '<td style="text-align:center">' +
-        '<label style="position:relative;width:30px;height:16px;display:inline-block;">' +
-          '<input type="checkbox" id="team-perm-' + p + '" ' + (isChecked?'checked':'') + ' style="opacity:0;width:0;height:0;position:absolute;">' +
-          '<div onclick="this.previousElementSibling.checked=!this.previousElementSibling.checked"' +
-            ' style="position:absolute;inset:0;background:var(--bg-3);border:1px solid var(--border-2);border-radius:8px;cursor:pointer;transition:all 0.2s;">' +
-          '</div>' +
-        '</label>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-// ── Editor ─────────────────────────────────────────────────────
-function teamShowEditor(agent) {
-  const isNew = !agent;
-  agent = agent || {};
-  const color = agent.color || 'blue';
-  const server = agent.server || '';
-  const permsHTML = teamBuildPerms(server, agent.perms);
-  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(server);
-
-  teamShowMain(
-    '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);">' +
-        '<div>' +
-          '<div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);margin-bottom:3px;" id="team-editor-title">' + (isNew ? 'New Agent' : escH(agent.name||'Agent')) + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);">Configure connection and permissions</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<div class="team-vault-indicator" id="team-vault-indicator"><div class="team-vault-dot"></div><span id="team-vault-text">vault encrypted</span></div>' +
-          (!isNew ? '<button class="sb-agent-btn" onclick="teamDeleteAgent()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--red);color:var(--red);">Delete</button>' : '') +
-          (!isNew ? '<button class="sb-agent-btn" onclick="teamShowActivity(\'' + escH(agent.id || '') + '\',\'' + escH((agent.name || 'Agent').replace(/'/g, "\\'")) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Activity</button>' : '') +
-          '<button class="sb-agent-btn" onclick="teamCancelEdit()" style="width:auto;padding:4px 10px;font-size:9px;">Cancel</button>' +
-          '<button class="sb-agent-btn" onclick="teamSaveAgent()" style="width:auto;padding:5px 12px;font-size:9px;border-color:var(--accent);color:var(--accent);">Save to Vault</button>' +
-        '</div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Identity</div>' +
-        '<div class="team-form-row">' +
-          '<div class="team-field"><label class="team-label">Agent Name</label><input class="team-input" id="team-f-name" value="' + escH(agent.name||'') + '" placeholder="e.g. GitHub Assistant"></div>' +
-          '<div class="team-field"><label class="team-label">Role Description</label><input class="team-input" id="team-f-desc" value="' + escH(agent.desc||'') + '" placeholder="e.g. manages repos and issues"></div>' +
-        '</div>' +
-        '<div class="team-form-row single"><div class="team-field"><label class="team-label">Icon Color</label><div class="team-color-row">' + teamBuildColorPicker(color) + '</div></div></div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Connection</div>' +
-        '<div class="team-form-row">' +
-          '<div class="team-field"><label class="team-label">MCP Server</label>' +
-            '<select class="team-select" id="team-f-server" onchange="teamOnServerChange()">' +
-              '<option value="">— select or custom —</option>' +
-              '<optgroup label="Official">' +
-                '<option value="github" ' + (server==='github'?'selected':'') + '>GitHub</option>' +
-                '<option value="slack" ' + (server==='slack'?'selected':'') + '>Slack</option>' +
-                '<option value="notion" ' + (server==='notion'?'selected':'') + '>Notion</option>' +
-                '<option value="google_drive" ' + (server==='google_drive'?'selected':'') + '>Google Drive</option>' +
-                '<option value="stripe" ' + (server==='stripe'?'selected':'') + '>Stripe</option>' +
-                '<option value="figma" ' + (server==='figma'?'selected':'') + '>Figma</option>' +
-              '</optgroup>' +
-              '<optgroup label="Aether Built-in">' +
-                '<option value="fal_ai" ' + (server==='fal_ai'?'selected':'') + '>fal.ai (image/video)</option>' +
-                '<option value="excalidraw" ' + (server==='excalidraw'?'selected':'') + '>Excalidraw</option>' +
-                '<option value="context7" ' + (server==='context7'?'selected':'') + '>Context7</option>' +
-                '<option value="desktop_commander" ' + (server==='desktop_commander'?'selected':'') + '>Desktop Commander</option>' +
-              '</optgroup>' +
-              '<optgroup label="Custom">' +
-                '<option value="custom_http" ' + (server==='custom_http'?'selected':'') + '>Custom HTTP Endpoint</option>' +
-                '<option value="custom_stdio" ' + (server==='custom_stdio'?'selected':'') + '>Custom stdio Server</option>' +
-              '</optgroup>' +
-            '</select>' +
-          '</div>' +
-          '<div class="team-field"><label class="team-label">Transport</label>' +
-            '<select class="team-select" id="team-f-transport">' +
-              '<option value="http" ' + ((agent.transport||'http')==='http'?'selected':'') + '>Streamable HTTP</option>' +
-              '<option value="stdio" ' + (agent.transport==='stdio'?'selected':'') + '>stdio (local)</option>' +
-              '<option value="sse" ' + (agent.transport==='sse'?'selected':'') + '>SSE (legacy)</option>' +
-            '</select>' +
-          '</div>' +
-        '</div>' +
-        '<div class="team-form-row single" id="team-url-row" ' + (isStdio?'style="display:none"':'') + '>' +
-          '<div class="team-field"><label class="team-label">Server URL</label><input class="team-input" id="team-f-url" value="' + escH(agent.url||'') + '" placeholder="https://mcp.example.com/mcp"></div>' +
-        '</div>' +
-        '<div class="team-form-row single" id="team-cmd-row" ' + (isStdio?'':'style="display:none"') + '>' +
-          '<div class="team-field"><label class="team-label">Command</label><input class="team-input" id="team-f-cmd" value="' + escH(agent.cmd||'') + '" placeholder="npx -y @org/server-name"></div>' +
-        '</div>' +
-        '<div class="team-form-row" id="team-auth-row" ' + (server&&!['excalidraw','context7','desktop_commander'].includes(server)?'':'style="display:none"') + '>' +
-          '<div class="team-field"><label class="team-label">Auth Type</label>' +
-            '<select class="team-select" id="team-f-auth-type" onchange="teamOnAuthChange()">' +
-              '<option value="bearer" ' + ((agent.authType||'bearer')==='bearer'?'selected':'') + '>Bearer / API Key</option>' +
-              '<option value="none" ' + (agent.authType==='none'?'selected':'') + '>None</option>' +
-            '</select>' +
-          '</div>' +
-          '<div class="team-field" id="team-key-field"><label class="team-label">API Key <span style="color:var(--accent);font-size:8px;">// vault encrypted</span></label>' +
-            '<input class="team-input" id="team-f-key" type="password" value="' + escH(agent.keyHint||'') + '" placeholder="sk-...">' +
-          '</div>' +
-        '</div>' +
-        '<div class="team-test-row">' +
-          '<span class="team-test-status" id="team-test-status">Not tested</span>' +
-          '<button class="sb-agent-btn" onclick="teamTestConnection()" style="width:auto;padding:4px 10px;font-size:9px;">Test Connection</button>' +
-        '</div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
-          '<button class="sb-agent-btn" id="team-tools-btn" onclick="teamLoadTools(\'' + (agent.id || teamCurrentId) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Discover Tools</button>' +
-          '<span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);">// see what this agent can do</span>' +
-        '</div>' +
-        '<div id="team-tools-panel" style="display:none;margin-bottom:10px;max-height:220px;overflow-y:auto;"></div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Permissions</div>' +
-        '<table class="team-perms-table">' +
-          '<thead><tr>' +
-            '<th style="width:130px">Permission</th>' +
-            '<th>Description</th>' +
-            '<th style="width:55px;text-align:center">Risk</th>' +
-            '<th style="width:45px;text-align:center">Allow</th>' +
-          '</tr></thead>' +
-          '<tbody id="team-perms-body">' + permsHTML + '</tbody>' +
-        '</table>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Routing Hints</div>' +
-        '<div class="team-form-row single"><div class="team-field">' +
-          '<label class="team-label">Trigger Keywords <span style="color:var(--text-muted);">// comma-separated</span></label>' +
-          '<input class="team-input" id="team-f-keywords" value="' + escH(agent.keywords||'') + '" placeholder="e.g. github, repo, pull request, issue">' +
-        '</div></div>' +
-        '<div class="team-form-row single"><div class="team-field">' +
-          '<label class="team-label">System Prompt Injection <span style="color:var(--text-muted);">// added to QOPC when active</span></label>' +
-          '<textarea class="team-textarea" id="team-f-prompt" placeholder="e.g. You have access to GitHub. Use the GitHub agent for code and repo tasks.">' + escH(agent.prompt||'') + '</textarea>' +
-        '</div></div>' +
-      '</div>' +
-    '</div>'
-  );
-}
-
-// ── Server change ──────────────────────────────────────────────
-window.teamOnServerChange = function() {
-  const val = document.getElementById('team-f-server').value;
-  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(val);
-  const urlRow = document.getElementById('team-url-row');
-  const cmdRow = document.getElementById('team-cmd-row');
-  const authRow = document.getElementById('team-auth-row');
-  if (urlRow) urlRow.style.display = isStdio ? 'none' : '';
-  if (cmdRow) cmdRow.style.display = isStdio ? '' : 'none';
-  const noAuth = ['excalidraw','context7','desktop_commander'].includes(val);
-  if (authRow) authRow.style.display = noAuth ? 'none' : '';
-
-  const reg = REGISTRY.find(function(r) { return r.id === val; });
-  if (reg) {
-    if (reg.url) { const u = document.getElementById('team-f-url'); if (u) u.value = reg.url; }
-    teamSelectColor(reg.color || 'blue');
-  }
-
-  const body = document.getElementById('team-perms-body');
-  if (body) body.innerHTML = teamBuildPerms(val, {});
-};
-
-window.teamOnAuthChange = function() {
-  const type = document.getElementById('team-f-auth-type').value;
-  const kf = document.getElementById('team-key-field');
-  if (kf) kf.style.display = type === 'none' ? 'none' : '';
-};
-
-// ── Connection test ────────────────────────────────────────────
-window.teamTestConnection = async function() {
-  const el = document.getElementById('team-test-status');
-  if (!el) return;
-  el.className = 'team-test-status testing';
-  el.textContent = 'Testing...';
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/test', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify({
-        server: document.getElementById('team-f-server').value,
-        url: (document.getElementById('team-f-url') || {}).value || '',
-        transport: document.getElementById('team-f-transport').value,
-        agentId: teamCurrentId || 'test',
-      }),
-    });
-    const data = await r.json();
-    if (data.ok) {
-      el.className = 'team-test-status ok';
-      el.textContent = 'Connected ✓ ' + (data.tools ? data.tools.length : 0) + ' tools';
-      const a = teamAgents.find(function(x) { return x.id === teamCurrentId; });
-      if (a) { a.connected = true; teamRenderSidebar(); }
-    } else {
-      el.className = 'team-test-status fail';
-      el.textContent = 'Failed: ' + (data.error||'connection refused');
-    }
-  } catch(e) {
-    el.className = 'team-test-status fail';
-    el.textContent = 'Error: ' + e.message;
-  }
-};
-
-// ── CRUD ───────────────────────────────────────────────────────
-window.teamNewAgent = function() {
-  teamCurrentId = 'new_' + Date.now();
-  teamShowEditor(null);
-  teamRenderSidebar();
-};
-
-window.teamEditAgent = function(id) {
-  const a = teamAgents.find(function(x) { return x.id === id; });
-  if (!a) return;
-  teamCurrentId = id;
-  teamShowEditor(a);
-  teamRenderSidebar();
-};
-
-window.teamSaveAgent = async function() {
-  const name = (document.getElementById('team-f-name') ? document.getElementById('team-f-name').value : '').trim();
-  if (!name) { const nf = document.getElementById('team-f-name'); if (nf) nf.focus(); return; }
-  const colorSwatch = document.querySelector('.team-color-swatch.selected');
-  const color = colorSwatch ? (colorSwatch.id || '').replace('team-swatch-','') : 'blue';
-  const server = (document.getElementById('team-f-server') || {}).value || '';
-  const permsObj = {};
-  (SERVER_PERMS[server]||SERVER_PERMS.default).forEach(function(p) {
-    const el = document.getElementById('team-perm-' + p);
-    if (el) permsObj[p] = el.checked;
-  });
-  const keyEl = document.getElementById('team-f-key');
-  const rawKey = keyEl ? keyEl.value : '';
-  if (rawKey && rawKey !== '••••••••') {
-    try {
-      const token = await getSessionToken();
-      await fetch(API_BASE + '/agent/key/' + teamCurrentId, {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-        body: JSON.stringify({ key: rawKey }),
-      });
-    } catch(_) {}
-  }
-  const agent = {
-    id: teamCurrentId,
-    name: name,
-    desc: ((document.getElementById('team-f-desc') || {}).value||'').trim(),
-    color: color,
-    server: server,
-    transport: (document.getElementById('team-f-transport') || {}).value || 'http',
-    url: ((document.getElementById('team-f-url') || {}).value||'').trim(),
-    cmd: ((document.getElementById('team-f-cmd') || {}).value||'').trim(),
-    authType: (document.getElementById('team-f-auth-type') || {}).value || 'bearer',
-    keyHint: rawKey ? '••••••••' : '',
-    keywords: ((document.getElementById('team-f-keywords') || {}).value||'').trim(),
-    prompt: ((document.getElementById('team-f-prompt') || {}).value||'').trim(),
-    perms: permsObj,
-    connected: false,
-  };
-  const idx = teamAgents.findIndex(function(a) { return a.id === teamCurrentId; });
-  if (idx >= 0) teamAgents[idx] = agent; else teamAgents.push(agent);
-  await teamPersistToVault(true);
-  teamRenderSidebar();
-  const titleEl = document.getElementById('team-editor-title');
-  if (titleEl) titleEl.textContent = name;
-  if (typeof showToast === 'function') showToast('Agent saved to vault', 'success');
-};
-
-window.teamDeleteAgent = function() {
-  if (!teamCurrentId) return;
-  if (!confirm('Remove this agent from your team?')) return;
-  teamAgents = teamAgents.filter(function(a) { return a.id !== teamCurrentId; });
-  teamCurrentId = null;
-  teamPersistToVault(false);
-  teamRenderSidebar();
-  if (teamAgents.length) teamEditAgent(teamAgents[0].id);
-  else teamShowEmpty();
-};
-
-window.teamCancelEdit = function() {
-  if (teamAgents.length) {
-    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) return;
-    teamCurrentId = null;
-    teamEditAgent(teamAgents[0].id);
-  } else {
-    teamCurrentId = null;
-    teamShowEmpty();
-  }
-};
-
-// ── Registry ───────────────────────────────────────────────────
-function teamShowRegistry(filter) {
-  filter = (filter||'').toLowerCase();
-  const items = REGISTRY.filter(function(r) {
-    return !filter || r.name.toLowerCase().includes(filter) || r.desc.toLowerCase().includes(filter);
-  });
-  teamShowMain(
-    '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
-        '<input class="sb-search" id="team-registry-search" placeholder="search servers..." oninput="teamShowRegistry(this.value)" style="flex:1;margin-bottom:0;">' +
-        '<button class="sb-agent-btn" onclick="switchTeamTab(\'team\')" style="width:auto;padding:5px 12px;font-size:9px;">← Back</button>' +
-      '</div>' +
-      '<div class="team-registry-grid">' +
-        items.map(function(r) {
-          const installed = teamAgents.some(function(a) { return a.server === r.id; });
-          return '<div class="team-registry-card ' + (installed?'installed':'') + '" onclick="teamInstallFromRegistry(\'' + r.id + '\')">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">' +
-              '<div style="width:22px;height:16px;image-rendering:pixelated;">' + teamSVG(r.color,22,16) + '</div>' +
-              '<span class="team-registry-card-name">' + escH(r.name) + '</span>' +
-            '</div>' +
-            '<div class="team-registry-card-desc">' + escH(r.desc) + '</div>' +
-            '<div class="team-registry-card-footer">' +
-              '<span class="team-registry-card-auth">' + r.auth + '</span>' +
-              '<span class="team-badge ' + (installed?'installed':r.type) + '">' + (installed?'installed':r.type) + '</span>' +
-            '</div>' +
-          '</div>';
-        }).join('') +
-      '</div>' +
-    '</div>'
-  );
-}
-
-window.teamInstallFromRegistry = function(serverId) {
-  const reg = REGISTRY.find(function(r) { return r.id === serverId; });
-  if (!reg) return;
-  switchTeamTab('team');
-  teamCurrentId = 'new_' + Date.now();
-  setTimeout(function() {
-    teamShowEditor({ server: reg.id, url: reg.url||'', name: reg.name + ' Agent', color: reg.color, keywords: reg.name.toLowerCase() });
-    teamRenderSidebar();
-  }, 50);
-};
-
-// ── Tab switching ──────────────────────────────────────────────
-window.switchTeamTab = function(tab) {
-  teamTab = tab;
-  const t1 = document.getElementById('team-tab-my');
-  const t2 = document.getElementById('team-tab-registry');
-  const t3 = document.getElementById('team-tab-pipeline');
-  if (t1) t1.classList.toggle('active', tab === 'team');
-  if (t2) t2.classList.toggle('active', tab === 'registry');
-  if (t3) t3.classList.toggle('active', tab === 'pipeline');
-  if (tab === 'registry') {
-    teamShowRegistry('');
-  } else if (tab === 'pipeline') {
-    teamShowPipeline();
-  } else {
-    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) teamEditAgent(teamCurrentId);
-    else if (teamAgents.length) teamEditAgent(teamAgents[0].id);
-    else teamShowEmpty();
-  }
-};
-
-// ── Tool Discovery (Priority 4) ────────────────────────────────
-window.teamLoadTools = async function(agentId) {
-  const panel = document.getElementById('team-tools-panel');
-  const btn   = document.getElementById('team-tools-btn');
-  if (!panel) return;
-  panel.style.display = 'block';
-  panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:8px;">Connecting to MCP server...</div>';
-  if (btn) btn.disabled = true;
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/tools/' + encodeURIComponent(agentId), {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await r.json();
-    if (data.ok && data.tools && data.tools.length) {
-      panel.innerHTML =
-        '<div style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">' +
-        data.tools.length + ' tools available ' +
-        (data.source === 'live' ? '<span style="color:var(--green);">// live</span>' : '<span style="color:var(--text-muted);">// cached</span>') +
-        '</div>' +
-        data.tools.map(function(t) {
-          return '<div style="padding:5px 8px;margin-bottom:3px;background:var(--bg-3);border:1px solid var(--border);">' +
-            '<div style="font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--text-primary);">' + escH(t.name) + '</div>' +
-            (t.description ? '<div style="font-size:9px;color:var(--text-muted);margin-top:2px;">' + escH(t.description) + '</div>' : '') +
-            '</div>';
-        }).join('');
-    } else {
-      panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:8px;">' +
-        (data.error || 'No tools found') + '</div>';
-    }
-  } catch(e) {
-    panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);padding:8px;">Error: ' + escH(e.message) + '</div>';
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-};
-
-// ── Activity Log (Priority 5) ──────────────────────────────────
-window.teamShowActivity = async function(agentId, agentName) {
-  teamShowMain('<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:20px;">Loading activity...</div>');
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/activity/' + encodeURIComponent(agentId) + '?limit=50', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await r.json();
-    const entries = data.entries || [];
-    if (!entries.length) {
-      teamShowMain(
-        '<div class="team-empty-state">' +
-        '<div class="team-empty-title">No activity yet for ' + escH(agentName || agentId) + '</div>' +
-        '<div class="team-empty-sub">Send a message that matches this agent\'s keywords and the call will be logged here with a Protocol-C hash.</div>' +
-        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-top:10px;width:auto;padding:6px 14px;">← Back to Config</button>' +
-        '</div>'
-      );
-      return;
-    }
-    teamShowMain(
-      '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
-        '<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--accent);">' + escH(agentName || agentId) + ' — Activity</span>' +
-        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + entries.length + ' calls</span>' +
-        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-left:auto;width:auto;padding:4px 10px;font-size:9px;">← Config</button>' +
-      '</div>' +
-      entries.map(function(e) {
-        var statusColor = e.status === 'ok' ? 'var(--green)' : 'var(--red)';
-        var ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
-        return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + statusColor + ';">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-            '<span style="font-family:var(--font-mono);font-size:9px;color:' + statusColor + ';text-transform:uppercase;">' + escH(e.status) + '</span>' +
-            '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + escH(e.tool_name) + '</span>' +
-            '<span style="font-size:9px;color:var(--text-muted);margin-left:auto;">' + escH(ts) + '</span>' +
-          '</div>' +
-          '<div style="font-size:10px;color:var(--text-primary);margin-bottom:3px;">' + escH(e.query_summary) + '</div>' +
-          (e.result_summary ? '<div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;">' + escH(e.result_summary.substring(0, 120)) + (e.result_summary.length > 120 ? '…' : '') + '</div>' : '') +
-          (e.error ? '<div style="font-size:9px;color:var(--red);">Error: ' + escH(e.error) + '</div>' : '') +
-          '<div style="font-family:var(--font-mono);font-size:8px;color:rgba(0,212,255,0.3);margin-top:4px;" title="Protocol-C hash">&#8984; ' + (e.hash || '').substring(0, 16) + '…</div>' +
-        '</div>';
-      }).join('') +
-      '</div>'
-    );
-  } catch(ex) {
-    teamShowMain('<div style="padding:20px;font-family:var(--font-mono);font-size:10px;color:var(--red);">Failed to load activity: ' + escH(ex.message) + '</div>');
-  }
-};
-
-// ── Pipeline Builder (Priority 6) ─────────────────────────────
-var _pipelineSteps = [];
-
-window.teamShowPipeline = async function() {
-  // Load templates in background
-  let templates = [];
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
-    const d = await r.json();
-    templates = d.templates || [];
-  } catch(_) {}
-
-  const agentOptions = teamAgents.map(function(a) {
-    return '<option value="' + escH(a.id) + '">' + escH(a.name) + ' (' + escH(a.server || '?') + ')</option>';
+  const skillChips = (profile.skills || []).map(function(s) {
+    return '<span class="profile-chip">' + esc(s) +
+      ' <span class="remove" onclick="profileRemoveSkill(\'' + esc(s) + '\')">&times;</span></span>';
   }).join('');
 
-  teamShowMain(
-    '<div style="max-width:700px;" id="pipeline-editor">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">' +
-      '<span style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);">Pipeline Builder</span>' +
-      '<span style="font-size:11px;color:var(--text-muted);">// chain agents sequentially</span>' +
-      '<div style="margin-left:auto;display:flex;gap:6px;">' +
-        (templates.length ? '<select class="team-select" id="pipeline-template-sel" style="font-size:9px;padding:4px 24px 4px 8px;" onchange="teamLoadTemplate(this.value)">' +
-          '<option value="">Load template…</option>' +
-          templates.map(function(t) { return '<option value="' + escH(t.id) + '">' + escH(t.name) + '</option>'; }).join('') +
-          '</select>' : '') +
-        '<button class="sb-agent-btn" onclick="teamAddPipelineStep()" style="width:auto;padding:4px 10px;font-size:9px;">+ Add Step</button>' +
-        '<button class="sb-agent-btn" id="pipeline-run-btn" onclick="teamRunPipeline()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--accent);color:var(--accent);">▶ Run</button>' +
+  main.innerHTML =
+    '<div class="profile-editor" id="profile-editor">' +
+
+    // ── IDENTITY SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">IDENTITY</div>' +
+      '<div class="profile-identity-row">' +
+        '<div class="profile-icon-large" id="profile-icon-preview">' + largeIcon + '</div>' +
+        '<div class="profile-identity-fields">' +
+          '<div><label class="profile-label">AGENT NAME</label>' +
+            '<input class="profile-input" id="profile-name" type="text" maxlength="32" placeholder="ENTER DESIGNATION..." value="' + esc(profile.name) + '" oninput="profileUpdateCharCount()">' +
+            '<div class="profile-char-counter" id="profile-name-count">' + (profile.name||'').length + '/32</div>' +
+          '</div>' +
+          '<div><label class="profile-label">TEAM</label>' +
+            '<select class="profile-select" id="profile-team-select">' +
+              TEAMS.map(t => '<option value="' + esc(t) + '"' + (t === profile.team ? ' selected' : '') + '>' + esc(t) + '</option>').join('') +
+            '</select>' +
+          '</div>' +
+          '<div><label class="profile-label">DESCRIPTION</label>' +
+            '<textarea class="profile-textarea" id="profile-desc" rows="3" placeholder="Describe this agent\'s role and purpose...">' + esc(profile.description) + '</textarea>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="profile-section-header" style="margin-top:14px;">CHOOSE ICON</div>' +
+      '<div class="profile-icon-grid" id="profile-icon-grid">' + iconGrid + '</div>' +
+    '</div>' +
+
+    // ── SYSTEM PROMPT SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">SYSTEM PROMPT' +
+        '<span class="profile-section-toggle" id="prompt-toggle" onclick="profileToggleSection(\'prompt\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="prompt-body" style="max-height:400px;">' +
+        '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
+          '<div class="profile-template-dropdown">' +
+            '<button class="profile-btn outlined" onclick="profileToggleTemplateMenu()" style="font-size:9px;padding:4px 10px;">Load Template &#9660;</button>' +
+            '<div class="profile-template-menu" id="profile-template-menu">' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'analyst\')">Analyst</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'executor\')">Executor</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'sentinel\')">Sentinel</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'researcher\')">Researcher</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'custom\')">Custom (blank)</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<textarea class="profile-textarea" id="profile-prompt" style="min-height:200px;" placeholder="You are [AGENT NAME], an AI agent operating within AetherCloud...\nDefine behavior, tone, restrictions, and context here." oninput="profileUpdateTokenCount()">' + esc(profile.systemPrompt) + '</textarea>' +
+        '<div class="profile-token-counter" id="profile-token-count">' + (profile.systemPrompt||'').length + ' chars / ~' + Math.ceil((profile.systemPrompt||'').length / 4) + ' tokens</div>' +
       '</div>' +
     '</div>' +
-    '<div class="team-form-row single" style="margin-bottom:14px;"><div class="team-field">' +
-      '<label class="team-label">Initial Input</label>' +
-      '<textarea class="team-textarea" id="pipeline-input" placeholder="What should the first step work on?" style="min-height:50px;"></textarea>' +
-    '</div></div>' +
-    '<div id="pipeline-steps" style="display:flex;flex-direction:column;gap:8px;"></div>' +
-    '<div id="pipeline-results" style="margin-top:16px;"></div>' +
-    '</div>'
-  );
-  _pipelineSteps = [];
-  // Add one default step
-  teamAddPipelineStep();
-};
 
-window.teamAddPipelineStep = function() {
-  _pipelineSteps.push({ agent_id: '', prompt_template: '{initial_input}', label: '' });
-  teamRenumberSteps();
-};
-
-window.teamRenumberSteps = function() {
-  const container = document.getElementById('pipeline-steps');
-  if (!container) return;
-  const agentOptions = '<option value="">— select agent —</option>' + teamAgents.map(function(a) {
-    return '<option value="' + escH(a.id) + '">' + escH(a.name) + '</option>';
-  }).join('');
-
-  container.innerHTML = _pipelineSteps.map(function(step, i) {
-    return '<div style="padding:12px;background:var(--bg-3);border:1px solid var(--border);" id="pipeline-step-' + i + '">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);">STEP ' + (i + 1) + '</span>' +
-        '<input class="team-input" placeholder="Step label (optional)" value="' + escH(step.label || '') + '" style="flex:1;" oninput="_pipelineSteps[' + i + '].label=this.value">' +
-        '<button onclick="_pipelineSteps.splice(' + i + ',1);teamRenumberSteps()" style="background:none;border:1px solid var(--border-2);color:var(--text-muted);font-size:10px;padding:2px 8px;cursor:pointer;">✕</button>' +
+    // ── TASKS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">TASKS <span style="font-size:9px;color:var(--text-muted);">(' + (profile.tasks||[]).length + '/10)</span>' +
+        '<button class="profile-btn outlined" onclick="profileAddTask()" style="font-size:9px;padding:3px 10px;margin-left:auto;"' + ((profile.tasks||[]).length >= 10 ? ' disabled' : '') + '>+ ADD TASK</button>' +
       '</div>' +
-      '<div class="team-form-row">' +
-        '<div class="team-field"><label class="team-label">Agent</label>' +
-          '<select class="team-select" onchange="_pipelineSteps[' + i + '].agent_id=this.value">' +
-            agentOptions.replace('value="' + escH(step.agent_id) + '"', 'value="' + escH(step.agent_id) + '" selected') +
-          '</select>' +
-        '</div>' +
-        '<div class="team-field"><label class="team-label">Prompt Template</label>' +
-          '<input class="team-input" value="' + escH(step.prompt_template || '{initial_input}') + '" placeholder="{initial_input} or {previous_output}" oninput="_pipelineSteps[' + i + '].prompt_template=this.value">' +
+      '<div id="profile-tasks">' + (tasksHtml || '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;padding:8px 0;">No tasks configured</div>') + '</div>' +
+    '</div>' +
+
+    // ── MCP AGENTS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">MCP AGENTS' +
+        '<span class="profile-section-toggle" id="mcp-toggle" onclick="profileToggleSection(\'mcp\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="mcp-body" style="max-height:600px;">' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">Connect model context protocol tools to this agent.</div>' +
+        (mcpChips ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">' + mcpChips + '</div>' : '') +
+        '<input class="profile-search" id="mcp-search" type="text" placeholder="Search MCPs..." oninput="profileFilterMcps()">' +
+        '<div id="profile-mcp-list">' + mcpList + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── SKILLS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">SKILLS' +
+        '<span class="profile-section-toggle" id="skills-toggle" onclick="profileToggleSection(\'skills\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="skills-body" style="max-height:400px;">' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">Attach skill modules to this agent.</div>' +
+        (skillChips ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">' + skillChips + '</div>' : '') +
+        '<div id="profile-skill-list"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;">No skills available. Add skills to agent/skills/ directory.</div></div>' +
+        '<button class="profile-btn outlined" onclick="profileToggleAddSkill()" style="font-size:9px;padding:4px 10px;margin-top:8px;">+ ADD SKILL</button>' +
+        '<div class="profile-add-form" id="profile-add-skill-form">' +
+          '<div class="profile-add-form-row">' +
+            '<input class="profile-input" id="new-skill-name" placeholder="Skill name" style="flex:1;">' +
+            '<input class="profile-input" id="new-skill-desc" placeholder="Description" style="flex:2;">' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="profile-btn primary" onclick="profileSaveNewSkill()" style="font-size:9px;padding:4px 12px;">Save</button>' +
+            '<button class="profile-btn outlined" onclick="profileToggleAddSkill()" style="font-size:9px;padding:4px 12px;">Cancel</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
+    '</div>' +
+
+    '</div>' +
+
+    // ── SAVE BAR ──
+    '<div class="profile-save-bar">' +
+      '<button class="profile-btn primary" onclick="profileSave()">SAVE AGENT</button>' +
+      '<button class="profile-btn outlined" onclick="profileExport()">EXPORT CONFIG</button>' +
+      '<button class="profile-btn outlined" onclick="profileDuplicate()">DUPLICATE</button>' +
+      '<div style="flex:1;"></div>' +
+      '<button class="profile-btn danger" onclick="profileDelete()">DELETE AGENT</button>' +
     '</div>';
-  }).join('');
-};
+}
 
-window.teamRunPipeline = async function() {
-  const input = (document.getElementById('pipeline-input') || {}).value || '';
-  if (!input.trim()) { alert('Enter an initial input for the pipeline.'); return; }
-  if (!_pipelineSteps.length) { alert('Add at least one step.'); return; }
-  const btn = document.getElementById('pipeline-run-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Running…'; }
-  const resultsEl = document.getElementById('pipeline-results');
-  if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">Executing pipeline…</div>';
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/pipeline/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ steps: _pipelineSteps, initial_input: input, name: 'Dashboard Pipeline' }),
-    });
-    const data = await r.json();
-    if (resultsEl) {
-      resultsEl.innerHTML =
-        '<div style="margin-bottom:8px;font-family:var(--font-mono);font-size:9px;color:' + (data.ok ? 'var(--green)' : 'var(--amber)') + ';text-transform:uppercase;">' +
-        'Pipeline ' + (data.ok ? 'Complete ✓' : 'Partial') + ' — ' + (data.step_count || 0) + ' steps</div>' +
-        (data.results || []).map(function(res) {
-          var c = res.status === 'ok' ? 'var(--green)' : 'var(--red)';
-          return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + c + ';">' +
-            '<div style="font-family:var(--font-mono);font-size:9px;color:' + c + ';margin-bottom:4px;">STEP ' + (res.step_index + 1) + ' — ' + escH(res.label || res.agent_id) + ' (' + res.duration_ms + 'ms)</div>' +
-            (res.output ? '<div style="font-size:10px;color:var(--text-primary);white-space:pre-wrap;">' + escH(res.output.substring(0, 500)) + (res.output.length > 500 ? '\n…' : '') + '</div>' : '') +
-            (res.error ? '<div style="font-size:9px;color:var(--red);margin-top:4px;">Error: ' + escH(res.error) + '</div>' : '') +
-          '</div>';
-        }).join('');
-    }
-  } catch(ex) {
-    if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);">Pipeline failed: ' + escH(ex.message) + '</div>';
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Run'; }
+// ── Task row builder ──────────────────────────────────────────
+function buildTaskRow(task, index, total) {
+  const priorities = ['LOW','MEDIUM','HIGH','CRITICAL'];
+  const priorityBtns = priorities.map(function(p) {
+    const cls = task.priority === p ? 'active-' + p.toLowerCase() : '';
+    return '<button class="profile-priority-btn ' + cls + '" onclick="profileSetTaskPriority(' + index + ',\'' + p + '\')">' + p + '</button>';
+  }).join('');
+
+  const triggers = ['Manual','Scheduled','Event','Chained'];
+  const triggerOpts = triggers.map(function(t) {
+    return '<option value="' + t + '"' + (task.trigger === t ? ' selected' : '') + '>' + t + '</option>';
+  }).join('');
+
+  return '<div class="profile-task-row" data-task-index="' + index + '">' +
+    '<div class="profile-task-fields">' +
+      '<input class="profile-input" placeholder="Task name" value="' + esc(task.name) + '" onchange="profileUpdateTask(' + index + ',\'name\',this.value)" style="font-weight:500;">' +
+      '<textarea class="profile-textarea" rows="2" placeholder="Task description..." onchange="profileUpdateTask(' + index + ',\'description\',this.value)" style="min-height:40px;">' + esc(task.description) + '</textarea>' +
+      '<div class="profile-task-meta">' +
+        '<div class="profile-priority-seg">' + priorityBtns + '</div>' +
+        '<select class="profile-select" onchange="profileUpdateTask(' + index + ',\'trigger\',this.value)" style="width:120px;padding:3px 24px 3px 8px;font-size:9px;">' + triggerOpts + '</select>' +
+      '</div>' +
+    '</div>' +
+    '<div class="profile-task-actions">' +
+      '<button class="profile-task-action-btn" onclick="profileMoveTask(' + index + ',-1)"' + (index === 0 ? ' disabled style="opacity:0.3"' : '') + '>&#9650;</button>' +
+      '<button class="profile-task-action-btn" onclick="profileMoveTask(' + index + ',1)"' + (index === total - 1 ? ' disabled style="opacity:0.3"' : '') + '>&#9660;</button>' +
+      '<button class="profile-task-action-btn delete" onclick="profileRemoveTask(' + index + ')">&#10005;</button>' +
+    '</div>' +
+  '</div>';
+}
+
+// ── Collect current form state into profile object ────────────
+function collectProfile() {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return null;
+  p.name = (document.getElementById('profile-name')?.value || '').trim();
+  p.description = (document.getElementById('profile-desc')?.value || '').trim();
+  p.systemPrompt = (document.getElementById('profile-prompt')?.value || '');
+  const teamSel = document.getElementById('profile-team-select');
+  if (teamSel) p.team = teamSel.value;
+  return p;
+}
+
+// ── Window-level handlers (called from onclick) ───────────────
+
+window.profilePanelInit = async function() {
+  await loadIcons();
+  await loadProfiles();
+  renderSidebar();
+  if (currentProfileId) {
+    const p = allProfiles.find(pr => pr.id === currentProfileId);
+    if (p) renderEditor(p); else showEmptyState();
+  } else {
+    showEmptyState();
   }
 };
 
-window.teamLoadTemplate = function(templateId) {
-  if (!templateId) return;
-  // Fetch from cached templates or re-request
-  getSessionToken().then(function(token) {
-    return fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    var tpl = (d.templates || []).find(function(t) { return t.id === templateId; });
-    if (!tpl) return;
-    _pipelineSteps = (tpl.steps || []).map(function(s) {
-      return { agent_id: s.agent_id || '', prompt_template: s.prompt_template || '{initial_input}', label: s.label || '' };
-    });
-    // Try to auto-match steps to user agents by hint_server
-    tpl.steps.forEach(function(s, i) {
-      if (s.hint_server && !_pipelineSteps[i].agent_id) {
-        var match = teamAgents.find(function(a) { return a.server === s.hint_server; });
-        if (match) _pipelineSteps[i].agent_id = match.id;
-      }
-    });
-    teamRenumberSteps();
-    if (typeof showToast === 'function') showToast('Template "' + tpl.name + '" loaded', 'info');
-  }).catch(function() {});
+window.profileNew = function() {
+  const profile = {
+    id: genId(),
+    name: '',
+    icon: allIcons.length ? allIcons[0].name : '',
+    description: '',
+    team: 'Default Team',
+    systemPrompt: '',
+    tasks: [],
+    mcpAgents: [],
+    skills: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  allProfiles.push(profile);
+  currentProfileId = profile.id;
+  renderSidebar();
+  renderEditor(profile);
 };
 
-// ── Expose init ────────────────────────────────────────────────
-window.teamPanelInit = function() {
-  teamLoadFromVault();
-  if (!teamAgents.length) teamShowEmpty();
-  const t1 = document.getElementById('team-tab-my');
-  if (t1) t1.classList.add('active');
+window.profileEdit = function(id) {
+  const p = allProfiles.find(pr => pr.id === id);
+  if (!p) return;
+  if (currentProfileId && currentProfileId !== id) collectProfile();
+  currentProfileId = id;
+  renderSidebar();
+  renderEditor(p);
 };
 
-})(); // end AGENT TEAM CONFIG PANEL IIFE
+window.profileSelectIcon = function(iconName) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  p.icon = iconName;
+  const preview = document.getElementById('profile-icon-preview');
+  const icon = allIcons.find(i => i.name === iconName);
+  if (preview && icon) preview.innerHTML = icon.svgContent;
+  document.querySelectorAll('.profile-icon-tile').forEach(function(tile) {
+    tile.classList.toggle('selected', tile.dataset.icon === iconName);
+  });
+  renderSidebar();
+};
+
+window.profileUpdateCharCount = function() {
+  const input = document.getElementById('profile-name');
+  const counter = document.getElementById('profile-name-count');
+  if (input && counter) counter.textContent = input.value.length + '/32';
+};
+
+window.profileUpdateTokenCount = function() {
+  const textarea = document.getElementById('profile-prompt');
+  const counter = document.getElementById('profile-token-count');
+  if (textarea && counter) {
+    const len = textarea.value.length;
+    counter.textContent = len + ' chars / ~' + Math.ceil(len / 4) + ' tokens';
+  }
+};
+
+window.profileToggleSection = function(section) {
+  const body = document.getElementById(section + '-body');
+  const toggle = document.getElementById(section + '-toggle');
+  if (!body || !toggle) return;
+  const collapsed = body.classList.toggle('collapsed');
+  toggle.textContent = collapsed ? 'EXPAND' : 'COLLAPSE';
+};
+
+window.profileToggleTemplateMenu = function() {
+  const menu = document.getElementById('profile-template-menu');
+  if (menu) menu.classList.toggle('open');
+};
+
+window.profileLoadTemplate = function(key) {
+  const textarea = document.getElementById('profile-prompt');
+  const nameInput = document.getElementById('profile-name');
+  const menu = document.getElementById('profile-template-menu');
+  if (menu) menu.classList.remove('open');
+  if (!textarea) return;
+  if (key === 'custom') { textarea.value = ''; }
+  else {
+    const name = nameInput ? nameInput.value.trim() || '[AGENT NAME]' : '[AGENT NAME]';
+    textarea.value = (PROMPT_TEMPLATES[key] || '').replace(/\{NAME\}/g, name);
+  }
+  window.profileUpdateTokenCount();
+};
+
+// ── Task handlers ─────────────────────────────────────────────
+
+window.profileAddTask = function() {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || (p.tasks||[]).length >= 10) return;
+  if (!p.tasks) p.tasks = [];
+  p.tasks.push({ id: genId(), name: '', description: '', priority: 'MEDIUM', trigger: 'Manual' });
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileUpdateTask = function(index, field, value) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks || !p.tasks[index]) return;
+  p.tasks[index][field] = value;
+};
+
+window.profileSetTaskPriority = function(index, priority) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks || !p.tasks[index]) return;
+  p.tasks[index].priority = priority;
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileMoveTask = function(index, dir) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks) return;
+  const newIdx = index + dir;
+  if (newIdx < 0 || newIdx >= p.tasks.length) return;
+  const tmp = p.tasks[index];
+  p.tasks[index] = p.tasks[newIdx];
+  p.tasks[newIdx] = tmp;
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileRemoveTask = function(index) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks) return;
+  p.tasks.splice(index, 1);
+  collectProfile();
+  renderEditor(p);
+};
+
+// ── MCP handlers ──────────────────────────────────────────────
+
+window.profileToggleMcp = function(mcpId) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  if (!p.mcpAgents) p.mcpAgents = [];
+  const idx = p.mcpAgents.indexOf(mcpId);
+  if (idx >= 0) p.mcpAgents.splice(idx, 1); else p.mcpAgents.push(mcpId);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileRemoveMcp = function(mcpId) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.mcpAgents) return;
+  p.mcpAgents = p.mcpAgents.filter(id => id !== mcpId);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileFilterMcps = function() {
+  const search = (document.getElementById('mcp-search')?.value || '').toLowerCase();
+  const items = document.querySelectorAll('.profile-mcp-item');
+  items.forEach(function(item) {
+    const name = item.querySelector('.profile-mcp-name')?.textContent?.toLowerCase() || '';
+    const desc = item.querySelector('.profile-mcp-desc')?.textContent?.toLowerCase() || '';
+    item.style.display = (name.includes(search) || desc.includes(search)) ? 'flex' : 'none';
+  });
+};
+
+// ── Skill handlers ────────────────────────────────────────────
+
+window.profileRemoveSkill = function(skillName) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.skills) return;
+  p.skills = p.skills.filter(s => s !== skillName);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileToggleAddSkill = function() {
+  const form = document.getElementById('profile-add-skill-form');
+  if (form) form.classList.toggle('open');
+};
+
+window.profileSaveNewSkill = function() {
+  const name = (document.getElementById('new-skill-name')?.value || '').trim();
+  if (!name) return;
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  if (!p.skills) p.skills = [];
+  if (!p.skills.includes(name)) p.skills.push(name);
+  collectProfile();
+  renderEditor(p);
+};
+
+// ── Save / Export / Duplicate / Delete ─────────────────────────
+
+window.profileSave = function() {
+  const p = collectProfile();
+  if (!p) return;
+  if (!p.name) {
+    if (typeof showToast === 'function') showToast('Agent name is required', 'error');
+    return;
+  }
+  saveProfile(p);
+};
+
+window.profileExport = function() {
+  const p = collectProfile();
+  if (!p) return;
+  const blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (p.name || 'agent').toLowerCase().replace(/\s+/g, '_') + '_profile.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.profileDuplicate = function() {
+  const p = collectProfile();
+  if (!p) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = genId();
+  copy.name = (copy.name || 'Agent') + ' Copy';
+  copy.createdAt = new Date().toISOString();
+  copy.updatedAt = new Date().toISOString();
+  allProfiles.push(copy);
+  currentProfileId = copy.id;
+  renderSidebar();
+  renderEditor(copy);
+  if (typeof showToast === 'function') showToast('Agent duplicated', 'info');
+};
+
+window.profileDelete = function() {
+  if (!currentProfileId) return;
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  const name = p ? p.name || 'this agent' : 'this agent';
+  if (!confirm('Delete ' + name + '? This cannot be undone.')) return;
+  deleteProfile(currentProfileId);
+};
+
+// ── Team filter ───────────────────────────────────────────────
+
+window.profileToggleTeamDropdown = function() {
+  const dd = document.getElementById('profile-team-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+
+window.profileSelectTeam = function(team, event) {
+  if (event) event.stopPropagation();
+  currentTeamFilter = team;
+  const label = document.getElementById('profile-team-label');
+  if (label) label.textContent = team === 'all' ? 'All Teams' : team;
+  document.querySelectorAll('.profile-team-option').forEach(function(opt) {
+    opt.classList.toggle('active', opt.textContent.trim() === (team === 'all' ? 'All Teams' : team));
+  });
+  const dd = document.getElementById('profile-team-dropdown');
+  if (dd) dd.classList.remove('open');
+  renderSidebar();
+};
+
+})(); // end AGENT PROFILE SYSTEM IIFE
 
 // ════════════════════════════════════════════════════
 // AUTONOMOUS PROJECT EXECUTION
