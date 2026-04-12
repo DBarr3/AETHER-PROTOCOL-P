@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from agent.qopc_interaction_style import InteractionStyleProfile
+
 logger = logging.getLogger("aethercloud.task_qopc")
 
 
@@ -56,6 +58,14 @@ class TaskQOPC:
     def __init__(self, username: str):
         self._username = username
         self._cache: dict[str, list[dict]] = {}
+        self._style_profile: Optional[InteractionStyleProfile] = None  # Lazy-loaded
+
+    def _get_style_profile(self) -> InteractionStyleProfile:
+        if self._style_profile is None:
+            from config.storage import DATA_ROOT
+            data_dir = str(DATA_ROOT / "users")
+            self._style_profile = InteractionStyleProfile(self._username, data_dir)
+        return self._style_profile
 
     def _signal_file(self, task_id: str) -> Path:
         from config.storage import user_task_qopc
@@ -309,6 +319,13 @@ class TaskQOPC:
             avg = sum(opened_hours) / len(opened_hours)
             parts.append(f"User typically opens output within {avg:.1f} hours.")
 
+        # Interaction style preferences
+        style = self._get_style_profile()
+        style_injection = style.get_style_injection()
+        if style_injection:
+            parts.append("")  # blank line separator
+            parts.append(style_injection)
+
         return "\n".join(parts)
 
     # ── Utility ───────────────────────────────────────
@@ -327,3 +344,8 @@ class TaskQOPC:
             except Exception:
                 pass
         self._cache.pop(task_id, None)
+
+    def record_style_signal(self, signal_type: str, metadata: dict = None):
+        """Record an interaction style signal for this user."""
+        style = self._get_style_profile()
+        style.record_signal(signal_type, metadata)
