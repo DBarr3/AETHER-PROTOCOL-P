@@ -10962,6 +10962,328 @@ window.profileSelectTeam = function(team, event) {
 
 })(); // end AGENT PROFILE SYSTEM IIFE
 
+// ═══════════════════════════════════════════════════════════════
+// AGENT ORCHESTRATION PIPELINE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+const AETHER_SYSTEM_PROMPT = 'You are AETHER, the primary AI orchestrator for AetherCloud. ' +
+  'When a user submits input, you analyze it, identify which sub-agents from the active team should handle parts of the request, ' +
+  'and construct structured task assignments for each.\n\n' +
+  'SAFETY: You are a productivity and research tool. Reject any requests involving network scanning, penetration testing, ' +
+  'vulnerability exploitation, credential harvesting, social engineering, malware, or offensive security actions. ' +
+  'If detected, return: {"error":"This request involves prohibited operations. AetherCloud is an AI agent productivity platform."}\n\n' +
+  'Return ONLY valid JSON with this exact shape:\n' +
+  '{"analysis":"brief analysis of what the user wants","agentAssignments":[{"agentId":"id","agentName":"NAME","mainTask":"task description","subTasks":["subtask1","subtask2"],"context":"additional context","priority":"HIGH|MEDIUM|LOW"}]}';
+
+let _orchState = { phase: 'IDLE', report: null };
+
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Prompt builders ───────────────────────────────────────────
+
+function buildOrchestratorPrompt(userInput, team, agents) {
+  const agentDescs = agents.map(function(a) {
+    return '  Agent: ' + a.name + ' (id: ' + a.id + ')\n' +
+      '  Description: ' + (a.description || 'No description') + '\n' +
+      '  Skills: ' + (a.skills || []).join(', ') + '\n' +
+      '  MCP Tools: ' + (a.mcpAgents || []).join(', ');
+  }).join('\n---\n');
+
+  return AETHER_SYSTEM_PROMPT + '\n\n' +
+    'ACTIVE TEAM: ' + (team || 'Default Team') + '\n' +
+    'ACTIVE AGENTS (' + agents.length + '):\n' + agentDescs + '\n\n' +
+    'USER INPUT:\n' + userInput + '\n\n' +
+    'Decompose this input into specific tasks for the available agents. Return valid JSON only.';
+}
+
+function buildSubAgentPrompt(agent, assignment) {
+  var prompt = (agent.systemPrompt || 'You are ' + agent.name + ', an AI agent.') + '\n\n';
+  prompt += 'YOUR ASSIGNED TASK: ' + assignment.mainTask + '\n\n';
+  if (assignment.subTasks && assignment.subTasks.length) {
+    prompt += 'SUBTASKS TO COMPLETE:\n';
+    assignment.subTasks.forEach(function(t, i) { prompt += (i + 1) + '. ' + t + '\n'; });
+    prompt += '\n';
+  }
+  if (assignment.context) prompt += 'CONTEXT: ' + assignment.context + '\n\n';
+  prompt += 'Complete all subtasks thoroughly. Return your findings as a structured report.\n' +
+    'Start with a one-line summary, then detail each subtask result.';
+  return prompt;
+}
+
+function buildSummaryPrompt(analysis, results) {
+  var prompt = 'You are AETHER. All sub-agents have completed their tasks.\n' +
+    'Here are their individual reports:\n\n';
+  results.forEach(function(r) {
+    prompt += '=== ' + r.agentName + ' REPORT ===\n' +
+      'Task: ' + r.mainTask + '\n' +
+      'Output:\n' + r.output + '\n\n';
+  });
+  prompt += 'ORIGINAL ANALYSIS: ' + analysis + '\n\n' +
+    'Write the final summary report. Be concise and actionable.\n' +
+    'Structure: KEY FINDINGS, then RECOMMENDATIONS, then NEXT STEPS.';
+  return prompt;
+}
+
+// ── API call helpers ──────────────────────────────────────────
+
+async function chatAPI(query) {
+  var r = await authFetch(API_BASE + '/agent/chat', {
+    method: 'POST',
+    body: JSON.stringify({ query: query })
+  });
+  var result = await safeJson(r);
+  if (result.error) throw new Error(result.message || result.detail || 'API error');
+  return result.response || result.reply || result.message || JSON.stringify(result);
+}
+
+async function chatAPIJson(query) {
+  var raw = await chatAPI(query);
+  // Try to extract JSON from response (may be wrapped in markdown code block)
+  var cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  try { return JSON.parse(cleaned); }
+  catch(e) { throw new Error('Failed to parse orchestrator JSON: ' + e.message + '\nRaw: ' + raw.substring(0, 200)); }
+}
+
+// ── Main orchestration flow ───────────────────────────────────
+
+window.orchestrateAgentFlow = async function(userInput, teamName, agents) {
+  if (!agents || !agents.length) {
+    if (typeof showToast === 'function') showToast('No agents in active team', 'error');
+    return;
+  }
+
+  _orchState.phase = 'ORCHESTRATING';
+  _orchState.report = null;
+
+  // Show thinking state
+  displayAIResponse('[AETHER] Analyzing request and assigning agents...', true);
+  setAgentStatus('Orchestrating...', 'working');
+  addAgentLog('AETHER: orchestrating ' + agents.length + ' agents', 'active');
+
+  try {
+    // Step 1: AetherAI analyzes and assigns
+    var orchPrompt = buildOrchestratorPrompt(userInput, teamName, agents);
+    var assignments = await chatAPIJson(orchPrompt);
+
+    if (assignments.error) {
+      displayAIResponse('[AETHER] ' + assignments.error, false);
+      setAgentStatus('Blocked', 'error');
+      _orchState.phase = 'IDLE';
+      return;
+    }
+
+    if (!assignments.agentAssignments || !assignments.agentAssignments.length) {
+      displayAIResponse('[AETHER] No agent assignments generated. Try rephrasing your request.', false);
+      setAgentStatus('Ready', '');
+      _orchState.phase = 'IDLE';
+      return;
+    }
+
+    // Step 2: Dispatch sub-agents in parallel
+    _orchState.phase = 'DISPATCHING';
+    var statusLines = ['[AETHER] Dispatching ' + assignments.agentAssignments.length + ' agent(s)...\n'];
+    assignments.agentAssignments.forEach(function(a) {
+      statusLines.push('  > ' + a.agentName + ': ' + a.mainTask);
+    });
+    displayAIResponse(statusLines.join('\n'), true);
+
+    var promises = assignments.agentAssignments.map(function(assignment) {
+      var agent = agents.find(function(a) { return a.id === assignment.agentId; });
+      if (!agent) {
+        // Try name match as fallback
+        agent = agents.find(function(a) { return a.name.toLowerCase() === (assignment.agentName || '').toLowerCase(); });
+      }
+      if (!agent) {
+        return Promise.resolve({
+          agentId: assignment.agentId,
+          agentName: assignment.agentName || 'Unknown',
+          agentIcon: '',
+          mainTask: assignment.mainTask,
+          output: '[Agent not found in team]',
+          completedAt: new Date().toISOString()
+        });
+      }
+
+      addAgentLog(agent.name + ': working...', 'active');
+
+      var subPrompt = buildSubAgentPrompt(agent, assignment);
+      return chatAPI(subPrompt).then(function(output) {
+        addAgentLog(agent.name + ': complete', 'done');
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentIcon: agent.icon || '',
+          mainTask: assignment.mainTask,
+          output: output,
+          completedAt: new Date().toISOString()
+        };
+      }).catch(function(err) {
+        addAgentLog(agent.name + ': error', 'idle');
+        return {
+          agentId: agent.id || assignment.agentId,
+          agentName: agent.name || assignment.agentName,
+          agentIcon: agent.icon || '',
+          mainTask: assignment.mainTask,
+          output: '[Error: ' + err.message + ']',
+          completedAt: new Date().toISOString()
+        };
+      });
+    });
+
+    var results = await Promise.all(promises);
+
+    // Step 3: AetherAI summarizes
+    _orchState.phase = 'SUMMARIZING';
+    displayAIResponse('[AETHER] All agents complete. Generating summary...', true);
+    addAgentLog('AETHER: summarizing', 'active');
+
+    var summaryPrompt = buildSummaryPrompt(assignments.analysis, results);
+    var summary = await chatAPI(summaryPrompt);
+
+    // Step 4: Build report and show output panel
+    var report = {
+      analysis: assignments.analysis,
+      agentReports: results,
+      summary: summary,
+      generatedAt: new Date().toISOString()
+    };
+
+    _orchState.report = report;
+    _orchState.phase = 'COMPLETE';
+
+    displayAIResponse('[AETHER] Orchestration complete. ' + results.length + ' agent report(s) ready.', false);
+    setAgentStatus('Complete', '');
+    addAgentLog('AETHER: complete', 'done');
+    setTimeout(function() { setAgentStatus('Ready', ''); }, 3000);
+
+    renderOutputPanel(report);
+
+  } catch(err) {
+    _orchState.phase = 'IDLE';
+    displayAIResponse('[AETHER] Orchestration failed: ' + err.message, false);
+    setAgentStatus('Error', 'error');
+    addAgentLog('AETHER: error', 'idle');
+  }
+};
+
+// ── Output panel rendering ────────────────────────────────────
+
+function renderOutputPanel(report) {
+  var body = document.getElementById('output-body');
+  if (!body) return;
+
+  // Load icons for rendering
+  var iconCache = {};
+  if (window._orchIconCache) iconCache = window._orchIconCache;
+
+  var html = '';
+
+  // Per-agent report sections
+  report.agentReports.forEach(function(r) {
+    var iconHtml = '';
+    if (r.agentIcon && iconCache[r.agentIcon]) {
+      iconHtml = '<div class="output-agent-icon">' + iconCache[r.agentIcon] + '</div>';
+    } else {
+      iconHtml = '<div class="output-agent-icon" style="background:var(--bg-4);width:28px;height:28px;"></div>';
+    }
+    html += '<div class="output-agent-section">' +
+      '<div class="output-agent-header">' +
+        iconHtml +
+        '<span class="output-agent-name">' + esc(r.agentName) + '</span>' +
+        '<span class="output-agent-task">' + esc(r.mainTask) + '</span>' +
+      '</div>' +
+      '<div class="output-agent-content">' + esc(r.output) + '</div>' +
+    '</div>';
+  });
+
+  // AETHER summary section
+  var aetherIcon = iconCache['orange_agent'] ? '<div class="output-agent-icon">' + iconCache['orange_agent'] + '</div>' :
+    '<div class="output-agent-icon" style="background:rgba(249,115,22,0.2);width:28px;height:28px;"></div>';
+
+  html += '<div class="output-summary-section">' +
+    '<div class="output-agent-header">' +
+      aetherIcon +
+      '<span class="output-agent-name">AETHER</span>' +
+      '<span class="output-summary-badge">SUMMARY</span>' +
+    '</div>' +
+    '<div class="output-summary-content">' + esc(report.summary) + '</div>' +
+  '</div>';
+
+  body.innerHTML = html;
+
+  // Show the panel
+  var panel = document.getElementById('agent-output-panel');
+  if (panel) panel.classList.add('visible');
+}
+
+// ── Panel actions ─────────────────────────────────────────────
+
+window.closeOutputPanel = function() {
+  var panel = document.getElementById('agent-output-panel');
+  if (panel) panel.classList.remove('visible');
+};
+
+window.copyOutputReport = function() {
+  if (!_orchState.report) return;
+  var r = _orchState.report;
+  var text = 'AETHER ORCHESTRATION REPORT\n' +
+    'Generated: ' + r.generatedAt + '\n' +
+    '═══════════════════════════════════\n\n';
+  r.agentReports.forEach(function(ar) {
+    text += '── ' + ar.agentName + ' ──\n' +
+      'Task: ' + ar.mainTask + '\n' +
+      ar.output + '\n\n';
+  });
+  text += '═══════════════════════════════════\n' +
+    'AETHER SUMMARY\n' + r.summary;
+
+  navigator.clipboard.writeText(text).then(function() {
+    if (typeof showToast === 'function') showToast('Report copied to clipboard', 'info');
+  });
+};
+
+window.exportOutputReport = function() {
+  if (!_orchState.report) return;
+  var blob = new Blob([JSON.stringify(_orchState.report, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'aether_report_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.newOutputRun = function() {
+  window.closeOutputPanel();
+  _orchState = { phase: 'IDLE', report: null };
+  var input = document.getElementById('chat-input');
+  if (input) { input.value = ''; input.focus(); }
+};
+
+// ── Icon cache loader (called from profile system) ────────────
+
+window._orchLoadIcons = async function() {
+  if (window._orchIconCache) return;
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    window._orchIconCache = {};
+    icons.forEach(function(ic) { window._orchIconCache[ic.name] = ic.svgContent; });
+  } catch(e) { window._orchIconCache = {}; }
+};
+
+// ── Helper to get active team agents ──────────────────────────
+
+window.getActiveTeamAgents = async function(teamFilter) {
+  try {
+    var profiles = await window.aether.agentLoadProfiles();
+    if (!teamFilter || teamFilter === 'all') return profiles;
+    return profiles.filter(function(p) { return p.team === teamFilter; });
+  } catch(e) { return []; }
+};
+
+})(); // end AGENT ORCHESTRATION PIPELINE IIFE
+
 // ════════════════════════════════════════════════════
 // AUTONOMOUS PROJECT EXECUTION
 // ════════════════════════════════════════════════════
