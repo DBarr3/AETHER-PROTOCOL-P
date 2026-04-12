@@ -2766,6 +2766,7 @@
         </span>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
           <button class="profile-btn primary" id="run-team-btn" onclick="openRunTeamInput()" style="font-size:9px;padding:4px 14px;">&#9654; RUN TEAM</button>
+          <button class="profile-btn outlined" onclick="openTeamTerminal()" style="font-size:9px;padding:4px 14px;">&#9638; TEAM TERMINAL</button>
         </div>
       </div>
       <!-- Run Team command bar (hidden by default) -->
@@ -10809,6 +10810,7 @@ function renderEditor(profile) {
       '<button class="profile-btn primary" onclick="profileSave()">SAVE AGENT</button>' +
       '<button class="profile-btn outlined" onclick="profileExport()">EXPORT CONFIG</button>' +
       '<button class="profile-btn outlined" onclick="profileDuplicate()">DUPLICATE</button>' +
+      '<button class="profile-btn outlined" onclick="profileOpenTerminal()">TERMINAL</button>' +
       '<div style="flex:1;"></div>' +
       '<button class="profile-btn danger" onclick="profileDelete()">DELETE AGENT</button>' +
     '</div>';
@@ -11100,6 +11102,24 @@ window.profileDelete = function() {
   const name = p ? p.name || 'this agent' : 'this agent';
   if (!confirm('Delete ' + name + '? This cannot be undone.')) return;
   deleteProfile(currentProfileId);
+};
+
+window.profileOpenTerminal = async function() {
+  var p = collectProfile();
+  if (!p || !p.name) {
+    if (typeof showToast === 'function') showToast('Save the agent first', 'error');
+    return;
+  }
+  var icon = allIcons.find(function(i) { return i.name === p.icon; });
+  await window.aether.terminalOpen({
+    type: 'agent',
+    agentId: p.id,
+    agentName: p.name,
+    agentDescription: p.description || '',
+    agentIcon: icon ? icon.svgContent : '',
+    agentProfile: p,
+    apiBase: API_BASE,
+  });
 };
 
 // ── Team filter ───────────────────────────────────────────────
@@ -11445,6 +11465,24 @@ window.getActiveTeamAgents = async function(teamFilter) {
 };
 
 // ── Run Team bar handlers ─────────────────────────────────────
+
+window.openTeamTerminal = async function() {
+  var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+  if (!agents.length) {
+    if (typeof showToast === 'function') showToast('No agents configured', 'error');
+    return;
+  }
+  if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+  var teamLabel = document.getElementById('profile-team-label');
+  var teamName = (teamLabel && teamLabel.textContent !== 'All Teams') ? teamLabel.textContent : 'Default Team';
+  await window.aether.terminalOpen({
+    type: 'team',
+    teamName: teamName,
+    agentProfiles: agents,
+    agentIcons: window._orchIconCache || {},
+    apiBase: typeof API_BASE !== 'undefined' ? API_BASE : 'https://api.aethersystems.net/cloud',
+  });
+};
 
 window.openRunTeamInput = function() {
   var bar = document.getElementById('run-team-bar');
