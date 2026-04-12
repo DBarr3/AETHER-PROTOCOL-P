@@ -135,7 +135,14 @@ function initTerminal(cfg) {
 
   var iconsEl = document.getElementById('titlebar-icons');
   if (cfg.type === 'agent') {
-    iconsEl.innerHTML = '<div class="agent-icon-badge">' + (cfg.agentIcon || '') + '</div>';
+    iconsEl.innerHTML = '<div class="agent-icon-badge" id="titlebar-agent-icon">' + (cfg.agentIcon || '') + '</div>';
+    // Animate if animation data is available
+    if (cfg.agentAnimData) {
+      setTimeout(function() {
+        var badge = document.getElementById('titlebar-agent-icon');
+        if (badge) animateIcon(badge, cfg.agentAnimData, 22);
+      }, 50);
+    }
   } else {
     iconsEl.innerHTML = (cfg.agentProfiles || []).map(function(a) {
       var svg = cfg.agentIcons && cfg.agentIcons[a.icon] ? cfg.agentIcons[a.icon] : '';
@@ -336,6 +343,51 @@ function esc(str) {
 input.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) handleSend();
 });
+
+// ── Mini animation engine for titlebar icon ───────────
+function animateIcon(container, animConfig, size) {
+  var gridW = animConfig.gridWidth || 11;
+  var gridH = (animConfig.gridHeight || 9) + 4;
+  var scale = Math.max(1, Math.floor(size / Math.max(gridW, gridH)));
+  var canvas = document.createElement('canvas');
+  canvas.width = gridW * scale;
+  canvas.height = gridH * scale;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  var ctx = canvas.getContext('2d');
+  var seq = animConfig.sequences[animConfig.defaultSequence || 'idle'] || animConfig.sequences['duck'];
+  if (!seq) return;
+  var step = 0;
+
+  function computeFrame(frameIdx) {
+    var fd = animConfig.frames[frameIdx];
+    var colors = animConfig.colors;
+    return animConfig.basePixels.map(function(p) {
+      var x = p[0], y = p[1], ck = p[2];
+      var ny = y + fd.yShift;
+      if (fd.bodySquish < 1 && y >= 4) ny = 4 + Math.round((y - 4) * fd.bodySquish) + fd.yShift;
+      if (fd.capJump && y <= 3) ny = ny - fd.capJump;
+      return { x: x, y: ny, c: colors[ck] || ck };
+    });
+  }
+
+  function tick() {
+    var pixels = computeFrame(seq.frames[step]);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pixels.forEach(function(p) {
+      if (p.y < 0) return;
+      ctx.fillStyle = p.c;
+      ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+    });
+    step = (step + 1) % seq.frames.length;
+    setTimeout(tick, seq.delays[step] || 200);
+  }
+  tick();
+}
 </script>
 </body>
 </html>

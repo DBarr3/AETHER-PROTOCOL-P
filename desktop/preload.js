@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('aether', {
   previewPlan: (actions) => ipcRenderer.invoke('fs:previewPlan', actions),
   // Agent Profile System
   agentLoadIcons:    () => ipcRenderer.invoke('agent:loadIcons'),
+  agentLoadAnimations: () => ipcRenderer.invoke('agent:loadAnimations'),
   agentLoadProfiles: () => ipcRenderer.invoke('agent:loadProfiles'),
   agentSaveProfile:  (profile) => ipcRenderer.invoke('agent:saveProfile', profile),
   agentDeleteProfile:(id) => ipcRenderer.invoke('agent:deleteProfile', id),

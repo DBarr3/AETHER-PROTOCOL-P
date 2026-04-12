@@ -10655,6 +10655,22 @@ function renderSidebar() {
       '</div>' +
     '</div>';
   }).join('');
+
+  // Post-render: animate sidebar icons that have animation data
+  setTimeout(function() {
+    if (!window.agentAnimator) return;
+    filtered.forEach(function(p) {
+      if (window.agentAnimator.hasAnimation(p.icon)) {
+        var cards = list.querySelectorAll('.profile-card');
+        cards.forEach(function(card) {
+          if (card.getAttribute('onclick') && card.getAttribute('onclick').includes(p.id)) {
+            var iconDiv = card.querySelector('.profile-card-icon');
+            if (iconDiv) window.agentAnimator.animate(iconDiv, p.icon, { size: 36, sequence: 'idle' });
+          }
+        });
+      }
+    });
+  }, 0);
 }
 
 // ── Empty state ───────────────────────────────────────────────
@@ -10814,6 +10830,14 @@ function renderEditor(profile) {
       '<div style="flex:1;"></div>' +
       '<button class="profile-btn danger" onclick="profileDelete()">DELETE AGENT</button>' +
     '</div>';
+
+  // Post-render: activate animation on the large icon preview if available
+  setTimeout(function() {
+    if (window.agentAnimator && window.agentAnimator.hasAnimation(profile.icon)) {
+      var preview = document.getElementById('profile-icon-preview');
+      if (preview) window.agentAnimator.animate(preview, profile.icon, { size: 72, sequence: 'duck' });
+    }
+  }, 0);
 }
 
 // ── Task row builder ──────────────────────────────────────────
@@ -10863,6 +10887,7 @@ function collectProfile() {
 window.profilePanelInit = async function() {
   await loadIcons();
   await loadProfiles();
+  if (window.agentAnimator) await window.agentAnimator.load();
   renderSidebar();
   if (currentProfileId) {
     const p = allProfiles.find(pr => pr.id === currentProfileId);
@@ -10907,7 +10932,14 @@ window.profileSelectIcon = function(iconName) {
   p.icon = iconName;
   const preview = document.getElementById('profile-icon-preview');
   const icon = allIcons.find(i => i.name === iconName);
-  if (preview && icon) preview.innerHTML = icon.svgContent;
+  if (preview) {
+    // Check for animation — animate if available, otherwise static SVG
+    if (window.agentAnimator && window.agentAnimator.hasAnimation(iconName)) {
+      window.agentAnimator.animate(preview, iconName, { size: 72, sequence: 'duck' });
+    } else if (icon) {
+      preview.innerHTML = icon.svgContent;
+    }
+  }
   document.querySelectorAll('.profile-icon-tile').forEach(function(tile) {
     tile.classList.toggle('selected', tile.dataset.icon === iconName);
   });
@@ -11111,6 +11143,7 @@ window.profileOpenTerminal = async function() {
     return;
   }
   var icon = allIcons.find(function(i) { return i.name === p.icon; });
+  var animData = window.agentAnimator ? window.agentAnimator.getData() : {};
   await window.aether.terminalOpen({
     type: 'agent',
     agentId: p.id,
@@ -11118,6 +11151,7 @@ window.profileOpenTerminal = async function() {
     agentDescription: p.description || '',
     agentIcon: icon ? icon.svgContent : '',
     agentProfile: p,
+    agentAnimData: animData[p.icon] || null,
     apiBase: API_BASE,
   });
 };
@@ -11739,6 +11773,102 @@ window.mcpSkillsRemoveAgentChip = function(toolId, type, agentId, event) {
 };
 
 })(); // end MCP & SKILLS LIBRARY IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT ANIMATION ENGINE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+var _animData = {};
+var _activeAnims = [];
+
+async function loadAnimations() {
+  if (Object.keys(_animData).length) return;
+  try { _animData = await window.aether.agentLoadAnimations(); } catch(e) { _animData = {}; }
+}
+
+function computeFrame(config, frameIdx) {
+  var frameDef = config.frames[frameIdx];
+  var colors = config.colors;
+  return config.basePixels.map(function(p) {
+    var x = p[0], y = p[1], colorKey = p[2];
+    var ny = y + frameDef.yShift;
+    if (frameDef.bodySquish < 1 && y >= 4) {
+      ny = 4 + Math.round((y - 4) * frameDef.bodySquish) + frameDef.yShift;
+    }
+    if (frameDef.capJump && y <= 3) {
+      ny = ny - frameDef.capJump;
+    }
+    return { x: x, y: ny, color: colors[colorKey] || colorKey };
+  });
+}
+
+function drawPixels(ctx, pixels, scale) {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  pixels.forEach(function(p) {
+    if (p.y < 0) return;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+  });
+}
+
+function animate(container, iconName, opts) {
+  opts = opts || {};
+  var config = _animData[iconName];
+  if (!config) return null;
+
+  var size = opts.size || 72;
+  var sequence = opts.sequence || config.defaultSequence || 'duck';
+  var seq = config.sequences[sequence];
+  if (!seq) return null;
+
+  var gridW = config.gridWidth || 11;
+  var gridH = (config.gridHeight || 9) + 4;
+  var scale = Math.max(1, Math.floor(size / Math.max(gridW, gridH)));
+
+  var canvas = document.createElement('canvas');
+  canvas.width = gridW * scale;
+  canvas.height = gridH * scale;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  canvas.style.display = 'block';
+
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  var ctx = canvas.getContext('2d');
+  var step = 0;
+  var running = true;
+  var timer = null;
+
+  function tick() {
+    if (!running) return;
+    var frameIdx = seq.frames[step];
+    var pixels = computeFrame(config, frameIdx);
+    drawPixels(ctx, pixels, scale);
+    step = (step + 1) % seq.frames.length;
+    timer = setTimeout(tick, seq.delays[step] || 200);
+  }
+  tick();
+
+  var handle = { stop: function() { running = false; if (timer) clearTimeout(timer); }, canvas: canvas, iconName: iconName };
+  _activeAnims.push(handle);
+  return handle;
+}
+
+function hasAnimation(iconName) { return !!_animData[iconName]; }
+function stopAll() { _activeAnims.forEach(function(h) { h.stop(); }); _activeAnims = []; }
+
+window.agentAnimator = {
+  load: loadAnimations,
+  animate: animate,
+  hasAnimation: hasAnimation,
+  stopAll: stopAll,
+  getData: function() { return _animData; },
+};
+
+})(); // end AGENT ANIMATION ENGINE IIFE
 
 // ════════════════════════════════════════════════════
 // AUTONOMOUS PROJECT EXECUTION

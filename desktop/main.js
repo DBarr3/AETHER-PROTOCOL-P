@@ -393,6 +393,25 @@ ipcMain.handle('agent:loadIcons', async () => {
   }
 });
 
+ipcMain.handle('agent:loadAnimations', async () => {
+  const animPath = path.join(__dirname, '..', 'agent', 'agents', 'animations');
+  try {
+    if (!fs.existsSync(animPath)) return {};
+    const files = fs.readdirSync(animPath).filter(f => f.endsWith('.json'));
+    const anims = {};
+    files.forEach(file => {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(animPath, file), 'utf-8'));
+        if (data.id) anims[data.id] = data;
+      } catch(e) { /* skip bad files */ }
+    });
+    return anims;
+  } catch (e) {
+    console.error('[agent:loadAnimations]', e.message);
+    return {};
+  }
+});
+
 ipcMain.handle('agent:loadProfiles', async () => {
   const profilesPath = path.join(__dirname, '..', 'agent', 'profiles');
   try {
