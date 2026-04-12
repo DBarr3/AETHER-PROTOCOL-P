@@ -2486,8 +2486,12 @@
     <button class="view-mode-btn active" id="vm-vault" onclick="switchViewMode('vault')">VAULT</button>
     <button class="view-mode-btn" id="vm-project" onclick="switchViewMode('project')">PROJECT</button>
     <button class="view-mode-btn" id="vm-agent" onclick="switchViewMode('agent')">AGENTS</button>
-    <button class="view-mode-btn" id="vm-team" onclick="switchViewMode('team')">PROFILES</button>
     <button class="view-mode-btn" id="vm-logs" onclick="switchViewMode('logs')">LOGS</button>
+  </div>
+  <!-- Agent sub-tabs — visible only when AGENTS mode is active -->
+  <div class="agent-sub-tab-bar" id="agent-sub-tab-bar" style="display:none;">
+    <button class="agent-sub-tab active" id="asub-orbit" onclick="switchAgentSubTab('orbit')">ORBIT</button>
+    <button class="agent-sub-tab" id="asub-team" onclick="switchAgentSubTab('team')">PROFILES</button>
   </div>
 
   <div class="breadcrumb-bar" id="breadcrumb-bar">
@@ -6395,16 +6399,55 @@ function resizeCanvas() {
 // ════════════════════════════════════════════════════
 // VIEW MODE SWITCHING (preserves vault state)
 // ════════════════════════════════════════════════════
+// Agent sub-tab switcher (orbit vs profiles) — only when AGENTS view is active
+function switchAgentSubTab(sub) {
+  document.querySelectorAll('.agent-sub-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('asub-' + sub);
+  if (btn) btn.classList.add('active');
+
+  const teamPanel = document.getElementById('agent-team-panel');
+  const orbitPanel = document.getElementById('agent-orbit-panel');
+  const taskTracker = document.getElementById('task-tracker');
+
+  if (sub === 'team') {
+    if (teamPanel) { teamPanel.style.display = 'flex'; }
+    if (orbitPanel) orbitPanel.classList.remove('visible');
+    if (taskTracker) taskTracker.classList.remove('visible');
+    if (typeof profilePanelInit === 'function') profilePanelInit();
+    document.getElementById('chat-input').placeholder = 'Describe the agent you want to add...';
+  } else {
+    if (teamPanel) { teamPanel.style.display = 'none'; }
+    if (orbitPanel) orbitPanel.classList.add('visible');
+    if (taskTracker) taskTracker.classList.add('visible');
+    document.getElementById('chat-input').placeholder = 'Command your agents...';
+    buildAgentOrbitVault();
+    renderAgentOrbitPanel();
+    renderTaskTracker();
+  }
+}
+
 function switchViewMode(mode) {
   const prevMode = currentViewMode;
   currentViewMode = mode;
   document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('vm-' + mode).classList.add('active');
+  const modeBtn = document.getElementById('vm-' + mode);
+  if (modeBtn) modeBtn.classList.add('active');
   document.getElementById('status-view').textContent = 'VIEW: ' + mode.toUpperCase();
   document.getElementById('project-actions').classList.remove('visible');
   document.getElementById('agent-detail').classList.remove('visible');
   closePatchPanel();
   dismissPatchOffer();
+
+  // Show/hide agent sub-tab bar
+  const agentSubBar = document.getElementById('agent-sub-tab-bar');
+  if (agentSubBar) agentSubBar.style.display = mode === 'agent' ? 'flex' : 'none';
+
+  // When entering agent mode, always reset to orbit sub-tab
+  if (mode === 'agent') {
+    document.querySelectorAll('.agent-sub-tab').forEach(b => b.classList.remove('active'));
+    const orbitBtn = document.getElementById('asub-orbit');
+    if (orbitBtn) orbitBtn.classList.add('active');
+  }
 
   // Show/hide mode-specific UI
   document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
@@ -6412,16 +6455,14 @@ function switchViewMode(mode) {
   document.getElementById('logs-panel').classList.toggle('visible', mode === 'logs');
   const teamPanel = document.getElementById('agent-team-panel');
   if (teamPanel) {
-    teamPanel.style.display = mode === 'team' ? 'flex' : 'none';
-    if (mode === 'team' && typeof profilePanelInit === 'function') { profilePanelInit(); }
+    // Team panel now only shows via agent sub-tab, not as a top-level mode
+    if (mode !== 'agent') teamPanel.style.display = 'none';
   }
 
   // When entering logs mode, load the feed
   if (mode === 'logs') {
     loadLogsFeed();
     loadRecentExports();
-  } else if (mode === 'team') {
-    if (typeof profilePanelInit === 'function') profilePanelInit();
   }
 
   // Update chat placeholder
@@ -6429,7 +6470,6 @@ function switchViewMode(mode) {
   if (mode === 'vault') input.placeholder = 'Ask AetherCloud anything...';
   else if (mode === 'project') input.placeholder = 'Describe your project or ask for analysis...';
   else if (mode === 'logs') input.placeholder = 'Search audit trail...';
-  else if (mode === 'team') input.placeholder = 'Describe the agent you want to add...';
   else input.placeholder = 'Command your agents...';
 
   // Save vault state when leaving vault
