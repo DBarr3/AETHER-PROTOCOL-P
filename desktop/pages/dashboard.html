@@ -2486,7 +2486,7 @@
     <button class="view-mode-btn active" id="vm-vault" onclick="switchViewMode('vault')">VAULT</button>
     <button class="view-mode-btn" id="vm-project" onclick="switchViewMode('project')">PROJECT</button>
     <button class="view-mode-btn" id="vm-agent" onclick="switchViewMode('agent')">AGENTS</button>
-    <button class="view-mode-btn" id="vm-team" onclick="switchViewMode('team')">TEAM</button>
+    <button class="view-mode-btn" id="vm-team" onclick="switchViewMode('team')">PROFILES</button>
     <button class="view-mode-btn" id="vm-logs" onclick="switchViewMode('logs')">LOGS</button>
   </div>
 
@@ -2611,7 +2611,7 @@
       <!-- Event-capture canvas: transparent overlay, sits above render canvas (z:1), below loading-overlay (z:50) -->
       <canvas id="circuit-interact" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:auto;cursor:grab;background:transparent;"></canvas>
     </div>
-    <!-- AGENT TEAM CONFIG PANEL -->
+    <!-- AGENT PROFILE PANEL -->
     <div class="agent-team-panel" id="agent-team-panel" style="
       position:absolute; inset:0; display:none; flex-direction:column;
       background:var(--bg); z-index:50; overflow:hidden;
@@ -2631,56 +2631,44 @@
         "></div>
         <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
           letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);">
-          Agent Team
+          Agent Profiles
         </span>
         <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
-          // configure mcp agents
+          // manage agent configurations
         </span>
-        <div style="margin-left:auto;display:flex;gap:0;">
-          <button class="view-mode-btn" id="team-tab-my"
-            onclick="switchTeamTab('team')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">My Team</button>
-          <button class="view-mode-btn" id="team-tab-registry"
-            onclick="switchTeamTab('registry')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">Registry</button>
-          <button class="view-mode-btn" id="team-tab-pipeline"
-            onclick="switchTeamTab('pipeline')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">Pipeline</button>
-        </div>
       </div>
 
-      <!-- Body: sidebar + main -->
+      <!-- Body: sidebar + editor -->
       <div style="display:flex;flex:1;overflow:hidden;">
 
-        <!-- Agent sidebar list -->
-        <div id="team-sidebar" style="
-          width:240px; background:var(--bg-2);
-          border-right:1px solid var(--border);
-          display:flex; flex-direction:column;
-          overflow:hidden; flex-shrink:0;
-        ">
-          <div style="padding:10px 14px 6px;font-family:var(--font-mono);
-            font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
-            color:var(--text-muted);">Active Agents</div>
-          <div id="team-agent-list" style="flex:1;overflow-y:auto;"></div>
-          <div style="height:1px;background:var(--border);"></div>
-          <div onclick="teamNewAgent()" style="
-            display:flex;align-items:center;gap:8px;
-            padding:8px 14px;cursor:pointer;
-            font-family:var(--font-mono);font-size:10px;
-            color:var(--accent);opacity:0.7;transition:opacity 0.15s;
-          " onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
-            <div style="width:16px;height:16px;border:1px solid var(--accent);
-              display:flex;align-items:center;justify-content:center;font-size:14px;">+</div>
-            Add Agent
+        <!-- Profile sidebar -->
+        <div class="profile-sidebar" id="profile-sidebar">
+          <div class="profile-sidebar-header">
+            <span class="profile-sidebar-title">AGENTS</span>
+            <span class="profile-count-badge" id="profile-count">0</span>
+            <div style="margin-left:auto;">
+              <div class="profile-team-pill" id="profile-team-pill" onclick="profileToggleTeamDropdown()">
+                <span id="profile-team-label">All Teams</span>
+                <span style="font-size:7px;">&#9660;</span>
+                <div class="profile-team-dropdown" id="profile-team-dropdown">
+                  <div class="profile-team-option active" onclick="profileSelectTeam('all',event)">All Teams</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Default Team',event)">Default Team</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Research',event)">Research</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Automation',event)">Automation</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Security',event)">Security</div>
+                </div>
+              </div>
+            </div>
           </div>
+          <button class="profile-new-btn" onclick="profileNew()">+ NEW AGENT</button>
+          <div class="profile-list" id="profile-list"></div>
         </div>
 
-        <!-- Editor / empty / registry -->
-        <div id="team-main" style="flex:1;overflow-y:auto;padding:20px;"></div>
+        <!-- Main editor area -->
+        <div id="profile-main" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       </div>
     </div>
-    <!-- END AGENT TEAM CONFIG PANEL -->
+    <!-- END AGENT PROFILE PANEL -->
 
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
@@ -6425,7 +6413,7 @@ function switchViewMode(mode) {
   const teamPanel = document.getElementById('agent-team-panel');
   if (teamPanel) {
     teamPanel.style.display = mode === 'team' ? 'flex' : 'none';
-    if (mode === 'team' && typeof teamPanelInit === 'function') { teamPanelInit(); }
+    if (mode === 'team' && typeof profilePanelInit === 'function') { profilePanelInit(); }
   }
 
   // When entering logs mode, load the feed
@@ -6433,7 +6421,7 @@ function switchViewMode(mode) {
     loadLogsFeed();
     loadRecentExports();
   } else if (mode === 'team') {
-    if (typeof teamPanelInit === 'function') teamPanelInit();
+    if (typeof profilePanelInit === 'function') profilePanelInit();
   }
 
   // Update chat placeholder
