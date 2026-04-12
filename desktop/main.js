@@ -31,6 +31,7 @@ let _updateInfo = { currentVersion: null, latestVersion: null, updateAvailable: 
 
 let mainWindow = null;
 let appQuitting = false;
+const terminalWindows = new Map(); // key: 'agent-{id}' or 'team-{name}'
 
 // ── Window configs per page ──────────────────────────
 const WINDOW_CONFIGS = {
@@ -483,6 +484,67 @@ ipcMain.handle('agent:saveToolRegistry', async (_e, registry) => {
   } catch (e) {
     return { success: false, error: e.message };
   }
+});
+
+// ── IPC: Terminal Windows ───────────────────────────
+ipcMain.handle('terminal:open', async (_e, config) => {
+  const key = config.type === 'agent'
+    ? 'agent-' + config.agentId
+    : 'team-' + config.teamName;
+
+  if (terminalWindows.has(key)) {
+    const existing = terminalWindows.get(key);
+    if (!existing.isDestroyed()) {
+      existing.focus();
+      return { focused: true };
+    }
+    terminalWindows.delete(key);
+  }
+
+  const win = new BrowserWindow({
+    width: 680,
+    height: 480,
+    minWidth: 480,
+    minHeight: 320,
+    resizable: true,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0a0a0f',
+    title: config.type === 'agent' ? config.agentName : ('Team \u00b7 ' + config.teamName),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      devTools: !app.isPackaged,
+    },
+    show: false,
+  });
+
+  win.loadFile(path.join(PAGES_DIR, 'terminal.html'));
+
+  win.once('ready-to-show', () => {
+    win.show();
+    win.webContents.send('terminal:init', config);
+  });
+
+  win.on('closed', () => {
+    terminalWindows.delete(key);
+  });
+
+  terminalWindows.set(key, win);
+  return { opened: true };
+});
+
+ipcMain.on('terminal:minimize', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+ipcMain.on('terminal:maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win?.isMaximized()) win.unmaximize(); else win?.maximize();
+});
+ipcMain.on('terminal:close', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
 // ── IPC: Vault ───────────────────────────────────────
