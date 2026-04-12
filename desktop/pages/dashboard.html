@@ -2432,6 +2432,80 @@
     transition:border-color 0.15s;margin-bottom:8px;
   }
   .profile-search:focus { border-color:var(--accent); }
+
+  /* ── Agent Output Panel ──────────────────────────── */
+  .output-panel {
+    position:absolute;top:0;right:0;width:380px;height:100%;
+    background:var(--bg-2);border-left:1px solid var(--border);
+    display:none;flex-direction:column;font-family:var(--font-mono);
+    z-index:60;animation:slideInRight 250ms ease forwards;
+  }
+  .output-panel.visible { display:flex; }
+  @keyframes slideInRight {
+    from { transform:translateX(100%);opacity:0; }
+    to   { transform:translateX(0);opacity:1; }
+  }
+  .output-header {
+    padding:12px 16px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+  }
+  .output-header-title {
+    font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);
+  }
+  .output-close-btn {
+    background:transparent;border:1px solid var(--border);color:var(--text-muted);
+    width:24px;height:24px;cursor:pointer;font-size:14px;
+    display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+  }
+  .output-close-btn:hover { border-color:var(--red);color:var(--red); }
+  .output-body { flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px; }
+  .output-agent-section { border-bottom:1px solid var(--border);padding-bottom:14px; }
+  .output-agent-section:last-child { border-bottom:none; }
+  .output-agent-header {
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  }
+  .output-agent-icon { width:28px;height:28px;image-rendering:pixelated;flex-shrink:0; }
+  .output-agent-name {
+    font-size:11px;font-weight:500;letter-spacing:0.1em;color:var(--text-primary);
+  }
+  .output-agent-task { font-size:9px;color:var(--text-muted);margin-left:auto; }
+  .output-agent-content {
+    font-size:11px;color:var(--text-primary);line-height:1.6;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .output-summary-section {
+    background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);
+    padding:14px;margin-top:4px;
+  }
+  .output-summary-badge {
+    font-size:9px;letter-spacing:0.15em;color:#f97316;
+    background:rgba(249,115,22,0.1);padding:2px 8px;
+    border:1px solid rgba(249,115,22,0.3);
+  }
+  .output-summary-content {
+    font-size:11px;color:var(--text-primary);line-height:1.7;
+    margin-top:10px;white-space:pre-wrap;word-break:break-word;
+  }
+  .output-footer {
+    padding:10px 16px;border-top:1px solid var(--border);
+    display:flex;gap:8px;flex-shrink:0;
+  }
+  .output-footer-btn {
+    flex:1;padding:7px;font-size:10px;letter-spacing:0.08em;
+    font-family:var(--font-mono);text-transform:uppercase;cursor:pointer;
+    background:transparent;border:1px solid var(--border-2);color:var(--text-muted);
+    transition:all 0.15s;
+  }
+  .output-footer-btn:hover { border-color:var(--accent);color:var(--text-primary); }
+  .output-footer-btn.primary {
+    background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);
+  }
+  .output-footer-btn.primary:hover { box-shadow:0 0 8px rgba(0,212,255,0.3); }
+  .output-status {
+    font-size:10px;color:var(--text-muted);text-align:center;padding:20px;
+  }
+  .output-status .working { color:var(--amber); }
+  .output-status .done { color:var(--green); }
 </style>
 </head>
 <body>
@@ -2673,6 +2747,21 @@
       </div>
     </div>
     <!-- END AGENT PROFILE PANEL -->
+
+    <!-- AGENT OUTPUT PANEL -->
+    <div class="output-panel" id="agent-output-panel">
+      <div class="output-header">
+        <span class="output-header-title">OUTPUT</span>
+        <button class="output-close-btn" onclick="closeOutputPanel()">&times;</button>
+      </div>
+      <div class="output-body" id="output-body"></div>
+      <div class="output-footer">
+        <button class="output-footer-btn" onclick="copyOutputReport()">COPY</button>
+        <button class="output-footer-btn" onclick="exportOutputReport()">EXPORT</button>
+        <button class="output-footer-btn primary" onclick="newOutputRun()">NEW RUN</button>
+      </div>
+    </div>
+    <!-- END AGENT OUTPUT PANEL -->
 
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
