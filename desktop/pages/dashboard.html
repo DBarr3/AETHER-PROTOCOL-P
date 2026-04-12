@@ -3219,110 +3219,387 @@
 
   /* ── Agent Team Panel ──────────────────────────────────── */
   .team-agent-row {
+
+  /* ── Agent Profile Panel ─────────────────────────── */
+  .profile-sidebar {
+    width:240px;flex-shrink:0;border-right:1px solid var(--border);
+    display:flex;flex-direction:column;overflow:hidden;background:var(--bg-2);
+  }
+  .profile-sidebar-header {
+    padding:12px 14px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:8px;flex-shrink:0;
+  }
+  .profile-sidebar-title {
+    font-family:var(--font-mono);font-size:10px;font-weight:600;
+    letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);
+  }
+  .profile-count-badge {
+    font-family:var(--font-mono);font-size:9px;padding:1px 6px;
+    background:var(--accent-dim);color:var(--accent);
+    border:1px solid var(--accent-border);
+  }
+  .profile-team-pill {
+    font-family:var(--font-mono);font-size:9px;padding:4px 10px;
+    background:var(--bg-3);border:1px solid var(--border-2);color:var(--text-muted);
+    cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:4px;
+    position:relative;
+  }
+  .profile-team-pill:hover { border-color:var(--accent);color:var(--text-primary); }
+  .profile-team-dropdown {
+    position:absolute;top:100%;left:0;right:0;z-index:10;
+    background:var(--bg-3);border:1px solid var(--border-2);display:none;
+  }
+  .profile-team-dropdown.open { display:block; }
+  .profile-team-option {
+    padding:6px 10px;font-family:var(--font-mono);font-size:9px;
+    color:var(--text-muted);cursor:pointer;
+  }
+  .profile-team-option:hover { background:var(--bg-hover);color:var(--text-primary); }
+  .profile-team-option.active { color:var(--accent); }
+  .profile-new-btn {
+    margin:10px 14px;padding:6px 0;text-align:center;
+    font-family:var(--font-mono);font-size:10px;color:var(--accent);
+    border:1px dashed var(--accent-border);cursor:pointer;
+    transition:all 0.15s;background:transparent;
+  }
+  .profile-new-btn:hover { background:var(--accent-dim);border-color:var(--accent); }
+  .profile-list { flex:1;overflow-y:auto; }
+  .profile-card {
     display:flex;align-items:center;gap:8px;
     padding:8px 14px;cursor:pointer;
     border-left:2px solid transparent;transition:all 0.15s;
   }
-  .team-agent-row:hover { background:rgba(0,212,255,0.06); }
-  .team-agent-row.active {
+  .profile-card:hover { background:rgba(0,212,255,0.06); }
+  .profile-card.active {
     background:rgba(0,212,255,0.1);border-left-color:var(--accent);
   }
-  .team-agent-row.active .team-row-name { color:var(--accent); }
-  .team-row-name {
+  .profile-card.active .profile-card-name { color:var(--accent); }
+  .profile-card-icon { width:36px;height:36px;image-rendering:pixelated;flex-shrink:0; }
+  .profile-card-name {
     font-family:var(--font-mono);font-size:10px;font-weight:500;
-    color:var(--text-primary);flex:1;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .team-row-server { font-size:9px;color:var(--text-muted); }
-  .team-status-dot { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
-  .team-status-dot.connected { background:var(--green);box-shadow:0 0 4px var(--green); }
-  .team-status-dot.disconnected { background:var(--text-muted); }
-  .team-form-section { margin-bottom:22px; }
-  .team-section-label {
-    font-family:var(--font-mono);font-size:9px;letter-spacing:0.1em;
-    text-transform:uppercase;color:var(--accent);opacity:0.7;
-    margin-bottom:10px;
+  .profile-card-desc { font-size:9px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .profile-editor { flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:0; }
+  .profile-section {
+    border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:20px;
   }
-  .team-form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px; }
-  .team-form-row.single { grid-template-columns:1fr; }
-  .team-field { display:flex;flex-direction:column;gap:4px; }
-  .team-label { font-family:var(--font-mono);font-size:9px;color:var(--text-muted); }
-  .team-input, .team-select, .team-textarea {
+  .profile-section:last-child { border-bottom:none; }
+  .profile-section-header {
+    font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;
+    text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .profile-section-toggle {
+    font-family:var(--font-mono);font-size:9px;color:var(--accent);
+    cursor:pointer;margin-left:auto;user-select:none;
+  }
+  .profile-section-toggle:hover { text-decoration:underline; }
+  .profile-collapsible { overflow:hidden;transition:max-height 0.2s ease-in-out; }
+  .profile-collapsible.collapsed { max-height:0 !important; }
+  .profile-identity-row { display:flex;gap:16px;align-items:flex-start; }
+  .profile-icon-large {
+    width:72px;height:72px;image-rendering:pixelated;flex-shrink:0;
+    border:2px solid var(--border-2);display:flex;align-items:center;
+    justify-content:center;background:var(--bg-3);
+  }
+  .profile-icon-large svg { width:100%;height:100%; }
+  .profile-identity-fields { flex:1;display:flex;flex-direction:column;gap:8px; }
+  .profile-icon-grid {
+    display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px;
+  }
+  .profile-icon-tile {
+    width:56px;height:56px;display:flex;align-items:center;justify-content:center;
+    background:var(--bg-3);border:2px solid var(--border);cursor:pointer;
+    transition:all 0.15s;image-rendering:pixelated;
+  }
+  .profile-icon-tile:hover { border-color:var(--accent-border);background:var(--bg-4); }
+  .profile-icon-tile.selected {
+    border-color:var(--accent);box-shadow:0 0 8px rgba(0,212,255,0.3);
+    background:rgba(0,212,255,0.08);
+  }
+  .profile-icon-tile svg { width:40px;height:40px; }
+  .profile-input, .profile-select, .profile-textarea {
     background:var(--bg-3);border:1px solid var(--border-2);
     color:var(--text-primary);font-family:var(--font-mono);
-    font-size:11px;padding:7px 9px;outline:none;
-    transition:border-color 0.15s;width:100%;
+    font-size:11px;padding:7px 9px;outline:none;width:100%;
+    transition:border-color 0.15s;
   }
-  .team-input:focus,.team-select:focus,.team-textarea:focus { border-color:var(--accent); }
-  .team-textarea { resize:vertical;min-height:60px; }
-  .team-select {
+  .profile-input:focus,.profile-select:focus,.profile-textarea:focus { border-color:var(--accent); }
+  .profile-textarea { resize:vertical;min-height:60px; }
+  .profile-select {
     appearance:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300d4ff' opacity='.5'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 8px center;
-    padding-right:24px;
+    background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;
   }
-  .team-color-row { display:flex;gap:6px;align-items:center;flex-wrap:wrap; }
-  .team-color-swatch {
-    display:flex;flex-direction:column;align-items:center;gap:4px;
-    cursor:pointer;padding:5px;border:1px solid transparent;
+  .profile-label {
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
+    text-transform:uppercase;letter-spacing:0.05em;
+  }
+  .profile-char-counter {
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);text-align:right;
+  }
+  .profile-token-counter {
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
+    text-align:right;margin-top:4px;
+  }
+  .profile-task-row {
+    display:flex;gap:8px;align-items:flex-start;padding:10px 12px;
+    background:var(--bg-3);border:1px solid var(--border);margin-bottom:6px;
     transition:all 0.15s;
   }
-  .team-color-swatch:hover { background:var(--bg-3); }
-  .team-color-swatch.selected { border-color:var(--accent);background:rgba(0,212,255,0.1); }
-  .team-color-swatch-label { font-family:var(--font-mono);font-size:8px;color:var(--text-muted);text-transform:uppercase; }
-  .team-test-row {
-    display:flex;align-items:center;gap:8px;padding:8px 10px;
-    background:var(--bg-3);border:1px solid var(--border);margin-top:4px;
+  .profile-task-row:hover { border-color:var(--border-2); }
+  .profile-task-fields { flex:1;display:flex;flex-direction:column;gap:6px; }
+  .profile-task-meta { display:flex;gap:8px;align-items:center; }
+  .profile-priority-seg { display:flex;gap:0; }
+  .profile-priority-btn {
+    font-family:var(--font-mono);font-size:8px;padding:3px 8px;
+    border:1px solid var(--border-2);background:transparent;
+    color:var(--text-muted);cursor:pointer;transition:all 0.15s;
+    text-transform:uppercase;letter-spacing:0.05em;
   }
-  .team-test-status { font-family:var(--font-mono);font-size:10px;color:var(--text-muted);flex:1; }
-  .team-test-status.ok { color:var(--green); }
-  .team-test-status.fail { color:var(--red); }
-  .team-test-status.testing { color:var(--accent); }
-  .team-perms-table { width:100%;border-collapse:collapse; }
-  .team-perms-table th {
-    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
-    text-align:left;padding:0 0 6px;
-    border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.05em;
+  .profile-priority-btn:first-child { border-right:none; }
+  .profile-priority-btn:last-child { border-left:none; }
+  .profile-priority-btn:not(:first-child):not(:last-child) { border-left:none;border-right:none; }
+  .profile-priority-btn.active-low { background:rgba(34,197,94,0.15);color:var(--green);border-color:rgba(34,197,94,0.3); }
+  .profile-priority-btn.active-medium { background:var(--accent-dim);color:var(--accent);border-color:var(--accent-border); }
+  .profile-priority-btn.active-high { background:var(--amber-dim);color:var(--amber);border-color:var(--amber-border); }
+  .profile-priority-btn.active-critical { background:var(--red-dim);color:var(--red);border-color:var(--red-border); }
+  .profile-task-actions { display:flex;flex-direction:column;gap:2px;align-items:center; }
+  .profile-task-action-btn {
+    width:22px;height:18px;display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1px solid var(--border);color:var(--text-muted);
+    cursor:pointer;font-size:10px;transition:all 0.15s;
   }
-  .team-perms-table td { padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle; }
-  .team-perms-table tr:last-child td { border-bottom:none; }
-  .team-perm-name { font-family:var(--font-mono);font-size:10px;color:var(--text-primary); }
-  .team-perm-desc { font-size:10px;color:var(--text-muted); }
-  .team-perm-risk { font-family:var(--font-mono);font-size:9px;padding:2px 5px;text-align:center; }
-  .team-perm-risk.low { background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3); }
-  .team-perm-risk.med { background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.2); }
-  .team-perm-risk.high { background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.35); }
-  .team-vault-indicator {
-    display:flex;align-items:center;gap:5px;
-    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
-    transition:all 0.3s;
+  .profile-task-action-btn:hover { border-color:var(--accent);color:var(--accent); }
+  .profile-task-action-btn.delete:hover { border-color:var(--red);color:var(--red); }
+  .profile-chip {
+    display:inline-flex;align-items:center;gap:4px;
+    font-family:var(--font-mono);font-size:9px;padding:3px 8px;
+    background:var(--accent-dim);color:var(--accent);
+    border:1px solid var(--accent-border);
   }
-  .team-vault-indicator.saving { color:var(--amber); }
-  .team-vault-indicator.saved  { color:var(--green); }
-  .team-vault-dot { width:4px;height:4px;border-radius:50%;background:currentColor; }
-  .team-registry-grid {
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;
+  .profile-chip .remove {
+    cursor:pointer;opacity:0.6;font-size:11px;
   }
-  .team-registry-card {
-    background:var(--bg-3);border:1px solid var(--border);
-    padding:12px;cursor:pointer;transition:all 0.15s;
+  .profile-chip .remove:hover { opacity:1;color:var(--red); }
+  .profile-mcp-item, .profile-skill-item {
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    border-bottom:1px solid rgba(255,255,255,0.04);
   }
-  .team-registry-card:hover { border-color:var(--border-2);background:var(--bg-4); }
-  .team-registry-card.installed { border-color:rgba(34,197,94,0.25); }
-  .team-registry-card-name { font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-primary);margin-bottom:3px; }
-  .team-registry-card-desc { font-size:10px;color:var(--text-muted);line-height:1.4;margin-bottom:8px; }
-  .team-registry-card-footer { display:flex;align-items:center;justify-content:space-between; }
-  .team-registry-card-auth { font-family:var(--font-mono);font-size:8px;color:var(--text-muted);text-transform:uppercase; }
-  .team-badge { font-family:var(--font-mono);font-size:8px;padding:2px 5px; }
-  .team-badge.installed { background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3); }
-  .team-badge.official  { background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.2); }
-  .team-badge.community { background:var(--bg-4);color:var(--text-muted);border:1px solid var(--border); }
-  .team-empty-state {
+  .profile-mcp-item:last-child, .profile-skill-item:last-child { border-bottom:none; }
+  .profile-mcp-name, .profile-skill-name {
+    font-family:var(--font-mono);font-size:10px;color:var(--text-primary);flex:1;
+  }
+  .profile-mcp-desc, .profile-skill-desc { font-size:9px;color:var(--text-muted);flex:2; }
+  .profile-toggle {
+    width:32px;height:18px;border-radius:9px;background:var(--bg-4);
+    border:1px solid var(--border-2);cursor:pointer;position:relative;
+    transition:all 0.15s;flex-shrink:0;
+  }
+  .profile-toggle::after {
+    content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;
+    border-radius:50%;background:var(--text-muted);transition:all 0.15s;
+  }
+  .profile-toggle.on { background:rgba(0,212,255,0.2);border-color:var(--accent); }
+  .profile-toggle.on::after { transform:translateX(14px);background:var(--accent); }
+  .profile-add-form {
+    padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);
+    margin-top:8px;display:none;flex-direction:column;gap:8px;
+  }
+  .profile-add-form.open { display:flex; }
+  .profile-add-form-row { display:flex;gap:8px; }
+  .profile-badge {
+    font-family:var(--font-mono);font-size:8px;padding:2px 5px;text-transform:uppercase;
+  }
+  .profile-badge.active { background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3); }
+  .profile-badge.inactive { background:var(--bg-4);color:var(--text-muted);border:1px solid var(--border); }
+  .profile-save-bar {
+    display:flex;align-items:center;gap:8px;padding:10px 20px;
+    background:rgba(10,10,10,0.9);backdrop-filter:blur(8px);
+    border-top:1px solid var(--border);flex-shrink:0;
+  }
+  .profile-btn {
+    font-family:var(--font-mono);font-size:10px;padding:7px 16px;
+    cursor:pointer;transition:all 0.15s;text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+  .profile-btn.primary {
+    background:var(--accent);color:#000;border:1px solid var(--accent);font-weight:600;
+  }
+  .profile-btn.primary:hover { box-shadow:0 0 12px rgba(0,212,255,0.4); }
+  .profile-btn.outlined {
+    background:transparent;color:var(--text-muted);border:1px solid var(--border-2);
+  }
+  .profile-btn.outlined:hover { border-color:var(--accent);color:var(--text-primary); }
+  .profile-btn.danger {
+    background:transparent;color:var(--red);border:1px solid var(--red-border);
+  }
+  .profile-btn.danger:hover { background:var(--red-dim); }
+  .profile-empty-state {
     display:flex;flex-direction:column;align-items:center;
-    justify-content:center;padding:60px 20px;text-align:center;gap:10px;
+    justify-content:center;padding:60px 20px;text-align:center;gap:10px;flex:1;
   }
-  .team-empty-title { font-family:var(--font-mono);font-size:12px;color:var(--text-muted); }
-  .team-empty-sub { font-size:11px;color:rgba(255,255,255,0.25);max-width:260px;line-height:1.5; }
+  .profile-empty-title { font-family:var(--font-mono);font-size:12px;color:var(--text-muted); }
+  .profile-empty-sub { font-size:11px;color:rgba(255,255,255,0.25);max-width:260px;line-height:1.5; }
+  .profile-template-dropdown {
+    position:relative;display:inline-block;
+  }
+  .profile-template-menu {
+    position:absolute;top:100%;left:0;z-index:10;min-width:160px;
+    background:var(--bg-3);border:1px solid var(--border-2);display:none;
+  }
+  .profile-template-menu.open { display:block; }
+  .profile-template-option {
+    padding:6px 10px;font-family:var(--font-mono);font-size:9px;
+    color:var(--text-muted);cursor:pointer;
+  }
+  .profile-template-option:hover { background:var(--bg-hover);color:var(--text-primary); }
+  .profile-search {
+    background:var(--bg-3);border:1px solid var(--border-2);
+    color:var(--text-primary);font-family:var(--font-mono);
+    font-size:10px;padding:5px 8px;outline:none;width:100%;
+    transition:border-color 0.15s;margin-bottom:8px;
+  }
+  .profile-search:focus { border-color:var(--accent); }
+
+  /* ── Aether Node Menu ────────────────────────────── */
+  .aether-menu-item {
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    border-radius:8px;cursor:pointer;font-size:12px;color:#94a3b8;
+    transition:all 100ms ease;
+  }
+  .aether-menu-item:hover { background:#1a1a26;color:#e2e8f0; }
+  .aether-menu-item:active { transform:scale(0.98); }
+  .aether-menu-icon { font-size:12px;color:#475569;width:16px;text-align:center;flex-shrink:0; }
+  .aether-menu-item:hover .aether-menu-icon { color:#06b6d4; }
+  @keyframes menuPop {
+    from { opacity:0; transform:scale(0.92) translateY(4px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+  }
+
+  /* ── Agent Output Panel ──────────────────────────── */
+  .output-panel {
+    position:absolute;top:0;right:0;width:380px;height:100%;
+    background:var(--bg-2);border-left:1px solid var(--border);
+    display:none;flex-direction:column;font-family:var(--font-mono);
+    z-index:60;animation:slideInRight 250ms ease forwards;
+  }
+  .output-panel.visible { display:flex; }
+  @keyframes slideInRight {
+    from { transform:translateX(100%);opacity:0; }
+    to   { transform:translateX(0);opacity:1; }
+  }
+  .output-header {
+    padding:12px 16px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+  }
+  .output-header-title {
+    font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);
+  }
+  .output-close-btn {
+    background:transparent;border:1px solid var(--border);color:var(--text-muted);
+    width:24px;height:24px;cursor:pointer;font-size:14px;
+    display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+  }
+  .output-close-btn:hover { border-color:var(--red);color:var(--red); }
+  .output-body { flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px; }
+  .output-agent-section { border-bottom:1px solid var(--border);padding-bottom:14px; }
+  .output-agent-section:last-child { border-bottom:none; }
+  .output-agent-header {
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  }
+  .output-agent-icon { width:28px;height:28px;image-rendering:pixelated;flex-shrink:0; }
+  .output-agent-name {
+    font-size:11px;font-weight:500;letter-spacing:0.1em;color:var(--text-primary);
+  }
+  .output-agent-task { font-size:9px;color:var(--text-muted);margin-left:auto; }
+  .output-agent-content {
+    font-size:11px;color:var(--text-primary);line-height:1.6;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .output-summary-section {
+    background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);
+    padding:14px;margin-top:4px;
+  }
+  .output-summary-badge {
+    font-size:9px;letter-spacing:0.15em;color:#f97316;
+    background:rgba(249,115,22,0.1);padding:2px 8px;
+    border:1px solid rgba(249,115,22,0.3);
+  }
+  .output-summary-content {
+    font-size:11px;color:var(--text-primary);line-height:1.7;
+    margin-top:10px;white-space:pre-wrap;word-break:break-word;
+  }
+  .output-footer {
+    padding:10px 16px;border-top:1px solid var(--border);
+    display:flex;gap:8px;flex-shrink:0;
+  }
+  .output-footer-btn {
+    flex:1;padding:7px;font-size:10px;letter-spacing:0.08em;
+    font-family:var(--font-mono);text-transform:uppercase;cursor:pointer;
+    background:transparent;border:1px solid var(--border-2);color:var(--text-muted);
+    transition:all 0.15s;
+  }
+  .output-footer-btn:hover { border-color:var(--accent);color:var(--text-primary); }
+  .output-footer-btn.primary {
+    background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);
+  }
+  .output-footer-btn.primary:hover { box-shadow:0 0 8px rgba(0,212,255,0.3); }
+  .output-status {
+    font-size:10px;color:var(--text-muted);text-align:center;padding:20px;
+  }
+  .output-status .working { color:var(--amber); }
+  .output-status .done { color:var(--green); }
+
+  /* ── MCP & Skills Panel ──────────────────────────── */
+  .tools-header-bar { display:flex;justify-content:space-between;align-items:center;gap:12px; }
+  .tools-search {
+    flex:1;background:var(--bg-3);border:1px solid var(--border-2);
+    color:var(--text-primary);font-family:var(--font-mono);font-size:11px;
+    padding:7px 10px;outline:none;transition:border-color 0.15s;
+  }
+  .tools-search:focus { border-color:var(--accent); }
+  .tools-section-header {
+    font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;
+    color:var(--text-muted);text-transform:uppercase;
+    padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px;
+  }
+  .tool-row {
+    display:flex;align-items:center;gap:10px;padding:7px 6px;
+    transition:background 120ms ease;cursor:pointer;
+  }
+  .tool-row:hover { background:var(--bg-2); }
+  .tool-checkbox { width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--accent); }
+  .tool-name { font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--text-primary);min-width:140px; }
+  .tool-description { font-size:11px;color:var(--text-muted);flex:1; }
+  .tool-category-badge {
+    font-family:var(--font-mono);font-size:8px;letter-spacing:0.08em;
+    padding:2px 7px;flex-shrink:0;text-transform:uppercase;
+  }
+  .tool-agent-chips { display:flex;gap:3px;align-items:center;min-width:80px;justify-content:flex-end; }
+  .tool-agent-chip {
+    width:22px;height:22px;background:var(--bg-3);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    cursor:pointer;transition:border-color 100ms;image-rendering:pixelated;
+  }
+  .tool-agent-chip:hover { border-color:var(--red); }
+  .tool-agent-chip svg { width:16px;height:16px; }
+  .tool-status-badge {
+    font-family:var(--font-mono);font-size:8px;letter-spacing:0.1em;
+    padding:2px 8px;flex-shrink:0;text-transform:uppercase;
+  }
+  .tool-status-badge.active { color:var(--green);background:var(--green-dim);border:1px solid var(--green-border); }
+  .tool-status-badge.installed { color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-border); }
+  .tool-status-badge.available { color:var(--text-muted);background:transparent;border:1px solid var(--border); }
+  .tool-status-badge.soon { color:var(--amber);background:var(--amber-dim);border:1px solid var(--amber-border); }
+  .agent-filter-banner {
+    background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);
+    padding:7px 12px;font-family:var(--font-mono);font-size:11px;color:var(--accent);
+    display:none;align-items:center;gap:8px;
+  }
+  .agent-filter-banner.visible { display:flex; }
+  .tool-empty-msg { font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;padding:10px 6px; }
 </style>
 </head>
 <body>
@@ -3382,7 +3659,8 @@
   <!-- Agent sub-tabs — visible only when AGENTS mode is active -->
   <div class="agent-sub-tab-bar" id="agent-sub-tab-bar" style="display:none;">
     <button class="agent-sub-tab active" id="asub-orbit" onclick="switchAgentSubTab('orbit')">ORBIT</button>
-    <button class="agent-sub-tab" id="asub-team" onclick="switchAgentSubTab('team')">TEAM</button>
+    <button class="agent-sub-tab" id="asub-team" onclick="switchAgentSubTab('team')">PROFILES</button>
+    <button class="agent-sub-tab" id="asub-mcpskills" onclick="switchAgentSubTab('mcp-skills')">MCP & SKILLS</button>
     <button class="agent-sub-tab agent-terminal-btn" id="asub-terminal" onclick="openTeamTerminal()" title="Team Terminal (coming soon)">&#8857; TERMINAL</button>
   </div>
 
@@ -3587,7 +3865,7 @@
       <!-- Event-capture canvas: transparent overlay, sits above render canvas (z:1), below loading-overlay (z:50) -->
       <canvas id="circuit-interact" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:auto;cursor:grab;background:transparent;"></canvas>
     </div>
-    <!-- AGENT TEAM CONFIG PANEL -->
+    <!-- AGENT PROFILE PANEL -->
     <div class="agent-team-panel" id="agent-team-panel" style="
       position:absolute; inset:0; display:none; flex-direction:column;
       background:var(--bg); z-index:50; overflow:hidden;
@@ -3607,56 +3885,162 @@
         "></div>
         <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
           letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);">
-          Agent Team
+          Agent Profiles
         </span>
         <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
-          // configure mcp agents
+          // manage agent configurations
         </span>
-        <div style="margin-left:auto;display:flex;gap:0;">
-          <button class="view-mode-btn" id="team-tab-my"
-            onclick="switchTeamTab('team')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">My Team</button>
-          <button class="view-mode-btn" id="team-tab-registry"
-            onclick="switchTeamTab('registry')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">Registry</button>
-          <button class="view-mode-btn" id="team-tab-pipeline"
-            onclick="switchTeamTab('pipeline')"
-            style="font-size:9px;padding:4px 12px;border-radius:0;">Pipeline</button>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <button class="profile-btn primary" id="run-team-btn" onclick="openRunTeamInput()" style="font-size:9px;padding:4px 14px;">&#9654; RUN TEAM</button>
+          <button class="profile-btn outlined" onclick="openTeamTerminal()" style="font-size:9px;padding:4px 14px;">&#9638; TEAM TERMINAL</button>
         </div>
       </div>
+      <!-- Run Team command bar (hidden by default) -->
+      <div id="run-team-bar" style="
+        display:none;padding:6px 16px;background:var(--bg-3);
+        border-bottom:1px solid var(--border);flex-shrink:0;
+        gap:8px;align-items:center;
+      ">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:0.1em;">AETHER &gt;</span>
+        <input id="run-team-input" class="profile-input" type="text" placeholder="Ask AETHER or enter a command..."
+          style="flex:1;font-size:11px;padding:6px 8px;background:var(--bg);border-color:var(--accent-border);"
+          onkeydown="if(event.key==='Enter')runTeamFromInput()">
+        <button class="profile-btn primary" onclick="runTeamFromInput()" style="font-size:9px;padding:4px 12px;">&#9654; RUN</button>
+        <button class="profile-btn outlined" onclick="closeRunTeamInput()" style="font-size:9px;padding:4px 10px;">&times;</button>
+      </div>
 
-      <!-- Body: sidebar + main -->
+      <!-- Body: sidebar + editor -->
       <div style="display:flex;flex:1;overflow:hidden;">
 
-        <!-- Agent sidebar list -->
-        <div id="team-sidebar" style="
-          width:240px; background:var(--bg-2);
-          border-right:1px solid var(--border);
-          display:flex; flex-direction:column;
-          overflow:hidden; flex-shrink:0;
-        ">
-          <div style="padding:10px 14px 6px;font-family:var(--font-mono);
-            font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
-            color:var(--text-muted);">Active Agents</div>
-          <div id="team-agent-list" style="flex:1;overflow-y:auto;"></div>
-          <div style="height:1px;background:var(--border);"></div>
-          <div onclick="teamNewAgent()" style="
-            display:flex;align-items:center;gap:8px;
-            padding:8px 14px;cursor:pointer;
-            font-family:var(--font-mono);font-size:10px;
-            color:var(--accent);opacity:0.7;transition:opacity 0.15s;
-          " onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.7">
-            <div style="width:16px;height:16px;border:1px solid var(--accent);
-              display:flex;align-items:center;justify-content:center;font-size:14px;">+</div>
-            Add Agent
+        <!-- Profile sidebar -->
+        <div class="profile-sidebar" id="profile-sidebar">
+          <div class="profile-sidebar-header">
+            <span class="profile-sidebar-title">AGENTS</span>
+            <span class="profile-count-badge" id="profile-count">0</span>
+            <div style="margin-left:auto;">
+              <div class="profile-team-pill" id="profile-team-pill" onclick="profileToggleTeamDropdown()">
+                <span id="profile-team-label">All Teams</span>
+                <span style="font-size:7px;">&#9660;</span>
+                <div class="profile-team-dropdown" id="profile-team-dropdown">
+                  <div class="profile-team-option active" onclick="profileSelectTeam('all',event)">All Teams</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Default Team',event)">Default Team</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Research',event)">Research</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Automation',event)">Automation</div>
+                  <div class="profile-team-option" onclick="profileSelectTeam('Security',event)">Security</div>
+                </div>
+              </div>
+            </div>
           </div>
+          <button class="profile-new-btn" onclick="profileNew()">+ NEW AGENT</button>
+          <div class="profile-list" id="profile-list"></div>
         </div>
 
-        <!-- Editor / empty / registry -->
-        <div id="team-main" style="flex:1;overflow-y:auto;padding:20px;"></div>
+        <!-- Main editor area -->
+        <div id="profile-main" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       </div>
     </div>
-    <!-- END AGENT TEAM CONFIG PANEL -->
+    <!-- END AGENT PROFILE PANEL -->
+
+    <!-- AGENT MCP & SKILLS PANEL -->
+    <div id="agent-mcp-skills-panel" style="
+      position:absolute; inset:0; display:none; flex-direction:column;
+      background:var(--bg); z-index:50; overflow:hidden;
+      border-top:2px solid rgba(0,212,255,0.3);
+    ">
+      <!-- Panel header -->
+      <div style="
+        display:flex; align-items:center; gap:10px;
+        padding:0 16px; height:44px;
+        background:var(--bg-2); border-bottom:1px solid var(--border);
+        flex-shrink:0;
+      ">
+        <div style="
+          width:7px; height:7px; border-radius:50%;
+          background:var(--accent); box-shadow:0 0 6px var(--accent);
+          animation:pulse 2.4s ease-in-out infinite;
+        "></div>
+        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
+          letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);">
+          MCP & Skills
+        </span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
+          // manage tools per agent
+        </span>
+      </div>
+
+      <!-- Toolbar: search + agent filter -->
+      <div class="tools-header-bar" style="padding:12px 16px 0;">
+        <input class="tools-search" id="tools-search-input" type="text" placeholder="Search tools..." oninput="mcpSkillsSearch()">
+        <div style="position:relative;">
+          <button class="profile-team-pill" id="tools-agent-filter-btn" onclick="mcpSkillsToggleAgentFilter()">
+            <span id="tools-agent-filter-label">All Agents</span>
+            <span style="font-size:7px;">&#9660;</span>
+          </button>
+          <div class="profile-team-dropdown" id="tools-agent-filter-dropdown" style="min-width:180px;">
+            <div class="profile-team-option active" onclick="mcpSkillsSelectAgent('all',event)">All Agents</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent filter banner -->
+      <div class="agent-filter-banner" id="tools-agent-banner" style="margin:8px 16px 0;">
+        Editing tools for: <strong id="tools-agent-banner-name"></strong>
+      </div>
+
+      <!-- Scrollable body -->
+      <div style="flex:1;overflow-y:auto;padding:0 16px 16px;">
+        <!-- MCP SERVERS section -->
+        <div class="tools-section-header">MCP SERVERS</div>
+        <div id="mcp-rows"></div>
+
+        <!-- SKILLS section -->
+        <div class="tools-section-header" style="margin-top:20px;">SKILLS</div>
+        <div id="skills-rows"></div>
+      </div>
+    </div>
+    <!-- END AGENT MCP & SKILLS PANEL -->
+
+    <!-- AETHER NODE CONTEXT MENU -->
+    <div id="aether-node-menu" style="
+      position:fixed; z-index:900; width:200px; display:none;
+      background:#0d0d14; border:1px solid #1e2030; border-radius:12px;
+      padding:6px; box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      font-family:var(--font-sans),system-ui,sans-serif;
+    ">
+      <div style="padding:8px 10px 6px;display:flex;flex-direction:column;gap:1px;">
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.12em;color:#06b6d4;">AETHER</span>
+        <span style="font-size:10px;color:#334155;letter-spacing:0.06em;">orchestrator</span>
+      </div>
+      <div style="height:1px;background:#1e2030;margin:4px 2px;"></div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('add-agent')">
+        <span class="aether-menu-icon">＋</span><span>Add Agent</span>
+      </div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('configure')">
+        <span class="aether-menu-icon">⊙</span><span>Configure Team</span>
+      </div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('run-task')">
+        <span class="aether-menu-icon">▶</span><span>Run Task</span>
+      </div>
+      <div style="height:1px;background:#1e2030;margin:4px 2px;"></div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('team-terminal')">
+        <span class="aether-menu-icon">⌨</span><span>Team Terminal</span>
+      </div>
+    </div>
+
+    <!-- AGENT OUTPUT PANEL -->
+    <div class="output-panel" id="agent-output-panel">
+      <div class="output-header">
+        <span class="output-header-title">OUTPUT</span>
+        <button class="output-close-btn" onclick="closeOutputPanel()">&times;</button>
+      </div>
+      <div class="output-body" id="output-body"></div>
+      <div class="output-footer">
+        <button class="output-footer-btn" onclick="copyOutputReport()">COPY</button>
+        <button class="output-footer-btn" onclick="exportOutputReport()">EXPORT</button>
+        <button class="output-footer-btn primary" onclick="newOutputRun()">NEW RUN</button>
+      </div>
+    </div>
+    <!-- END AGENT OUTPUT PANEL -->
 
     <!-- LOGS Panel (Cryptographic File Access Log) -->
     <div class="logs-panel" id="logs-panel">
@@ -4186,6 +4570,36 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 // CIRCUIT GRAPH ENGINE — Radial Quantum Layout
 // ════════════════════════════════════════════════════
+
+// ── Agent SVG icon cache for canvas rendering ─────
+var _agentIconImages = {}; // { iconName: Image }
+var _agentIconsLoaded = false;
+
+async function loadAgentIconsForCanvas() {
+  if (_agentIconsLoaded) return;
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    icons.forEach(function(ic) {
+      var img = new Image();
+      var blob = new Blob([ic.svgContent], { type: 'image/svg+xml' });
+      var url = URL.createObjectURL(blob);
+      img.onload = function() { URL.revokeObjectURL(url); };
+      img.src = url;
+      _agentIconImages[ic.name] = img;
+    });
+    _agentIconsLoaded = true;
+  } catch(e) { console.error('[canvas] loadIcons', e); }
+}
+
+function getAgentAccentColor(agentId) {
+  var palette = ['#06b6d4','#10b981','#f59e0b','#a855f7','#ef4444','#3b82f6','#ec4899','#14b8a6'];
+  var hash = 0;
+  for (var i = 0; i < String(agentId).length; i++) {
+    hash = String(agentId).charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return palette[Math.abs(hash) % palette.length];
+}
+
 const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, focusedNode:null, prevView:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{}, pinnedNodes:new Set(), collapsedNodes:new Set(), draggingNode:null };
 
 // ════════════════════════════════════════════════════
@@ -4524,7 +4938,7 @@ function initCircuit() {
     if (currentViewMode === 'project' && node.isRoot) {
       document.getElementById('project-actions').classList.add('visible');
     } else if (currentViewMode === 'agent' && node.isRoot) {
-      openSpawnModal();
+      showAetherNodeMenu(e);
     } else if (currentViewMode === 'agent' && node.agentId) {
       showAgentDetail(node.agentId);
     } else if (currentViewMode === 'agent' && node.taskId) {
@@ -4928,6 +5342,27 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(typeIcon, nx, ny + 0.5);
     ctx.restore();
+  } else if (isConfig) {
+    const d = radius * 1.5;
+    ctx.beginPath(); ctx.moveTo(nx, ny - d); ctx.lineTo(nx + d, ny);
+    ctx.lineTo(nx, ny + d); ctx.lineTo(nx - d, ny); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
+    ctx.stroke();
+    // Draw agent SVG icon inside the circle if available
+    if (n.agentIcon && _agentIconImages[n.agentIcon] && _agentIconImages[n.agentIcon].complete) {
+      var iconImg = _agentIconImages[n.agentIcon];
+      var iconSize = radius * 1.6;
+      ctx.save();
+      // Clip to circle
+      ctx.beginPath();
+      ctx.arc(nx, ny, radius - 1, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(iconImg, nx - iconSize/2, ny - iconSize/2, iconSize, iconSize);
+      ctx.restore();
+    }
   }
 
   // ── Collapsed dir chevron ──────────────────────────
@@ -6841,6 +7276,33 @@ async function sendMessage() {
     return;
   }
 
+  // Agent orchestration — route through AETHER when in agent mode with active team profiles
+  if (currentViewMode === 'agent' && typeof orchestrateAgentFlow === 'function') {
+    (async function() {
+      try {
+        var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+        if (agents.length > 0) {
+          input.value = '';
+          document.getElementById('send-btn').disabled = true;
+          // Pre-load icons for output panel
+          if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+          await orchestrateAgentFlow(query, 'Default Team', agents);
+          document.getElementById('send-btn').disabled = false;
+          return;
+        }
+      } catch(e) { console.error('[agent-flow]', e); }
+      // Fall through to normal chat if no agents or error
+      _sendMessageDirect(query);
+    })();
+    return;
+  }
+
+  _sendMessageDirect(query);
+}
+
+// Extracted direct message flow (called when not in agent orchestration mode)
+async function _sendMessageDirect(query) {
+  const input = document.getElementById('chat-input');
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
@@ -7904,41 +8366,47 @@ function resizeCanvas() {
 // ════════════════════════════════════════════════════
 // VIEW MODE SWITCHING (preserves vault state)
 // ════════════════════════════════════════════════════
-// Agent sub-tab switcher (orbit vs team) — only when AGENTS view is active
+// Agent sub-tab switcher (orbit vs profiles vs mcp-skills) — only when AGENTS view is active
 function switchAgentSubTab(sub) {
   // TERMINAL is a stub action, not a sub-tab — ignore
   if (sub === 'terminal') return;
 
-  // Only toggle real sub-tab buttons (orbit/team) — leave the TERMINAL pill alone
-  ['orbit', 'team'].forEach(s => {
-    const el = document.getElementById('asub-' + s);
-    if (el) el.classList.remove('active');
-  });
-  const btn = document.getElementById('asub-' + sub);
+  document.querySelectorAll('.agent-sub-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('asub-' + (sub === 'mcp-skills' ? 'mcpskills' : sub));
   if (btn) btn.classList.add('active');
 
   const teamPanel = document.getElementById('agent-team-panel');
   const orbitPanel = document.getElementById('agent-orbit-panel');
   const taskTracker = document.getElementById('task-tracker');
   const circuitInteract = document.getElementById('circuit-interact');
+  const mcpSkillsPanel = document.getElementById('agent-mcp-skills-panel');
 
   if (sub === 'team') {
-    if (teamPanel) { teamPanel.style.display = 'flex'; }
+    if (teamPanel) teamPanel.style.display = 'flex';
     if (orbitPanel) orbitPanel.classList.remove('visible');
     if (taskTracker) taskTracker.classList.remove('visible');
+    if (mcpSkillsPanel) mcpSkillsPanel.style.display = 'none';
     if (circuitInteract) circuitInteract.style.pointerEvents = 'auto';
-    if (typeof teamPanelInit === 'function') teamPanelInit();
+    if (typeof profilePanelInit === 'function') profilePanelInit();
     document.getElementById('chat-input').placeholder = 'Describe the agent you want to add...';
+  } else if (sub === 'mcp-skills') {
+    if (teamPanel) teamPanel.style.display = 'none';
+    if (orbitPanel) orbitPanel.classList.remove('visible');
+    if (taskTracker) taskTracker.classList.remove('visible');
+    if (mcpSkillsPanel) mcpSkillsPanel.style.display = 'flex';
+    if (circuitInteract) circuitInteract.style.pointerEvents = 'auto';
+    if (typeof mcpSkillsPanelInit === 'function') mcpSkillsPanelInit();
+    document.getElementById('chat-input').placeholder = 'Search or manage agent tools...';
   } else {
-    if (teamPanel) { teamPanel.style.display = 'none'; }
+    if (teamPanel) teamPanel.style.display = 'none';
     if (orbitPanel) orbitPanel.classList.add('visible');
-    if (taskTracker) taskTracker.classList.remove('visible'); // V3 has its own task panel
-    // Let V3 canvas receive clicks; disable the circuit interaction layer underneath
+    if (taskTracker) taskTracker.classList.add('visible');
+    if (mcpSkillsPanel) mcpSkillsPanel.style.display = 'none';
     if (circuitInteract) circuitInteract.style.pointerEvents = 'none';
     document.getElementById('chat-input').placeholder = 'Command your agents...';
+    buildAgentOrbitVault();
     renderAgentOrbitPanel();
-    // Second render after layout settles — the first pass may run before
-    // the flex children receive their final dimensions.
+    renderTaskTracker();
     requestAnimationFrame(() => renderAgentOrbitPanel());
   }
 }
@@ -9054,9 +9522,75 @@ const AgentPresence = (function () {
   }
 })();
 
+  panel.innerHTML = spawnedAgents.map(a => `
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-card-name"><span class="agent-card-icon-wrap" style="display:inline-block;width:16px;height:16px;vertical-align:middle;image-rendering:pixelated;margin-right:4px;">${_agentIconImages[a.icon] ? '<img src="' + _agentIconImages[a.icon].src + '" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;">' : a.icon}</span>${escH(a.name)}</span>
+        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
+      </div>
+      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
+      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | Schedule: ${a.schedule}</div>
+      <div class="agent-card-actions">
+        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
+        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
+        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Aether Node Context Menu ──────────────────────────
+function showAetherNodeMenu(clickEvent) {
+  var menu = document.getElementById('aether-node-menu');
+  if (!menu) return;
+  var x = clickEvent.clientX, y = clickEvent.clientY;
+  var mw = 200, mh = 200;
+  var left = x - mw / 2;
+  var top = y - mh - 12;
+  left = Math.max(8, Math.min(left, window.innerWidth - mw - 8));
+  top = Math.max(8, Math.min(top, window.innerHeight - mh - 8));
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.style.display = 'block';
+  menu.style.animation = 'menuPop 150ms cubic-bezier(0.34,1.56,0.64,1) forwards';
+  setTimeout(function() {
+    document.addEventListener('click', closeAetherNodeMenu, { once: true });
+  }, 10);
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { closeAetherNodeMenu(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+function closeAetherNodeMenu() {
+  var menu = document.getElementById('aether-node-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+window.aetherMenuAction = function(action) {
+  closeAetherNodeMenu();
+  switch(action) {
+    case 'add-agent':
+      switchAgentSubTab('team');
+      setTimeout(function() { if (typeof profileNew === 'function') profileNew(); }, 100);
+      break;
+    case 'configure':
+      switchAgentSubTab('team');
+      break;
+    case 'run-task':
+      switchAgentSubTab('team');
+      setTimeout(function() { if (typeof openRunTeamInput === 'function') openRunTeamInput(); }, 100);
+      break;
+    case 'team-terminal':
+      if (typeof openTeamTerminal === 'function') openTeamTerminal();
+      else if (typeof showToast === 'function') showToast('No agents configured yet', 'info');
+      break;
+  }
+};
+
 // Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
 function buildAgentOrbitVault() {
   if (window.resizeCanvas) window.resizeCanvas();
+  if (!_agentIconsLoaded) loadAgentIconsForCanvas();
 
   const N = [], E = [];
   let id = 0;
@@ -9068,11 +9602,18 @@ function buildAgentOrbitVault() {
   spawnedAgents.forEach(a => {
     const aid = id++;
     const statusType = a.status === 'active' ? 'Python' : a.status === 'processing' ? 'JSON' : a.status === 'error' ? 'Binary' : 'Config';
+    // Try to find a real SVG icon name - check if icon matches a loaded icon, otherwise keep emoji
+    var iconName = a.icon;
+    if (a.icon && !_agentIconImages[a.icon]) {
+      // icon is probably an emoji, try to find a profile with matching name
+      var matchProfile = (typeof getActiveTeamAgents === 'function') ? null : null;
+      // Use the icon field as-is — profiles will have SVG names like 'mushroom_agent'
+    }
     N.push({
       id:aid, name:a.name, dir:false, type:statusType,
       size:0, path:'agent://'+a.id,
       cx:0, cy:0, r:18,
-      agentId:a.id, agentStatus:a.status, agentIcon:a.icon
+      agentId:a.id, agentStatus:a.status, agentIcon:iconName
     });
     E.push({ from:0, to:aid });
 
@@ -12509,763 +13050,1325 @@ class ActivityLayer {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AGENT TEAM CONFIG PANEL
+// AGENT PROFILE SYSTEM
 // ═══════════════════════════════════════════════════════════════
 (function() {
 
-const TEAM_PIXELS = [
-  [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
-  [2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
-  [2,2],[4,2],[5,2],[6,2],[8,2],
-  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
-  [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
-  [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
-  [2,6],[4,6],[6,6],[8,6],
-  [2,7],[4,7],[6,7],[8,7],
-];
-const TEAM_COLORS = { blue:'#2196F3', green:'#4CAF50', orange:'#E36C35', red:'#F44336', yellow:'#FFEB3B' };
-const TEAM_COLOR_LABELS = { blue:'Blue', green:'Green', orange:'Orange', red:'Red', yellow:'Yellow' };
-
-function teamSVG(color, w, h) {
-  w = w || 22; h = h || 16;
-  const fill = TEAM_COLORS[color] || TEAM_COLORS.blue;
-  const rects = TEAM_PIXELS.map(function(p) {
-    return '<rect x="' + p[0] + '" y="' + p[1] + '" width="1" height="1" fill="' + fill + '"/>';
-  }).join('');
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="' + w + '" height="' + h + '" shape-rendering="crispEdges">' + rects + '</svg>';
-}
-
-const SERVER_COLOR_MAP = {
-  github:'orange', slack:'green', notion:'yellow', google_drive:'blue',
-  stripe:'green', figma:'blue', fal_ai:'orange', excalidraw:'orange',
-  context7:'yellow', desktop_commander:'red', linear:'blue', postgres:'blue',
-  supabase:'green', playwright:'orange', firecrawl:'green',
+const TEAMS = ['Default Team', 'Research', 'Automation', 'Security'];
+const PROMPT_TEMPLATES = {
+  analyst:    'You are {NAME}, an AI analyst within AetherCloud.\n\nYour role is to interpret data, identify patterns, and produce structured analytical output.\n\nBehavior:\n- Always cite sources and evidence\n- Use tables and structured formats when presenting findings\n- Flag confidence levels for each conclusion\n- Ask clarifying questions before making assumptions',
+  executor:   'You are {NAME}, an AI executor within AetherCloud.\n\nYour role is to carry out tasks efficiently and report results.\n\nBehavior:\n- Execute tasks in order of priority\n- Report completion status after each step\n- Escalate blockers immediately\n- Minimize unnecessary communication — focus on action',
+  sentinel:   'You are {NAME}, a security sentinel within AetherCloud.\n\nYour role is to monitor, detect, and alert on security events.\n\nBehavior:\n- Continuously scan for anomalies and threats\n- Classify severity: INFO / WARN / CRITICAL\n- Never take destructive action without human approval\n- Log all observations with timestamps',
+  researcher: 'You are {NAME}, an AI researcher within AetherCloud.\n\nYour role is to investigate topics, synthesize information, and present findings.\n\nBehavior:\n- Explore multiple angles before drawing conclusions\n- Distinguish between facts, inferences, and speculation\n- Provide sources and references when available\n- Summarize key findings at the end of each investigation',
 };
 
-const SERVER_PERMS = {
-  github:['read','write','auth_delegate'],
-  slack:['read','write'],
-  notion:['read','write'],
-  google_drive:['read','write','auth_delegate'],
-  stripe:['read','write','auth_delegate'],
-  figma:['read'],
-  fal_ai:['execute','network'],
-  excalidraw:['read','write'],
-  context7:['read','network'],
-  desktop_commander:['read','write','execute','file_system'],
-  default:['read','write'],
-};
-
-const PERM_CATALOG = {
-  read:         { desc:'Read data from service',       risk:'low'  },
-  write:        { desc:'Create or modify data',        risk:'med'  },
-  delete:       { desc:'Delete data',                  risk:'high' },
-  execute:      { desc:'Run commands or workflows',    risk:'high' },
-  auth_delegate:{ desc:'Authenticate on your behalf',  risk:'med'  },
-  network:      { desc:'Make outbound HTTP requests',  risk:'med'  },
-  file_system:  { desc:'Read/write local files',       risk:'high' },
-};
-
-const REGISTRY = [
-  { id:'github',            name:'GitHub',          desc:'Repos, issues, PRs, CI/CD',    auth:'api_key',  type:'official',  color:'orange', url:'https://api.githubcopilot.com/mcp' },
-  { id:'slack',             name:'Slack',            desc:'Messages, channels, search',   auth:'oauth',    type:'official',  color:'green',  url:'' },
-  { id:'notion',            name:'Notion',           desc:'Pages, databases, knowledge',  auth:'api_key',  type:'official',  color:'yellow', url:'https://api.notion.com/mcp' },
-  { id:'google_drive',      name:'Google Drive',     desc:'Docs, Sheets, file search',    auth:'oauth',    type:'official',  color:'blue',   url:'' },
-  { id:'stripe',            name:'Stripe',           desc:'Payments, subscriptions',      auth:'api_key',  type:'official',  color:'green',  url:'https://mcp.stripe.com' },
-  { id:'figma',             name:'Figma',            desc:'Design files, components',     auth:'api_key',  type:'official',  color:'blue',   url:'https://mcp.figma.com/mcp' },
-  { id:'fal_ai',            name:'fal.ai',           desc:'1000+ image/video models',     auth:'api_key',  type:'official',  color:'orange', url:'https://mcp.fal.ai/mcp' },
-  { id:'excalidraw',        name:'Excalidraw',       desc:'Diagrams from language',       auth:'none',     type:'official',  color:'orange', url:'' },
-  { id:'context7',          name:'Context7',         desc:'Live docs in prompt',          auth:'none',     type:'official',  color:'yellow', url:'' },
-  { id:'desktop_commander', name:'Desktop Commander',desc:'Terminal, file ops',           auth:'none',     type:'community', color:'red',    url:'' },
-  { id:'postgres',          name:'PostgreSQL',       desc:'Natural language SQL',         auth:'conn_str', type:'community', color:'blue',   url:'' },
-  { id:'supabase',          name:'Supabase',         desc:'Full backend access',          auth:'api_key',  type:'community', color:'green',  url:'' },
-  { id:'playwright',        name:'Playwright',       desc:'Browser automation',           auth:'none',     type:'community', color:'orange', url:'' },
-  { id:'firecrawl',         name:'Firecrawl',        desc:'Scrape + research agent',      auth:'api_key',  type:'community', color:'green',  url:'https://mcp.firecrawl.dev/mcp' },
+const MCP_REGISTRY = [
+  { id:'github',            name:'GitHub',           desc:'Repos, issues, PRs, CI/CD',    transport:'http' },
+  { id:'slack',             name:'Slack',            desc:'Messages, channels, search',    transport:'http' },
+  { id:'notion',            name:'Notion',           desc:'Pages, databases, knowledge',   transport:'http' },
+  { id:'google_drive',      name:'Google Drive',     desc:'Docs, Sheets, file search',     transport:'http' },
+  { id:'stripe',            name:'Stripe',           desc:'Payments, subscriptions',       transport:'http' },
+  { id:'figma',             name:'Figma',            desc:'Design files, components',      transport:'http' },
+  { id:'fal_ai',            name:'fal.ai',           desc:'1000+ image/video models',      transport:'http' },
+  { id:'excalidraw',        name:'Excalidraw',       desc:'Diagrams from language',        transport:'stdio' },
+  { id:'context7',          name:'Context7',         desc:'Live docs in prompt',           transport:'stdio' },
+  { id:'desktop_commander', name:'Desktop Commander', desc:'Terminal, file ops',            transport:'stdio' },
+  { id:'postgres',          name:'PostgreSQL',       desc:'Natural language SQL',          transport:'stdio' },
+  { id:'supabase',          name:'Supabase',         desc:'Full backend access',           transport:'http' },
+  { id:'playwright',        name:'Playwright',       desc:'Browser automation',            transport:'stdio' },
+  { id:'firecrawl',         name:'Firecrawl',        desc:'Scrape + research agent',       transport:'http' },
 ];
 
-let teamAgents = [];
-let teamCurrentId = null;
-let teamTab = 'team';
+let allIcons = [];
+let allProfiles = [];
+let currentProfileId = null;
+let currentTeamFilter = 'all';
 
-function escH(str) {
-  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function genId() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+// ── Data loading ──────────────────────────────────────────────
+async function loadIcons() {
+  if (allIcons.length) return;
+  try { allIcons = await window.aether.agentLoadIcons(); } catch(e) { console.error('[profiles] loadIcons', e); }
 }
 
-// ── Load from vault ────────────────────────────────────────────
-async function teamLoadFromVault() {
+async function loadProfiles() {
+  try { allProfiles = await window.aether.agentLoadProfiles(); } catch(e) { console.error('[profiles] loadProfiles', e); allProfiles = []; }
+}
+
+async function saveProfile(profile) {
+  profile.updatedAt = new Date().toISOString();
   try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/team', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    if (r.ok) { teamAgents = await r.json(); teamRenderSidebar(); }
-  } catch(_) {}
+    await window.aether.agentSaveProfile(profile);
+    const idx = allProfiles.findIndex(p => p.id === profile.id);
+    if (idx >= 0) allProfiles[idx] = profile; else allProfiles.push(profile);
+    renderSidebar();
+    if (typeof showToast === 'function') showToast('Agent saved', 'info');
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Save failed: ' + e.message, 'error');
+  }
 }
 
-async function teamPersistToVault(showFeedback) {
-  if (showFeedback) teamSetVaultState('saving');
+async function deleteProfile(id) {
   try {
-    const token = await getSessionToken();
-    await fetch(API_BASE + '/agent/team', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify(teamAgents),
-    });
-    if (showFeedback) {
-      teamSetVaultState('saved');
-      setTimeout(function() { teamSetVaultState('idle'); }, 2200);
-    }
-  } catch(_) { if (showFeedback) teamSetVaultState('idle'); }
+    await window.aether.agentDeleteProfile(id);
+    allProfiles = allProfiles.filter(p => p.id !== id);
+    if (currentProfileId === id) { currentProfileId = null; showEmptyState(); }
+    renderSidebar();
+    if (typeof showToast === 'function') showToast('Agent deleted', 'info');
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Delete failed: ' + e.message, 'error');
+  }
 }
 
-function teamSetVaultState(state) {
-  const el = document.getElementById('team-vault-indicator');
-  const txt = document.getElementById('team-vault-text');
-  if (!el || !txt) return;
-  el.className = 'team-vault-indicator ' + (state !== 'idle' ? state : '');
-  txt.textContent = state === 'saving' ? 'encrypting...' : state === 'saved' ? 'saved to vault' : 'vault encrypted';
-}
-
-// ── Sidebar ────────────────────────────────────────────────────
-function teamRenderSidebar() {
-  const list = document.getElementById('team-agent-list');
+// ── Sidebar ───────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('profile-list');
+  const badge = document.getElementById('profile-count');
   if (!list) return;
-  if (!teamAgents.length) {
+  const filtered = currentTeamFilter === 'all' ? allProfiles : allProfiles.filter(p => p.team === currentTeamFilter);
+  if (badge) badge.textContent = filtered.length;
+
+  if (!filtered.length) {
     list.innerHTML = '<div style="padding:8px 14px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;">No agents yet</div>';
     return;
   }
-  list.innerHTML = teamAgents.map(function(a) {
-    return '<div class="team-agent-row ' + (a.id === teamCurrentId ? 'active' : '') + '" onclick="teamEditAgent(\'' + a.id + '\')">' +
-      '<div style="width:22px;height:16px;image-rendering:pixelated;flex-shrink:0;">' + teamSVG(a.color||'blue',22,16) + '</div>' +
+  list.innerHTML = filtered.map(function(p) {
+    const icon = allIcons.find(i => i.name === p.icon);
+    const thumb = icon ? '<div class="profile-card-icon">' + icon.svgContent + '</div>' : '<div class="profile-card-icon" style="background:var(--bg-4);"></div>';
+    return '<div class="profile-card ' + (p.id === currentProfileId ? 'active' : '') + '" onclick="profileEdit(\'' + p.id + '\')">' +
+      thumb +
       '<div style="flex:1;min-width:0;">' +
-        '<div class="team-row-name">' + escH(a.name||'Unnamed') + '</div>' +
-        '<div class="team-row-server">' + escH(a.server||'—') + '</div>' +
+        '<div class="profile-card-name">' + esc(p.name || 'Unnamed') + '</div>' +
+        '<div class="profile-card-desc">' + esc(p.description || '') + '</div>' +
       '</div>' +
-      '<div class="team-status-dot ' + (a.connected?'connected':'disconnected') + '"></div>' +
     '</div>';
   }).join('');
-}
 
-// ── Main area ──────────────────────────────────────────────────
-function teamShowMain(html) {
-  const m = document.getElementById('team-main');
-  if (m) m.innerHTML = html;
-}
-
-function teamShowEmpty() {
-  teamShowMain('<div class="team-empty-state">' +
-    '<div style="width:44px;height:32px;image-rendering:pixelated;opacity:0.2;">' + teamSVG('blue',44,32) + '</div>' +
-    '<div class="team-empty-title">No agents configured</div>' +
-    '<div class="team-empty-sub">Add your first MCP agent to start building your team.</div>' +
-    '<button class="sb-agent-btn" onclick="teamNewAgent()" style="margin-top:10px;width:auto;padding:6px 16px;">+ Add First Agent</button>' +
-  '</div>');
-}
-
-// ── Color picker ───────────────────────────────────────────────
-function teamBuildColorPicker(selected) {
-  return Object.keys(TEAM_COLORS).map(function(c) {
-    return '<div class="team-color-swatch ' + (c === selected ? 'selected' : '') + '" id="team-swatch-' + c + '" onclick="teamSelectColor(\'' + c + '\')">' +
-      '<div style="width:33px;height:24px;image-rendering:pixelated;">' + teamSVG(c,33,24) + '</div>' +
-      '<div class="team-color-swatch-label">' + TEAM_COLOR_LABELS[c] + '</div>' +
-    '</div>';
-  }).join('');
-}
-
-window.teamSelectColor = function(color) {
-  document.querySelectorAll('.team-color-swatch').forEach(function(s) { s.classList.remove('selected'); });
-  const sw = document.getElementById('team-swatch-' + color);
-  if (sw) sw.classList.add('selected');
-};
-
-// ── Permissions table ──────────────────────────────────────────
-function teamBuildPerms(serverId, existing) {
-  existing = existing || {};
-  const perms = SERVER_PERMS[serverId] || SERVER_PERMS.default;
-  return perms.map(function(p) {
-    const def = PERM_CATALOG[p]; if (!def) return '';
-    const safeDef = (p === 'delete' || p === 'execute' || p === 'file_system') ? false : true;
-    const isChecked = (p in existing) ? existing[p] : safeDef;
-    return '<tr>' +
-      '<td><span class="team-perm-name">' + p + '</span></td>' +
-      '<td><span class="team-perm-desc">' + def.desc + '</span></td>' +
-      '<td style="text-align:center"><span class="team-perm-risk ' + def.risk + '">' + def.risk + '</span></td>' +
-      '<td style="text-align:center">' +
-        '<label style="position:relative;width:30px;height:16px;display:inline-block;">' +
-          '<input type="checkbox" id="team-perm-' + p + '" ' + (isChecked?'checked':'') + ' style="opacity:0;width:0;height:0;position:absolute;">' +
-          '<div onclick="this.previousElementSibling.checked=!this.previousElementSibling.checked"' +
-            ' style="position:absolute;inset:0;background:var(--bg-3);border:1px solid var(--border-2);border-radius:8px;cursor:pointer;transition:all 0.2s;">' +
-          '</div>' +
-        '</label>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-// ── Editor ─────────────────────────────────────────────────────
-function teamShowEditor(agent) {
-  const isNew = !agent;
-  agent = agent || {};
-  const color = agent.color || 'blue';
-  const server = agent.server || '';
-  const permsHTML = teamBuildPerms(server, agent.perms);
-  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(server);
-
-  teamShowMain(
-    '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);">' +
-        '<div>' +
-          '<div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);margin-bottom:3px;" id="team-editor-title">' + (isNew ? 'New Agent' : escH(agent.name||'Agent')) + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);">Configure connection and permissions</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<div class="team-vault-indicator" id="team-vault-indicator"><div class="team-vault-dot"></div><span id="team-vault-text">vault encrypted</span></div>' +
-          (!isNew ? '<button class="sb-agent-btn" onclick="teamDeleteAgent()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--red);color:var(--red);">Delete</button>' : '') +
-          (!isNew ? '<button class="sb-agent-btn" onclick="teamShowActivity(\'' + escH(agent.id || '') + '\',\'' + escH((agent.name || 'Agent').replace(/'/g, "\\'")) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Activity</button>' : '') +
-          '<button class="sb-agent-btn" onclick="teamCancelEdit()" style="width:auto;padding:4px 10px;font-size:9px;">Cancel</button>' +
-          '<button class="sb-agent-btn" onclick="teamSaveAgent()" style="width:auto;padding:5px 12px;font-size:9px;border-color:var(--accent);color:var(--accent);">Save to Vault</button>' +
-        '</div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Identity</div>' +
-        '<div class="team-form-row">' +
-          '<div class="team-field"><label class="team-label">Agent Name</label><input class="team-input" id="team-f-name" value="' + escH(agent.name||'') + '" placeholder="e.g. GitHub Assistant"></div>' +
-          '<div class="team-field"><label class="team-label">Role Description</label><input class="team-input" id="team-f-desc" value="' + escH(agent.desc||'') + '" placeholder="e.g. manages repos and issues"></div>' +
-        '</div>' +
-        '<div class="team-form-row single"><div class="team-field"><label class="team-label">Icon Color</label><div class="team-color-row">' + teamBuildColorPicker(color) + '</div></div></div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Connection</div>' +
-        '<div class="team-form-row">' +
-          '<div class="team-field"><label class="team-label">MCP Server</label>' +
-            '<select class="team-select" id="team-f-server" onchange="teamOnServerChange()">' +
-              '<option value="">— select or custom —</option>' +
-              '<optgroup label="Official">' +
-                '<option value="github" ' + (server==='github'?'selected':'') + '>GitHub</option>' +
-                '<option value="slack" ' + (server==='slack'?'selected':'') + '>Slack</option>' +
-                '<option value="notion" ' + (server==='notion'?'selected':'') + '>Notion</option>' +
-                '<option value="google_drive" ' + (server==='google_drive'?'selected':'') + '>Google Drive</option>' +
-                '<option value="stripe" ' + (server==='stripe'?'selected':'') + '>Stripe</option>' +
-                '<option value="figma" ' + (server==='figma'?'selected':'') + '>Figma</option>' +
-              '</optgroup>' +
-              '<optgroup label="Aether Built-in">' +
-                '<option value="fal_ai" ' + (server==='fal_ai'?'selected':'') + '>fal.ai (image/video)</option>' +
-                '<option value="excalidraw" ' + (server==='excalidraw'?'selected':'') + '>Excalidraw</option>' +
-                '<option value="context7" ' + (server==='context7'?'selected':'') + '>Context7</option>' +
-                '<option value="desktop_commander" ' + (server==='desktop_commander'?'selected':'') + '>Desktop Commander</option>' +
-              '</optgroup>' +
-              '<optgroup label="Custom">' +
-                '<option value="custom_http" ' + (server==='custom_http'?'selected':'') + '>Custom HTTP Endpoint</option>' +
-                '<option value="custom_stdio" ' + (server==='custom_stdio'?'selected':'') + '>Custom stdio Server</option>' +
-              '</optgroup>' +
-            '</select>' +
-          '</div>' +
-          '<div class="team-field"><label class="team-label">Transport</label>' +
-            '<select class="team-select" id="team-f-transport">' +
-              '<option value="http" ' + ((agent.transport||'http')==='http'?'selected':'') + '>Streamable HTTP</option>' +
-              '<option value="stdio" ' + (agent.transport==='stdio'?'selected':'') + '>stdio (local)</option>' +
-              '<option value="sse" ' + (agent.transport==='sse'?'selected':'') + '>SSE (legacy)</option>' +
-            '</select>' +
-          '</div>' +
-        '</div>' +
-        '<div class="team-form-row single" id="team-url-row" ' + (isStdio?'style="display:none"':'') + '>' +
-          '<div class="team-field"><label class="team-label">Server URL</label><input class="team-input" id="team-f-url" value="' + escH(agent.url||'') + '" placeholder="https://mcp.example.com/mcp"></div>' +
-        '</div>' +
-        '<div class="team-form-row single" id="team-cmd-row" ' + (isStdio?'':'style="display:none"') + '>' +
-          '<div class="team-field"><label class="team-label">Command</label><input class="team-input" id="team-f-cmd" value="' + escH(agent.cmd||'') + '" placeholder="npx -y @org/server-name"></div>' +
-        '</div>' +
-        '<div class="team-form-row" id="team-auth-row" ' + (server&&!['excalidraw','context7','desktop_commander'].includes(server)?'':'style="display:none"') + '>' +
-          '<div class="team-field"><label class="team-label">Auth Type</label>' +
-            '<select class="team-select" id="team-f-auth-type" onchange="teamOnAuthChange()">' +
-              '<option value="bearer" ' + ((agent.authType||'bearer')==='bearer'?'selected':'') + '>Bearer / API Key</option>' +
-              '<option value="none" ' + (agent.authType==='none'?'selected':'') + '>None</option>' +
-            '</select>' +
-          '</div>' +
-          '<div class="team-field" id="team-key-field"><label class="team-label">API Key <span style="color:var(--accent);font-size:8px;">// vault encrypted</span></label>' +
-            '<input class="team-input" id="team-f-key" type="password" value="' + escH(agent.keyHint||'') + '" placeholder="sk-...">' +
-          '</div>' +
-        '</div>' +
-        '<div class="team-test-row">' +
-          '<span class="team-test-status" id="team-test-status">Not tested</span>' +
-          '<button class="sb-agent-btn" onclick="teamTestConnection()" style="width:auto;padding:4px 10px;font-size:9px;">Test Connection</button>' +
-        '</div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
-          '<button class="sb-agent-btn" id="team-tools-btn" onclick="teamLoadTools(\'' + (agent.id || teamCurrentId) + '\')" style="width:auto;padding:4px 10px;font-size:9px;">Discover Tools</button>' +
-          '<span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);">// see what this agent can do</span>' +
-        '</div>' +
-        '<div id="team-tools-panel" style="display:none;margin-bottom:10px;max-height:220px;overflow-y:auto;"></div>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Permissions</div>' +
-        '<table class="team-perms-table">' +
-          '<thead><tr>' +
-            '<th style="width:130px">Permission</th>' +
-            '<th>Description</th>' +
-            '<th style="width:55px;text-align:center">Risk</th>' +
-            '<th style="width:45px;text-align:center">Allow</th>' +
-          '</tr></thead>' +
-          '<tbody id="team-perms-body">' + permsHTML + '</tbody>' +
-        '</table>' +
-      '</div>' +
-
-      '<div class="team-form-section">' +
-        '<div class="team-section-label">Routing Hints</div>' +
-        '<div class="team-form-row single"><div class="team-field">' +
-          '<label class="team-label">Trigger Keywords <span style="color:var(--text-muted);">// comma-separated</span></label>' +
-          '<input class="team-input" id="team-f-keywords" value="' + escH(agent.keywords||'') + '" placeholder="e.g. github, repo, pull request, issue">' +
-        '</div></div>' +
-        '<div class="team-form-row single"><div class="team-field">' +
-          '<label class="team-label">System Prompt Injection <span style="color:var(--text-muted);">// added to QOPC when active</span></label>' +
-          '<textarea class="team-textarea" id="team-f-prompt" placeholder="e.g. You have access to GitHub. Use the GitHub agent for code and repo tasks.">' + escH(agent.prompt||'') + '</textarea>' +
-        '</div></div>' +
-      '</div>' +
-    '</div>'
-  );
-}
-
-// ── Server change ──────────────────────────────────────────────
-window.teamOnServerChange = function() {
-  const val = document.getElementById('team-f-server').value;
-  const isStdio = ['excalidraw','desktop_commander','context7','custom_stdio'].includes(val);
-  const urlRow = document.getElementById('team-url-row');
-  const cmdRow = document.getElementById('team-cmd-row');
-  const authRow = document.getElementById('team-auth-row');
-  if (urlRow) urlRow.style.display = isStdio ? 'none' : '';
-  if (cmdRow) cmdRow.style.display = isStdio ? '' : 'none';
-  const noAuth = ['excalidraw','context7','desktop_commander'].includes(val);
-  if (authRow) authRow.style.display = noAuth ? 'none' : '';
-
-  const reg = REGISTRY.find(function(r) { return r.id === val; });
-  if (reg) {
-    if (reg.url) { const u = document.getElementById('team-f-url'); if (u) u.value = reg.url; }
-    teamSelectColor(reg.color || 'blue');
-  }
-
-  const body = document.getElementById('team-perms-body');
-  if (body) body.innerHTML = teamBuildPerms(val, {});
-};
-
-window.teamOnAuthChange = function() {
-  const type = document.getElementById('team-f-auth-type').value;
-  const kf = document.getElementById('team-key-field');
-  if (kf) kf.style.display = type === 'none' ? 'none' : '';
-};
-
-// ── Connection test ────────────────────────────────────────────
-window.teamTestConnection = async function() {
-  const el = document.getElementById('team-test-status');
-  if (!el) return;
-  el.className = 'team-test-status testing';
-  el.textContent = 'Testing...';
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/test', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify({
-        server: document.getElementById('team-f-server').value,
-        url: (document.getElementById('team-f-url') || {}).value || '',
-        transport: document.getElementById('team-f-transport').value,
-        agentId: teamCurrentId || 'test',
-      }),
-    });
-    const data = await r.json();
-    if (data.ok) {
-      el.className = 'team-test-status ok';
-      el.textContent = 'Connected ✓ ' + (data.tools ? data.tools.length : 0) + ' tools';
-      const a = teamAgents.find(function(x) { return x.id === teamCurrentId; });
-      if (a) { a.connected = true; teamRenderSidebar(); }
-    } else {
-      el.className = 'team-test-status fail';
-      el.textContent = 'Failed: ' + (data.error||'connection refused');
-    }
-  } catch(e) {
-    el.className = 'team-test-status fail';
-    el.textContent = 'Error: ' + e.message;
-  }
-};
-
-// ── CRUD ───────────────────────────────────────────────────────
-window.teamNewAgent = function() {
-  teamCurrentId = 'new_' + Date.now();
-  teamShowEditor(null);
-  teamRenderSidebar();
-};
-
-window.teamEditAgent = function(id) {
-  const a = teamAgents.find(function(x) { return x.id === id; });
-  if (!a) return;
-  teamCurrentId = id;
-  teamShowEditor(a);
-  teamRenderSidebar();
-};
-
-window.teamSaveAgent = async function() {
-  const name = (document.getElementById('team-f-name') ? document.getElementById('team-f-name').value : '').trim();
-  if (!name) { const nf = document.getElementById('team-f-name'); if (nf) nf.focus(); return; }
-  const colorSwatch = document.querySelector('.team-color-swatch.selected');
-  const color = colorSwatch ? (colorSwatch.id || '').replace('team-swatch-','') : 'blue';
-  const server = (document.getElementById('team-f-server') || {}).value || '';
-  const permsObj = {};
-  (SERVER_PERMS[server]||SERVER_PERMS.default).forEach(function(p) {
-    const el = document.getElementById('team-perm-' + p);
-    if (el) permsObj[p] = el.checked;
-  });
-  const keyEl = document.getElementById('team-f-key');
-  const rawKey = keyEl ? keyEl.value : '';
-  if (rawKey && rawKey !== '••••••••') {
-    try {
-      const token = await getSessionToken();
-      await fetch(API_BASE + '/agent/key/' + teamCurrentId, {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-        body: JSON.stringify({ key: rawKey }),
-      });
-    } catch(_) {}
-  }
-  const agent = {
-    id: teamCurrentId,
-    name: name,
-    desc: ((document.getElementById('team-f-desc') || {}).value||'').trim(),
-    color: color,
-    server: server,
-    transport: (document.getElementById('team-f-transport') || {}).value || 'http',
-    url: ((document.getElementById('team-f-url') || {}).value||'').trim(),
-    cmd: ((document.getElementById('team-f-cmd') || {}).value||'').trim(),
-    authType: (document.getElementById('team-f-auth-type') || {}).value || 'bearer',
-    keyHint: rawKey ? '••••••••' : '',
-    keywords: ((document.getElementById('team-f-keywords') || {}).value||'').trim(),
-    prompt: ((document.getElementById('team-f-prompt') || {}).value||'').trim(),
-    perms: permsObj,
-    connected: false,
-  };
-  const idx = teamAgents.findIndex(function(a) { return a.id === teamCurrentId; });
-  if (idx >= 0) teamAgents[idx] = agent; else teamAgents.push(agent);
-  await teamPersistToVault(true);
-  teamRenderSidebar();
-  const titleEl = document.getElementById('team-editor-title');
-  if (titleEl) titleEl.textContent = name;
-  if (typeof showToast === 'function') showToast('Agent saved to vault', 'success');
-};
-
-window.teamDeleteAgent = function() {
-  if (!teamCurrentId) return;
-  if (!confirm('Remove this agent from your team?')) return;
-  teamAgents = teamAgents.filter(function(a) { return a.id !== teamCurrentId; });
-  teamCurrentId = null;
-  teamPersistToVault(false);
-  teamRenderSidebar();
-  if (teamAgents.length) teamEditAgent(teamAgents[0].id);
-  else teamShowEmpty();
-};
-
-window.teamCancelEdit = function() {
-  if (teamAgents.length) {
-    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) return;
-    teamCurrentId = null;
-    teamEditAgent(teamAgents[0].id);
-  } else {
-    teamCurrentId = null;
-    teamShowEmpty();
-  }
-};
-
-// ── Registry ───────────────────────────────────────────────────
-function teamShowRegistry(filter) {
-  filter = (filter||'').toLowerCase();
-  const items = REGISTRY.filter(function(r) {
-    return !filter || r.name.toLowerCase().includes(filter) || r.desc.toLowerCase().includes(filter);
-  });
-  teamShowMain(
-    '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
-        '<input class="sb-search" id="team-registry-search" placeholder="search servers..." oninput="teamShowRegistry(this.value)" style="flex:1;margin-bottom:0;">' +
-        '<button class="sb-agent-btn" onclick="switchTeamTab(\'team\')" style="width:auto;padding:5px 12px;font-size:9px;">← Back</button>' +
-      '</div>' +
-      '<div class="team-registry-grid">' +
-        items.map(function(r) {
-          const installed = teamAgents.some(function(a) { return a.server === r.id; });
-          return '<div class="team-registry-card ' + (installed?'installed':'') + '" onclick="teamInstallFromRegistry(\'' + r.id + '\')">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">' +
-              '<div style="width:22px;height:16px;image-rendering:pixelated;">' + teamSVG(r.color,22,16) + '</div>' +
-              '<span class="team-registry-card-name">' + escH(r.name) + '</span>' +
-            '</div>' +
-            '<div class="team-registry-card-desc">' + escH(r.desc) + '</div>' +
-            '<div class="team-registry-card-footer">' +
-              '<span class="team-registry-card-auth">' + r.auth + '</span>' +
-              '<span class="team-badge ' + (installed?'installed':r.type) + '">' + (installed?'installed':r.type) + '</span>' +
-            '</div>' +
-          '</div>';
-        }).join('') +
-      '</div>' +
-    '</div>'
-  );
-}
-
-window.teamInstallFromRegistry = function(serverId) {
-  const reg = REGISTRY.find(function(r) { return r.id === serverId; });
-  if (!reg) return;
-  switchTeamTab('team');
-  teamCurrentId = 'new_' + Date.now();
+  // Post-render: animate sidebar icons that have animation data
   setTimeout(function() {
-    teamShowEditor({ server: reg.id, url: reg.url||'', name: reg.name + ' Agent', color: reg.color, keywords: reg.name.toLowerCase() });
-    teamRenderSidebar();
-  }, 50);
-};
-
-// ── Tab switching ──────────────────────────────────────────────
-window.switchTeamTab = function(tab) {
-  teamTab = tab;
-  const t1 = document.getElementById('team-tab-my');
-  const t2 = document.getElementById('team-tab-registry');
-  const t3 = document.getElementById('team-tab-pipeline');
-  if (t1) t1.classList.toggle('active', tab === 'team');
-  if (t2) t2.classList.toggle('active', tab === 'registry');
-  if (t3) t3.classList.toggle('active', tab === 'pipeline');
-  if (tab === 'registry') {
-    teamShowRegistry('');
-  } else if (tab === 'pipeline') {
-    teamShowPipeline();
-  } else {
-    if (teamCurrentId && teamAgents.find(function(a) { return a.id === teamCurrentId; })) teamEditAgent(teamCurrentId);
-    else if (teamAgents.length) teamEditAgent(teamAgents[0].id);
-    else teamShowEmpty();
-  }
-};
-
-// ── Tool Discovery (Priority 4) ────────────────────────────────
-window.teamLoadTools = async function(agentId) {
-  const panel = document.getElementById('team-tools-panel');
-  const btn   = document.getElementById('team-tools-btn');
-  if (!panel) return;
-  panel.style.display = 'block';
-  panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:8px;">Connecting to MCP server...</div>';
-  if (btn) btn.disabled = true;
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/tools/' + encodeURIComponent(agentId), {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await r.json();
-    if (data.ok && data.tools && data.tools.length) {
-      panel.innerHTML =
-        '<div style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">' +
-        data.tools.length + ' tools available ' +
-        (data.source === 'live' ? '<span style="color:var(--green);">// live</span>' : '<span style="color:var(--text-muted);">// cached</span>') +
-        '</div>' +
-        data.tools.map(function(t) {
-          return '<div style="padding:5px 8px;margin-bottom:3px;background:var(--bg-3);border:1px solid var(--border);">' +
-            '<div style="font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--text-primary);">' + escH(t.name) + '</div>' +
-            (t.description ? '<div style="font-size:9px;color:var(--text-muted);margin-top:2px;">' + escH(t.description) + '</div>' : '') +
-            '</div>';
-        }).join('');
-    } else {
-      panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--amber);padding:8px;">' +
-        (data.error || 'No tools found') + '</div>';
-    }
-  } catch(e) {
-    panel.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);padding:8px;">Error: ' + escH(e.message) + '</div>';
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-};
-
-// ── Activity Log (Priority 5) ──────────────────────────────────
-window.teamShowActivity = async function(agentId, agentName) {
-  teamShowMain('<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding:20px;">Loading activity...</div>');
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/activity/' + encodeURIComponent(agentId) + '?limit=50', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await r.json();
-    const entries = data.entries || [];
-    if (!entries.length) {
-      teamShowMain(
-        '<div class="team-empty-state">' +
-        '<div class="team-empty-title">No activity yet for ' + escH(agentName || agentId) + '</div>' +
-        '<div class="team-empty-sub">Send a message that matches this agent\'s keywords and the call will be logged here with a Protocol-C hash.</div>' +
-        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-top:10px;width:auto;padding:6px 14px;">← Back to Config</button>' +
-        '</div>'
-      );
-      return;
-    }
-    teamShowMain(
-      '<div style="max-width:700px;">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
-        '<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--accent);">' + escH(agentName || agentId) + ' — Activity</span>' +
-        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + entries.length + ' calls</span>' +
-        '<button class="sb-agent-btn" onclick="teamEditAgent(\'' + agentId + '\')" style="margin-left:auto;width:auto;padding:4px 10px;font-size:9px;">← Config</button>' +
-      '</div>' +
-      entries.map(function(e) {
-        var statusColor = e.status === 'ok' ? 'var(--green)' : 'var(--red)';
-        var ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
-        return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + statusColor + ';">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-            '<span style="font-family:var(--font-mono);font-size:9px;color:' + statusColor + ';text-transform:uppercase;">' + escH(e.status) + '</span>' +
-            '<span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">' + escH(e.tool_name) + '</span>' +
-            '<span style="font-size:9px;color:var(--text-muted);margin-left:auto;">' + escH(ts) + '</span>' +
-          '</div>' +
-          '<div style="font-size:10px;color:var(--text-primary);margin-bottom:3px;">' + escH(e.query_summary) + '</div>' +
-          (e.result_summary ? '<div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;">' + escH(e.result_summary.substring(0, 120)) + (e.result_summary.length > 120 ? '…' : '') + '</div>' : '') +
-          (e.error ? '<div style="font-size:9px;color:var(--red);">Error: ' + escH(e.error) + '</div>' : '') +
-          '<div style="font-family:var(--font-mono);font-size:8px;color:rgba(0,212,255,0.3);margin-top:4px;" title="Protocol-C hash">&#8984; ' + (e.hash || '').substring(0, 16) + '…</div>' +
-        '</div>';
-      }).join('') +
-      '</div>'
-    );
-  } catch(ex) {
-    teamShowMain('<div style="padding:20px;font-family:var(--font-mono);font-size:10px;color:var(--red);">Failed to load activity: ' + escH(ex.message) + '</div>');
-  }
-};
-
-// ── Pipeline Builder (Priority 6) ─────────────────────────────
-var _pipelineSteps = [];
-
-window.teamShowPipeline = async function() {
-  // Load templates in background
-  let templates = [];
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
-    const d = await r.json();
-    templates = d.templates || [];
-  } catch(_) {}
-
-  const agentOptions = teamAgents.map(function(a) {
-    return '<option value="' + escH(a.id) + '">' + escH(a.name) + ' (' + escH(a.server || '?') + ')</option>';
-  }).join('');
-
-  teamShowMain(
-    '<div style="max-width:700px;" id="pipeline-editor">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">' +
-      '<span style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);">Pipeline Builder</span>' +
-      '<span style="font-size:11px;color:var(--text-muted);">// chain agents sequentially</span>' +
-      '<div style="margin-left:auto;display:flex;gap:6px;">' +
-        (templates.length ? '<select class="team-select" id="pipeline-template-sel" style="font-size:9px;padding:4px 24px 4px 8px;" onchange="teamLoadTemplate(this.value)">' +
-          '<option value="">Load template…</option>' +
-          templates.map(function(t) { return '<option value="' + escH(t.id) + '">' + escH(t.name) + '</option>'; }).join('') +
-          '</select>' : '') +
-        '<button class="sb-agent-btn" onclick="teamAddPipelineStep()" style="width:auto;padding:4px 10px;font-size:9px;">+ Add Step</button>' +
-        '<button class="sb-agent-btn" id="pipeline-run-btn" onclick="teamRunPipeline()" style="width:auto;padding:4px 10px;font-size:9px;border-color:var(--accent);color:var(--accent);">▶ Run</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="team-form-row single" style="margin-bottom:14px;"><div class="team-field">' +
-      '<label class="team-label">Initial Input</label>' +
-      '<textarea class="team-textarea" id="pipeline-input" placeholder="What should the first step work on?" style="min-height:50px;"></textarea>' +
-    '</div></div>' +
-    '<div id="pipeline-steps" style="display:flex;flex-direction:column;gap:8px;"></div>' +
-    '<div id="pipeline-results" style="margin-top:16px;"></div>' +
-    '</div>'
-  );
-  _pipelineSteps = [];
-  // Add one default step
-  teamAddPipelineStep();
-};
-
-window.teamAddPipelineStep = function() {
-  _pipelineSteps.push({ agent_id: '', prompt_template: '{initial_input}', label: '' });
-  teamRenumberSteps();
-};
-
-window.teamRenumberSteps = function() {
-  const container = document.getElementById('pipeline-steps');
-  if (!container) return;
-  const agentOptions = '<option value="">— select agent —</option>' + teamAgents.map(function(a) {
-    return '<option value="' + escH(a.id) + '">' + escH(a.name) + '</option>';
-  }).join('');
-
-  container.innerHTML = _pipelineSteps.map(function(step, i) {
-    return '<div style="padding:12px;background:var(--bg-3);border:1px solid var(--border);" id="pipeline-step-' + i + '">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-        '<span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);">STEP ' + (i + 1) + '</span>' +
-        '<input class="team-input" placeholder="Step label (optional)" value="' + escH(step.label || '') + '" style="flex:1;" oninput="_pipelineSteps[' + i + '].label=this.value">' +
-        '<button onclick="_pipelineSteps.splice(' + i + ',1);teamRenumberSteps()" style="background:none;border:1px solid var(--border-2);color:var(--text-muted);font-size:10px;padding:2px 8px;cursor:pointer;">✕</button>' +
-      '</div>' +
-      '<div class="team-form-row">' +
-        '<div class="team-field"><label class="team-label">Agent</label>' +
-          '<select class="team-select" onchange="_pipelineSteps[' + i + '].agent_id=this.value">' +
-            agentOptions.replace('value="' + escH(step.agent_id) + '"', 'value="' + escH(step.agent_id) + '" selected') +
-          '</select>' +
-        '</div>' +
-        '<div class="team-field"><label class="team-label">Prompt Template</label>' +
-          '<input class="team-input" value="' + escH(step.prompt_template || '{initial_input}') + '" placeholder="{initial_input} or {previous_output}" oninput="_pipelineSteps[' + i + '].prompt_template=this.value">' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-};
-
-window.teamRunPipeline = async function() {
-  const input = (document.getElementById('pipeline-input') || {}).value || '';
-  if (!input.trim()) { alert('Enter an initial input for the pipeline.'); return; }
-  if (!_pipelineSteps.length) { alert('Add at least one step.'); return; }
-  const btn = document.getElementById('pipeline-run-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Running…'; }
-  const resultsEl = document.getElementById('pipeline-results');
-  if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">Executing pipeline…</div>';
-  try {
-    const token = await getSessionToken();
-    const r = await fetch(API_BASE + '/agent/pipeline/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ steps: _pipelineSteps, initial_input: input, name: 'Dashboard Pipeline' }),
-    });
-    const data = await r.json();
-    if (resultsEl) {
-      resultsEl.innerHTML =
-        '<div style="margin-bottom:8px;font-family:var(--font-mono);font-size:9px;color:' + (data.ok ? 'var(--green)' : 'var(--amber)') + ';text-transform:uppercase;">' +
-        'Pipeline ' + (data.ok ? 'Complete ✓' : 'Partial') + ' — ' + (data.step_count || 0) + ' steps</div>' +
-        (data.results || []).map(function(res) {
-          var c = res.status === 'ok' ? 'var(--green)' : 'var(--red)';
-          return '<div style="margin-bottom:8px;padding:10px 12px;background:var(--bg-3);border:1px solid var(--border);border-left:3px solid ' + c + ';">' +
-            '<div style="font-family:var(--font-mono);font-size:9px;color:' + c + ';margin-bottom:4px;">STEP ' + (res.step_index + 1) + ' — ' + escH(res.label || res.agent_id) + ' (' + res.duration_ms + 'ms)</div>' +
-            (res.output ? '<div style="font-size:10px;color:var(--text-primary);white-space:pre-wrap;">' + escH(res.output.substring(0, 500)) + (res.output.length > 500 ? '\n…' : '') + '</div>' : '') +
-            (res.error ? '<div style="font-size:9px;color:var(--red);margin-top:4px;">Error: ' + escH(res.error) + '</div>' : '') +
-          '</div>';
-        }).join('');
-    }
-  } catch(ex) {
-    if (resultsEl) resultsEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);">Pipeline failed: ' + escH(ex.message) + '</div>';
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Run'; }
-  }
-};
-
-window.teamLoadTemplate = function(templateId) {
-  if (!templateId) return;
-  // Fetch from cached templates or re-request
-  getSessionToken().then(function(token) {
-    return fetch(API_BASE + '/agent/pipeline/templates', { headers: { 'Authorization': 'Bearer ' + token } });
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    var tpl = (d.templates || []).find(function(t) { return t.id === templateId; });
-    if (!tpl) return;
-    _pipelineSteps = (tpl.steps || []).map(function(s) {
-      return { agent_id: s.agent_id || '', prompt_template: s.prompt_template || '{initial_input}', label: s.label || '' };
-    });
-    // Try to auto-match steps to user agents by hint_server
-    tpl.steps.forEach(function(s, i) {
-      if (s.hint_server && !_pipelineSteps[i].agent_id) {
-        var match = teamAgents.find(function(a) { return a.server === s.hint_server; });
-        if (match) _pipelineSteps[i].agent_id = match.id;
+    if (!window.agentAnimator) return;
+    filtered.forEach(function(p) {
+      if (window.agentAnimator.hasAnimation(p.icon)) {
+        var cards = list.querySelectorAll('.profile-card');
+        cards.forEach(function(card) {
+          if (card.getAttribute('onclick') && card.getAttribute('onclick').includes(p.id)) {
+            var iconDiv = card.querySelector('.profile-card-icon');
+            if (iconDiv) window.agentAnimator.animate(iconDiv, p.icon, { size: 36, sequence: 'idle' });
+          }
+        });
       }
     });
-    teamRenumberSteps();
-    if (typeof showToast === 'function') showToast('Template "' + tpl.name + '" loaded', 'info');
-  }).catch(function() {});
+  }, 0);
+}
+
+// ── Empty state ───────────────────────────────────────────────
+function showEmptyState() {
+  const main = document.getElementById('profile-main');
+  if (!main) return;
+  const iconPreview = allIcons.slice(0, 8).map(function(ic) {
+    return '<div style="width:40px;height:40px;image-rendering:pixelated;opacity:0.3;">' + ic.svgContent + '</div>';
+  }).join('');
+  main.innerHTML = '<div class="profile-empty-state">' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">' + iconPreview + '</div>' +
+    '<div class="profile-empty-title">Create your first agent</div>' +
+    '<div class="profile-empty-sub">Configure an AI agent with a custom icon, system prompt, tasks, and MCP tools.</div>' +
+    '<button class="profile-btn primary" onclick="profileNew()" style="margin-top:12px;">+ NEW AGENT</button>' +
+  '</div>';
+}
+
+// ── Editor rendering ──────────────────────────────────────────
+function renderEditor(profile) {
+  const main = document.getElementById('profile-main');
+  if (!main) return;
+
+  const selectedIcon = allIcons.find(i => i.name === profile.icon);
+  const largeIcon = selectedIcon ? selectedIcon.svgContent : '';
+
+  const iconGrid = allIcons.map(function(ic) {
+    return '<div class="profile-icon-tile ' + (ic.name === profile.icon ? 'selected' : '') + '" data-icon="' + esc(ic.name) + '" onclick="profileSelectIcon(\'' + esc(ic.name) + '\')">' + ic.svgContent + '</div>';
+  }).join('');
+
+  const tasksHtml = (profile.tasks || []).map(function(t, i) {
+    return buildTaskRow(t, i, profile.tasks.length);
+  }).join('');
+
+  const mcpChips = (profile.mcpAgents || []).map(function(id) {
+    const mcp = MCP_REGISTRY.find(m => m.id === id);
+    return '<span class="profile-chip">' + esc(mcp ? mcp.name : id) +
+      ' <span class="remove" onclick="profileRemoveMcp(\'' + esc(id) + '\')">&times;</span></span>';
+  }).join('');
+
+  const mcpList = MCP_REGISTRY.map(function(m) {
+    const isActive = (profile.mcpAgents || []).includes(m.id);
+    return '<div class="profile-mcp-item">' +
+      '<span class="profile-mcp-name">' + esc(m.name) + '</span>' +
+      '<span class="profile-mcp-desc">' + esc(m.desc) + '</span>' +
+      '<span class="profile-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'ACTIVE' : 'OFF') + '</span>' +
+      '<div class="profile-toggle ' + (isActive ? 'on' : '') + '" onclick="profileToggleMcp(\'' + esc(m.id) + '\')"></div>' +
+    '</div>';
+  }).join('');
+
+  const skillChips = (profile.skills || []).map(function(s) {
+    return '<span class="profile-chip">' + esc(s) +
+      ' <span class="remove" onclick="profileRemoveSkill(\'' + esc(s) + '\')">&times;</span></span>';
+  }).join('');
+
+  main.innerHTML =
+    '<div class="profile-editor" id="profile-editor">' +
+
+    // ── IDENTITY SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">IDENTITY</div>' +
+      '<div class="profile-identity-row">' +
+        '<div class="profile-icon-large" id="profile-icon-preview">' + largeIcon + '</div>' +
+        '<div class="profile-identity-fields">' +
+          '<div><label class="profile-label">AGENT NAME</label>' +
+            '<input class="profile-input" id="profile-name" type="text" maxlength="32" placeholder="ENTER DESIGNATION..." value="' + esc(profile.name) + '" oninput="profileUpdateCharCount()">' +
+            '<div class="profile-char-counter" id="profile-name-count">' + (profile.name||'').length + '/32</div>' +
+          '</div>' +
+          '<div><label class="profile-label">TEAM</label>' +
+            '<select class="profile-select" id="profile-team-select">' +
+              TEAMS.map(t => '<option value="' + esc(t) + '"' + (t === profile.team ? ' selected' : '') + '>' + esc(t) + '</option>').join('') +
+            '</select>' +
+          '</div>' +
+          '<div><label class="profile-label">DESCRIPTION</label>' +
+            '<textarea class="profile-textarea" id="profile-desc" rows="3" placeholder="Describe this agent\'s role and purpose...">' + esc(profile.description) + '</textarea>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="profile-section-header" style="margin-top:14px;">CHOOSE ICON</div>' +
+      '<div class="profile-icon-grid" id="profile-icon-grid">' + iconGrid + '</div>' +
+    '</div>' +
+
+    // ── SYSTEM PROMPT SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">SYSTEM PROMPT' +
+        '<span class="profile-section-toggle" id="prompt-toggle" onclick="profileToggleSection(\'prompt\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="prompt-body" style="max-height:400px;">' +
+        '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
+          '<div class="profile-template-dropdown">' +
+            '<button class="profile-btn outlined" onclick="profileToggleTemplateMenu()" style="font-size:9px;padding:4px 10px;">Load Template &#9660;</button>' +
+            '<div class="profile-template-menu" id="profile-template-menu">' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'analyst\')">Analyst</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'executor\')">Executor</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'sentinel\')">Sentinel</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'researcher\')">Researcher</div>' +
+              '<div class="profile-template-option" onclick="profileLoadTemplate(\'custom\')">Custom (blank)</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<textarea class="profile-textarea" id="profile-prompt" style="min-height:200px;" placeholder="You are [AGENT NAME], an AI agent operating within AetherCloud...\nDefine behavior, tone, restrictions, and context here." oninput="profileUpdateTokenCount()">' + esc(profile.systemPrompt) + '</textarea>' +
+        '<div class="profile-token-counter" id="profile-token-count">' + (profile.systemPrompt||'').length + ' chars / ~' + Math.ceil((profile.systemPrompt||'').length / 4) + ' tokens</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── TASKS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">TASKS <span style="font-size:9px;color:var(--text-muted);">(' + (profile.tasks||[]).length + '/10)</span>' +
+        '<button class="profile-btn outlined" onclick="profileAddTask()" style="font-size:9px;padding:3px 10px;margin-left:auto;"' + ((profile.tasks||[]).length >= 10 ? ' disabled' : '') + '>+ ADD TASK</button>' +
+      '</div>' +
+      '<div id="profile-tasks">' + (tasksHtml || '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;padding:8px 0;">No tasks configured</div>') + '</div>' +
+    '</div>' +
+
+    // ── MCP AGENTS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">MCP AGENTS' +
+        '<span class="profile-section-toggle" id="mcp-toggle" onclick="profileToggleSection(\'mcp\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="mcp-body" style="max-height:600px;">' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">Connect model context protocol tools to this agent.</div>' +
+        (mcpChips ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">' + mcpChips + '</div>' : '') +
+        '<input class="profile-search" id="mcp-search" type="text" placeholder="Search MCPs..." oninput="profileFilterMcps()">' +
+        '<div id="profile-mcp-list">' + mcpList + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── SKILLS SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">SKILLS' +
+        '<span class="profile-section-toggle" id="skills-toggle" onclick="profileToggleSection(\'skills\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="skills-body" style="max-height:400px;">' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">Attach skill modules to this agent.</div>' +
+        (skillChips ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">' + skillChips + '</div>' : '') +
+        '<div id="profile-skill-list"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);font-style:italic;">No skills available. Add skills to agent/skills/ directory.</div></div>' +
+        '<button class="profile-btn outlined" onclick="profileToggleAddSkill()" style="font-size:9px;padding:4px 10px;margin-top:8px;">+ ADD SKILL</button>' +
+        '<div class="profile-add-form" id="profile-add-skill-form">' +
+          '<div class="profile-add-form-row">' +
+            '<input class="profile-input" id="new-skill-name" placeholder="Skill name" style="flex:1;">' +
+            '<input class="profile-input" id="new-skill-desc" placeholder="Description" style="flex:2;">' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="profile-btn primary" onclick="profileSaveNewSkill()" style="font-size:9px;padding:4px 12px;">Save</button>' +
+            '<button class="profile-btn outlined" onclick="profileToggleAddSkill()" style="font-size:9px;padding:4px 12px;">Cancel</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '</div>' +
+
+    // ── SAVE BAR ──
+    '<div class="profile-save-bar">' +
+      '<button class="profile-btn primary" onclick="profileSave()">SAVE AGENT</button>' +
+      '<button class="profile-btn outlined" onclick="profileExport()">EXPORT CONFIG</button>' +
+      '<button class="profile-btn outlined" onclick="profileDuplicate()">DUPLICATE</button>' +
+      '<button class="profile-btn outlined" onclick="profileOpenTerminal()">TERMINAL</button>' +
+      '<div style="flex:1;"></div>' +
+      '<button class="profile-btn danger" onclick="profileDelete()">DELETE AGENT</button>' +
+    '</div>';
+
+  // Post-render: activate animation on the large icon preview if available
+  setTimeout(function() {
+    if (window.agentAnimator && window.agentAnimator.hasAnimation(profile.icon)) {
+      var preview = document.getElementById('profile-icon-preview');
+      if (preview) window.agentAnimator.animate(preview, profile.icon, { size: 72, sequence: 'duck' });
+    }
+  }, 0);
+}
+
+// ── Task row builder ──────────────────────────────────────────
+function buildTaskRow(task, index, total) {
+  const priorities = ['LOW','MEDIUM','HIGH','CRITICAL'];
+  const priorityBtns = priorities.map(function(p) {
+    const cls = task.priority === p ? 'active-' + p.toLowerCase() : '';
+    return '<button class="profile-priority-btn ' + cls + '" onclick="profileSetTaskPriority(' + index + ',\'' + p + '\')">' + p + '</button>';
+  }).join('');
+
+  const triggers = ['Manual','Scheduled','Event','Chained'];
+  const triggerOpts = triggers.map(function(t) {
+    return '<option value="' + t + '"' + (task.trigger === t ? ' selected' : '') + '>' + t + '</option>';
+  }).join('');
+
+  return '<div class="profile-task-row" data-task-index="' + index + '">' +
+    '<div class="profile-task-fields">' +
+      '<input class="profile-input" placeholder="Task name" value="' + esc(task.name) + '" onchange="profileUpdateTask(' + index + ',\'name\',this.value)" style="font-weight:500;">' +
+      '<textarea class="profile-textarea" rows="2" placeholder="Task description..." onchange="profileUpdateTask(' + index + ',\'description\',this.value)" style="min-height:40px;">' + esc(task.description) + '</textarea>' +
+      '<div class="profile-task-meta">' +
+        '<div class="profile-priority-seg">' + priorityBtns + '</div>' +
+        '<select class="profile-select" onchange="profileUpdateTask(' + index + ',\'trigger\',this.value)" style="width:120px;padding:3px 24px 3px 8px;font-size:9px;">' + triggerOpts + '</select>' +
+      '</div>' +
+    '</div>' +
+    '<div class="profile-task-actions">' +
+      '<button class="profile-task-action-btn" onclick="profileMoveTask(' + index + ',-1)"' + (index === 0 ? ' disabled style="opacity:0.3"' : '') + '>&#9650;</button>' +
+      '<button class="profile-task-action-btn" onclick="profileMoveTask(' + index + ',1)"' + (index === total - 1 ? ' disabled style="opacity:0.3"' : '') + '>&#9660;</button>' +
+      '<button class="profile-task-action-btn delete" onclick="profileRemoveTask(' + index + ')">&#10005;</button>' +
+    '</div>' +
+  '</div>';
+}
+
+// ── Collect current form state into profile object ────────────
+function collectProfile() {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return null;
+  p.name = (document.getElementById('profile-name')?.value || '').trim();
+  p.description = (document.getElementById('profile-desc')?.value || '').trim();
+  p.systemPrompt = (document.getElementById('profile-prompt')?.value || '');
+  const teamSel = document.getElementById('profile-team-select');
+  if (teamSel) p.team = teamSel.value;
+  return p;
+}
+
+// ── Window-level handlers (called from onclick) ───────────────
+
+window.profilePanelInit = async function() {
+  await loadIcons();
+  await loadProfiles();
+  if (window.agentAnimator) await window.agentAnimator.load();
+  renderSidebar();
+  if (currentProfileId) {
+    const p = allProfiles.find(pr => pr.id === currentProfileId);
+    if (p) renderEditor(p); else showEmptyState();
+  } else {
+    showEmptyState();
+  }
 };
 
-// ── Expose init ────────────────────────────────────────────────
-window.teamPanelInit = function() {
-  teamLoadFromVault();
-  if (!teamAgents.length) teamShowEmpty();
-  const t1 = document.getElementById('team-tab-my');
-  if (t1) t1.classList.add('active');
+window.profileNew = function() {
+  const profile = {
+    id: genId(),
+    name: '',
+    icon: allIcons.length ? allIcons[0].name : '',
+    description: '',
+    team: 'Default Team',
+    systemPrompt: '',
+    tasks: [],
+    mcpAgents: [],
+    skills: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  allProfiles.push(profile);
+  currentProfileId = profile.id;
+  renderSidebar();
+  renderEditor(profile);
 };
 
-})(); // end AGENT TEAM CONFIG PANEL IIFE
+window.profileEdit = function(id) {
+  const p = allProfiles.find(pr => pr.id === id);
+  if (!p) return;
+  if (currentProfileId && currentProfileId !== id) collectProfile();
+  currentProfileId = id;
+  renderSidebar();
+  renderEditor(p);
+};
+
+window.profileSelectIcon = function(iconName) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  p.icon = iconName;
+  const preview = document.getElementById('profile-icon-preview');
+  const icon = allIcons.find(i => i.name === iconName);
+  if (preview) {
+    // Check for animation — animate if available, otherwise static SVG
+    if (window.agentAnimator && window.agentAnimator.hasAnimation(iconName)) {
+      window.agentAnimator.animate(preview, iconName, { size: 72, sequence: 'duck' });
+    } else if (icon) {
+      preview.innerHTML = icon.svgContent;
+    }
+  }
+  document.querySelectorAll('.profile-icon-tile').forEach(function(tile) {
+    tile.classList.toggle('selected', tile.dataset.icon === iconName);
+  });
+  renderSidebar();
+};
+
+window.profileUpdateCharCount = function() {
+  const input = document.getElementById('profile-name');
+  const counter = document.getElementById('profile-name-count');
+  if (input && counter) counter.textContent = input.value.length + '/32';
+};
+
+window.profileUpdateTokenCount = function() {
+  const textarea = document.getElementById('profile-prompt');
+  const counter = document.getElementById('profile-token-count');
+  if (textarea && counter) {
+    const len = textarea.value.length;
+    counter.textContent = len + ' chars / ~' + Math.ceil(len / 4) + ' tokens';
+  }
+};
+
+window.profileToggleSection = function(section) {
+  const body = document.getElementById(section + '-body');
+  const toggle = document.getElementById(section + '-toggle');
+  if (!body || !toggle) return;
+  const collapsed = body.classList.toggle('collapsed');
+  toggle.textContent = collapsed ? 'EXPAND' : 'COLLAPSE';
+};
+
+window.profileToggleTemplateMenu = function() {
+  const menu = document.getElementById('profile-template-menu');
+  if (menu) menu.classList.toggle('open');
+};
+
+window.profileLoadTemplate = function(key) {
+  const textarea = document.getElementById('profile-prompt');
+  const nameInput = document.getElementById('profile-name');
+  const menu = document.getElementById('profile-template-menu');
+  if (menu) menu.classList.remove('open');
+  if (!textarea) return;
+  if (key === 'custom') { textarea.value = ''; }
+  else {
+    const name = nameInput ? nameInput.value.trim() || '[AGENT NAME]' : '[AGENT NAME]';
+    textarea.value = (PROMPT_TEMPLATES[key] || '').replace(/\{NAME\}/g, name);
+  }
+  window.profileUpdateTokenCount();
+};
+
+// ── Task handlers ─────────────────────────────────────────────
+
+window.profileAddTask = function() {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || (p.tasks||[]).length >= 10) return;
+  if (!p.tasks) p.tasks = [];
+  p.tasks.push({ id: genId(), name: '', description: '', priority: 'MEDIUM', trigger: 'Manual' });
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileUpdateTask = function(index, field, value) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks || !p.tasks[index]) return;
+  p.tasks[index][field] = value;
+};
+
+window.profileSetTaskPriority = function(index, priority) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks || !p.tasks[index]) return;
+  p.tasks[index].priority = priority;
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileMoveTask = function(index, dir) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks) return;
+  const newIdx = index + dir;
+  if (newIdx < 0 || newIdx >= p.tasks.length) return;
+  const tmp = p.tasks[index];
+  p.tasks[index] = p.tasks[newIdx];
+  p.tasks[newIdx] = tmp;
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileRemoveTask = function(index) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.tasks) return;
+  p.tasks.splice(index, 1);
+  collectProfile();
+  renderEditor(p);
+};
+
+// ── MCP handlers ──────────────────────────────────────────────
+
+window.profileToggleMcp = function(mcpId) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  if (!p.mcpAgents) p.mcpAgents = [];
+  const idx = p.mcpAgents.indexOf(mcpId);
+  if (idx >= 0) p.mcpAgents.splice(idx, 1); else p.mcpAgents.push(mcpId);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileRemoveMcp = function(mcpId) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.mcpAgents) return;
+  p.mcpAgents = p.mcpAgents.filter(id => id !== mcpId);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileFilterMcps = function() {
+  const search = (document.getElementById('mcp-search')?.value || '').toLowerCase();
+  const items = document.querySelectorAll('.profile-mcp-item');
+  items.forEach(function(item) {
+    const name = item.querySelector('.profile-mcp-name')?.textContent?.toLowerCase() || '';
+    const desc = item.querySelector('.profile-mcp-desc')?.textContent?.toLowerCase() || '';
+    item.style.display = (name.includes(search) || desc.includes(search)) ? 'flex' : 'none';
+  });
+};
+
+// ── Skill handlers ────────────────────────────────────────────
+
+window.profileRemoveSkill = function(skillName) {
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p || !p.skills) return;
+  p.skills = p.skills.filter(s => s !== skillName);
+  collectProfile();
+  renderEditor(p);
+};
+
+window.profileToggleAddSkill = function() {
+  const form = document.getElementById('profile-add-skill-form');
+  if (form) form.classList.toggle('open');
+};
+
+window.profileSaveNewSkill = function() {
+  const name = (document.getElementById('new-skill-name')?.value || '').trim();
+  if (!name) return;
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  if (!p) return;
+  if (!p.skills) p.skills = [];
+  if (!p.skills.includes(name)) p.skills.push(name);
+  collectProfile();
+  renderEditor(p);
+};
+
+// ── Save / Export / Duplicate / Delete ─────────────────────────
+
+window.profileSave = function() {
+  const p = collectProfile();
+  if (!p) return;
+  if (!p.name) {
+    if (typeof showToast === 'function') showToast('Agent name is required', 'error');
+    return;
+  }
+  saveProfile(p);
+};
+
+window.profileExport = function() {
+  const p = collectProfile();
+  if (!p) return;
+  const blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (p.name || 'agent').toLowerCase().replace(/\s+/g, '_') + '_profile.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.profileDuplicate = function() {
+  const p = collectProfile();
+  if (!p) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = genId();
+  copy.name = (copy.name || 'Agent') + ' Copy';
+  copy.createdAt = new Date().toISOString();
+  copy.updatedAt = new Date().toISOString();
+  allProfiles.push(copy);
+  currentProfileId = copy.id;
+  renderSidebar();
+  renderEditor(copy);
+  if (typeof showToast === 'function') showToast('Agent duplicated', 'info');
+};
+
+window.profileDelete = function() {
+  if (!currentProfileId) return;
+  const p = allProfiles.find(pr => pr.id === currentProfileId);
+  const name = p ? p.name || 'this agent' : 'this agent';
+  if (!confirm('Delete ' + name + '? This cannot be undone.')) return;
+  deleteProfile(currentProfileId);
+};
+
+window.profileOpenTerminal = async function() {
+  var p = collectProfile();
+  if (!p || !p.name) {
+    if (typeof showToast === 'function') showToast('Save the agent first', 'error');
+    return;
+  }
+  var icon = allIcons.find(function(i) { return i.name === p.icon; });
+  var animData = window.agentAnimator ? window.agentAnimator.getData() : {};
+  await window.aether.terminalOpen({
+    type: 'agent',
+    agentId: p.id,
+    agentName: p.name,
+    agentDescription: p.description || '',
+    agentIcon: icon ? icon.svgContent : '',
+    agentProfile: p,
+    agentAnimData: animData[p.icon] || null,
+    apiBase: API_BASE,
+  });
+};
+
+// ── Team filter ───────────────────────────────────────────────
+
+window.profileToggleTeamDropdown = function() {
+  const dd = document.getElementById('profile-team-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+
+window.profileSelectTeam = function(team, event) {
+  if (event) event.stopPropagation();
+  currentTeamFilter = team;
+  const label = document.getElementById('profile-team-label');
+  if (label) label.textContent = team === 'all' ? 'All Teams' : team;
+  document.querySelectorAll('.profile-team-option').forEach(function(opt) {
+    opt.classList.toggle('active', opt.textContent.trim() === (team === 'all' ? 'All Teams' : team));
+  });
+  const dd = document.getElementById('profile-team-dropdown');
+  if (dd) dd.classList.remove('open');
+  renderSidebar();
+};
+
+})(); // end AGENT PROFILE SYSTEM IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT ORCHESTRATION PIPELINE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+const AETHER_SYSTEM_PROMPT = 'You are AETHER, the primary AI orchestrator for AetherCloud. ' +
+  'When a user submits input, you analyze it, identify which sub-agents from the active team should handle parts of the request, ' +
+  'and construct structured task assignments for each.\n\n' +
+  'SAFETY: You are a productivity and research tool. Reject any requests involving network scanning, penetration testing, ' +
+  'vulnerability exploitation, credential harvesting, social engineering, malware, or offensive security actions. ' +
+  'If detected, return: {"error":"This request involves prohibited operations. AetherCloud is an AI agent productivity platform."}\n\n' +
+  'Return ONLY valid JSON with this exact shape:\n' +
+  '{"analysis":"brief analysis of what the user wants","agentAssignments":[{"agentId":"id","agentName":"NAME","mainTask":"task description","subTasks":["subtask1","subtask2"],"context":"additional context","priority":"HIGH|MEDIUM|LOW"}]}';
+
+let _orchState = { phase: 'IDLE', report: null };
+
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Prompt builders ───────────────────────────────────────────
+
+function buildOrchestratorPrompt(userInput, team, agents) {
+  const agentDescs = agents.map(function(a) {
+    return '  Agent: ' + a.name + ' (id: ' + a.id + ')\n' +
+      '  Description: ' + (a.description || 'No description') + '\n' +
+      '  Skills: ' + (a.skills || []).join(', ') + '\n' +
+      '  MCP Tools: ' + (a.mcpAgents || []).join(', ');
+  }).join('\n---\n');
+
+  return AETHER_SYSTEM_PROMPT + '\n\n' +
+    'ACTIVE TEAM: ' + (team || 'Default Team') + '\n' +
+    'ACTIVE AGENTS (' + agents.length + '):\n' + agentDescs + '\n\n' +
+    'USER INPUT:\n' + userInput + '\n\n' +
+    'Decompose this input into specific tasks for the available agents. Return valid JSON only.';
+}
+
+function buildSubAgentPrompt(agent, assignment) {
+  var prompt = (agent.systemPrompt || 'You are ' + agent.name + ', an AI agent.') + '\n\n';
+  prompt += 'YOUR ASSIGNED TASK: ' + assignment.mainTask + '\n\n';
+  if (assignment.subTasks && assignment.subTasks.length) {
+    prompt += 'SUBTASKS TO COMPLETE:\n';
+    assignment.subTasks.forEach(function(t, i) { prompt += (i + 1) + '. ' + t + '\n'; });
+    prompt += '\n';
+  }
+  if (assignment.context) prompt += 'CONTEXT: ' + assignment.context + '\n\n';
+  prompt += 'Complete all subtasks thoroughly. Return your findings as a structured report.\n' +
+    'Start with a one-line summary, then detail each subtask result.';
+  return prompt;
+}
+
+function buildSummaryPrompt(analysis, results) {
+  var prompt = 'You are AETHER. All sub-agents have completed their tasks.\n' +
+    'Here are their individual reports:\n\n';
+  results.forEach(function(r) {
+    prompt += '=== ' + r.agentName + ' REPORT ===\n' +
+      'Task: ' + r.mainTask + '\n' +
+      'Output:\n' + r.output + '\n\n';
+  });
+  prompt += 'ORIGINAL ANALYSIS: ' + analysis + '\n\n' +
+    'Write the final summary report. Be concise and actionable.\n' +
+    'Structure: KEY FINDINGS, then RECOMMENDATIONS, then NEXT STEPS.';
+  return prompt;
+}
+
+// ── API call helpers ──────────────────────────────────────────
+
+async function chatAPI(query) {
+  var r = await authFetch(API_BASE + '/agent/chat', {
+    method: 'POST',
+    body: JSON.stringify({ query: query })
+  });
+  var result = await safeJson(r);
+  if (result.error) throw new Error(result.message || result.detail || 'API error');
+  return result.response || result.reply || result.message || JSON.stringify(result);
+}
+
+async function chatAPIJson(query) {
+  var raw = await chatAPI(query);
+  // Try to extract JSON from response (may be wrapped in markdown code block)
+  var cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  try { return JSON.parse(cleaned); }
+  catch(e) { throw new Error('Failed to parse orchestrator JSON: ' + e.message + '\nRaw: ' + raw.substring(0, 200)); }
+}
+
+// ── Main orchestration flow ───────────────────────────────────
+
+window.orchestrateAgentFlow = async function(userInput, teamName, agents) {
+  if (!agents || !agents.length) {
+    if (typeof showToast === 'function') showToast('No agents in active team', 'error');
+    return;
+  }
+
+  _orchState.phase = 'ORCHESTRATING';
+  _orchState.report = null;
+
+  // Show thinking state
+  displayAIResponse('[AETHER] Analyzing request and assigning agents...', true);
+  setAgentStatus('Orchestrating...', 'working');
+  addAgentLog('AETHER: orchestrating ' + agents.length + ' agents', 'active');
+
+  try {
+    // Step 1: AetherAI analyzes and assigns
+    var orchPrompt = buildOrchestratorPrompt(userInput, teamName, agents);
+    var assignments = await chatAPIJson(orchPrompt);
+
+    if (assignments.error) {
+      displayAIResponse('[AETHER] ' + assignments.error, false);
+      setAgentStatus('Blocked', 'error');
+      _orchState.phase = 'IDLE';
+      return;
+    }
+
+    if (!assignments.agentAssignments || !assignments.agentAssignments.length) {
+      displayAIResponse('[AETHER] No agent assignments generated. Try rephrasing your request.', false);
+      setAgentStatus('Ready', '');
+      _orchState.phase = 'IDLE';
+      return;
+    }
+
+    // Step 2: Dispatch sub-agents in parallel
+    _orchState.phase = 'DISPATCHING';
+    var statusLines = ['[AETHER] Dispatching ' + assignments.agentAssignments.length + ' agent(s)...\n'];
+    assignments.agentAssignments.forEach(function(a) {
+      statusLines.push('  > ' + a.agentName + ': ' + a.mainTask);
+    });
+    displayAIResponse(statusLines.join('\n'), true);
+
+    var promises = assignments.agentAssignments.map(function(assignment) {
+      var agent = agents.find(function(a) { return a.id === assignment.agentId; });
+      if (!agent) {
+        // Try name match as fallback
+        agent = agents.find(function(a) { return a.name.toLowerCase() === (assignment.agentName || '').toLowerCase(); });
+      }
+      if (!agent) {
+        return Promise.resolve({
+          agentId: assignment.agentId,
+          agentName: assignment.agentName || 'Unknown',
+          agentIcon: '',
+          mainTask: assignment.mainTask,
+          output: '[Agent not found in team]',
+          completedAt: new Date().toISOString()
+        });
+      }
+
+      addAgentLog(agent.name + ': working...', 'active');
+
+      var subPrompt = buildSubAgentPrompt(agent, assignment);
+      return chatAPI(subPrompt).then(function(output) {
+        addAgentLog(agent.name + ': complete', 'done');
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentIcon: agent.icon || '',
+          mainTask: assignment.mainTask,
+          output: output,
+          completedAt: new Date().toISOString()
+        };
+      }).catch(function(err) {
+        addAgentLog(agent.name + ': error', 'idle');
+        return {
+          agentId: agent.id || assignment.agentId,
+          agentName: agent.name || assignment.agentName,
+          agentIcon: agent.icon || '',
+          mainTask: assignment.mainTask,
+          output: '[Error: ' + err.message + ']',
+          completedAt: new Date().toISOString()
+        };
+      });
+    });
+
+    var results = await Promise.all(promises);
+
+    // Step 3: AetherAI summarizes
+    _orchState.phase = 'SUMMARIZING';
+    displayAIResponse('[AETHER] All agents complete. Generating summary...', true);
+    addAgentLog('AETHER: summarizing', 'active');
+
+    var summaryPrompt = buildSummaryPrompt(assignments.analysis, results);
+    var summary = await chatAPI(summaryPrompt);
+
+    // Step 4: Build report and show output panel
+    var report = {
+      analysis: assignments.analysis,
+      agentReports: results,
+      summary: summary,
+      generatedAt: new Date().toISOString()
+    };
+
+    _orchState.report = report;
+    _orchState.phase = 'COMPLETE';
+
+    displayAIResponse('[AETHER] Orchestration complete. ' + results.length + ' agent report(s) ready.', false);
+    setAgentStatus('Complete', '');
+    addAgentLog('AETHER: complete', 'done');
+    setTimeout(function() { setAgentStatus('Ready', ''); }, 3000);
+
+    renderOutputPanel(report);
+
+  } catch(err) {
+    _orchState.phase = 'IDLE';
+    displayAIResponse('[AETHER] Orchestration failed: ' + err.message, false);
+    setAgentStatus('Error', 'error');
+    addAgentLog('AETHER: error', 'idle');
+  }
+};
+
+// ── Output panel rendering ────────────────────────────────────
+
+function renderOutputPanel(report) {
+  var body = document.getElementById('output-body');
+  if (!body) return;
+
+  // Load icons for rendering
+  var iconCache = {};
+  if (window._orchIconCache) iconCache = window._orchIconCache;
+
+  var html = '';
+
+  // Per-agent report sections
+  report.agentReports.forEach(function(r) {
+    var iconHtml = '';
+    if (r.agentIcon && iconCache[r.agentIcon]) {
+      iconHtml = '<div class="output-agent-icon">' + iconCache[r.agentIcon] + '</div>';
+    } else {
+      iconHtml = '<div class="output-agent-icon" style="background:var(--bg-4);width:28px;height:28px;"></div>';
+    }
+    html += '<div class="output-agent-section">' +
+      '<div class="output-agent-header">' +
+        iconHtml +
+        '<span class="output-agent-name">' + esc(r.agentName) + '</span>' +
+        '<span class="output-agent-task">' + esc(r.mainTask) + '</span>' +
+      '</div>' +
+      '<div class="output-agent-content">' + esc(r.output) + '</div>' +
+    '</div>';
+  });
+
+  // AETHER summary section
+  var aetherIcon = iconCache['orange_agent'] ? '<div class="output-agent-icon">' + iconCache['orange_agent'] + '</div>' :
+    '<div class="output-agent-icon" style="background:rgba(249,115,22,0.2);width:28px;height:28px;"></div>';
+
+  html += '<div class="output-summary-section">' +
+    '<div class="output-agent-header">' +
+      aetherIcon +
+      '<span class="output-agent-name">AETHER</span>' +
+      '<span class="output-summary-badge">SUMMARY</span>' +
+    '</div>' +
+    '<div class="output-summary-content">' + esc(report.summary) + '</div>' +
+  '</div>';
+
+  body.innerHTML = html;
+
+  // Show the panel
+  var panel = document.getElementById('agent-output-panel');
+  if (panel) panel.classList.add('visible');
+}
+
+// ── Panel actions ─────────────────────────────────────────────
+
+window.closeOutputPanel = function() {
+  var panel = document.getElementById('agent-output-panel');
+  if (panel) panel.classList.remove('visible');
+};
+
+window.copyOutputReport = function() {
+  if (!_orchState.report) return;
+  var r = _orchState.report;
+  var text = 'AETHER ORCHESTRATION REPORT\n' +
+    'Generated: ' + r.generatedAt + '\n' +
+    '═══════════════════════════════════\n\n';
+  r.agentReports.forEach(function(ar) {
+    text += '── ' + ar.agentName + ' ──\n' +
+      'Task: ' + ar.mainTask + '\n' +
+      ar.output + '\n\n';
+  });
+  text += '═══════════════════════════════════\n' +
+    'AETHER SUMMARY\n' + r.summary;
+
+  navigator.clipboard.writeText(text).then(function() {
+    if (typeof showToast === 'function') showToast('Report copied to clipboard', 'info');
+  });
+};
+
+window.exportOutputReport = function() {
+  if (!_orchState.report) return;
+  var blob = new Blob([JSON.stringify(_orchState.report, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'aether_report_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.newOutputRun = function() {
+  window.closeOutputPanel();
+  _orchState = { phase: 'IDLE', report: null };
+  var input = document.getElementById('chat-input');
+  if (input) { input.value = ''; input.focus(); }
+};
+
+// ── Icon cache loader (called from profile system) ────────────
+
+window._orchLoadIcons = async function() {
+  if (window._orchIconCache) return;
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    window._orchIconCache = {};
+    icons.forEach(function(ic) { window._orchIconCache[ic.name] = ic.svgContent; });
+  } catch(e) { window._orchIconCache = {}; }
+};
+
+// ── Helper to get active team agents ──────────────────────────
+
+window.getActiveTeamAgents = async function(teamFilter) {
+  try {
+    var profiles = await window.aether.agentLoadProfiles();
+    if (!teamFilter || teamFilter === 'all') return profiles;
+    return profiles.filter(function(p) { return p.team === teamFilter; });
+  } catch(e) { return []; }
+};
+
+// ── Run Team bar handlers ─────────────────────────────────────
+
+window.openTeamTerminal = async function() {
+  var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+  if (!agents.length) {
+    if (typeof showToast === 'function') showToast('No agents configured', 'error');
+    return;
+  }
+  if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+  var teamLabel = document.getElementById('profile-team-label');
+  var teamName = (teamLabel && teamLabel.textContent !== 'All Teams') ? teamLabel.textContent : 'Default Team';
+  await window.aether.terminalOpen({
+    type: 'team',
+    teamName: teamName,
+    agentProfiles: agents,
+    agentIcons: window._orchIconCache || {},
+    apiBase: typeof API_BASE !== 'undefined' ? API_BASE : 'https://api.aethersystems.net/cloud',
+  });
+};
+
+window.openRunTeamInput = function() {
+  var bar = document.getElementById('run-team-bar');
+  if (bar) { bar.style.display = 'flex'; }
+  var input = document.getElementById('run-team-input');
+  if (input) { input.value = ''; input.focus(); }
+};
+
+window.closeRunTeamInput = function() {
+  var bar = document.getElementById('run-team-bar');
+  if (bar) bar.style.display = 'none';
+};
+
+window.runTeamFromInput = async function() {
+  var input = document.getElementById('run-team-input');
+  if (!input) return;
+  var query = input.value.trim();
+  if (!query) return;
+
+  input.disabled = true;
+  var runBtn = document.querySelector('#run-team-bar .profile-btn.primary');
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'RUNNING...'; }
+
+  try {
+    // Load icons for output panel
+    if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+
+    // Get agents from current team filter or all
+    var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+    if (!agents.length) {
+      if (typeof showToast === 'function') showToast('No agents configured. Create agent profiles first.', 'error');
+      return;
+    }
+
+    // Determine team name from sidebar filter
+    var teamLabel = document.getElementById('profile-team-label');
+    var teamName = (teamLabel && teamLabel.textContent !== 'All Teams') ? teamLabel.textContent : 'Default Team';
+
+    await orchestrateAgentFlow(query, teamName, agents);
+    window.closeRunTeamInput();
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Run failed: ' + e.message, 'error');
+  } finally {
+    input.disabled = false;
+    if (runBtn) { runBtn.disabled = false; runBtn.textContent = '\u25B6 RUN'; }
+  }
+};
+
+})(); // end AGENT ORCHESTRATION PIPELINE IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// MCP & SKILLS LIBRARY
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+let _tsRegistry = { mcpServers: [], skills: [] };
+let _tsProfiles = [];
+let _tsIcons = {};
+let _tsAgentFilter = 'all';
+let _tsSearch = '';
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const CATEGORY_STYLES = {
+  'Communication': 'color:var(--accent);border-color:var(--accent-border);background:var(--accent-dim);',
+  'Dev Tools':     'color:#6366f1;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);',
+  'Research':      'color:#a855f7;border-color:rgba(168,85,247,0.3);background:rgba(168,85,247,0.08);',
+  'Data':          'color:var(--amber);border-color:var(--amber-border);background:var(--amber-dim);',
+  'Security':      'color:var(--red);border-color:var(--red-border);background:var(--red-dim);',
+  'Productivity':  'color:var(--green);border-color:var(--green-border);background:var(--green-dim);',
+  'AI Tools':      'color:#14b8a6;border-color:rgba(20,184,166,0.3);background:rgba(20,184,166,0.08);',
+  'Documents':     'color:var(--text-muted);border-color:var(--border-2);background:var(--bg-3);',
+  'System':        'color:var(--text-muted);border-color:var(--border-2);background:var(--bg-3);',
+  'Automation':    'color:#f97316;border-color:rgba(249,115,22,0.3);background:rgba(249,115,22,0.08);',
+  'Cloud':         'color:#38bdf8;border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.08);',
+  'Language':      'color:#a855f7;border-color:rgba(168,85,247,0.3);background:rgba(168,85,247,0.08);',
+};
+
+// ── Load data ─────────────────────────────────────────────────
+async function loadAll() {
+  try { _tsRegistry = await window.aether.agentLoadToolRegistry(); } catch(e) { console.error('[mcp-skills] loadRegistry', e); }
+  try { _tsProfiles = await window.aether.agentLoadProfiles(); } catch(e) { _tsProfiles = []; }
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    _tsIcons = {};
+    icons.forEach(function(ic) { _tsIcons[ic.name] = ic.svgContent; });
+  } catch(e) { _tsIcons = {}; }
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderAll() {
+  renderAgentFilter();
+  renderSection('mcp-rows', _tsRegistry.mcpServers || [], 'mcp');
+  renderSection('skills-rows', _tsRegistry.skills || [], 'skill');
+  updateBanner();
+}
+
+function renderSection(containerId, tools, type) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var q = _tsSearch.toLowerCase();
+  var filtered = tools;
+  if (q) {
+    filtered = tools.filter(function(t) {
+      return (t.name||'').toLowerCase().includes(q) ||
+        (t.description||'').toLowerCase().includes(q) ||
+        (t.category||'').toLowerCase().includes(q);
+    });
+  }
+  if (!filtered.length) {
+    container.innerHTML = '<div class="tool-empty-msg">' + (q ? 'No tools match "' + esc(q) + '"' : 'No tools available') + '</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(function(tool) { return renderRow(tool, type); }).join('');
+}
+
+function renderRow(tool, type) {
+  // Find which agents have this tool assigned
+  var assigned = getAssignedAgents(tool.id, type);
+  var chips = assigned.slice(0, 4).map(function(a) {
+    var iconSvg = _tsIcons[a.icon] || '';
+    var chipInner = iconSvg ? iconSvg : '';
+    return '<div class="tool-agent-chip" title="' + esc(a.name) + '" onclick="mcpSkillsRemoveAgentChip(\'' + esc(tool.id) + '\',\'' + type + '\',\'' + esc(a.id) + '\',event)">' + chipInner + '</div>';
+  }).join('');
+  var overflow = assigned.length > 4 ? '<span style="font-size:8px;color:var(--text-muted);">+' + (assigned.length - 4) + '</span>' : '';
+
+  // Checkbox state
+  var isChecked = false;
+  if (_tsAgentFilter === 'all') {
+    isChecked = assigned.length > 0;
+  } else {
+    isChecked = assigned.some(function(a) { return a.id === _tsAgentFilter; });
+  }
+
+  var catStyle = CATEGORY_STYLES[tool.category] || CATEGORY_STYLES['Documents'];
+
+  return '<div class="tool-row">' +
+    '<input type="checkbox" class="tool-checkbox" ' + (isChecked ? 'checked' : '') +
+      ' onchange="mcpSkillsToggleTool(\'' + esc(tool.id) + '\',\'' + type + '\',this.checked)">' +
+    '<span class="tool-name">' + esc(tool.name) + '</span>' +
+    '<span class="tool-description">' + esc(tool.description) + '</span>' +
+    '<span class="tool-category-badge" style="' + catStyle + '">' + esc(tool.category) + '</span>' +
+    '<div class="tool-agent-chips">' + chips + overflow + '</div>' +
+    '<span class="tool-status-badge ' + (tool.status || 'available') + '">' + (tool.status || 'available').toUpperCase() + '</span>' +
+  '</div>';
+}
+
+function getAssignedAgents(toolId, type) {
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  var result = [];
+  _tsProfiles.forEach(function(p) {
+    if (p[key] && p[key].includes(toolId)) {
+      result.push({ id: p.id, name: p.name || 'Unnamed', icon: p.icon || '' });
+    }
+  });
+  return result;
+}
+
+function renderAgentFilter() {
+  var dropdown = document.getElementById('tools-agent-filter-dropdown');
+  if (!dropdown) return;
+  var html = '<div class="profile-team-option ' + (_tsAgentFilter === 'all' ? 'active' : '') + '" onclick="mcpSkillsSelectAgent(\'all\',event)">All Agents</div>';
+  _tsProfiles.forEach(function(p) {
+    html += '<div class="profile-team-option ' + (_tsAgentFilter === p.id ? 'active' : '') + '" onclick="mcpSkillsSelectAgent(\'' + esc(p.id) + '\',event)">' + esc(p.name || 'Unnamed') + '</div>';
+  });
+  dropdown.innerHTML = html;
+}
+
+function updateBanner() {
+  var banner = document.getElementById('tools-agent-banner');
+  var bannerName = document.getElementById('tools-agent-banner-name');
+  if (!banner) return;
+  if (_tsAgentFilter !== 'all') {
+    var agent = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+    if (bannerName) bannerName.textContent = agent ? agent.name : 'Unknown';
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+  var label = document.getElementById('tools-agent-filter-label');
+  if (label) {
+    if (_tsAgentFilter === 'all') label.textContent = 'All Agents';
+    else {
+      var a = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+      label.textContent = a ? a.name : 'Unknown';
+    }
+  }
+}
+
+// ── Save ──────────────────────────────────────────────────────
+async function saveAll() {
+  try { await window.aether.agentSaveToolRegistry(_tsRegistry); } catch(e) { console.error('[mcp-skills] saveRegistry', e); }
+  for (var i = 0; i < _tsProfiles.length; i++) {
+    try { await window.aether.agentSaveProfile(_tsProfiles[i]); } catch(e) { console.error('[mcp-skills] saveProfile', e); }
+  }
+}
+
+// ── Window handlers ───────────────────────────────────────────
+
+window.mcpSkillsPanelInit = async function() {
+  await loadAll();
+  renderAll();
+};
+
+window.mcpSkillsToggleTool = function(toolId, type, checked) {
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  if (_tsAgentFilter === 'all') {
+    _tsProfiles.forEach(function(p) {
+      if (!p[key]) p[key] = [];
+      if (checked && !p[key].includes(toolId)) p[key].push(toolId);
+      if (!checked) p[key] = p[key].filter(function(id) { return id !== toolId; });
+    });
+  } else {
+    var profile = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+    if (profile) {
+      if (!profile[key]) profile[key] = [];
+      if (checked && !profile[key].includes(toolId)) profile[key].push(toolId);
+      if (!checked) profile[key] = profile[key].filter(function(id) { return id !== toolId; });
+    }
+  }
+  saveAll();
+  renderAll();
+};
+
+window.mcpSkillsSelectAgent = function(agentId, event) {
+  if (event) event.stopPropagation();
+  _tsAgentFilter = agentId;
+  var dd = document.getElementById('tools-agent-filter-dropdown');
+  if (dd) dd.classList.remove('open');
+  renderAll();
+};
+
+window.mcpSkillsToggleAgentFilter = function() {
+  var dd = document.getElementById('tools-agent-filter-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+
+window.mcpSkillsSearch = function() {
+  var input = document.getElementById('tools-search-input');
+  _tsSearch = input ? input.value.trim() : '';
+  renderSection('mcp-rows', _tsRegistry.mcpServers || [], 'mcp');
+  renderSection('skills-rows', _tsRegistry.skills || [], 'skill');
+};
+
+window.mcpSkillsRemoveAgentChip = function(toolId, type, agentId, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  var profile = _tsProfiles.find(function(p) { return p.id === agentId; });
+  if (profile && profile[key]) {
+    profile[key] = profile[key].filter(function(id) { return id !== toolId; });
+    saveAll();
+    renderAll();
+  }
+};
+
+})(); // end MCP & SKILLS LIBRARY IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT ANIMATION ENGINE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+var _animData = {};
+var _activeAnims = [];
+
+async function loadAnimations() {
+  if (Object.keys(_animData).length) return;
+  try { _animData = await window.aether.agentLoadAnimations(); } catch(e) { _animData = {}; }
+}
+
+function computeFrame(config, frameIdx) {
+  var frameDef = config.frames[frameIdx];
+  var colors = config.colors;
+  // Pre-computed frames: each frame has its own pixel array
+  if (config.usePrecomputed && frameDef.pixels) {
+    var eyeColor = frameDef.eyeColor || colors['E'] || '#00E5FF';
+    return frameDef.pixels.map(function(p) {
+      var colorKey = p[2];
+      var resolved = colorKey === 'E' ? eyeColor : (colors[colorKey] || colorKey);
+      return { x: p[0], y: p[1], color: resolved };
+    });
+  }
+  // Computed frames: transform base pixels (mushroom-style)
+  return config.basePixels.map(function(p) {
+    var x = p[0], y = p[1], colorKey = p[2];
+    var ny = y + frameDef.yShift;
+    if (frameDef.bodySquish < 1 && y >= 4) {
+      ny = 4 + Math.round((y - 4) * frameDef.bodySquish) + frameDef.yShift;
+    }
+    if (frameDef.capJump && y <= 3) {
+      ny = ny - frameDef.capJump;
+    }
+    return { x: x, y: ny, color: colors[colorKey] || colorKey };
+  });
+}
+
+function drawPixels(ctx, pixels, scale) {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  pixels.forEach(function(p) {
+    if (p.y < 0) return;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+  });
+}
+
+function animate(container, iconName, opts) {
+  opts = opts || {};
+  var config = _animData[iconName];
+  if (!config) return null;
+
+  var size = opts.size || 72;
+  var sequence = opts.sequence || config.defaultSequence || 'duck';
+  var seq = config.sequences[sequence];
+  if (!seq) return null;
+
+  var gridW = config.gridWidth || 11;
+  var gridH = (config.gridHeight || 9) + 4;
+  var scale = Math.max(1, Math.floor(size / Math.max(gridW, gridH)));
+
+  var canvas = document.createElement('canvas');
+  canvas.width = gridW * scale;
+  canvas.height = gridH * scale;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  canvas.style.display = 'block';
+
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  var ctx = canvas.getContext('2d');
+  var step = 0;
+  var running = true;
+  var timer = null;
+
+  function tick() {
+    if (!running) return;
+    var frameIdx = seq.frames[step];
+    var pixels = computeFrame(config, frameIdx);
+    drawPixels(ctx, pixels, scale);
+    step = (step + 1) % seq.frames.length;
+    timer = setTimeout(tick, seq.delays[step] || 200);
+  }
+  tick();
+
+  var handle = { stop: function() { running = false; if (timer) clearTimeout(timer); }, canvas: canvas, iconName: iconName };
+  _activeAnims.push(handle);
+  return handle;
+}
+
+function hasAnimation(iconName) { return !!_animData[iconName]; }
+function stopAll() { _activeAnims.forEach(function(h) { h.stop(); }); _activeAnims = []; }
+
+window.agentAnimator = {
+  load: loadAnimations,
+  animate: animate,
+  hasAnimation: hasAnimation,
+  stopAll: stopAll,
+  getData: function() { return _animData; },
+};
+
+})(); // end AGENT ANIMATION ENGINE IIFE
 
 // ════════════════════════════════════════════════════
 // AUTONOMOUS PROJECT EXECUTION

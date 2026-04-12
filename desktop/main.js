@@ -31,6 +31,7 @@ let _updateInfo = { currentVersion: null, latestVersion: null, updateAvailable: 
 
 let mainWindow = null;
 let appQuitting = false;
+const terminalWindows = new Map(); // key: 'agent-{id}' or 'team-{name}'
 
 // ── Window configs per page ──────────────────────────
 const WINDOW_CONFIGS = {
@@ -383,6 +384,194 @@ ipcMain.handle('fs:previewPlan', async (_e, actions) => {
     }
     return { action, exists };
   });
+});
+
+// ── IPC: Agent Profile System ───────────────────────
+ipcMain.handle('agent:loadIcons', async () => {
+  const iconsPath = path.join(__dirname, '..', 'agent', 'agents');
+  try {
+    const files = fs.readdirSync(iconsPath).filter(f => f.endsWith('.svg'));
+    return files.map(file => ({
+      name: path.basename(file, '.svg'),
+      svgContent: fs.readFileSync(path.join(iconsPath, file), 'utf-8'),
+    }));
+  } catch (e) {
+    console.error('[agent:loadIcons]', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('agent:loadAnimations', async () => {
+  const animPath = path.join(__dirname, '..', 'agent', 'agents', 'animations');
+  try {
+    if (!fs.existsSync(animPath)) return {};
+    const files = fs.readdirSync(animPath).filter(f => f.endsWith('.json'));
+    const anims = {};
+    files.forEach(file => {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(animPath, file), 'utf-8'));
+        if (data.id) anims[data.id] = data;
+      } catch(e) { /* skip bad files */ }
+    });
+    return anims;
+  } catch (e) {
+    console.error('[agent:loadAnimations]', e.message);
+    return {};
+  }
+});
+
+ipcMain.handle('agent:loadProfiles', async () => {
+  const profilesPath = path.join(__dirname, '..', 'agent', 'profiles');
+  try {
+    if (!fs.existsSync(profilesPath)) fs.mkdirSync(profilesPath, { recursive: true });
+    const files = fs.readdirSync(profilesPath).filter(f => f.endsWith('.json'));
+    return files.map(file => {
+      try { return JSON.parse(fs.readFileSync(path.join(profilesPath, file), 'utf-8')); }
+      catch { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    console.error('[agent:loadProfiles]', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('agent:saveProfile', async (_e, profile) => {
+  const profilesPath = path.join(__dirname, '..', 'agent', 'profiles');
+  if (!fs.existsSync(profilesPath)) fs.mkdirSync(profilesPath, { recursive: true });
+  const filePath = path.join(profilesPath, `${profile.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(profile, null, 2));
+  return { success: true, path: filePath };
+});
+
+ipcMain.handle('agent:deleteProfile', async (_e, profileId) => {
+  const filePath = path.join(__dirname, '..', 'agent', 'profiles', `${profileId}.json`);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ── IPC: Tool Registry ──────────────────────────────
+const DEFAULT_TOOL_REGISTRY = {
+  mcpServers: [
+    { id:'gmail', name:'Gmail', description:'Read, send, and search emails', category:'Communication', status:'active', transport:'SSE' },
+    { id:'google-calendar', name:'Google Calendar', description:'Manage events and scheduling', category:'Productivity', status:'active', transport:'SSE' },
+    { id:'slack', name:'Slack', description:'Send and read Slack messages', category:'Communication', status:'available', transport:'HTTP' },
+    { id:'github', name:'GitHub', description:'Access repos, issues, and PRs', category:'Dev Tools', status:'available', transport:'HTTP' },
+    { id:'notion', name:'Notion', description:'Read and write Notion pages', category:'Productivity', status:'available', transport:'HTTP' },
+    { id:'linear', name:'Linear', description:'Create and manage issues', category:'Dev Tools', status:'available', transport:'HTTP' },
+    { id:'brave-search', name:'Brave Search', description:'Live web search', category:'Research', status:'available', transport:'HTTP' },
+    { id:'filesystem', name:'Filesystem', description:'Read and write local files', category:'System', status:'available', transport:'STDIO' },
+    { id:'postgres', name:'PostgreSQL', description:'Query PostgreSQL databases', category:'Data', status:'available', transport:'STDIO' },
+    { id:'puppeteer', name:'Puppeteer', description:'Headless browser automation', category:'Automation', status:'available', transport:'STDIO' },
+    { id:'fetch-http', name:'Fetch / HTTP', description:'Make HTTP requests', category:'Dev Tools', status:'available', transport:'HTTP' },
+    { id:'memory', name:'Memory', description:'Persistent agent memory store', category:'AI Tools', status:'available', transport:'STDIO' },
+    { id:'obsidian', name:'Obsidian', description:'Read Obsidian vault notes', category:'Productivity', status:'available', transport:'STDIO' },
+    { id:'youtube', name:'YouTube', description:'Search and fetch transcripts', category:'Research', status:'available', transport:'HTTP' },
+    { id:'aws-s3', name:'AWS S3', description:'Read and write S3 buckets', category:'Cloud', status:'available', transport:'HTTP' },
+  ],
+  skills: [
+    { id:'web-search', name:'Web Search', description:'Search the internet for current info', category:'Research', status:'available', promptInjection:'You have access to web search. When answering questions that require current information, search the web first.' },
+    { id:'code-execution', name:'Code Execution', description:'Run Python and JavaScript snippets', category:'Dev Tools', status:'available', promptInjection:'You can execute Python and JavaScript code to compute answers, process data, or demonstrate solutions.' },
+    { id:'pdf-reader', name:'PDF Reader', description:'Extract and parse PDF content', category:'Documents', status:'available', promptInjection:'You can read and extract text from PDF files.' },
+    { id:'image-vision', name:'Image Vision', description:'Analyze and describe images', category:'AI Tools', status:'available', promptInjection:'You can analyze images and provide detailed descriptions of their content.' },
+    { id:'data-analyst', name:'Data Analyst', description:'Process CSV, Excel, and structured data', category:'Data', status:'available', promptInjection:'You can process and analyze structured data from CSV, Excel, and similar formats.' },
+    { id:'summarizer', name:'Summarizer', description:'Compress long documents to key points', category:'Documents', status:'available', promptInjection:'You can summarize long documents into concise key points.' },
+    { id:'translator', name:'Translator', description:'Translate between languages', category:'Language', status:'available', promptInjection:'You can translate text between multiple languages accurately.' },
+    { id:'deep-researcher', name:'Deep Researcher', description:'Multi-step web research synthesis', category:'Research', status:'available', promptInjection:'You can perform multi-step research, synthesizing information from multiple sources into comprehensive findings.' },
+    { id:'email-drafter', name:'Email Drafter', description:'Compose professional emails', category:'Communication', status:'available', promptInjection:'You can draft professional emails with appropriate tone and formatting.' },
+    { id:'scheduler', name:'Scheduler', description:'Parse and manage time-based tasks', category:'Productivity', status:'available', promptInjection:'You can parse dates, schedule tasks, and manage time-based workflows.' },
+    { id:'report-writer', name:'Report Writer', description:'Generate structured markdown reports', category:'Documents', status:'available', promptInjection:'You can generate well-structured markdown reports with sections, tables, and findings.' },
+    { id:'task-planner', name:'Task Planner', description:'Break goals into actionable task lists', category:'Productivity', status:'available', promptInjection:'You can decompose complex goals into structured, actionable task lists with priorities and dependencies.' },
+  ]
+};
+
+ipcMain.handle('agent:loadToolRegistry', async () => {
+  const registryPath = path.join(__dirname, '..', 'agent', 'tools', 'registry.json');
+  try {
+    if (!fs.existsSync(registryPath)) {
+      fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+      fs.writeFileSync(registryPath, JSON.stringify(DEFAULT_TOOL_REGISTRY, null, 2));
+    }
+    return JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+  } catch (e) {
+    console.error('[agent:loadToolRegistry]', e.message);
+    return DEFAULT_TOOL_REGISTRY;
+  }
+});
+
+ipcMain.handle('agent:saveToolRegistry', async (_e, registry) => {
+  const registryPath = path.join(__dirname, '..', 'agent', 'tools', 'registry.json');
+  try {
+    fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ── IPC: Terminal Windows ───────────────────────────
+ipcMain.handle('terminal:open', async (_e, config) => {
+  const key = config.type === 'agent'
+    ? 'agent-' + config.agentId
+    : 'team-' + config.teamName;
+
+  if (terminalWindows.has(key)) {
+    const existing = terminalWindows.get(key);
+    if (!existing.isDestroyed()) {
+      existing.focus();
+      return { focused: true };
+    }
+    terminalWindows.delete(key);
+  }
+
+  const win = new BrowserWindow({
+    width: 680,
+    height: 480,
+    minWidth: 480,
+    minHeight: 320,
+    resizable: true,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0a0a0f',
+    title: config.type === 'agent' ? config.agentName : ('Team \u00b7 ' + config.teamName),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      devTools: !app.isPackaged,
+    },
+    show: false,
+  });
+
+  win.loadFile(path.join(PAGES_DIR, 'terminal.html'));
+
+  win.once('ready-to-show', () => {
+    win.show();
+    win.webContents.send('terminal:init', config);
+  });
+
+  win.on('closed', () => {
+    terminalWindows.delete(key);
+  });
+
+  terminalWindows.set(key, win);
+  return { opened: true };
+});
+
+ipcMain.on('terminal:minimize', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+ipcMain.on('terminal:maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win?.isMaximized()) win.unmaximize(); else win?.maximize();
+});
+ipcMain.on('terminal:close', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
 
 // ── IPC: Vault ───────────────────────────────────────

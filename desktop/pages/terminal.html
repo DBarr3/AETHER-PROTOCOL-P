@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0a0a0f; color:#e2e8f0;
+    font-family:'IBM Plex Mono','Courier New',monospace;
+    height:100vh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .titlebar {
+    -webkit-app-region:drag; height:40px; background:#0d0d14;
+    border-bottom:1px solid #1e2030; display:flex; align-items:center;
+    padding:0 12px; gap:10px; flex-shrink:0;
+  }
+  .win-controls { display:flex; gap:5px; -webkit-app-region:no-drag; }
+  .win-btn {
+    width:13px; height:13px; border-radius:50%; border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:8px; color:transparent; transition:color 100ms;
+  }
+  .win-btn:hover { color:rgba(0,0,0,0.6); }
+  .win-close { background:#ef4444; }
+  .win-minimize { background:#f59e0b; }
+  .win-maximize { background:#10b981; }
+  .titlebar-icons { display:flex; gap:4px; -webkit-app-region:no-drag; }
+  .agent-icon-badge {
+    width:26px; height:26px; border:1px solid #1e2030; background:#12121a;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; flex-shrink:0; image-rendering:pixelated;
+  }
+  .agent-icon-badge svg { width:18px; height:18px; }
+  .titlebar-info { flex:1; display:flex; flex-direction:column; gap:1px; }
+  .titlebar-name { font-size:12px; font-weight:500; letter-spacing:0.08em; color:#e2e8f0; }
+  .titlebar-sub { font-size:10px; color:#64748b; }
+  .status-dot { width:7px; height:7px; border-radius:50%; background:#64748b; flex-shrink:0; }
+  .status-dot.ready { background:#10b981; }
+  .status-dot.working { background:#f59e0b; animation:pulse 1s infinite; }
+  .status-dot.error { background:#ef4444; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  .terminal-output {
+    flex:1; overflow-y:auto; padding:12px 16px;
+    display:flex; flex-direction:column; gap:2px;
+    scrollbar-width:thin; scrollbar-color:#1e2030 transparent;
+  }
+  .terminal-output::-webkit-scrollbar { width:4px; }
+  .terminal-output::-webkit-scrollbar-thumb { background:#1e2030; border-radius:2px; }
+
+  .t-line { display:flex; gap:8px; font-size:12px; line-height:1.6; animation:fadein 80ms ease; }
+  @keyframes fadein { from{opacity:0;transform:translateY(1px);} to{opacity:1;transform:translateY(0);} }
+  .t-prefix { color:#475569; flex-shrink:0; min-width:16px; }
+  .t-text { word-break:break-word; flex:1; }
+  .t-system .t-prefix { color:#06b6d4; }
+  .t-system .t-text { color:#64748b; }
+  .t-user .t-prefix { color:#10b981; }
+  .t-user .t-text { color:#e2e8f0; }
+  .t-agent .t-prefix { color:#f97316; }
+  .t-agent .t-text { color:#cbd5e1; white-space:pre-wrap; }
+  .t-tool .t-prefix { color:#f59e0b; }
+  .t-tool .t-text { color:#f59e0b; font-size:11px; }
+  .t-muted .t-text { color:#334155; font-style:italic; }
+  .t-error .t-text { color:#ef4444; }
+  .t-success .t-text { color:#10b981; }
+  .t-divider { border:none; border-top:1px solid #1e2030; margin:6px 0; }
+
+  .input-bar {
+    display:flex; align-items:center; gap:8px; padding:10px 16px;
+    border-top:1px solid #1e2030; background:#0d0d14; flex-shrink:0;
+  }
+  .input-prompt { color:#10b981; font-size:14px; flex-shrink:0; }
+  #terminal-input {
+    flex:1; background:transparent; border:none; outline:none;
+    font-family:'IBM Plex Mono',monospace; font-size:12px;
+    color:#e2e8f0; caret-color:#06b6d4;
+  }
+  #terminal-input::placeholder { color:#1e293b; }
+  #terminal-input:disabled { opacity:0.4; }
+  .send-btn {
+    font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em;
+    color:#06b6d4; background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.2);
+    padding:5px 12px; cursor:pointer; transition:all 100ms; flex-shrink:0;
+  }
+  .send-btn:hover { background:rgba(6,182,212,0.15); }
+  .send-btn:disabled { opacity:0.3; cursor:default; }
+</style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="win-controls">
+      <button class="win-btn win-close" onclick="window.aether.terminalClose()">&#10005;</button>
+      <button class="win-btn win-minimize" onclick="window.aether.terminalMinimize()">&#8722;</button>
+      <button class="win-btn win-maximize" onclick="window.aether.terminalMaximize()">+</button>
+    </div>
+    <div class="titlebar-icons" id="titlebar-icons"></div>
+    <div class="titlebar-info">
+      <span class="titlebar-name" id="titlebar-name">TERMINAL</span>
+      <span class="titlebar-sub" id="titlebar-sub">Initializing...</span>
+    </div>
+    <div class="status-dot" id="status-dot"></div>
+  </div>
+  <div class="terminal-output" id="output"></div>
+  <div class="input-bar">
+    <span class="input-prompt">&#10095;</span>
+    <input id="terminal-input" type="text" placeholder="Type here..." autocomplete="off" spellcheck="false">
+    <button class="send-btn" id="send-btn" onclick="handleSend()">SEND</button>
+  </div>
+
+<script>
+var _cfg = null;
+var _memoryKey = null;
+var MAX_HISTORY_TURNS = 10;
+var output = document.getElementById('output');
+var input = document.getElementById('terminal-input');
+var sendBtn = document.getElementById('send-btn');
+
+// ── Receive config from main process ──────────────────
+window.aether.terminalInit(function(config) {
+  _cfg = config;
+  initTerminal(config);
+});
+
+// ── Init ──────────────────────────────────────────────
+function initTerminal(cfg) {
+  document.getElementById('titlebar-name').textContent =
+    cfg.type === 'agent' ? cfg.agentName : 'TEAM';
+  document.getElementById('titlebar-sub').textContent =
+    cfg.type === 'agent'
+      ? (cfg.agentDescription || 'Agent Terminal')
+      : cfg.teamName + ' \u00b7 ' + cfg.agentProfiles.length + ' agents';
+
+  var iconsEl = document.getElementById('titlebar-icons');
+  if (cfg.type === 'agent') {
+    iconsEl.innerHTML = '<div class="agent-icon-badge" id="titlebar-agent-icon">' + (cfg.agentIcon || '') + '</div>';
+    // Animate if animation data is available
+    if (cfg.agentAnimData) {
+      setTimeout(function() {
+        var badge = document.getElementById('titlebar-agent-icon');
+        if (badge) animateIcon(badge, cfg.agentAnimData, 22);
+      }, 50);
+    }
+  } else {
+    iconsEl.innerHTML = (cfg.agentProfiles || []).map(function(a) {
+      var svg = cfg.agentIcons && cfg.agentIcons[a.icon] ? cfg.agentIcons[a.icon] : '';
+      return '<div class="agent-icon-badge" title="' + esc(a.name) + '">' + svg + '</div>';
+    }).join('');
+  }
+
+  setStatus('ready');
+  _memoryKey = cfg.type === 'agent' ? 'terminal:' + cfg.agentId : 'terminal:team:' + cfg.teamName;
+
+  var history = loadMemory(_memoryKey);
+  if (history.length > 0) {
+    print('system', 'Loaded ' + Math.floor(history.length / 2) + ' previous exchange(s) from memory.');
+  }
+
+  if (cfg.type === 'agent') {
+    print('system', cfg.agentName + ' terminal ready.');
+    if (cfg.agentDescription) print('muted', cfg.agentDescription);
+    if (cfg.agentProfile && cfg.agentProfile.mcpAgents && cfg.agentProfile.mcpAgents.length) {
+      print('system', 'MCP tools: ' + cfg.agentProfile.mcpAgents.join(', '));
+    }
+    print('system', 'Type a message to interact directly with this agent.');
+  } else {
+    print('system', 'Team terminal ready \u2014 ' + cfg.teamName);
+    print('system', 'Active agents: ' + cfg.agentProfiles.map(function(a){return a.name;}).join(' \u00b7 '));
+    print('system', 'Messages are dispatched to all agents in parallel.');
+  }
+
+  input.focus();
+}
+
+// ── Send handler ──────────────────────────────────────
+async function handleSend() {
+  var msg = input.value.trim();
+  if (!msg || !_cfg) return;
+  input.value = '';
+  print('user', msg);
+  setInputLocked(true);
+  setStatus('working');
+
+  try {
+    if (_cfg.type === 'agent') {
+      await sendToAgent(_cfg.agentProfile, msg, _cfg.agentName);
+    } else {
+      print('system', 'Dispatching to ' + _cfg.agentProfiles.length + ' agents...');
+      var promises = _cfg.agentProfiles.map(function(agent) {
+        return sendToAgentRaw(agent, msg).then(function(res) {
+          return { agent: agent, result: res };
+        }).catch(function(err) {
+          return { agent: agent, result: { error: true, message: err.message } };
+        });
+      });
+      var results = await Promise.all(promises);
+      printDivider();
+      results.forEach(function(r) {
+        if (r.result.tools_used && r.result.tools_used.length) {
+          r.result.tools_used.forEach(function(t) {
+            print('tool', '[TOOL] ' + t, '\u26a1');
+          });
+        }
+        var reply = r.result.response || r.result.reply || r.result.message || 'No response';
+        if (r.result.error) {
+          print('error', r.agent.name + ': ' + reply);
+        } else {
+          print('agent', reply, r.agent.name);
+        }
+        printDivider();
+      });
+      print('success', 'All agents responded.');
+      var history = loadMemory(_memoryKey);
+      history.push({ role: 'user', content: msg });
+      history.push({ role: 'assistant', content: results.map(function(r) {
+        return r.agent.name + ': ' + (r.result.response || r.result.reply || r.result.message || '');
+      }).join('\n---\n') });
+      saveMemory(_memoryKey, history);
+    }
+  } catch(err) {
+    print('error', 'Error: ' + err.message);
+    setStatus('error');
+  }
+
+  setInputLocked(false);
+}
+
+// ── Agent-level send ──────────────────────────────────
+async function sendToAgent(agent, msg, agentName) {
+  print('muted', agentName + ' is thinking...');
+  var res = await sendToAgentRaw(agent, msg);
+
+  var muted = output.querySelectorAll('.t-muted');
+  if (muted.length) muted[muted.length - 1].remove();
+
+  if (res.tools_used && res.tools_used.length) {
+    res.tools_used.forEach(function(t) {
+      print('tool', '[TOOL] ' + t, '\u26a1');
+    });
+  }
+
+  var reply = res.response || res.reply || res.message || 'No response';
+  if (res.error) {
+    print('error', 'Error: ' + (res.message || res.detail || 'Unknown error'));
+  } else {
+    print('agent', reply, agentName);
+  }
+
+  var history = loadMemory(_memoryKey);
+  history.push({ role: 'user', content: msg });
+  history.push({ role: 'assistant', content: reply });
+  saveMemory(_memoryKey, history);
+}
+
+async function sendToAgentRaw(agent, msg) {
+  var systemPrompt = agent.systemPrompt || 'You are ' + (agent.name || 'an AI agent') + '.';
+  var fullQuery = systemPrompt + '\n\nUSER: ' + msg;
+
+  var history = loadMemory(_memoryKey);
+  var recentHistory = history.slice(-(MAX_HISTORY_TURNS * 2));
+
+  var hasMCP = agent.mcpAgents && agent.mcpAgents.length > 0;
+  var endpoint = hasMCP ? '/agent/mcp-chat' : '/agent/chat';
+
+  var payload = { query: fullQuery, conversation_history: recentHistory };
+  if (hasMCP) {
+    payload.mcp_servers = agent.mcpAgents;
+  }
+
+  // Use aetherAPI for standard chat (non-MCP), direct fetch for MCP
+  if (!hasMCP && window.aetherAPI && window.aetherAPI.chat) {
+    return await window.aetherAPI.chat(fullQuery);
+  }
+
+  // Direct fetch for MCP or fallback
+  var token = null;
+  try {
+    var authData = await window.aether.authGet();
+    if (authData) token = authData.sessionToken;
+  } catch(e) {}
+
+  var apiBase = _cfg.apiBase || 'https://api.aethersystems.net/cloud';
+  var r = await fetch(apiBase + endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': token ? 'Bearer ' + token : '',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  var text = await r.text();
+  try { return JSON.parse(text); }
+  catch(e) { return { error: true, message: 'Invalid response: ' + text.substring(0, 200) }; }
+}
+
+// ── Memory (localStorage) ─────────────────────────────
+function loadMemory(key) {
+  try {
+    var raw = localStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch(e) { return []; }
+}
+
+function saveMemory(key, history) {
+  if (history.length > 100) history = history.slice(-100);
+  try { localStorage.setItem(key, JSON.stringify(history)); } catch(e) {}
+}
+
+// ── UI helpers ────────────────────────────────────────
+function print(type, text, prefix) {
+  var line = document.createElement('div');
+  line.className = 't-line t-' + type;
+  var pre = prefix || (type === 'user' ? '\u276f' : '\u00b7');
+  line.innerHTML = '<span class="t-prefix">' + esc(pre) + '</span><span class="t-text">' + esc(text) + '</span>';
+  output.appendChild(line);
+  output.scrollTop = output.scrollHeight;
+}
+
+function printDivider() {
+  var hr = document.createElement('hr');
+  hr.className = 't-divider';
+  output.appendChild(hr);
+}
+
+function setStatus(s) {
+  document.getElementById('status-dot').className = 'status-dot ' + s;
+}
+
+function setInputLocked(locked) {
+  input.disabled = locked;
+  sendBtn.disabled = locked;
+  if (!locked) { input.focus(); setStatus('ready'); }
+}
+
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+input.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) handleSend();
+});
+
+// ── Mini animation engine for titlebar icon ───────────
+function animateIcon(container, animConfig, size) {
+  var gridW = animConfig.gridWidth || 11;
+  var gridH = (animConfig.gridHeight || 9) + 4;
+  var scale = Math.max(1, Math.floor(size / Math.max(gridW, gridH)));
+  var canvas = document.createElement('canvas');
+  canvas.width = gridW * scale;
+  canvas.height = gridH * scale;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  var ctx = canvas.getContext('2d');
+  var seq = animConfig.sequences[animConfig.defaultSequence || 'idle'] || animConfig.sequences['duck'];
+  if (!seq) return;
+  var step = 0;
+
+  function computeFrame(frameIdx) {
+    var fd = animConfig.frames[frameIdx];
+    var colors = animConfig.colors;
+    if (animConfig.usePrecomputed && fd.pixels) {
+      var eyeColor = fd.eyeColor || colors['E'] || '#00E5FF';
+      return fd.pixels.map(function(p) {
+        var ck = p[2];
+        return { x: p[0], y: p[1], c: ck === 'E' ? eyeColor : (colors[ck] || ck) };
+      });
+    }
+    return animConfig.basePixels.map(function(p) {
+      var x = p[0], y = p[1], ck = p[2];
+      var ny = y + fd.yShift;
+      if (fd.bodySquish < 1 && y >= 4) ny = 4 + Math.round((y - 4) * fd.bodySquish) + fd.yShift;
+      if (fd.capJump && y <= 3) ny = ny - fd.capJump;
+      return { x: x, y: ny, c: colors[ck] || ck };
+    });
+  }
+
+  function tick() {
+    var pixels = computeFrame(seq.frames[step]);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pixels.forEach(function(p) {
+      if (p.y < 0) return;
+      ctx.fillStyle = p.c;
+      ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+    });
+    step = (step + 1) % seq.frames.length;
+    setTimeout(tick, seq.delays[step] || 200);
+  }
+  tick();
+}
+</script>
+</body>
+</html>

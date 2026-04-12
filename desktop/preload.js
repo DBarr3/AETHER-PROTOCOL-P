@@ -55,6 +55,21 @@ contextBridge.exposeInMainWorld('aether', {
   agent: {
     qopcRefresh: (agentId) => ipcRenderer.invoke('agent:qopcRefresh', agentId),
   },
+  // Agent Profile System
+  agentLoadIcons:    () => ipcRenderer.invoke('agent:loadIcons'),
+  agentLoadAnimations: () => ipcRenderer.invoke('agent:loadAnimations'),
+  agentLoadProfiles: () => ipcRenderer.invoke('agent:loadProfiles'),
+  agentSaveProfile:  (profile) => ipcRenderer.invoke('agent:saveProfile', profile),
+  agentDeleteProfile:(id) => ipcRenderer.invoke('agent:deleteProfile', id),
+  // Tool Registry
+  agentLoadToolRegistry:  () => ipcRenderer.invoke('agent:loadToolRegistry'),
+  agentSaveToolRegistry:  (reg) => ipcRenderer.invoke('agent:saveToolRegistry', reg),
+  // Terminal Windows
+  terminalOpen:     (config) => ipcRenderer.invoke('terminal:open', config),
+  terminalInit:     (cb) => ipcRenderer.on('terminal:init', (_e, config) => cb(config)),
+  terminalMinimize: () => ipcRenderer.send('terminal:minimize'),
+  terminalMaximize: () => ipcRenderer.send('terminal:maximize'),
+  terminalClose:    () => ipcRenderer.send('terminal:close'),
 });
 
 // ═══════════════════════════════════════════════════
