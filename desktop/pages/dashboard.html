@@ -11495,6 +11495,213 @@ window.runTeamFromInput = async function() {
 
 })(); // end AGENT ORCHESTRATION PIPELINE IIFE
 
+// ═══════════════════════════════════════════════════════════════
+// MCP & SKILLS LIBRARY
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+let _tsRegistry = { mcpServers: [], skills: [] };
+let _tsProfiles = [];
+let _tsIcons = {};
+let _tsAgentFilter = 'all';
+let _tsSearch = '';
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const CATEGORY_STYLES = {
+  'Communication': 'color:var(--accent);border-color:var(--accent-border);background:var(--accent-dim);',
+  'Dev Tools':     'color:#6366f1;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);',
+  'Research':      'color:#a855f7;border-color:rgba(168,85,247,0.3);background:rgba(168,85,247,0.08);',
+  'Data':          'color:var(--amber);border-color:var(--amber-border);background:var(--amber-dim);',
+  'Security':      'color:var(--red);border-color:var(--red-border);background:var(--red-dim);',
+  'Productivity':  'color:var(--green);border-color:var(--green-border);background:var(--green-dim);',
+  'AI Tools':      'color:#14b8a6;border-color:rgba(20,184,166,0.3);background:rgba(20,184,166,0.08);',
+  'Documents':     'color:var(--text-muted);border-color:var(--border-2);background:var(--bg-3);',
+  'System':        'color:var(--text-muted);border-color:var(--border-2);background:var(--bg-3);',
+  'Automation':    'color:#f97316;border-color:rgba(249,115,22,0.3);background:rgba(249,115,22,0.08);',
+  'Cloud':         'color:#38bdf8;border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.08);',
+  'Language':      'color:#a855f7;border-color:rgba(168,85,247,0.3);background:rgba(168,85,247,0.08);',
+};
+
+// ── Load data ─────────────────────────────────────────────────
+async function loadAll() {
+  try { _tsRegistry = await window.aether.agentLoadToolRegistry(); } catch(e) { console.error('[mcp-skills] loadRegistry', e); }
+  try { _tsProfiles = await window.aether.agentLoadProfiles(); } catch(e) { _tsProfiles = []; }
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    _tsIcons = {};
+    icons.forEach(function(ic) { _tsIcons[ic.name] = ic.svgContent; });
+  } catch(e) { _tsIcons = {}; }
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderAll() {
+  renderAgentFilter();
+  renderSection('mcp-rows', _tsRegistry.mcpServers || [], 'mcp');
+  renderSection('skills-rows', _tsRegistry.skills || [], 'skill');
+  updateBanner();
+}
+
+function renderSection(containerId, tools, type) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var q = _tsSearch.toLowerCase();
+  var filtered = tools;
+  if (q) {
+    filtered = tools.filter(function(t) {
+      return (t.name||'').toLowerCase().includes(q) ||
+        (t.description||'').toLowerCase().includes(q) ||
+        (t.category||'').toLowerCase().includes(q);
+    });
+  }
+  if (!filtered.length) {
+    container.innerHTML = '<div class="tool-empty-msg">' + (q ? 'No tools match "' + esc(q) + '"' : 'No tools available') + '</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(function(tool) { return renderRow(tool, type); }).join('');
+}
+
+function renderRow(tool, type) {
+  // Find which agents have this tool assigned
+  var assigned = getAssignedAgents(tool.id, type);
+  var chips = assigned.slice(0, 4).map(function(a) {
+    var iconSvg = _tsIcons[a.icon] || '';
+    var chipInner = iconSvg ? iconSvg : '';
+    return '<div class="tool-agent-chip" title="' + esc(a.name) + '" onclick="mcpSkillsRemoveAgentChip(\'' + esc(tool.id) + '\',\'' + type + '\',\'' + esc(a.id) + '\',event)">' + chipInner + '</div>';
+  }).join('');
+  var overflow = assigned.length > 4 ? '<span style="font-size:8px;color:var(--text-muted);">+' + (assigned.length - 4) + '</span>' : '';
+
+  // Checkbox state
+  var isChecked = false;
+  if (_tsAgentFilter === 'all') {
+    isChecked = assigned.length > 0;
+  } else {
+    isChecked = assigned.some(function(a) { return a.id === _tsAgentFilter; });
+  }
+
+  var catStyle = CATEGORY_STYLES[tool.category] || CATEGORY_STYLES['Documents'];
+
+  return '<div class="tool-row">' +
+    '<input type="checkbox" class="tool-checkbox" ' + (isChecked ? 'checked' : '') +
+      ' onchange="mcpSkillsToggleTool(\'' + esc(tool.id) + '\',\'' + type + '\',this.checked)">' +
+    '<span class="tool-name">' + esc(tool.name) + '</span>' +
+    '<span class="tool-description">' + esc(tool.description) + '</span>' +
+    '<span class="tool-category-badge" style="' + catStyle + '">' + esc(tool.category) + '</span>' +
+    '<div class="tool-agent-chips">' + chips + overflow + '</div>' +
+    '<span class="tool-status-badge ' + (tool.status || 'available') + '">' + (tool.status || 'available').toUpperCase() + '</span>' +
+  '</div>';
+}
+
+function getAssignedAgents(toolId, type) {
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  var result = [];
+  _tsProfiles.forEach(function(p) {
+    if (p[key] && p[key].includes(toolId)) {
+      result.push({ id: p.id, name: p.name || 'Unnamed', icon: p.icon || '' });
+    }
+  });
+  return result;
+}
+
+function renderAgentFilter() {
+  var dropdown = document.getElementById('tools-agent-filter-dropdown');
+  if (!dropdown) return;
+  var html = '<div class="profile-team-option ' + (_tsAgentFilter === 'all' ? 'active' : '') + '" onclick="mcpSkillsSelectAgent(\'all\',event)">All Agents</div>';
+  _tsProfiles.forEach(function(p) {
+    html += '<div class="profile-team-option ' + (_tsAgentFilter === p.id ? 'active' : '') + '" onclick="mcpSkillsSelectAgent(\'' + esc(p.id) + '\',event)">' + esc(p.name || 'Unnamed') + '</div>';
+  });
+  dropdown.innerHTML = html;
+}
+
+function updateBanner() {
+  var banner = document.getElementById('tools-agent-banner');
+  var bannerName = document.getElementById('tools-agent-banner-name');
+  if (!banner) return;
+  if (_tsAgentFilter !== 'all') {
+    var agent = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+    if (bannerName) bannerName.textContent = agent ? agent.name : 'Unknown';
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+  var label = document.getElementById('tools-agent-filter-label');
+  if (label) {
+    if (_tsAgentFilter === 'all') label.textContent = 'All Agents';
+    else {
+      var a = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+      label.textContent = a ? a.name : 'Unknown';
+    }
+  }
+}
+
+// ── Save ──────────────────────────────────────────────────────
+async function saveAll() {
+  try { await window.aether.agentSaveToolRegistry(_tsRegistry); } catch(e) { console.error('[mcp-skills] saveRegistry', e); }
+  for (var i = 0; i < _tsProfiles.length; i++) {
+    try { await window.aether.agentSaveProfile(_tsProfiles[i]); } catch(e) { console.error('[mcp-skills] saveProfile', e); }
+  }
+}
+
+// ── Window handlers ───────────────────────────────────────────
+
+window.mcpSkillsPanelInit = async function() {
+  await loadAll();
+  renderAll();
+};
+
+window.mcpSkillsToggleTool = function(toolId, type, checked) {
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  if (_tsAgentFilter === 'all') {
+    _tsProfiles.forEach(function(p) {
+      if (!p[key]) p[key] = [];
+      if (checked && !p[key].includes(toolId)) p[key].push(toolId);
+      if (!checked) p[key] = p[key].filter(function(id) { return id !== toolId; });
+    });
+  } else {
+    var profile = _tsProfiles.find(function(p) { return p.id === _tsAgentFilter; });
+    if (profile) {
+      if (!profile[key]) profile[key] = [];
+      if (checked && !profile[key].includes(toolId)) profile[key].push(toolId);
+      if (!checked) profile[key] = profile[key].filter(function(id) { return id !== toolId; });
+    }
+  }
+  saveAll();
+  renderAll();
+};
+
+window.mcpSkillsSelectAgent = function(agentId, event) {
+  if (event) event.stopPropagation();
+  _tsAgentFilter = agentId;
+  var dd = document.getElementById('tools-agent-filter-dropdown');
+  if (dd) dd.classList.remove('open');
+  renderAll();
+};
+
+window.mcpSkillsToggleAgentFilter = function() {
+  var dd = document.getElementById('tools-agent-filter-dropdown');
+  if (dd) dd.classList.toggle('open');
+};
+
+window.mcpSkillsSearch = function() {
+  var input = document.getElementById('tools-search-input');
+  _tsSearch = input ? input.value.trim() : '';
+  renderSection('mcp-rows', _tsRegistry.mcpServers || [], 'mcp');
+  renderSection('skills-rows', _tsRegistry.skills || [], 'skill');
+};
+
+window.mcpSkillsRemoveAgentChip = function(toolId, type, agentId, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  var key = type === 'mcp' ? 'mcpAgents' : 'skills';
+  var profile = _tsProfiles.find(function(p) { return p.id === agentId; });
+  if (profile && profile[key]) {
+    profile[key] = profile[key].filter(function(id) { return id !== toolId; });
+    saveAll();
+    renderAll();
+  }
+};
+
+})(); // end MCP & SKILLS LIBRARY IIFE
+
 // ════════════════════════════════════════════════════
 // AUTONOMOUS PROJECT EXECUTION
 // ════════════════════════════════════════════════════
