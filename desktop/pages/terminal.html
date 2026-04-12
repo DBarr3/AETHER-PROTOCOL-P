@@ -366,6 +366,13 @@ function animateIcon(container, animConfig, size) {
   function computeFrame(frameIdx) {
     var fd = animConfig.frames[frameIdx];
     var colors = animConfig.colors;
+    if (animConfig.usePrecomputed && fd.pixels) {
+      var eyeColor = fd.eyeColor || colors['E'] || '#00E5FF';
+      return fd.pixels.map(function(p) {
+        var ck = p[2];
+        return { x: p[0], y: p[1], c: ck === 'E' ? eyeColor : (colors[ck] || ck) };
+      });
+    }
     return animConfig.basePixels.map(function(p) {
       var x = p[0], y = p[1], ck = p[2];
       var ny = y + fd.yShift;

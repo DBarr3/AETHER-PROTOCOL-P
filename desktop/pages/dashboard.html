@@ -11790,6 +11790,16 @@ async function loadAnimations() {
 function computeFrame(config, frameIdx) {
   var frameDef = config.frames[frameIdx];
   var colors = config.colors;
+  // Pre-computed frames: each frame has its own pixel array
+  if (config.usePrecomputed && frameDef.pixels) {
+    var eyeColor = frameDef.eyeColor || colors['E'] || '#00E5FF';
+    return frameDef.pixels.map(function(p) {
+      var colorKey = p[2];
+      var resolved = colorKey === 'E' ? eyeColor : (colors[colorKey] || colorKey);
+      return { x: p[0], y: p[1], color: resolved };
+    });
+  }
+  // Computed frames: transform base pixels (mushroom-style)
   return config.basePixels.map(function(p) {
     var x = p[0], y = p[1], colorKey = p[2];
     var ny = y + frameDef.yShift;
