@@ -64,6 +64,7 @@ from config.storage import (
     ensure_system_dirs, ensure_user_dirs,
     CREDENTIALS_FILE as STORAGE_CREDENTIALS_FILE,
     AUDIT_LOG as STORAGE_AUDIT_LOG,
+    DATA_ROOT,
     user_tasks_file, user_task_history, user_task_qopc,
     user_agent_team_file, user_agent_keys_file,
 )
@@ -79,9 +80,13 @@ from agent.task_scheduler import (
     get_task_history, parse_schedule,
 )
 from agent.task_qopc import TaskQOPC, TaskSignal
+from agent.qopc_interaction_style import InteractionStyleProfile, analyze_query_signals, analyze_response_signals
 from aether_protocol.audit import AuditLog
 
 log = logging.getLogger("aethercloud.api")
+
+# Per-user data directory for interaction style profiles etc.
+_USER_DATA_DIR = str(DATA_ROOT / "users")
 
 # ═══════════════════════════════════════════════════
 # FILE METADATA — single source of truth for ext → (icon, category)
@@ -1341,6 +1346,16 @@ async def agent_chat(request: Request, req: ChatRequest, token: str = Depends(ge
             ctx_lines.append("[END VAULT CONTEXT]")
             query = query + '\n'.join(ctx_lines)
 
+        # Analyze query for interaction style signals (passive learning)
+        try:
+            username = get_username_from_token(token)
+            style_profile = InteractionStyleProfile(username, _USER_DATA_DIR)
+            query_signals = analyze_query_signals(req.query)
+            for sig in query_signals:
+                style_profile.record_signal(sig)
+        except Exception:
+            pass  # Style tracking is non-critical
+
         # Route planning queries to the dedicated planner (no file-agent identity)
         if svc.agent._is_planning_query(req.query):
             response_text = svc.agent.plan_day(req.query)
@@ -1420,9 +1435,11 @@ async def set_agent_context(
     """Store user context preferences. Injected into every agent call."""
     session_context[token] = request.context
 
-    # Update the agent's context scorer
+    # Update the agent's context scorer + interaction style
     if svc.agent and svc.agent._claude_available and svc.agent._claude_agent:
         try:
+            username = get_username_from_token(token)
+            svc.agent._claude_agent._user_id = username
             svc.agent._claude_agent.set_user_context(request.context)
         except Exception as e:
             log.warning("Failed to set agent context: %s", e)
@@ -2504,6 +2521,31 @@ async def get_task_qopc(task_id: str, token: str = Depends(get_session_token)):
         "prompt_injection": injection,
         "signal_history": history,
     }
+
+
+# ── Interaction Style ─────────────────────────────
+
+
+@app.post("/interaction/signal")
+async def record_interaction_signal(request: Request, token: str = Depends(get_session_token)):
+    """Record a user interaction style signal."""
+    username = get_username_from_token(token)
+    body = await request.json()
+    signal_type = body.get("signal_type", "")
+    metadata = body.get("metadata", {})
+
+    profile = InteractionStyleProfile(username, _USER_DATA_DIR)
+    profile.record_signal(signal_type, metadata)
+
+    return {"recorded": True, "signal_type": signal_type, "dimensions": profile.dimensions}
+
+
+@app.get("/interaction/style")
+async def get_interaction_style(token: str = Depends(get_session_token)):
+    """Get the user's current interaction style profile."""
+    username = get_username_from_token(token)
+    profile = InteractionStyleProfile(username, _USER_DATA_DIR)
+    return profile.get_dimensions_dict()
 
 
 # ── Status ────────────────────────────────────────

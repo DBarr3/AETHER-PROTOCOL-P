@@ -42,6 +42,7 @@ from config.settings import (
 )
 from config.agent_prompt import AETHER_AGENT_SYSTEM_PROMPT, TASK_SUFFIXES
 from agent.qopc_feedback import QOPCLoop, UserContextScorer
+from agent.qopc_interaction_style import InteractionStyleProfile
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,7 @@ class HardenedClaudeAgent:
         self.system_prompt = AETHER_AGENT_SYSTEM_PROMPT
         self._active_system_prompt = self.system_prompt
         self.user_context: str = ""
+        self._user_id: Optional[str] = None
         self._context_scorer = UserContextScorer("")
         self.conversation_history: list[dict] = []
 
@@ -185,10 +187,23 @@ class HardenedClaudeAgent:
         """Update user context preferences for scoring and prompt injection."""
         self.user_context = context
         self._context_scorer.update_context(context)
-        if context.strip():
-            self._active_system_prompt = (
-                self.system_prompt + f"\n\nUSER PREFERENCES:\n{context}"
-            )
+
+        # Load interaction style profile if user_id is available
+        style_injection = ""
+        if self._user_id:
+            try:
+                style_profile = InteractionStyleProfile(self._user_id)
+                style_injection = style_profile.get_style_injection()
+            except Exception:
+                pass
+
+        if context.strip() or style_injection:
+            additions = []
+            if context.strip():
+                additions.append(f"USER PREFERENCES:\n{context}")
+            if style_injection:
+                additions.append(style_injection)
+            self._active_system_prompt = self.system_prompt + "\n\n" + "\n\n".join(additions)
         else:
             self._active_system_prompt = self.system_prompt
 
