@@ -5802,6 +5802,33 @@ async function sendMessage() {
     return;
   }
 
+  // Agent orchestration — route through AETHER when in agent mode with active team profiles
+  if (currentViewMode === 'agent' && typeof orchestrateAgentFlow === 'function') {
+    (async function() {
+      try {
+        var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+        if (agents.length > 0) {
+          input.value = '';
+          document.getElementById('send-btn').disabled = true;
+          // Pre-load icons for output panel
+          if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+          await orchestrateAgentFlow(query, 'Default Team', agents);
+          document.getElementById('send-btn').disabled = false;
+          return;
+        }
+      } catch(e) { console.error('[agent-flow]', e); }
+      // Fall through to normal chat if no agents or error
+      _sendMessageDirect(query);
+    })();
+    return;
+  }
+
+  _sendMessageDirect(query);
+}
+
+// Extracted direct message flow (called when not in agent orchestration mode)
+async function _sendMessageDirect(query) {
+  const input = document.getElementById('chat-input');
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
