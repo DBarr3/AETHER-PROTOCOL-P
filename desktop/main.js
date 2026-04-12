@@ -268,6 +268,14 @@ ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('app:updateInfo', () => _updateInfo);
 ipcMain.handle('app:openDownload', () => shell.openExternal(DOWNLOAD_URL));
 
+// ── IPC: Agent QOPC refresh (stub — full loop integration deferred) ──
+ipcMain.handle('agent:qopcRefresh', async (_e, agentId) => ({
+  agentId,
+  status: 'IDLE',
+  lastSync: new Date().toISOString(),
+  qopcCycle: Math.floor(Math.random() * 1000),
+}));
+
 // ── IPC: Dialogs ─────────────────────────────────────
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

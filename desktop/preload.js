@@ -52,6 +52,9 @@ contextBridge.exposeInMainWorld('aether', {
   // Local file plan execution — runs agent action plans on the user's machine
   execPlan:    (actions) => ipcRenderer.invoke('fs:execPlan', actions),
   previewPlan: (actions) => ipcRenderer.invoke('fs:previewPlan', actions),
+  agent: {
+    qopcRefresh: (agentId) => ipcRenderer.invoke('agent:qopcRefresh', agentId),
+  },
 });
 
 // ═══════════════════════════════════════════════════

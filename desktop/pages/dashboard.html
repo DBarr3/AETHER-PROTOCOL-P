@@ -26,6 +26,12 @@
     --amber-dim: rgba(245,158,11,0.1);
     --red: #ef4444;
     --red-dim: rgba(239,68,68,0.1);
+    --green-border: rgba(34,197,94,0.30);
+    --amber-border: rgba(245,158,11,0.30);
+    --red-border: rgba(239,68,68,0.30);
+    --accent-border: rgba(0,212,255,0.25);
+    --bg-hover: rgba(255,255,255,0.04);
+    --bg-raised: rgba(255,255,255,0.06);
     --sidebar-w: 280px;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
@@ -964,6 +970,36 @@
     font-weight: 600;
   }
 
+  /* ═══ AGENT SUB-TAB BAR ════════════════════════════ */
+  .agent-sub-tab-bar {
+    display: none;
+    align-items: center;
+    gap: 0;
+    padding: 3px 12px;
+    background: rgba(0,0,0,0.25);
+    border-bottom: 1px solid rgba(0,212,255,0.15);
+    flex-shrink: 0;
+  }
+  .agent-sub-tab {
+    background: transparent;
+    border: 1px solid rgba(0,212,255,0.2);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 0.6px;
+    padding: 2px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .agent-sub-tab:first-child { border-radius: 2px 0 0 2px; }
+  .agent-sub-tab:last-child  { border-radius: 0 2px 2px 0; }
+  .agent-sub-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .agent-sub-tab.active {
+    background: rgba(0,212,255,0.15);
+    color: var(--accent);
+    border-color: rgba(0,212,255,0.5);
+    font-weight: 600;
+  }
+
   /* ═══ PROJECT MODE ACTION PANEL ═══════════════════ */
   .project-actions {
     position: absolute;
@@ -1035,6 +1071,564 @@
   }
   .agent-card-btn:hover { border-color: var(--accent); color: var(--accent); }
   .agent-card-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* ═══════════════════════════════════════════════════════════════
+     AGENT PAGE V3 — LIVE TEAM CANVAS
+     Overrides the old top-right orbit card panel with a full-canvas
+     spatial view (orchestrator + agent nodes + task panel + context menu).
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* Promote #agent-orbit-panel into a full-canvas overlay when visible */
+  .agent-orbit-panel.visible {
+    top: 0; right: 0; bottom: 0; left: 0;
+    max-width: none;
+    z-index: 10;
+    flex-direction: row;
+    gap: 0;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .v3-canvas {
+    position: relative;
+    flex: 1;
+    height: 100%;
+    background:
+      radial-gradient(circle at center, rgba(0,212,255,0.04) 0%, transparent 60%),
+      var(--bg);
+    overflow: hidden;
+  }
+  .v3-lines {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .v3-agent-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .v3-agent-layer > * { pointer-events: auto; }
+
+  /* ── Orchestrator (center lock node) ─────────────────────────── */
+  .v3-orchestrator {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    z-index: 4;
+    pointer-events: auto;
+  }
+  .orch-pulse-ring {
+    position: relative;
+    width: 72px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .orch-pulse-ring::before,
+  .orch-pulse-ring::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    opacity: 0.35;
+    animation: v3-pulse-ring 2s ease-in-out infinite;
+  }
+  .orch-pulse-ring::after {
+    animation-delay: 0.75s;
+  }
+  .v3-orchestrator[data-orch="ORCHESTRATING"] .orch-pulse-ring::before,
+  .v3-orchestrator[data-orch="ORCHESTRATING"] .orch-pulse-ring::after,
+  .v3-orchestrator[data-orch="SUMMARIZING"]   .orch-pulse-ring::before,
+  .v3-orchestrator[data-orch="SUMMARIZING"]   .orch-pulse-ring::after {
+    animation-duration: 1s;
+    opacity: 0.7;
+  }
+  .orch-lock-svg {
+    width: 56px; height: 56px;
+    color: var(--accent);
+    filter: drop-shadow(0 0 8px rgba(0,212,255,0.35));
+    transition: transform 300ms ease, filter 300ms ease;
+  }
+  .v3-orchestrator[data-orch="COMPLETE"] .orch-lock-svg {
+    animation: v3-orch-pop 500ms ease;
+    filter: drop-shadow(0 0 14px rgba(0,212,255,0.7));
+  }
+  .orch-label {
+    font-family: var(--font-mono);
+    font-size: 10px; letter-spacing: 0.15em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .orch-sublabel {
+    font-family: var(--font-mono);
+    font-size: 8px; letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    min-height: 10px;
+  }
+
+  /* ── Agent node ──────────────────────────────────────────────── */
+  .agent-node-v3 {
+    position: absolute;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    animation: v3-node-enter 250ms ease forwards;
+    user-select: none;
+  }
+  .agent-icon-card {
+    position: relative;
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+  .agent-icon-card img,
+  .agent-icon-card svg {
+    width: 36px; height: 36px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    pointer-events: none;
+  }
+  .agent-icon-card .agent-icon-glyph {
+    font-size: 22px;
+    line-height: 1;
+  }
+  .agent-node-v3:hover .agent-icon-card {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,212,255,0.2);
+    transform: scale(1.04);
+  }
+  .agent-node-v3[data-state="WORKING"] .agent-icon-card {
+    border-color: var(--amber);
+    box-shadow: 0 0 12px rgba(245,158,11,0.25);
+  }
+  .agent-node-v3[data-state="COMPLETE"] .agent-icon-card {
+    border-color: var(--green);
+    box-shadow: 0 0 12px rgba(34,197,94,0.25);
+  }
+  .agent-node-v3[data-state="ERROR"] .agent-icon-card {
+    border-color: var(--red);
+    box-shadow: 0 0 12px rgba(239,68,68,0.3);
+  }
+
+  .agent-status-dot {
+    position: absolute;
+    top: -3px; right: -3px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    border: 2px solid var(--bg);
+    z-index: 2;
+  }
+  .agent-node-v3[data-state="WORKING"] .agent-status-dot {
+    background: var(--amber);
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+  }
+  .agent-node-v3[data-state="COMPLETE"] .agent-status-dot {
+    background: var(--green);
+    animation: v3-dot-complete 500ms ease;
+  }
+  .agent-node-v3[data-state="ERROR"] .agent-status-dot {
+    background: var(--red);
+    animation: v3-dot-blink 1.4s ease-in-out infinite;
+  }
+
+  /* Orbiting dots (WORKING) */
+  .orbit-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .agent-node-v3[data-state="WORKING"] .orbit-container { opacity: 1; }
+  .orbit-dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 4px; height: 4px;
+    margin: -2px 0 0 -2px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 4px rgba(245,158,11,0.6);
+    animation: v3-orbit 1.5s linear infinite;
+  }
+  .orbit-dot:nth-child(1) { animation-delay: 0s; }
+  .orbit-dot:nth-child(2) { animation-delay: 0.25s; }
+  .orbit-dot:nth-child(3) { animation-delay: 0.5s; }
+  .orbit-dot:nth-child(4) { animation-delay: 0.75s; }
+  .orbit-dot:nth-child(5) { animation-delay: 1s; }
+  .orbit-dot:nth-child(6) { animation-delay: 1.25s; }
+
+  .agent-name-label {
+    font-family: var(--font-mono);
+    font-size: 10px; letter-spacing: 0.08em;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    max-width: 96px;
+    text-align: center;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .agent-sync-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-muted);
+    opacity: 0.7;
+    min-height: 8px;
+  }
+  .agent-complete-check {
+    position: absolute;
+    bottom: -16px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .agent-node-v3[data-state="COMPLETE"] .agent-complete-check { opacity: 1; }
+
+  /* ── Connection lines ───────────────────────────────────────── */
+  .v3-lines line {
+    stroke: var(--border);
+    stroke-width: 1;
+    transition: stroke 200ms ease;
+  }
+  .v3-lines line[data-state="WORKING"] {
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+    animation: v3-dash-flow 1s linear infinite;
+  }
+  .v3-lines line[data-state="COMPLETE"] {
+    stroke: var(--green);
+    stroke-width: 1.5;
+  }
+  .v3-lines line[data-state="ERROR"] {
+    stroke: var(--red);
+    stroke-width: 1.5;
+  }
+
+  /* ── Empty state ────────────────────────────────────────────── */
+  .v3-empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px;
+    z-index: 5;
+    text-align: center;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+  .v3-empty-state svg {
+    width: 96px; height: 96px;
+    color: var(--accent);
+    opacity: 0.4;
+  }
+  .v3-empty-title {
+    font-size: 12px; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .v3-empty-sub {
+    font-size: 10px; line-height: 1.5;
+    max-width: 320px;
+  }
+  .v3-empty-add-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10px; letter-spacing: 0.1em;
+    padding: 8px 18px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 150ms ease;
+  }
+  .v3-empty-add-btn:hover { background: var(--accent-dim); }
+
+  /* ── Task panel (right sidebar) ─────────────────────────────── */
+  .task-panel-v3 {
+    width: 280px;
+    min-width: 280px;
+    height: 100%;
+    border-left: 1px solid var(--border);
+    background: var(--bg-2);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 14px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    overflow: hidden;
+  }
+  .task-panel-v3 .tp-section-title {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+  .task-panel-v3 .tp-task-name {
+    font-size: 11px;
+    color: var(--text-primary);
+  }
+  .task-panel-v3 .tp-task-desc {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    max-height: 28px;
+    overflow: hidden;
+  }
+  .task-panel-v3 .tp-agent-list {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: 140px; overflow-y: auto;
+  }
+  .tp-agent-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+  }
+  .tp-agent-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+  }
+  .tp-agent-row[data-state="WORKING"] .tp-agent-dot { background: var(--amber); }
+  .tp-agent-row[data-state="COMPLETE"] .tp-agent-dot { background: var(--green); }
+  .tp-agent-row[data-state="ERROR"]    .tp-agent-dot { background: var(--red); }
+  .tp-agent-row img,
+  .tp-agent-row svg {
+    width: 16px; height: 16px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .tp-agent-name {
+    flex: 1;
+    color: var(--text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tp-agent-state {
+    font-size: 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .tp-agent-row[data-state="WORKING"] .tp-agent-state { color: var(--amber); }
+  .tp-agent-row[data-state="COMPLETE"] .tp-agent-state { color: var(--green); }
+  .tp-agent-row[data-state="ERROR"]    .tp-agent-state { color: var(--red); }
+
+  .task-panel-v3 .tp-output {
+    flex: 1;
+    min-height: 80px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 8px;
+    font-size: 9px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: var(--font-mono);
+  }
+  .task-panel-v3 .tp-run-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 150ms ease;
+  }
+  .task-panel-v3 .tp-run-btn:hover:not(:disabled) { background: var(--accent-dim); }
+  .task-panel-v3 .tp-run-btn:disabled {
+    border-color: var(--border);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+  .task-panel-v3 .tp-run-btn.running {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .task-panel-v3 .tp-run-btn.running:hover { background: rgba(239,68,68,0.1); }
+  .task-panel-v3 .tp-empty {
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.6;
+    text-align: center;
+    padding: 14px 4px;
+  }
+
+  /* ── Right-click context menu ───────────────────────────────── */
+  .agent-context-menu {
+    position: fixed;
+    z-index: 1000;
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 210px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
+    font-family: var(--font-mono);
+  }
+  .agent-context-menu.visible { display: block; }
+  .ctx-menu-item {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-primary);
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    transition: background 100ms ease;
+  }
+  .ctx-menu-item:hover { background: var(--bg-3); }
+  .ctx-menu-item.danger { color: var(--red); }
+  .ctx-menu-item.danger:hover { background: rgba(239,68,68,0.08); }
+  .ctx-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+  }
+  .ctx-menu-icon {
+    width: 14px; text-align: center; font-size: 11px;
+    color: var(--text-muted);
+  }
+  .ctx-menu-item:hover .ctx-menu-icon { color: var(--accent); }
+  .ctx-menu-item.danger:hover .ctx-menu-icon { color: var(--red); }
+
+  /* ── TERMINAL header button ─────────────────────────────────── */
+  .agent-terminal-btn {
+    margin-left: 8px;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent) !important;
+    background: rgba(0,212,255,0.06) !important;
+    border-radius: 2px !important;
+    letter-spacing: 0.8px;
+  }
+  .agent-terminal-btn:hover {
+    background: rgba(0,212,255,0.18) !important;
+  }
+
+  /* ── Agent Logs modal ───────────────────────────────────────── */
+  .agent-logs-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 900;
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .agent-logs-overlay.visible { display: flex; }
+  .agent-logs-modal {
+    background: var(--bg-2);
+    border: 1px solid var(--accent);
+    width: 520px; max-height: 70vh;
+    display: flex; flex-direction: column;
+    font-family: var(--font-mono);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  }
+  .agent-logs-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .agent-logs-title { font-size: 11px; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+  .agent-logs-close {
+    background: transparent; border: none; color: var(--text-muted);
+    font-size: 16px; cursor: pointer;
+  }
+  .agent-logs-close:hover { color: var(--accent); }
+  .agent-logs-body {
+    flex: 1;
+    padding: 12px 16px;
+    overflow-y: auto;
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .agent-log-line {
+    display: flex; gap: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .agent-log-ts { color: var(--text-muted); flex-shrink: 0; }
+  .agent-log-msg { color: var(--text-secondary); }
+
+  /* ── Confirm dialog (delete) ───────────────────────────────── */
+  .v3-confirm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 950;
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .v3-confirm-overlay.visible { display: flex; }
+  .v3-confirm-dialog {
+    background: var(--bg-2);
+    border: 1px solid var(--red);
+    padding: 18px 22px;
+    min-width: 320px;
+    font-family: var(--font-mono);
+  }
+  .v3-confirm-title {
+    font-size: 11px; color: var(--red); letter-spacing: 0.12em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .v3-confirm-msg {
+    font-size: 10px; color: var(--text-secondary); line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .v3-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .v3-confirm-btn {
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--text-secondary);
+    font-family: var(--font-mono); font-size: 10px;
+    padding: 6px 14px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .v3-confirm-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .v3-confirm-btn.danger { border-color: var(--red); color: var(--red); }
+  .v3-confirm-btn.danger:hover { background: rgba(239,68,68,0.1); }
+
+  /* ── Keyframes ──────────────────────────────────────────────── */
+  @keyframes v3-orbit {
+    from { transform: rotate(0deg) translateX(36px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(36px) rotate(-360deg); }
+  }
+  @keyframes v3-pulse-ring {
+    0%   { transform: scale(1);    opacity: 0.5; }
+    50%  { transform: scale(1.25); opacity: 0.1; }
+    100% { transform: scale(1);    opacity: 0.5; }
+  }
+  @keyframes v3-dot-complete {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
+  @keyframes v3-dot-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+  @keyframes v3-dash-flow {
+    from { stroke-dashoffset: 24; }
+    to   { stroke-dashoffset: 0; }
+  }
+  @keyframes v3-node-enter {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  @keyframes v3-orch-pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
 
   /* Task tracker bar */
   .task-tracker {
@@ -2190,6 +2784,259 @@
   .aplan-btn-exec:hover { background: #00f0ff; box-shadow: 0 0 12px rgba(0,212,255,0.4); }
   .aplan-btn-exec:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
+  /* ══ DAILY PLAN CARD ════════════════════════════════════ */
+  .aether-day-plan-card {
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    overflow: hidden;
+    max-width: 580px;
+    margin: 8px 0;
+    background: var(--bg-2);
+  }
+  .aether-plan-header {
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: var(--bg-3);
+  }
+  .aether-plan-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+  .aether-plan-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .aether-plan-badge {
+    font-size: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+  .aether-plan-blocks { padding: 4px 0; }
+  .aether-plan-block {
+    display: flex;
+    align-items: stretch;
+    padding: 0 18px;
+  }
+  .aether-plan-block:hover { background: var(--bg-hover); }
+  .aether-plan-time {
+    width: 72px;
+    flex-shrink: 0;
+    padding: 10px 10px 10px 0;
+    text-align: right;
+  }
+  .aether-plan-time-val {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+  }
+  .aether-plan-duration {
+    display: block;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  .aether-plan-timeline {
+    width: 18px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0 0;
+  }
+  .aether-plan-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .aether-plan-line {
+    width: 1px;
+    flex: 1;
+    background: var(--border);
+    margin-top: 4px;
+    min-height: 14px;
+  }
+  .aether-plan-block:last-child .aether-plan-line { display: none; }
+  .aether-priority-high   { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+  .aether-priority-medium { background: var(--amber); box-shadow: 0 0 6px rgba(245,158,11,0.4); }
+  .aether-priority-low    { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+  .aether-plan-task {
+    flex: 1;
+    padding: 8px 0 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .aether-plan-task-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.35;
+  }
+  .aether-plan-task-note {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+  }
+  .aether-plan-tag {
+    display: inline-block;
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-weight: 700;
+    align-self: flex-start;
+    font-family: var(--font-mono);
+  }
+  .aether-tag-high   { background: var(--red-dim);   color: var(--red);   border: 1px solid var(--red-border); }
+  .aether-tag-medium { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-border); }
+  .aether-tag-low    { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
+
+  /* ── Action bar (plan card + any future artifact) ── */
+  .aether-action-bar {
+    border-top: 1px solid var(--border);
+    padding: 9px 18px;
+    display: flex;
+    gap: 7px;
+    background: var(--bg-3);
+  }
+  .aether-btn {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border-radius: 5px;
+    border: 1px solid;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.14s;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+  .aether-btn svg { flex-shrink: 0; }
+  .aether-btn-addday {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+  .aether-btn-addday:hover { background: rgba(0,212,255,0.15); }
+  .aether-btn-copy {
+    background: transparent;
+    border-color: var(--border-2);
+    color: var(--text-muted);
+  }
+  .aether-btn-copy:hover { border-color: var(--text-muted); color: var(--text-primary); }
+  .aether-btn-save {
+    background: var(--green-dim);
+    border-color: var(--green-border);
+    color: var(--green);
+  }
+  .aether-btn-save:hover { background: rgba(34,197,94,0.18); }
+  .aether-btn-copied {
+    background: var(--green-dim) !important;
+    border-color: var(--green-border) !important;
+    color: var(--green) !important;
+  }
+
+  /* ── Sidebar daily task tracker ── */
+  .sb-day-tracker { padding: 0 0 4px; }
+  .sb-day-plan-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    padding: 0 16px 5px;
+    font-family: var(--font-mono);
+  }
+  .sb-day-progress-wrap {
+    height: 3px;
+    background: var(--bg-4);
+    border-radius: 2px;
+    margin: 0 16px 5px;
+    overflow: hidden;
+  }
+  .sb-day-progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.35s ease;
+  }
+  .sb-day-progress-text {
+    font-size: 9px;
+    color: var(--text-muted);
+    padding: 0 16px 6px;
+    font-family: var(--font-mono);
+  }
+  .sb-day-task-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 16px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-radius: 3px;
+    margin: 0 4px;
+  }
+  .sb-day-task-row:hover { background: var(--bg-hover); }
+  .sb-day-task-row.done .sb-day-task-label {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+  .sb-day-checkbox {
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--border-2);
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+  }
+  .sb-day-task-row.done .sb-day-checkbox {
+    background: var(--green);
+    border-color: var(--green);
+  }
+  .sb-day-task-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sb-day-task-time {
+    font-size: 9px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+
   /* ── Agent Team Panel ──────────────────────────────────── */
   .team-agent-row {
     display:flex;align-items:center;gap:8px;
@@ -2350,8 +3197,13 @@
     <button class="view-mode-btn active" id="vm-vault" onclick="switchViewMode('vault')">VAULT</button>
     <button class="view-mode-btn" id="vm-project" onclick="switchViewMode('project')">PROJECT</button>
     <button class="view-mode-btn" id="vm-agent" onclick="switchViewMode('agent')">AGENTS</button>
-    <button class="view-mode-btn" id="vm-team" onclick="switchViewMode('team')">TEAM</button>
     <button class="view-mode-btn" id="vm-logs" onclick="switchViewMode('logs')">LOGS</button>
+  </div>
+  <!-- Agent sub-tabs — visible only when AGENTS mode is active -->
+  <div class="agent-sub-tab-bar" id="agent-sub-tab-bar" style="display:none;">
+    <button class="agent-sub-tab active" id="asub-orbit" onclick="switchAgentSubTab('orbit')">ORBIT</button>
+    <button class="agent-sub-tab" id="asub-team" onclick="switchAgentSubTab('team')">TEAM</button>
+    <button class="agent-sub-tab agent-terminal-btn" id="asub-terminal" onclick="openTeamTerminal()" title="Team Terminal (coming soon)">&#8857; TERMINAL</button>
   </div>
 
   <div class="breadcrumb-bar" id="breadcrumb-bar">
@@ -2385,6 +3237,17 @@
         </div>
       </div>
 
+    <!-- TODAY'S PLAN -->
+    <div class="sb-section" id="sb-day-plan-section" style="display:none;">
+      <div class="sb-header">
+        TODAY'S PLAN
+        <span id="sb-day-done-badge" class="sb-badge" style="background:var(--green-dim);color:var(--green);border:1px solid var(--green-border);font-size:8px;">0%</span>
+      </div>
+      <div class="sb-day-tracker" id="sb-day-tracker">
+        <!-- populated by updateSidebarTaskList() -->
+      </div>
+    </div>
+
     <!-- CONVERSATIONS -->
     <div class="sb-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
       <div class="sb-header">
@@ -2396,7 +3259,7 @@
     </div>
     <!-- SIDEBAR CONTROLS -->
     <div class="sb-controls">
-      <button class="sb-agent-btn" onclick="switchViewMode('team')" style="margin-bottom:8px;">
+      <button class="sb-agent-btn" onclick="switchViewMode('agent'); setTimeout(()=>switchAgentSubTab('team'),50);" style="margin-bottom:8px;">
         <span class="agent-icon">&#9881;</span>
         Configure Agent Team
       </button>
@@ -2428,8 +3291,77 @@
       <div class="task-tracker" id="task-tracker"></div>
       <!-- Agent Detail Panel (on click) -->
       <div class="agent-detail" id="agent-detail"></div>
-      <!-- Agent Mode Orbit Panel -->
-      <div class="agent-orbit-panel" id="agent-orbit-panel"></div>
+      <!-- Agent Mode Orbit Panel (V3 — live team canvas) -->
+      <div class="agent-orbit-panel" id="agent-orbit-panel">
+        <div class="v3-canvas" id="v3-canvas">
+          <svg class="v3-lines" id="v3-lines" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="v3-orchestrator" id="v3-orch" data-orch="IDLE">
+            <div class="orch-pulse-ring">
+              <svg class="orch-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+                <path d="M8 11V7a4 4 0 1 1 8 0v4"></path>
+                <circle cx="12" cy="16" r="1.2" fill="currentColor"></circle>
+              </svg>
+            </div>
+            <div class="orch-label">AETHER</div>
+            <div class="orch-sublabel" id="v3-orch-sublabel">IDLE</div>
+          </div>
+          <div class="v3-agent-layer" id="v3-agent-layer"></div>
+          <div class="v3-empty-state" id="v3-empty-state" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+              <path d="M8 11V7a4 4 0 1 1 8 0v4"></path>
+            </svg>
+            <div class="v3-empty-title">No Agents In This Team</div>
+            <div class="v3-empty-sub">
+              Click the button below (or AGENTS &rarr; TEAM) to create or assign agents<br>
+              to this team to begin orchestration.
+            </div>
+            <button class="v3-empty-add-btn" onclick="openSpawnModal()">+ ADD AGENT</button>
+          </div>
+        </div>
+        <aside class="task-panel-v3" id="v3-task-panel">
+          <div class="tp-section-title">Active Task</div>
+          <div class="tp-task-name" id="v3-task-name">No active task</div>
+          <div class="tp-task-desc" id="v3-task-desc">Assign tasks to agents via the agent editor.</div>
+          <div class="tp-section-title">Agents</div>
+          <div class="tp-agent-list" id="v3-tp-agent-list">
+            <div class="tp-empty">No agents in this team.</div>
+          </div>
+          <div class="tp-section-title">Aether Output</div>
+          <pre class="tp-output" id="v3-tp-output">—</pre>
+          <button class="tp-run-btn" id="v3-tp-run-btn" onclick="v3ToggleRunTask()" disabled>&#9654; RUN TASK</button>
+        </aside>
+      </div>
+      <!-- Agent context menu (portal-style, appended to body via JS fallback) -->
+      <div class="agent-context-menu" id="agent-ctx-menu">
+        <div class="ctx-menu-item" data-action="terminal"><span class="ctx-menu-icon">&#9654;</span>Launch Agent Terminal</div>
+        <div class="ctx-menu-item" data-action="edit"><span class="ctx-menu-icon">&#9998;</span>Edit Agent</div>
+        <div class="ctx-menu-item" data-action="logs"><span class="ctx-menu-icon">&#9776;</span>View Logs</div>
+        <div class="ctx-menu-divider"></div>
+        <div class="ctx-menu-item danger" data-action="delete"><span class="ctx-menu-icon">&#10005;</span>Delete Agent</div>
+      </div>
+      <!-- Agent logs modal -->
+      <div class="agent-logs-overlay" id="agent-logs-overlay">
+        <div class="agent-logs-modal">
+          <div class="agent-logs-header">
+            <span class="agent-logs-title" id="agent-logs-title">AGENT LOGS</span>
+            <button class="agent-logs-close" onclick="closeAgentLogsModal()">&#10005;</button>
+          </div>
+          <div class="agent-logs-body" id="agent-logs-body"></div>
+        </div>
+      </div>
+      <!-- V3 confirm dialog -->
+      <div class="v3-confirm-overlay" id="v3-confirm-overlay">
+        <div class="v3-confirm-dialog">
+          <div class="v3-confirm-title" id="v3-confirm-title">Confirm</div>
+          <div class="v3-confirm-msg" id="v3-confirm-msg">Are you sure?</div>
+          <div class="v3-confirm-actions">
+            <button class="v3-confirm-btn" onclick="v3ConfirmCancel()">CANCEL</button>
+            <button class="v3-confirm-btn danger" id="v3-confirm-ok" onclick="v3ConfirmOK()">CONFIRM</button>
+          </div>
+        </div>
+      </div>
       <!-- Patch Prompt Generator Panel -->
       <div class="patch-panel" id="patch-panel">
         <div class="patch-panel-header">
@@ -3130,12 +4062,37 @@ function extColor(name) {
   const ext = '.' + (name.split('.').pop() || '').toLowerCase();
   return EXT_COLORS[ext] || null;
 }
+// Expanded extension color map (used by drawNodeShape + nodeColor)
+const _EXT_DOT_COLOR = {
+  '.py':'#06b6d4', '.js':'#a78bfa', '.ts':'#a78bfa', '.tsx':'#a78bfa', '.jsx':'#a78bfa',
+  '.go':'#00add8', '.rs':'#f97316', '.cpp':'#5c6bc0', '.c':'#5c6bc0', '.h':'#7986cb',
+  '.java':'#ef9a9a', '.rb':'#e57373', '.php':'#7c4dff', '.swift':'#ff9800', '.kt':'#7c4dff',
+  '.cs':'#26a69a',
+  '.json':'#f59e0b', '.yaml':'#f59e0b', '.yml':'#f59e0b', '.env':'#ef5350',
+  '.toml':'#ffd54f', '.cfg':'#ffd54f', '.ini':'#ffd54f', '.xml':'#ffca28',
+  '.properties':'#ffd54f',
+  '.md':'#78909c', '.txt':'#90a4ae', '.rst':'#78909c', '.log':'#546e7a',
+  '.html':'#10b981', '.css':'#4dd0e1', '.scss':'#f48fb1', '.less':'#f48fb1',
+  '.csv':'#26c6da', '.xlsx':'#43a047', '.xls':'#43a047', '.sql':'#29b6f6',
+  '.pdf':'#ef5350', '.docx':'#2196f3', '.doc':'#2196f3', '.pptx':'#ff7043',
+  '.png':'#ec4899', '.jpg':'#ec4899', '.jpeg':'#ec4899', '.gif':'#ec4899',
+  '.svg':'#f06292', '.ico':'#f06292', '.mp4':'#ab47bc', '.mp3':'#ab47bc',
+  '.zip':'#8d6e63', '.tar':'#8d6e63', '.gz':'#8d6e63', '.exe':'#ef5350',
+  '.bin':'#455a64', '.dll':'#455a64', '.pem':'#ef5350', '.key':'#ef5350', '.cert':'#ef5350',
+};
 function nodeColor(n) {
   if (n.agentActive) return TYPE_COLORS.agentActive;
   if (n.agentDone === 'ok')  return '#51cf66';   // green flash on success
   if (n.agentDone === 'err') return '#ff6b6b';   // red flash on failure
-  if (n.dir) return TYPE_COLORS.directory;
-  return extColor(n.name) || typeColor(n.type) || TYPE_COLORS.Binary;
+  if (n.isRoot) return '#00d4ff';
+  if (n.dir) return '#3b82f6';
+  // Agent orbit node — use status color
+  if (n.agentStatus) {
+    const k = _agentIconKey(n.agentStatus);
+    return { active:'#2196F3', done:'#4CAF50', pending:'#E36C35', error:'#F44336', idle:'#FFEB3B' }[k] || '#64748b';
+  }
+  const ext = ('.' + (n.name.split('.').pop() || '')).toLowerCase();
+  return _EXT_DOT_COLOR[ext] || extColor(n.name) || typeColor(n.type) || TYPE_COLORS.Binary;
 }
 
 // ── Ripple / click-burst FX ──────────────────────────
@@ -3190,6 +4147,43 @@ function animatePanZoom(targetX, targetY, targetZoom, steps) {
     if (step < steps) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+}
+
+// ════════════════════════════════════════════════════
+// AGENT PIXEL-ART SVG ICONS  (status → Image cache)
+// ════════════════════════════════════════════════════
+const _AGENT_SVG = {
+  // active → blue  #2196F3
+  active: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="110" height="80" shape-rendering="crispEdges"><rect x="2" y="0" width="1" height="1" fill="#2196F3"/><rect x="3" y="0" width="1" height="1" fill="#2196F3"/><rect x="4" y="0" width="1" height="1" fill="#2196F3"/><rect x="5" y="0" width="1" height="1" fill="#2196F3"/><rect x="6" y="0" width="1" height="1" fill="#2196F3"/><rect x="7" y="0" width="1" height="1" fill="#2196F3"/><rect x="8" y="0" width="1" height="1" fill="#2196F3"/><rect x="2" y="1" width="1" height="1" fill="#2196F3"/><rect x="3" y="1" width="1" height="1" fill="#2196F3"/><rect x="4" y="1" width="1" height="1" fill="#2196F3"/><rect x="5" y="1" width="1" height="1" fill="#2196F3"/><rect x="6" y="1" width="1" height="1" fill="#2196F3"/><rect x="7" y="1" width="1" height="1" fill="#2196F3"/><rect x="8" y="1" width="1" height="1" fill="#2196F3"/><rect x="2" y="2" width="1" height="1" fill="#2196F3"/><rect x="4" y="2" width="1" height="1" fill="#2196F3"/><rect x="5" y="2" width="1" height="1" fill="#2196F3"/><rect x="6" y="2" width="1" height="1" fill="#2196F3"/><rect x="8" y="2" width="1" height="1" fill="#2196F3"/><rect x="2" y="3" width="1" height="1" fill="#2196F3"/><rect x="3" y="3" width="1" height="1" fill="#2196F3"/><rect x="4" y="3" width="1" height="1" fill="#2196F3"/><rect x="5" y="3" width="1" height="1" fill="#2196F3"/><rect x="6" y="3" width="1" height="1" fill="#2196F3"/><rect x="7" y="3" width="1" height="1" fill="#2196F3"/><rect x="8" y="3" width="1" height="1" fill="#2196F3"/><rect x="0" y="4" width="1" height="1" fill="#2196F3"/><rect x="1" y="4" width="1" height="1" fill="#2196F3"/><rect x="2" y="4" width="1" height="1" fill="#2196F3"/><rect x="3" y="4" width="1" height="1" fill="#2196F3"/><rect x="4" y="4" width="1" height="1" fill="#2196F3"/><rect x="5" y="4" width="1" height="1" fill="#2196F3"/><rect x="6" y="4" width="1" height="1" fill="#2196F3"/><rect x="7" y="4" width="1" height="1" fill="#2196F3"/><rect x="8" y="4" width="1" height="1" fill="#2196F3"/><rect x="9" y="4" width="1" height="1" fill="#2196F3"/><rect x="10" y="4" width="1" height="1" fill="#2196F3"/><rect x="0" y="5" width="1" height="1" fill="#2196F3"/><rect x="1" y="5" width="1" height="1" fill="#2196F3"/><rect x="2" y="5" width="1" height="1" fill="#2196F3"/><rect x="3" y="5" width="1" height="1" fill="#2196F3"/><rect x="4" y="5" width="1" height="1" fill="#2196F3"/><rect x="5" y="5" width="1" height="1" fill="#2196F3"/><rect x="6" y="5" width="1" height="1" fill="#2196F3"/><rect x="7" y="5" width="1" height="1" fill="#2196F3"/><rect x="8" y="5" width="1" height="1" fill="#2196F3"/><rect x="9" y="5" width="1" height="1" fill="#2196F3"/><rect x="10" y="5" width="1" height="1" fill="#2196F3"/><rect x="2" y="6" width="1" height="1" fill="#2196F3"/><rect x="4" y="6" width="1" height="1" fill="#2196F3"/><rect x="6" y="6" width="1" height="1" fill="#2196F3"/><rect x="8" y="6" width="1" height="1" fill="#2196F3"/><rect x="2" y="7" width="1" height="1" fill="#2196F3"/><rect x="4" y="7" width="1" height="1" fill="#2196F3"/><rect x="6" y="7" width="1" height="1" fill="#2196F3"/><rect x="8" y="7" width="1" height="1" fill="#2196F3"/></svg>`,
+  // done → green  #4CAF50
+  done: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="110" height="80" shape-rendering="crispEdges"><rect x="2" y="0" width="1" height="1" fill="#4CAF50"/><rect x="3" y="0" width="1" height="1" fill="#4CAF50"/><rect x="4" y="0" width="1" height="1" fill="#4CAF50"/><rect x="5" y="0" width="1" height="1" fill="#4CAF50"/><rect x="6" y="0" width="1" height="1" fill="#4CAF50"/><rect x="7" y="0" width="1" height="1" fill="#4CAF50"/><rect x="8" y="0" width="1" height="1" fill="#4CAF50"/><rect x="2" y="1" width="1" height="1" fill="#4CAF50"/><rect x="3" y="1" width="1" height="1" fill="#4CAF50"/><rect x="4" y="1" width="1" height="1" fill="#4CAF50"/><rect x="5" y="1" width="1" height="1" fill="#4CAF50"/><rect x="6" y="1" width="1" height="1" fill="#4CAF50"/><rect x="7" y="1" width="1" height="1" fill="#4CAF50"/><rect x="8" y="1" width="1" height="1" fill="#4CAF50"/><rect x="2" y="2" width="1" height="1" fill="#4CAF50"/><rect x="4" y="2" width="1" height="1" fill="#4CAF50"/><rect x="5" y="2" width="1" height="1" fill="#4CAF50"/><rect x="6" y="2" width="1" height="1" fill="#4CAF50"/><rect x="8" y="2" width="1" height="1" fill="#4CAF50"/><rect x="2" y="3" width="1" height="1" fill="#4CAF50"/><rect x="3" y="3" width="1" height="1" fill="#4CAF50"/><rect x="4" y="3" width="1" height="1" fill="#4CAF50"/><rect x="5" y="3" width="1" height="1" fill="#4CAF50"/><rect x="6" y="3" width="1" height="1" fill="#4CAF50"/><rect x="7" y="3" width="1" height="1" fill="#4CAF50"/><rect x="8" y="3" width="1" height="1" fill="#4CAF50"/><rect x="0" y="4" width="1" height="1" fill="#4CAF50"/><rect x="1" y="4" width="1" height="1" fill="#4CAF50"/><rect x="2" y="4" width="1" height="1" fill="#4CAF50"/><rect x="3" y="4" width="1" height="1" fill="#4CAF50"/><rect x="4" y="4" width="1" height="1" fill="#4CAF50"/><rect x="5" y="4" width="1" height="1" fill="#4CAF50"/><rect x="6" y="4" width="1" height="1" fill="#4CAF50"/><rect x="7" y="4" width="1" height="1" fill="#4CAF50"/><rect x="8" y="4" width="1" height="1" fill="#4CAF50"/><rect x="9" y="4" width="1" height="1" fill="#4CAF50"/><rect x="10" y="4" width="1" height="1" fill="#4CAF50"/><rect x="0" y="5" width="1" height="1" fill="#4CAF50"/><rect x="1" y="5" width="1" height="1" fill="#4CAF50"/><rect x="2" y="5" width="1" height="1" fill="#4CAF50"/><rect x="3" y="5" width="1" height="1" fill="#4CAF50"/><rect x="4" y="5" width="1" height="1" fill="#4CAF50"/><rect x="5" y="5" width="1" height="1" fill="#4CAF50"/><rect x="6" y="5" width="1" height="1" fill="#4CAF50"/><rect x="7" y="5" width="1" height="1" fill="#4CAF50"/><rect x="8" y="5" width="1" height="1" fill="#4CAF50"/><rect x="9" y="5" width="1" height="1" fill="#4CAF50"/><rect x="10" y="5" width="1" height="1" fill="#4CAF50"/><rect x="2" y="6" width="1" height="1" fill="#4CAF50"/><rect x="4" y="6" width="1" height="1" fill="#4CAF50"/><rect x="6" y="6" width="1" height="1" fill="#4CAF50"/><rect x="8" y="6" width="1" height="1" fill="#4CAF50"/><rect x="2" y="7" width="1" height="1" fill="#4CAF50"/><rect x="4" y="7" width="1" height="1" fill="#4CAF50"/><rect x="6" y="7" width="1" height="1" fill="#4CAF50"/><rect x="8" y="7" width="1" height="1" fill="#4CAF50"/></svg>`,
+  // pending → orange  #E36C35
+  pending: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="110" height="80" shape-rendering="crispEdges"><rect x="2" y="0" width="1" height="1" fill="#E36C35"/><rect x="3" y="0" width="1" height="1" fill="#E36C35"/><rect x="4" y="0" width="1" height="1" fill="#E36C35"/><rect x="5" y="0" width="1" height="1" fill="#E36C35"/><rect x="6" y="0" width="1" height="1" fill="#E36C35"/><rect x="7" y="0" width="1" height="1" fill="#E36C35"/><rect x="8" y="0" width="1" height="1" fill="#E36C35"/><rect x="2" y="1" width="1" height="1" fill="#E36C35"/><rect x="3" y="1" width="1" height="1" fill="#E36C35"/><rect x="4" y="1" width="1" height="1" fill="#E36C35"/><rect x="5" y="1" width="1" height="1" fill="#E36C35"/><rect x="6" y="1" width="1" height="1" fill="#E36C35"/><rect x="7" y="1" width="1" height="1" fill="#E36C35"/><rect x="8" y="1" width="1" height="1" fill="#E36C35"/><rect x="2" y="2" width="1" height="1" fill="#E36C35"/><rect x="4" y="2" width="1" height="1" fill="#E36C35"/><rect x="5" y="2" width="1" height="1" fill="#E36C35"/><rect x="6" y="2" width="1" height="1" fill="#E36C35"/><rect x="8" y="2" width="1" height="1" fill="#E36C35"/><rect x="2" y="3" width="1" height="1" fill="#E36C35"/><rect x="3" y="3" width="1" height="1" fill="#E36C35"/><rect x="4" y="3" width="1" height="1" fill="#E36C35"/><rect x="5" y="3" width="1" height="1" fill="#E36C35"/><rect x="6" y="3" width="1" height="1" fill="#E36C35"/><rect x="7" y="3" width="1" height="1" fill="#E36C35"/><rect x="8" y="3" width="1" height="1" fill="#E36C35"/><rect x="0" y="4" width="1" height="1" fill="#E36C35"/><rect x="1" y="4" width="1" height="1" fill="#E36C35"/><rect x="2" y="4" width="1" height="1" fill="#E36C35"/><rect x="3" y="4" width="1" height="1" fill="#E36C35"/><rect x="4" y="4" width="1" height="1" fill="#E36C35"/><rect x="5" y="4" width="1" height="1" fill="#E36C35"/><rect x="6" y="4" width="1" height="1" fill="#E36C35"/><rect x="7" y="4" width="1" height="1" fill="#E36C35"/><rect x="8" y="4" width="1" height="1" fill="#E36C35"/><rect x="9" y="4" width="1" height="1" fill="#E36C35"/><rect x="10" y="4" width="1" height="1" fill="#E36C35"/><rect x="0" y="5" width="1" height="1" fill="#E36C35"/><rect x="1" y="5" width="1" height="1" fill="#E36C35"/><rect x="2" y="5" width="1" height="1" fill="#E36C35"/><rect x="3" y="5" width="1" height="1" fill="#E36C35"/><rect x="4" y="5" width="1" height="1" fill="#E36C35"/><rect x="5" y="5" width="1" height="1" fill="#E36C35"/><rect x="6" y="5" width="1" height="1" fill="#E36C35"/><rect x="7" y="5" width="1" height="1" fill="#E36C35"/><rect x="8" y="5" width="1" height="1" fill="#E36C35"/><rect x="9" y="5" width="1" height="1" fill="#E36C35"/><rect x="10" y="5" width="1" height="1" fill="#E36C35"/><rect x="2" y="6" width="1" height="1" fill="#E36C35"/><rect x="4" y="6" width="1" height="1" fill="#E36C35"/><rect x="6" y="6" width="1" height="1" fill="#E36C35"/><rect x="8" y="6" width="1" height="1" fill="#E36C35"/><rect x="2" y="7" width="1" height="1" fill="#E36C35"/><rect x="4" y="7" width="1" height="1" fill="#E36C35"/><rect x="6" y="7" width="1" height="1" fill="#E36C35"/><rect x="8" y="7" width="1" height="1" fill="#E36C35"/></svg>`,
+  // error → red  #F44336
+  error: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="110" height="80" shape-rendering="crispEdges"><rect x="2" y="0" width="1" height="1" fill="#F44336"/><rect x="3" y="0" width="1" height="1" fill="#F44336"/><rect x="4" y="0" width="1" height="1" fill="#F44336"/><rect x="5" y="0" width="1" height="1" fill="#F44336"/><rect x="6" y="0" width="1" height="1" fill="#F44336"/><rect x="7" y="0" width="1" height="1" fill="#F44336"/><rect x="8" y="0" width="1" height="1" fill="#F44336"/><rect x="2" y="1" width="1" height="1" fill="#F44336"/><rect x="3" y="1" width="1" height="1" fill="#F44336"/><rect x="4" y="1" width="1" height="1" fill="#F44336"/><rect x="5" y="1" width="1" height="1" fill="#F44336"/><rect x="6" y="1" width="1" height="1" fill="#F44336"/><rect x="7" y="1" width="1" height="1" fill="#F44336"/><rect x="8" y="1" width="1" height="1" fill="#F44336"/><rect x="2" y="2" width="1" height="1" fill="#F44336"/><rect x="4" y="2" width="1" height="1" fill="#F44336"/><rect x="5" y="2" width="1" height="1" fill="#F44336"/><rect x="6" y="2" width="1" height="1" fill="#F44336"/><rect x="8" y="2" width="1" height="1" fill="#F44336"/><rect x="2" y="3" width="1" height="1" fill="#F44336"/><rect x="3" y="3" width="1" height="1" fill="#F44336"/><rect x="4" y="3" width="1" height="1" fill="#F44336"/><rect x="5" y="3" width="1" height="1" fill="#F44336"/><rect x="6" y="3" width="1" height="1" fill="#F44336"/><rect x="7" y="3" width="1" height="1" fill="#F44336"/><rect x="8" y="3" width="1" height="1" fill="#F44336"/><rect x="0" y="4" width="1" height="1" fill="#F44336"/><rect x="1" y="4" width="1" height="1" fill="#F44336"/><rect x="2" y="4" width="1" height="1" fill="#F44336"/><rect x="3" y="4" width="1" height="1" fill="#F44336"/><rect x="4" y="4" width="1" height="1" fill="#F44336"/><rect x="5" y="4" width="1" height="1" fill="#F44336"/><rect x="6" y="4" width="1" height="1" fill="#F44336"/><rect x="7" y="4" width="1" height="1" fill="#F44336"/><rect x="8" y="4" width="1" height="1" fill="#F44336"/><rect x="9" y="4" width="1" height="1" fill="#F44336"/><rect x="10" y="4" width="1" height="1" fill="#F44336"/><rect x="0" y="5" width="1" height="1" fill="#F44336"/><rect x="1" y="5" width="1" height="1" fill="#F44336"/><rect x="2" y="5" width="1" height="1" fill="#F44336"/><rect x="3" y="5" width="1" height="1" fill="#F44336"/><rect x="4" y="5" width="1" height="1" fill="#F44336"/><rect x="5" y="5" width="1" height="1" fill="#F44336"/><rect x="6" y="5" width="1" height="1" fill="#F44336"/><rect x="7" y="5" width="1" height="1" fill="#F44336"/><rect x="8" y="5" width="1" height="1" fill="#F44336"/><rect x="9" y="5" width="1" height="1" fill="#F44336"/><rect x="10" y="5" width="1" height="1" fill="#F44336"/><rect x="2" y="6" width="1" height="1" fill="#F44336"/><rect x="4" y="6" width="1" height="1" fill="#F44336"/><rect x="6" y="6" width="1" height="1" fill="#F44336"/><rect x="8" y="6" width="1" height="1" fill="#F44336"/><rect x="2" y="7" width="1" height="1" fill="#F44336"/><rect x="4" y="7" width="1" height="1" fill="#F44336"/><rect x="6" y="7" width="1" height="1" fill="#F44336"/><rect x="8" y="7" width="1" height="1" fill="#F44336"/></svg>`,
+  // idle → yellow  #FFEB3B
+  idle: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 8" width="110" height="80" shape-rendering="crispEdges"><rect x="2" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="3" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="7" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="0" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="3" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="7" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="1" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="2" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="2" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="2" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="2" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="2" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="3" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="7" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="3" width="1" height="1" fill="#FFEB3B"/><rect x="0" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="1" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="3" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="7" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="9" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="10" y="4" width="1" height="1" fill="#FFEB3B"/><rect x="0" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="1" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="3" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="5" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="7" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="9" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="10" y="5" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="6" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="6" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="6" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="6" width="1" height="1" fill="#FFEB3B"/><rect x="2" y="7" width="1" height="1" fill="#FFEB3B"/><rect x="4" y="7" width="1" height="1" fill="#FFEB3B"/><rect x="6" y="7" width="1" height="1" fill="#FFEB3B"/><rect x="8" y="7" width="1" height="1" fill="#FFEB3B"/></svg>`
+};
+
+// Cache loaded Image objects keyed by status string
+const _agentIcons = {};
+(function _preloadAgentIcons() {
+  Object.entries(_AGENT_SVG).forEach(([status, svgStr]) => {
+    const img = new Image();
+    img.src = 'data:image/svg+xml,' + encodeURIComponent(svgStr);
+    _agentIcons[status] = img;
+  });
+})();
+
+// Map agent status strings → icon key
+function _agentIconKey(status) {
+  if (!status) return 'idle';
+  const s = status.toLowerCase();
+  if (s === 'active' || s === 'processing' || s === 'running') return 'active';
+  if (s === 'done' || s === 'complete' || s === 'completed') return 'done';
+  if (s === 'pending' || s === 'queued') return 'pending';
+  if (s === 'error' || s === 'failed') return 'error';
+  return 'idle';
 }
 
 function initCircuit() {
@@ -3661,27 +4655,50 @@ function radialLayout(nodes, edges) {
   buildEdgeMaps();
 }
 
+// Type icon to draw inside each node (white, small)
+function _nodeTypeIcon(ext, isDir, isRoot) {
+  if (isRoot) return '⬡';
+  if (isDir) return '/';
+  const codeExts = ['.py','.js','.ts','.tsx','.jsx','.go','.rs','.cpp','.c','.h','.java','.rb','.php','.swift','.kt','.cs','.html','.css','.scss'];
+  const configExts = ['.json','.yaml','.yml','.env','.toml','.cfg','.ini','.xml','.properties'];
+  const dataExts = ['.csv','.xlsx','.xls','.sql'];
+  const docExts = ['.md','.txt','.rst','.log','.pdf','.docx','.doc','.pptx'];
+  if (codeExts.includes(ext)) return '</>';
+  if (configExts.includes(ext)) return '{}';
+  if (dataExts.includes(ext)) return '#';
+  if (docExts.includes(ext)) return 'D';
+  return 'T';
+}
+
 function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
   const isDir = n.dir || n.type === 'directory';
-  const ext = (n.name.split('.').pop() || '').toLowerCase();
-  const isConfig = ['json','yaml','yml','env','toml','cfg','ini','xml','properties'].includes(ext);
+  const isRoot = n.isRoot || false;
+  const ext = ('.' + (n.name.split('.').pop() || '')).toLowerCase();
+  const isConfig = ['.json','.yaml','.yml','.env','.toml','.cfg','.ini','.xml','.properties'].includes(ext);
   const isPinned = CS.pinnedNodes.has(n.id);
   const isCollapsed = CS.collapsedNodes.has(n.id) && isDir;
+  const isAgentNode = !!n.agentStatus; // agent-orbit node with status
+
   let radius = n.r || 5;
   if (isH) radius += 2.5;
   if (isS || isF) radius += 3;
-  const finalColor = n.agentActive ? '#ffffff' : color;
+
+  // Resolve dot color — prefer extension map, fall back to passed-in color
+  let dotColor = _EXT_DOT_COLOR[ext] || color;
+  if (isDir && !isRoot) dotColor = '#3b82f6';      // directories → blue
+  if (isRoot) dotColor = '#00d4ff';                // root → cyan
+
+  const finalColor = n.agentActive ? '#ffffff' : dotColor;
+
   if (n.agentActive) {
     radius += 4 + Math.sin(time * 5) * 2;
     ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 16;
-    // Rotating outer ring in agent status color
-    const _agentStatusColor = '#00d4ff'; // Could be parameterised per-agent
     const _rRing = radius + 8;
     ctx.save();
     ctx.strokeStyle = `rgba(0,212,255,0.6)`;
     ctx.lineWidth = 1.5;
     ctx.shadowColor = 'rgba(0,212,255,0.5)'; ctx.shadowBlur = 6;
-    const _rotAngle = time * 1.8; // rotate 1.8 rad/s
+    const _rotAngle = time * 1.8;
     ctx.setLineDash([6, 5]);
     ctx.lineDashOffset = -(_rotAngle * _rRing);
     ctx.beginPath(); ctx.arc(nx, ny, _rRing, 0, Math.PI * 2); ctx.stroke();
@@ -3695,39 +4712,52 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
   } else if (isH) {
     ctx.shadowColor = finalColor; ctx.shadowBlur = 12;
   } else {
-    ctx.shadowColor = hexToRGBA(finalColor, 0.35); ctx.shadowBlur = 3;
+    ctx.shadowColor = hexToRGBA(finalColor, 0.5); ctx.shadowBlur = 6;
   }
-  ctx.fillStyle = hexToRGBA(finalColor, (isH || isS || isF) ? 1.0 : 0.85);
-  ctx.strokeStyle = (isH || isS || isF) ? finalColor : hexToRGBA(finalColor, 0.65);
-  ctx.lineWidth = (isH || isS || isF) ? 1.4 : 0.7;
-  if (isDir) {
-    const rw = radius * 2.4, rh = radius * 1.6, corner = radius * 0.4;
-    const rx_ = nx - rw/2, ry_ = ny - rh/2;
-    ctx.beginPath();
-    ctx.moveTo(rx_ + corner, ry_); ctx.lineTo(rx_ + rw - corner, ry_);
-    ctx.arcTo(rx_ + rw, ry_, rx_ + rw, ry_ + corner, corner);
-    ctx.lineTo(rx_ + rw, ry_ + rh - corner);
-    ctx.arcTo(rx_ + rw, ry_ + rh, rx_ + rw - corner, ry_ + rh, corner);
-    ctx.lineTo(rx_ + corner, ry_ + rh);
-    ctx.arcTo(rx_, ry_ + rh, rx_, ry_ + rh - corner, corner);
-    ctx.lineTo(rx_, ry_ + corner);
-    ctx.arcTo(rx_, ry_, rx_ + corner, ry_, corner);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    if (isCollapsed) {
-      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(0,212,255,0.9)';
-      ctx.font = `${Math.max(6, radius * 0.85)}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('▶', nx, ny);
+
+  // ── All nodes draw as circles (unified shape) ──────
+  ctx.fillStyle = hexToRGBA(finalColor, (isH || isS || isF) ? 1.0 : 0.9);
+  ctx.strokeStyle = (isH || isS || isF) ? finalColor : hexToRGBA(finalColor, 0.80);
+  ctx.lineWidth = (isH || isS || isF) ? 1.6 : 1.0;
+  ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // ── Agent pixel-art SVG icon (replaces type icon for agent nodes) ──
+  if (isAgentNode) {
+    const iconKey = _agentIconKey(n.agentStatus);
+    const img = _agentIcons[iconKey];
+    const iconDiam = radius * 1.55; // render icon at 155% of radius, centered
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.drawImage(img, nx - iconDiam * 0.5, ny - iconDiam * 0.5, iconDiam, iconDiam);
+      ctx.restore();
+    } else if (img && !img.onload) {
+      // Force a redraw once the image loads
+      img.onload = () => drawCircuit();
     }
-  } else if (isConfig) {
-    const d = radius * 1.5;
-    ctx.beginPath(); ctx.moveTo(nx, ny - d); ctx.lineTo(nx + d, ny);
-    ctx.lineTo(nx, ny + d); ctx.lineTo(nx - d, ny); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-  } else {
-    ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
-    ctx.stroke();
+  } else if (CS.zoom >= 0.6 && radius >= 5) {
+    // ── White type icon centered in node ──────────────
+    const typeIcon = _nodeTypeIcon(ext, isDir, isRoot);
+    const _fontSize = Math.max(5, Math.min(radius * 0.75, 11));
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `600 ${_fontSize}px 'JetBrains Mono', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(typeIcon, nx, ny + 0.5);
+    ctx.restore();
   }
+
+  // ── Collapsed dir chevron ──────────────────────────
+  if (isCollapsed && isDir) {
+    ctx.save();
+    ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(0,212,255,0.9)';
+    ctx.font = `${Math.max(6, radius * 0.85)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('▶', nx, ny);
+    ctx.restore();
+  }
+
   if (isPinned) {
     ctx.shadowBlur = 0; ctx.fillStyle = '#f59e0b';
     ctx.font = `${Math.max(7, radius)}px sans-serif`;
@@ -4036,14 +5066,18 @@ function drawCircuit() {
     } else if (hasFocus) {
       alpha = isFocConn ? 0.55 : 0.03; color = isFocConn ? '0,212,255' : '255,255,255';
     } else if (hasHover) {
-      // Unconnected edges dim to 0.05 on hover
-      alpha = 0.05; color = '255,255,255';
+      // Unconnected edges dim slightly on hover
+      alpha = 0.10; color = '255,255,255';
     } else {
-      alpha = 0.12; color = '255,255,255';
+      alpha = 0.30; color = '180,210,255';
     }
 
     ctx.strokeStyle = `rgba(${color},${alpha})`;
-    ctx.lineWidth   = (isSelectedConn ? 1.2 : 0.45) * Math.max(0.3, Math.min(1, 1/z*0.4));
+    // lineWidth: stays readable at all zoom levels — grows when zoomed out, stays solid when zoomed in
+    const _lw = isSelectedConn
+      ? Math.max(1.5, 2.2 / z)
+      : Math.max(0.7, 1.1 / z);
+    ctx.lineWidth = _lw;
     if (isSelectedConn) {
       ctx.shadowColor = 'rgba(0,212,255,0.35)'; ctx.shadowBlur = 4;
     } else { ctx.shadowBlur = 0; }
@@ -4140,8 +5174,8 @@ function drawCircuit() {
 // ── Label collision-avoiding batch renderer ────────
 function drawLabels(nodes, ctx) {
   if (CS.zoom < 0.45) return;
-  const showAll  = CS.zoom > 1.2;  // All labels only at 120%+ zoom
-  const showDirs = CS.zoom > 1.2;  // Directory labels also gated at 120% now
+  const showAll  = CS.zoom > 0.85;  // All labels at 85%+ zoom
+  const showDirs = CS.zoom > 0.65;  // Directory labels at 65%+ zoom
   const placedBoxes = [];
 
   const sorted = [...nodes].filter(n => !n.isRoot).sort((a, b) => {
@@ -4154,7 +5188,7 @@ function drawLabels(nodes, ctx) {
     return (b.size || 0) - (a.size || 0);
   });
 
-  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.font = '11px "Inter", "IBM Plex Mono", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
@@ -4169,10 +5203,10 @@ function drawLabels(nodes, ctx) {
     const radius = n.r || 3.5;
     const color = nodeColor(n);
 
-    const maxLen = 18;
+    const maxLen = 22;
     const label = n.name.length > maxLen ? n.name.slice(0, maxLen - 3) + '...' : n.name;
     const lw = ctx.measureText(label).width;
-    const lh = 11;
+    const lh = 13;
 
     const defaultLx = nx - lw / 2;
     const defaultLy = ny + radius + 6;
@@ -4216,10 +5250,10 @@ function drawLabels(nodes, ctx) {
         ctx.fillText(label, lx, ly);
         ctx.shadowBlur = 0;
         if (n.isLargeDir) {
-          ctx.font = '9px "IBM Plex Mono", monospace';
+          ctx.font = '10px "IBM Plex Mono", monospace';
           ctx.fillStyle = 'rgba(0,212,255,0.6)';
           ctx.fillText(`${n.totalChildrenCount} files`, lx, ly + lh + 2);
-          ctx.font = '10px "IBM Plex Mono", monospace';
+          ctx.font = '11px "Inter", "IBM Plex Mono", monospace';
         }
         placed = true;
         break;
@@ -5585,6 +6619,46 @@ async function sendMessage() {
     return;
   }
 
+  // ── Daily planning — route directly to /agent/plan-day, skip file agent ──
+  if (detectPlanningIntent(query)) {
+    input.value = '';
+    document.getElementById('send-btn').disabled = true;
+    setAgentStatus('Planning...', 'working');
+    addAgentLog('Building daily plan...', 'active');
+    displayAIResponse('Building your plan…', true);
+    try {
+      const _pt = await getSessionToken();
+      const _pr = await authFetch(`${API_BASE}/agent/plan-day`, {
+        method: 'POST',
+        body: JSON.stringify({ query }),
+      });
+      const _pd = await safeJson(_pr);
+      const _reply = _pd.response || _pd.reply || _pd.message || '';
+      displayAIResponse(_reply, false);
+      saveAgentReply(_reply);
+      addAgentLog('Plan ready', 'done');
+      setAgentStatus('Ready', '');
+    } catch (e) {
+      displayAIResponse('Planning failed: ' + e.message, false);
+      setAgentStatus('Error', 'error');
+    }
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('chat-input').focus();
+    return;
+  }
+
+  // ── "execute" / "run" / "yes" → run the last pending plan ────────────────
+  const _execTrigger = /^(execute|run plan|run it|run|go|yes[,!. ]*execute|confirm|do it|apply|apply plan)[\s!.]*$/i;
+  if (_execTrigger.test(query) && _lastPendingPlan && _lastPendingPlan.actions && _lastPendingPlan.actions.length) {
+    input.value = '';
+    document.getElementById('send-btn').disabled = false;
+    // Remove any lingering plan cards and fire execution
+    document.querySelectorAll('.aether-plan-card').forEach(c => c.remove());
+    displayAIResponse(`Executing plan: ${_lastPendingPlan.summary || ''}…`, true);
+    await executePlan(null, JSON.stringify(_lastPendingPlan.actions));
+    return;
+  }
+
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
@@ -5601,7 +6675,11 @@ async function sendMessage() {
   }
 
   let fullQuery = query;
-  if (planMode) fullQuery = 'First show your step-by-step plan, then execute:\n' + query;
+  if (planMode) fullQuery =
+    'Before doing anything, output an action plan using this EXACT format (use forward slashes in all paths):\n' +
+    '```action-plan\n{"summary":"one sentence","actions":[{"type":"mkdir","path":"C:/..."}, ' +
+    '{"type":"move","from":"C:/...","to":"C:/..."}, {"type":"rename","path":"C:/...","new_name":"..."}]}\n```\n\n' +
+    'Then describe the plan in plain English. Do NOT execute — wait for the user to click Execute.\n\n' + query;
   if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
 
   // Determine routing: MCP for web-tool queries, standard for everything else
@@ -5713,15 +6791,22 @@ async function sendMessage() {
       setAgentStatus('Error', 'error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
-      // Prefix with context summary so user knows what the agent saw
-      let contextPrefix = '';
-      if (localFileCount > 0 || vaultFileCount > 0) {
-        const parts = [];
-        if (localFileCount > 0) parts.push(`${localFileCount} local file${localFileCount > 1 ? 's' : ''}`);
-        if (vaultFileCount > 0) parts.push(`${vaultFileCount} vault file${vaultFileCount > 1 ? 's' : ''}`);
-        contextPrefix = `[Reading: ${parts.join(' + ')}]\n\n`;
+
+      // Check for daily_plan JSON first — skip context prefix for structured cards
+      const _intercepted = interceptAIResponse(reply);
+      if (_intercepted.type === 'daily_plan') {
+        displayAIResponse(reply, false);
+      } else {
+        // Prefix with context summary so user knows what the agent saw
+        let contextPrefix = '';
+        if (localFileCount > 0 || vaultFileCount > 0) {
+          const parts = [];
+          if (localFileCount > 0) parts.push(`${localFileCount} local file${localFileCount > 1 ? 's' : ''}`);
+          if (vaultFileCount > 0) parts.push(`${vaultFileCount} vault file${vaultFileCount > 1 ? 's' : ''}`);
+          contextPrefix = `[Reading: ${parts.join(' + ')}]\n\n`;
+        }
+        displayAIResponse(contextPrefix + reply, false);
       }
-      displayAIResponse(contextPrefix + reply, false);
       if (window.activityLayer) activityLayer.triggerResponse();
       saveAgentReply(reply);
       addAgentLog('Response received', 'done');
@@ -5761,21 +6846,285 @@ async function sendMessage() {
 // ── Action-plan parser ───────────────────────────────
 // Detects ```action-plan ... ``` blocks in agent responses,
 // extracts the JSON plan, and renders an Execute card.
+
+let _lastPendingPlan    = null;   // parsed plan — set when plan card renders
+let _lastRawPlanText    = null;   // raw JSON string from action-plan block (fallback)
+
+// ── Robust JSON cleaner ────────────────────────────────────────────────────────
+function _cleanPlanJSON(raw) {
+  // 1. Forward-slash all Windows paths
+  let s = raw.replace(/\\(?!["\\/bfnrtu])/g, '/');
+  // 2. Remove trailing commas before } or ]
+  s = s.replace(/,\s*([\]}])/g, '$1');
+  // 3. Ensure it starts with {
+  const start = s.indexOf('{');
+  if (start > 0) s = s.slice(start);
+  // 4. Truncate at the last valid closing brace
+  const end = s.lastIndexOf('}');
+  if (end !== -1) s = s.slice(0, end + 1);
+  return s;
+}
+
 function _parseActionPlan(text) {
-  const match = text.match(/```action-plan\s*([\s\S]*?)```/);
+  // Match ```action-plan ... ``` or just a bare JSON block after "action-plan"
+  const match = text.match(/`{1,3}action-plan\s*([\s\S]*?)`{1,3}/i)
+             || text.match(/action-plan\s*(\{[\s\S]*\})/i);
   if (!match) return null;
-  try {
-    return JSON.parse(match[1].trim());
-  } catch (_) { return null; }
+  _lastRawPlanText = match[1].trim();   // always store raw text
+
+  // Five parse attempts, most → least strict
+  for (const attempt of [
+    () => JSON.parse(_lastRawPlanText),
+    () => JSON.parse(_cleanPlanJSON(_lastRawPlanText)),
+    () => JSON.parse(_lastRawPlanText.replace(/\\/g, '/')),
+    () => {
+      // Extract summary + actions individually
+      const summary = (_lastRawPlanText.match(/"summary"\s*:\s*"([^"]+)"/) || [])[1] || 'Agent plan';
+      const am = _lastRawPlanText.match(/"actions"\s*:\s*(\[[\s\S]*?\])\s*(?:[,}]|$)/);
+      if (!am) return null;
+      const actions = JSON.parse(_cleanPlanJSON(am[1]));
+      return { summary, actions };
+    },
+    () => {
+      // Last resort: pull individual action objects out with regex
+      const summary = (_lastRawPlanText.match(/"summary"\s*:\s*"([^"]+)"/) || [])[1] || 'Agent plan';
+      const actionRx = /\{[^{}]*"type"\s*:\s*"[^"]+"[^{}]*\}/g;
+      const actions = [];
+      for (const m of _lastRawPlanText.matchAll(actionRx)) {
+        try { actions.push(JSON.parse(_cleanPlanJSON(m[0]))); } catch (_) {}
+      }
+      return actions.length ? { summary, actions } : null;
+    },
+  ]) {
+    try { const r = attempt(); if (r && r.actions && r.actions.length) return r; } catch (_) {}
+  }
+  return null;
 }
 
 function _stripActionPlan(text) {
-  return text.replace(/```action-plan[\s\S]*?```/g, '').trim();
+  return text.replace(/`{1,3}action-plan[\s\S]*?`{1,3}/gi, '').trim();
 }
+
+// ════════════════════════════════════════════════════════════
+// ── DAILY PLAN SYSTEM ───────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+
+// JS-side planning intent detector (mirrors Python _is_planning_query)
+function detectPlanningIntent(query) {
+  const q = query.toLowerCase();
+  const explicit = [
+    'plan my day','plan my week','make me a plan','create a plan',
+    'build a schedule','make a schedule','schedule my day',
+    'help me plan','what should i do today','organize my day',
+    'plan out my day','give me a schedule','make a daily plan',
+  ];
+  if (explicit.some(p => q.includes(p))) return true;
+  // "I need to X, Y, and Z" — at least one comma or "and" between tasks
+  if (/i need to .+[,]/.test(q)) return true;
+  if (/i need to .+ and .+ and/.test(q)) return true;
+  if (/i have to .+[,]/.test(q)) return true;
+  if (/i have to .+ and .+ and/.test(q)) return true;
+  if (/i(?:'ve)? got to .+[,]/.test(q)) return true;
+  if (/\bmy tasks?\b|\bthings? to do\b|\bto.?do list\b|\berrands?\b/.test(q)) return true;
+  return false;
+}
+
+// Intercept raw AI response — returns {type:'daily_plan'|'text', data}
+function interceptAIResponse(rawText) {
+  if (!rawText) return { type: 'text', data: rawText };
+  try {
+    // Strip any markdown fences the AI might wrap around the JSON
+    const clean = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    // Only try if it looks like an object starting with {
+    if (!clean.startsWith('{')) return { type: 'text', data: rawText };
+    const parsed = JSON.parse(clean);
+    if (parsed && parsed.type === 'daily_plan' && Array.isArray(parsed.blocks) && parsed.blocks.length) {
+      return { type: 'daily_plan', data: parsed };
+    }
+  } catch (_) {}
+  return { type: 'text', data: rawText };
+}
+
+// Render a complete daily plan card HTML string
+function renderDayPlanCard(plan) {
+  const escP = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const blocksHtml = (plan.blocks || []).map(b => `
+    <div class="aether-plan-block">
+      <div class="aether-plan-time">
+        <span class="aether-plan-time-val">${escP(b.time)}</span>
+        <span class="aether-plan-duration">${escP(b.duration)}</span>
+      </div>
+      <div class="aether-plan-timeline">
+        <div class="aether-plan-dot aether-priority-${escP(b.priority)}"></div>
+        <div class="aether-plan-line"></div>
+      </div>
+      <div class="aether-plan-task">
+        <span class="aether-plan-task-name">${escP(b.task)}</span>
+        ${b.note ? `<span class="aether-plan-task-note">${escP(b.note)}</span>` : ''}
+        <span class="aether-plan-tag aether-tag-${escP(b.priority)}">${escP(b.priority)}</span>
+      </div>
+    </div>`).join('');
+
+  const planJson = JSON.stringify(plan).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+  const cardId   = 'dayplan-' + Date.now();
+  return `
+    <div class="aether-day-plan-card" id="${cardId}" data-plan="${planJson}">
+      <div class="aether-plan-header">
+        <div>
+          <div class="aether-plan-title">${escP(plan.title)}</div>
+          <div class="aether-plan-meta">${(plan.blocks||[]).length} blocks · ${escP(plan.totalTime)}${plan.summary ? ' · ' + escP(plan.summary) : ''}</div>
+        </div>
+        <div class="aether-plan-badge">OPTIMIZED</div>
+      </div>
+      <div class="aether-plan-blocks">${blocksHtml}</div>
+      ${renderActionButtons(cardId, plan)}
+    </div>`;
+}
+
+// Universal action button bar — append to plan cards and any future artifacts
+function renderActionButtons(cardId, data) {
+  const safeData = JSON.stringify(data).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return `
+    <div class="aether-action-bar" id="bar-${cardId}">
+      <button class="aether-btn aether-btn-addday"
+        onclick="addToDay('${cardId}', JSON.parse(this.closest('.aether-day-plan-card').dataset.plan.replace(/&quot;/g,'\\\"')))">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="1" width="14" height="14" rx="3"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>
+        Add to Day
+      </button>
+      <button class="aether-btn aether-btn-copy" onclick="copyDayPlan('${cardId}')">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="1" width="10" height="12" rx="2"/><rect x="1" y="4" width="10" height="12" rx="2"/></svg>
+        Copy
+      </button>
+      <button class="aether-btn aether-btn-save" onclick="saveDayPlan('${cardId}')">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 11v3H3v-3"/><polyline points="8 1 8 9"/><polyline points="5 6 8 9 11 6"/></svg>
+        Save
+      </button>
+    </div>`;
+}
+
+// ── ADD TO DAY ──────────────────────────────────────────────
+function addToDay(cardId, data) {
+  if (!data || !data.blocks) return;
+  const tasks = data.blocks.map(b => ({
+    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    time: b.time,
+    task: b.task,
+    duration: b.duration,
+    priority: b.priority,
+    done: false
+  }));
+  updateSidebarTaskList(tasks, data.title || "Today's Plan");
+  showToast('Plan added to Today\'s tracker', 'success');
+}
+
+// ── COPY ─────────────────────────────────────────────────────
+function copyDayPlan(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  let planData = {};
+  try { planData = JSON.parse(card.dataset.plan.replace(/&quot;/g, '"').replace(/&#39;/g, "'")); } catch (_) {}
+  let text = '';
+  if (planData.title) {
+    text += `${planData.title}\n${planData.summary || ''}\n${'─'.repeat(44)}\n\n`;
+    (planData.blocks || []).forEach(b => {
+      text += `${b.time}  [${b.duration}]  ${b.task}\n`;
+      if (b.note) text += `               → ${b.note}\n`;
+    });
+    text += `\nTotal: ${planData.totalTime}`;
+  } else {
+    text = card.innerText;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = card.querySelector('.aether-btn-copy');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('aether-btn-copied');
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('aether-btn-copied'); }, 1800);
+    }
+    showToast('Copied to clipboard', 'success');
+  }).catch(() => showToast('Copy failed', 'error'));
+}
+
+// ── SAVE ─────────────────────────────────────────────────────
+function saveDayPlan(cardId) {
+  const card = document.getElementById(cardId);
+  let planData = {};
+  try { planData = JSON.parse((card?.dataset?.plan || '{}').replace(/&quot;/g, '"').replace(/&#39;/g, "'")); } catch (_) {}
+  const date = new Date().toISOString().slice(0, 10);
+  let text = `AETHERCLOUD EXPORT\n${'='.repeat(50)}\nGenerated: ${new Date().toLocaleString()}\n${'─'.repeat(50)}\n\n`;
+  if (planData.title) {
+    text += `${planData.title}\n${planData.summary || ''}\n\n`;
+    (planData.blocks || []).forEach(b => {
+      text += `${b.time}  •  ${b.task}\n`;
+      text += `         Duration: ${b.duration}  |  Priority: ${b.priority.toUpperCase()}\n`;
+      if (b.note) text += `         Note: ${b.note}\n`;
+      text += '\n';
+    });
+    text += `${'─'.repeat(50)}\nTotal time: ${planData.totalTime}\n`;
+  } else {
+    text += card?.innerText || 'No content';
+  }
+  text += `\n\nGenerated by AetherCloud-L · aethersecurity.net`;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `aether-plan-${date}.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showToast('Saved as .txt', 'success');
+}
+
+// ── SIDEBAR TASK LIST ─────────────────────────────────────────
+function updateSidebarTaskList(tasks, planTitle) {
+  const section  = document.getElementById('sb-day-plan-section');
+  const tracker  = document.getElementById('sb-day-tracker');
+  const badge    = document.getElementById('sb-day-done-badge');
+  if (!section || !tracker) return;
+
+  window._aetherDayTasks     = tasks;
+  window._aetherDayPlanTitle = planTitle;
+
+  const total = tasks.length;
+  const done  = tasks.filter(t => t.done).length;
+  const pct   = total ? Math.round((done / total) * 100) : 0;
+
+  if (badge) badge.textContent = pct + '%';
+
+  tracker.innerHTML = `
+    <div class="sb-day-plan-label">${planTitle || "Today's Plan"}</div>
+    <div class="sb-day-progress-wrap">
+      <div class="sb-day-progress-fill" style="width:${pct}%"></div>
+    </div>
+    <div class="sb-day-progress-text">${done} / ${total} complete</div>
+    <div class="sb-day-task-list">
+      ${tasks.map((t, i) => `
+        <div class="sb-day-task-row ${t.done ? 'done' : ''}" onclick="toggleSidebarTask(${i})">
+          <div class="sb-day-checkbox">
+            ${t.done ? '<svg width="8" height="8" viewBox="0 0 10 8" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><polyline points="1 4 4 7 9 1"/></svg>' : ''}
+          </div>
+          <span class="sb-day-task-label">${t.task}</span>
+          <span class="sb-day-task-time">${t.time}</span>
+        </div>`).join('')}
+    </div>`;
+
+  section.style.display = '';
+}
+
+function toggleSidebarTask(index) {
+  if (!window._aetherDayTasks) return;
+  window._aetherDayTasks[index].done = !window._aetherDayTasks[index].done;
+  updateSidebarTaskList(window._aetherDayTasks, window._aetherDayPlanTitle);
+}
+
+// ════════════════════════════════════════════════════════════
 
 function renderMarkdown(text) {
   if (!text) return '';
   let html = text;
+
+  // 0. Strip action-plan blocks entirely — they are rendered as plan cards, not code
+  html = html.replace(/`{1,3}action-plan[\s\S]*?`{1,3}/gi, '');
 
   // 1. Extract code blocks before escaping
   const codeBlocks = [];
@@ -5866,7 +7215,7 @@ function displayAIResponse(text, isThinking) {
   const panel        = document.getElementById('ai-response-panel');
   const responseText = document.getElementById('response-text');
 
-  panel.querySelectorAll('.aether-plan-card').forEach(c => c.remove());
+  panel.querySelectorAll('.aether-plan-card, .aether-day-plan-card, .aether-fallback-exec').forEach(c => c.remove());
 
   if (isThinking) {
     responseText.className = 'resp-text resp-thinking';
@@ -5878,14 +7227,31 @@ function displayAIResponse(text, isThinking) {
 
   responseText.className = 'resp-text';
 
+  // ── 1. Check for daily_plan JSON first ─────────────────────
+  const intercepted = interceptAIResponse(text);
+  if (intercepted.type === 'daily_plan') {
+    responseText.innerHTML = renderDayPlanCard(intercepted.data);
+    panel.classList.add('visible');
+    panel.scrollTop = panel.scrollHeight;
+    return;
+  }
+
+  // ── 2. Check for file action-plan block ────────────────────
   const plan = typeof _parseActionPlan === 'function' ? _parseActionPlan(text) : null;
   if (plan && plan.actions && plan.actions.length) {
+    _lastPendingPlan = plan;
     responseText.innerHTML = renderMarkdown(
       (typeof _stripActionPlan === 'function' ? _stripActionPlan(text) : '') || plan.summary || ''
     );
     _renderPlanCard(panel, plan);
   } else {
-    responseText.innerHTML = renderMarkdown(text);
+    // Strip any raw action-plan block so JSON never leaks into display
+    const displayText = (typeof _stripActionPlan === 'function') ? _stripActionPlan(text) : text;
+    responseText.innerHTML = renderMarkdown(displayText || text);
+    // Fallback execute bar if action-plan text was detected but parse failed
+    if (_lastRawPlanText && /action-plan/i.test(text)) {
+      _renderFallbackExecuteBar(panel);
+    }
   }
 
   panel.classList.add('visible');
@@ -5923,19 +7289,81 @@ function _renderPlanCard(panel, plan) {
     </div>
     <div class="aplan-list">${rows}</div>
     <div class="aplan-footer">
-      <button class="aplan-btn-cancel" onclick="this.closest('.aether-plan-card').remove()">DISMISS</button>
+      <button class="aplan-btn-cancel" onclick="_lastPendingPlan=null;this.closest('.aether-plan-card').remove()">DISMISS</button>
       <button class="aplan-btn-exec" onclick="executePlan(this, '${actionsJson}')">▶ EXECUTE PLAN</button>
+    </div>
+    <div style="font-size:9px;color:#555;text-align:center;padding:4px 0 2px;">
+      Or type <strong style="color:#888;">execute</strong> in the chat to run
     </div>`;
   panel.appendChild(card);
+}
+
+// Fallback Execute bar — shown when action-plan text exists but JSON parse fully failed
+function _renderFallbackExecuteBar(panel) {
+  panel.querySelectorAll('.aether-fallback-exec').forEach(e => e.remove());
+  const bar = document.createElement('div');
+  bar.className = 'aether-fallback-exec';
+  bar.style.cssText = [
+    'margin:10px 0 4px',
+    'padding:10px 14px',
+    'background:rgba(124,58,237,0.15)',
+    'border:1px solid rgba(124,58,237,0.5)',
+    'border-radius:8px',
+    'display:flex',
+    'align-items:center',
+    'justify-content:space-between',
+    'gap:10px',
+  ].join(';');
+  bar.innerHTML = `
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#a78bfa;margin-bottom:2px;">⚡ Plan Ready</div>
+      <div style="font-size:10px;color:#888;">Plan detected — click Execute or type <code style="background:#1a1a2e;padding:1px 4px;border-radius:3px;">execute</code> in chat</div>
+    </div>
+    <button onclick="_executeFallbackPlan(this)"
+      style="background:#7c3aed;border:none;border-radius:6px;padding:8px 16px;
+             color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;
+             letter-spacing:.05em;">
+      ▶ EXECUTE PLAN
+    </button>`;
+  panel.appendChild(bar);
+}
+
+async function _executeFallbackPlan(btn) {
+  // Try to parse the stored raw plan text right now at click time
+  if (!_lastRawPlanText) { showToast('No plan text found', 'error'); return; }
+  let plan = null;
+  const cleanedPlan = _cleanPlanJSON(_lastRawPlanText);
+  for (const src of [_lastRawPlanText, cleanedPlan, _lastRawPlanText.replace(/\\/g, '/')]) {
+    try { const p = JSON.parse(src); if (p && p.actions) { plan = p; break; } } catch (_) {}
+  }
+  // Last resort — extract individual action objects
+  if (!plan) {
+    const summary = (_lastRawPlanText.match(/"summary"\s*:\s*"([^"]+)"/) || [])[1] || 'Agent plan';
+    const actionRx = /\{[^{}]*"type"\s*:\s*"[^"]+"[^{}]*\}/g;
+    const actions = [];
+    for (const m of _lastRawPlanText.matchAll(actionRx)) {
+      try { actions.push(JSON.parse(_cleanPlanJSON(m[0]))); } catch (_) {}
+    }
+    if (actions.length) plan = { summary, actions };
+  }
+  if (!plan || !plan.actions || !plan.actions.length) {
+    showToast('Could not parse plan — ask the agent to re-generate it', 'error');
+    return;
+  }
+  _lastPendingPlan = plan;
+  btn.closest('.aether-fallback-exec').remove();
+  document.querySelectorAll('.aether-plan-card').forEach(c => c.remove());
+  displayAIResponse(`Executing plan: ${plan.summary || ''}…`, true);
+  await executePlan(null, JSON.stringify(plan.actions));
 }
 
 async function executePlan(btn, actionsJson) {
   let actions;
   try { actions = JSON.parse(actionsJson); } catch (_) { showToast('Plan parse error', 'error'); return; }
 
-  btn.textContent = 'EXECUTING...';
-  btn.disabled = true;
-  const card = btn.closest('.aether-plan-card');
+  _lastPendingPlan = null;   // consumed
+  if (btn) { btn.textContent = 'EXECUTING...'; btn.disabled = true; }
+  const card = btn ? btn.closest('.aether-plan-card') : null;
   const list  = card ? card.querySelector('.aplan-list') : null;
 
   addAgentLog('Executing plan — ' + actions.length + ' actions', 'active');
@@ -6005,6 +7433,20 @@ async function executePlan(btn, actionsJson) {
 
   const ok  = results.filter(r => r.success).length;
   const err = results.filter(r => !r.success).length;
+
+  // If executed via keyboard (no card), show results in response panel
+  if (!card) {
+    const summary = results.map(r => {
+      const a = r.action;
+      const fname = s => (s || '').split(/[/\\]/).pop();
+      const label = a.type === 'mkdir'  ? `📁 Created: ${fname(a.path)}`
+                  : a.type === 'move'   ? `➜ Moved: ${fname(a.from)} → ${fname(a.to)}`
+                  : a.type === 'rename' ? `✏️ Renamed: ${fname(a.path)} → ${a.new_name}`
+                  : a.type;
+      return (r.success ? '✓ ' : '✗ ') + label + (r.error ? ` (${r.error})` : '');
+    }).join('\n');
+    displayAIResponse(`## Plan Executed\n\n${ok} succeeded${err ? `, ${err} failed` : ''}\n\n${summary}`, false);
+  }
 
   // Update card rows with final result icons
   if (list) {
@@ -6271,33 +7713,86 @@ function resizeCanvas() {
 // ════════════════════════════════════════════════════
 // VIEW MODE SWITCHING (preserves vault state)
 // ════════════════════════════════════════════════════
+// Agent sub-tab switcher (orbit vs team) — only when AGENTS view is active
+function switchAgentSubTab(sub) {
+  // TERMINAL is a stub action, not a sub-tab — ignore
+  if (sub === 'terminal') return;
+
+  // Only toggle real sub-tab buttons (orbit/team) — leave the TERMINAL pill alone
+  ['orbit', 'team'].forEach(s => {
+    const el = document.getElementById('asub-' + s);
+    if (el) el.classList.remove('active');
+  });
+  const btn = document.getElementById('asub-' + sub);
+  if (btn) btn.classList.add('active');
+
+  const teamPanel = document.getElementById('agent-team-panel');
+  const orbitPanel = document.getElementById('agent-orbit-panel');
+  const taskTracker = document.getElementById('task-tracker');
+  const circuitInteract = document.getElementById('circuit-interact');
+
+  if (sub === 'team') {
+    if (teamPanel) { teamPanel.style.display = 'flex'; }
+    if (orbitPanel) orbitPanel.classList.remove('visible');
+    if (taskTracker) taskTracker.classList.remove('visible');
+    if (circuitInteract) circuitInteract.style.pointerEvents = 'auto';
+    if (typeof teamPanelInit === 'function') teamPanelInit();
+    document.getElementById('chat-input').placeholder = 'Describe the agent you want to add...';
+  } else {
+    if (teamPanel) { teamPanel.style.display = 'none'; }
+    if (orbitPanel) orbitPanel.classList.add('visible');
+    if (taskTracker) taskTracker.classList.remove('visible'); // V3 has its own task panel
+    // Let V3 canvas receive clicks; disable the circuit interaction layer underneath
+    if (circuitInteract) circuitInteract.style.pointerEvents = 'none';
+    document.getElementById('chat-input').placeholder = 'Command your agents...';
+    renderAgentOrbitPanel();
+    // Second render after layout settles — the first pass may run before
+    // the flex children receive their final dimensions.
+    requestAnimationFrame(() => renderAgentOrbitPanel());
+  }
+}
+
 function switchViewMode(mode) {
   const prevMode = currentViewMode;
   currentViewMode = mode;
   document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('vm-' + mode).classList.add('active');
+  const modeBtn = document.getElementById('vm-' + mode);
+  if (modeBtn) modeBtn.classList.add('active');
   document.getElementById('status-view').textContent = 'VIEW: ' + mode.toUpperCase();
   document.getElementById('project-actions').classList.remove('visible');
   document.getElementById('agent-detail').classList.remove('visible');
   closePatchPanel();
   dismissPatchOffer();
 
+  // Show/hide agent sub-tab bar
+  const agentSubBar = document.getElementById('agent-sub-tab-bar');
+  if (agentSubBar) agentSubBar.style.display = mode === 'agent' ? 'flex' : 'none';
+
+  // When entering agent mode, always reset to orbit sub-tab
+  if (mode === 'agent') {
+    document.querySelectorAll('.agent-sub-tab').forEach(b => b.classList.remove('active'));
+    const orbitBtn = document.getElementById('asub-orbit');
+    if (orbitBtn) orbitBtn.classList.add('active');
+  }
+
   // Show/hide mode-specific UI
   document.getElementById('agent-orbit-panel').classList.toggle('visible', mode === 'agent');
-  document.getElementById('task-tracker').classList.toggle('visible', mode === 'agent');
+  // V3 canvas owns the task area in agent mode — legacy task-tracker stays hidden there
+  document.getElementById('task-tracker').classList.toggle('visible', false);
   document.getElementById('logs-panel').classList.toggle('visible', mode === 'logs');
+  // Restore circuit-interact pointer events unless we're landing on agent/orbit
+  const _ci = document.getElementById('circuit-interact');
+  if (_ci) _ci.style.pointerEvents = mode === 'agent' ? 'none' : 'auto';
   const teamPanel = document.getElementById('agent-team-panel');
   if (teamPanel) {
-    teamPanel.style.display = mode === 'team' ? 'flex' : 'none';
-    if (mode === 'team' && typeof teamPanelInit === 'function') { teamPanelInit(); }
+    // Team panel now only shows via agent sub-tab, not as a top-level mode
+    if (mode !== 'agent') teamPanel.style.display = 'none';
   }
 
   // When entering logs mode, load the feed
   if (mode === 'logs') {
     loadLogsFeed();
     loadRecentExports();
-  } else if (mode === 'team') {
-    if (typeof teamPanelInit === 'function') teamPanelInit();
   }
 
   // Update chat placeholder
@@ -6305,7 +7800,6 @@ function switchViewMode(mode) {
   if (mode === 'vault') input.placeholder = 'Ask AetherCloud anything...';
   else if (mode === 'project') input.placeholder = 'Describe your project or ask for analysis...';
   else if (mode === 'logs') input.placeholder = 'Search audit trail...';
-  else if (mode === 'team') input.placeholder = 'Describe the agent you want to add...';
   else input.placeholder = 'Command your agents...';
 
   // Save vault state when leaving vault
@@ -6634,27 +8128,570 @@ function renderSpawnedAgentsSidebar() {
   renderAgentHUD();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AGENT PAGE V3 — LIVE TEAM CANVAS
+// renderAgentOrbitPanel delegates to renderV3Canvas. Keeps the
+// legacy function name so existing call sites keep working.
+// ═══════════════════════════════════════════════════════════════
+
+const V3 = {
+  // per-agent visual state: IDLE | WORKING | COMPLETE | ERROR
+  agentStates: new Map(),
+  // per-agent position {x,y} as pixel coords inside canvas
+  agentPos: new Map(),
+  // QOPC sync workers keyed by agent id
+  qopcSyncs: new Map(),
+  // last QOPC sync timestamp per agent id (ms epoch)
+  lastSync: new Map(),
+  // sync-label refresh ticker
+  syncTicker: null,
+  // run-task simulation state
+  runActive: false,
+  runTimeouts: [],
+  // context menu target agent
+  ctxAgent: null,
+  // confirm dialog pending action
+  pendingConfirm: null,
+  // ResizeObserver for canvas
+  resizeObserver: null,
+  // bound handler refs for cleanup
+  _ctxDocHandler: null,
+  _ctxKeyHandler: null,
+};
+
 function renderAgentOrbitPanel() {
+  renderV3Canvas();
+}
+
+function renderV3Canvas() {
   const panel = document.getElementById('agent-orbit-panel');
-  if (!spawnedAgents.length) {
-    panel.innerHTML = '<div style="background:var(--bg-2);border:1px solid var(--border-2);padding:12px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-align:center;">No agents spawned<br><span style="color:var(--accent);cursor:pointer;" onclick="openSpawnModal()">+ Spawn Agent</span></div>';
+  if (!panel) return;
+  const canvas = document.getElementById('v3-canvas');
+  const layer = document.getElementById('v3-agent-layer');
+  const lines = document.getElementById('v3-lines');
+  const emptyState = document.getElementById('v3-empty-state');
+  const orch = document.getElementById('v3-orch');
+  if (!canvas || !layer || !lines || !emptyState || !orch) return;
+
+  // Reconcile agent states (drop states for removed agents)
+  const aliveIds = new Set(spawnedAgents.map(a => a.id));
+  for (const id of Array.from(V3.agentStates.keys())) {
+    if (!aliveIds.has(id)) V3.agentStates.delete(id);
+  }
+  for (const id of Array.from(V3.agentPos.keys())) {
+    if (!aliveIds.has(id)) V3.agentPos.delete(id);
+  }
+  // Reconcile QOPC syncs
+  for (const [id, sync] of Array.from(V3.qopcSyncs.entries())) {
+    if (!aliveIds.has(id)) { try { sync.stop(); } catch(_){} V3.qopcSyncs.delete(id); V3.lastSync.delete(id); }
+  }
+
+  // Clear layer + lines
+  layer.innerHTML = '';
+  lines.innerHTML = '';
+
+  // Empty state
+  if (spawnedAgents.length === 0) {
+    emptyState.style.display = 'flex';
+    orch.style.display = 'none';
+    v3RenderTaskPanel();
     return;
   }
-  panel.innerHTML = spawnedAgents.map(a => `
-    <div class="agent-card">
-      <div class="agent-card-header">
-        <span class="agent-card-name">${a.icon} ${escH(a.name)}</span>
-        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
-      </div>
-      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
-      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | Schedule: ${a.schedule}</div>
-      <div class="agent-card-actions">
-        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
-        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
-        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
-      </div>
-    </div>
-  `).join('');
+  emptyState.style.display = 'none';
+  orch.style.display = 'flex';
+
+  // Compute agent positions radially around center
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const radius = Math.max(120, Math.min(rect.width, rect.height) * 0.28);
+  const positions = v3LayoutRadial(spawnedAgents.length, cx, cy, radius);
+
+  // Render each agent node + its connection line
+  spawnedAgents.forEach((agent, i) => {
+    const pos = positions[i];
+    V3.agentPos.set(agent.id, pos);
+    if (!V3.agentStates.has(agent.id)) V3.agentStates.set(agent.id, 'IDLE');
+
+    const state = V3.agentStates.get(agent.id);
+    const node = v3BuildAgentNode(agent, state);
+    node.style.left = pos.x + 'px';
+    node.style.top = pos.y + 'px';
+    layer.appendChild(node);
+
+    // Connection line (orchestrator center to node)
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(cx));
+    line.setAttribute('y1', String(cy));
+    line.setAttribute('x2', String(pos.x));
+    line.setAttribute('y2', String(pos.y));
+    line.setAttribute('data-agent-id', String(agent.id));
+    line.setAttribute('data-state', state);
+    lines.appendChild(line);
+
+    // Ensure QOPC sync is running for this agent
+    if (!V3.qopcSyncs.has(agent.id)) {
+      const sync = new AgentQOPCSync(agent.id, (result) => {
+        V3.lastSync.set(agent.id, Date.now());
+        v3UpdateSyncLabel(agent.id);
+      });
+      sync.start();
+      V3.qopcSyncs.set(agent.id, sync);
+    }
+  });
+
+  // Attach ResizeObserver once
+  if (!V3.resizeObserver && typeof ResizeObserver !== 'undefined') {
+    V3.resizeObserver = new ResizeObserver(() => {
+      if (document.getElementById('agent-orbit-panel')?.classList.contains('visible')) {
+        renderV3Canvas();
+      }
+    });
+    V3.resizeObserver.observe(canvas);
+  }
+
+  // Start the sync-label refresh ticker (updates "sync Ns ago" every 5s)
+  if (!V3.syncTicker) {
+    V3.syncTicker = setInterval(() => {
+      spawnedAgents.forEach(a => v3UpdateSyncLabel(a.id));
+    }, 5000);
+  }
+
+  v3RenderTaskPanel();
+}
+
+function v3LayoutRadial(n, cx, cy, r) {
+  // Returns array of {x,y} pixel coordinates
+  if (n === 1) return [{ x: cx - r, y: cy }];
+  if (n === 2) return [{ x: cx - r, y: cy }, { x: cx + r, y: cy }];
+  if (n === 3) return [
+    { x: cx,               y: cy - r },
+    { x: cx - r * 0.866,   y: cy + r * 0.5 },
+    { x: cx + r * 0.866,   y: cy + r * 0.5 },
+  ];
+  // 4+: evenly spaced circle starting at 180° (left)
+  const out = [];
+  const step = (Math.PI * 2) / n;
+  for (let i = 0; i < n; i++) {
+    const angle = Math.PI + step * i;
+    out.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
+  }
+  return out;
+}
+
+function v3BuildAgentNode(agent, state) {
+  const node = document.createElement('div');
+  node.className = 'agent-node-v3';
+  node.dataset.agentId = String(agent.id);
+  node.dataset.state = state || 'IDLE';
+
+  // Icon card (may contain SVG file <img> or emoji glyph)
+  const card = document.createElement('div');
+  card.className = 'agent-icon-card';
+
+  // Orbit dots container (WORKING state only, hidden otherwise via CSS)
+  const orbit = document.createElement('div');
+  orbit.className = 'orbit-container';
+  for (let i = 0; i < 6; i++) {
+    const d = document.createElement('div');
+    d.className = 'orbit-dot';
+    orbit.appendChild(d);
+  }
+  card.appendChild(orbit);
+
+  // Agent icon — try to resolve to agent/agents/*.svg, fall back to glyph/emoji
+  const iconEl = v3ResolveAgentIcon(agent);
+  card.appendChild(iconEl);
+
+  // Status dot
+  const dot = document.createElement('div');
+  dot.className = 'agent-status-dot';
+  card.appendChild(dot);
+
+  node.appendChild(card);
+
+  // Name label
+  const name = document.createElement('div');
+  name.className = 'agent-name-label';
+  name.textContent = (agent.name || 'AGENT').toString();
+  node.appendChild(name);
+
+  // Sync label
+  const sync = document.createElement('div');
+  sync.className = 'agent-sync-label';
+  sync.textContent = '';
+  node.appendChild(sync);
+
+  // Complete check
+  const check = document.createElement('div');
+  check.className = 'agent-complete-check';
+  check.textContent = '\u2713';
+  node.appendChild(check);
+
+  // Interaction: right-click → context menu
+  node.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openAgentContextMenu(e, agent);
+  });
+
+  return node;
+}
+
+function v3ResolveAgentIcon(agent) {
+  const raw = (agent.icon || '').toString();
+  // Heuristic: agents.icon in the existing codebase is often an emoji (🤖 etc.),
+  // but may be a filename stem matching agent/agents/*.svg. Try to load svg if
+  // the string looks like a filename; otherwise render as a glyph.
+  const looksLikeFile = /^[a-z0-9_\-]+$/i.test(raw) && raw.length > 0;
+  if (looksLikeFile) {
+    const img = document.createElement('img');
+    img.alt = agent.name || 'agent';
+    img.src = '../../agent/agents/' + raw + (raw.endsWith('.svg') ? '' : '.svg');
+    // Fallback to glyph if the image fails to load
+    img.addEventListener('error', () => {
+      const g = document.createElement('span');
+      g.className = 'agent-icon-glyph';
+      g.textContent = raw || '\u25C6';
+      img.replaceWith(g);
+    });
+    return img;
+  }
+  const g = document.createElement('span');
+  g.className = 'agent-icon-glyph';
+  g.textContent = raw || '\u25C6';
+  return g;
+}
+
+function v3UpdateSyncLabel(agentId) {
+  const node = document.querySelector('.agent-node-v3[data-agent-id="' + agentId + '"]');
+  if (!node) return;
+  const el = node.querySelector('.agent-sync-label');
+  if (!el) return;
+  const last = V3.lastSync.get(agentId);
+  if (!last) { el.textContent = ''; return; }
+  const secs = Math.max(0, Math.floor((Date.now() - last) / 1000));
+  el.textContent = 'sync ' + secs + 's ago';
+}
+
+// v3SetAgentStatus — do NOT collide with existing setAgentStatus(text,type)
+function v3SetAgentStatus(agentId, state) {
+  V3.agentStates.set(agentId, state);
+  const node = document.querySelector('.agent-node-v3[data-agent-id="' + agentId + '"]');
+  if (node) node.dataset.state = state;
+  const line = document.querySelector('.v3-lines line[data-agent-id="' + agentId + '"]');
+  if (line) line.setAttribute('data-state', state);
+  v3RenderTaskPanel();
+}
+
+function v3SetOrchestratorState(state) {
+  const orch = document.getElementById('v3-orch');
+  if (!orch) return;
+  orch.dataset.orch = state;
+  const sub = document.getElementById('v3-orch-sublabel');
+  if (sub) sub.textContent = state;
+}
+
+function v3RenderTaskPanel() {
+  const listEl = document.getElementById('v3-tp-agent-list');
+  const runBtn = document.getElementById('v3-tp-run-btn');
+  const nameEl = document.getElementById('v3-task-name');
+  const descEl = document.getElementById('v3-task-desc');
+  if (!listEl || !runBtn || !nameEl || !descEl) return;
+
+  if (spawnedAgents.length === 0) {
+    listEl.innerHTML = '<div class="tp-empty">No agents in this team.</div>';
+    nameEl.textContent = 'No active task';
+    descEl.textContent = 'Assign tasks to agents via the agent editor.';
+    runBtn.disabled = true;
+    runBtn.classList.remove('running');
+    runBtn.innerHTML = '\u25B6 RUN TASK';
+    return;
+  }
+
+  // Task metadata: take the first agent's task as the representative
+  const firstWithTask = spawnedAgents.find(a => a.task);
+  if (firstWithTask) {
+    nameEl.textContent = (firstWithTask.name || 'Task') + ' \u2014 primary';
+    descEl.textContent = (firstWithTask.task || '').toString().substring(0, 160);
+  } else {
+    nameEl.textContent = 'No active task';
+    descEl.textContent = 'Configure tasks on your agents to begin.';
+  }
+
+  listEl.innerHTML = '';
+  spawnedAgents.forEach(agent => {
+    const row = document.createElement('div');
+    row.className = 'tp-agent-row';
+    row.dataset.state = V3.agentStates.get(agent.id) || 'IDLE';
+
+    const dot = document.createElement('span');
+    dot.className = 'tp-agent-dot';
+    row.appendChild(dot);
+
+    const icon = v3ResolveAgentIcon(agent);
+    row.appendChild(icon);
+
+    const nm = document.createElement('span');
+    nm.className = 'tp-agent-name';
+    nm.textContent = agent.name || 'AGENT';
+    row.appendChild(nm);
+
+    const st = document.createElement('span');
+    st.className = 'tp-agent-state';
+    st.textContent = row.dataset.state;
+    row.appendChild(st);
+
+    listEl.appendChild(row);
+  });
+
+  runBtn.disabled = false;
+  if (V3.runActive) {
+    runBtn.classList.add('running');
+    runBtn.innerHTML = '\u25A0 STOP';
+  } else {
+    runBtn.classList.remove('running');
+    runBtn.innerHTML = '\u25B6 RUN TASK';
+  }
+}
+
+// ─── RUN TASK simulation ─────────────────────────────────────────
+function v3ToggleRunTask() {
+  if (V3.runActive) { v3StopRunTask(); return; }
+  v3StartRunTask();
+}
+
+function v3StartRunTask() {
+  if (!spawnedAgents.length) return;
+  V3.runActive = true;
+  v3SetOrchestratorState('ORCHESTRATING');
+  const outputEl = document.getElementById('v3-tp-output');
+  if (outputEl) outputEl.textContent = 'Orchestrating agents...';
+
+  // Reset all agents to IDLE then cycle IDLE → WORKING (stagger 400ms) → COMPLETE (stagger 800ms)
+  spawnedAgents.forEach(a => v3SetAgentStatus(a.id, 'IDLE'));
+
+  spawnedAgents.forEach((agent, i) => {
+    const workTimer = setTimeout(() => {
+      if (!V3.runActive) return;
+      v3SetAgentStatus(agent.id, 'WORKING');
+    }, 400 * (i + 1));
+    V3.runTimeouts.push(workTimer);
+
+    const doneTimer = setTimeout(() => {
+      if (!V3.runActive) return;
+      v3SetAgentStatus(agent.id, 'COMPLETE');
+      v3CheckAllComplete();
+    }, 400 * (i + 1) + 1200 + 800 * i);
+    V3.runTimeouts.push(doneTimer);
+  });
+
+  v3RenderTaskPanel();
+}
+
+function v3StopRunTask() {
+  V3.runActive = false;
+  V3.runTimeouts.forEach(t => clearTimeout(t));
+  V3.runTimeouts = [];
+  spawnedAgents.forEach(a => v3SetAgentStatus(a.id, 'IDLE'));
+  v3SetOrchestratorState('IDLE');
+  const outputEl = document.getElementById('v3-tp-output');
+  if (outputEl) outputEl.textContent = 'Stopped.';
+  v3RenderTaskPanel();
+}
+
+function v3CheckAllComplete() {
+  if (!V3.runActive) return;
+  const allDone = spawnedAgents.every(a => V3.agentStates.get(a.id) === 'COMPLETE');
+  if (!allDone) return;
+  v3SetOrchestratorState('SUMMARIZING');
+  const outputEl = document.getElementById('v3-tp-output');
+  if (outputEl) outputEl.textContent = 'Summarizing results...';
+  const t = setTimeout(() => {
+    v3SetOrchestratorState('COMPLETE');
+    const summary = 'All agents reported complete.\n\n' +
+      spawnedAgents.map(a => '  \u2713 ' + a.name + ' \u2014 ' + ((a.task || 'task').substring(0, 40))).join('\n') +
+      '\n\nOrchestration finished.';
+    if (outputEl) outputEl.textContent = summary;
+    V3.runActive = false;
+    v3RenderTaskPanel();
+  }, 1500);
+  V3.runTimeouts.push(t);
+}
+
+// ─── Context menu ─────────────────────────────────────────────────
+function openAgentContextMenu(e, agent) {
+  const menu = document.getElementById('agent-ctx-menu');
+  if (!menu) return;
+  V3.ctxAgent = agent;
+  menu.classList.add('visible');
+  // Position with viewport clamping
+  const mw = menu.offsetWidth || 210;
+  const mh = menu.offsetHeight || 180;
+  const x = Math.min(e.clientX, window.innerWidth - mw - 8);
+  const y = Math.min(e.clientY, window.innerHeight - mh - 8);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+
+  // Wire item clicks (idempotent)
+  menu.querySelectorAll('.ctx-menu-item').forEach(item => {
+    item.onclick = () => v3HandleCtxAction(item.dataset.action);
+  });
+
+  // Attach document listeners for outside-click / escape
+  if (!V3._ctxDocHandler) {
+    V3._ctxDocHandler = (evt) => {
+      if (!menu.contains(evt.target)) closeAgentContextMenu();
+    };
+    document.addEventListener('mousedown', V3._ctxDocHandler, true);
+  }
+  if (!V3._ctxKeyHandler) {
+    V3._ctxKeyHandler = (evt) => { if (evt.key === 'Escape') closeAgentContextMenu(); };
+    document.addEventListener('keydown', V3._ctxKeyHandler, true);
+  }
+}
+
+function closeAgentContextMenu() {
+  const menu = document.getElementById('agent-ctx-menu');
+  if (menu) menu.classList.remove('visible');
+  V3.ctxAgent = null;
+  if (V3._ctxDocHandler) {
+    document.removeEventListener('mousedown', V3._ctxDocHandler, true);
+    V3._ctxDocHandler = null;
+  }
+  if (V3._ctxKeyHandler) {
+    document.removeEventListener('keydown', V3._ctxKeyHandler, true);
+    V3._ctxKeyHandler = null;
+  }
+}
+
+function v3HandleCtxAction(action) {
+  const agent = V3.ctxAgent;
+  closeAgentContextMenu();
+  if (!agent) return;
+  switch (action) {
+    case 'terminal':
+      showToast('Agent Terminal for ' + agent.name + ' \u2014 coming soon', 'info');
+      console.log('agent terminal: TODO', agent);
+      break;
+    case 'edit':
+      // Bridge to the existing team-tab editor when possible; fall back to the
+      // spawn modal or a toast. teamEditAgent operates on teamAgents (different
+      // data collection), so we best-effort match by name.
+      try {
+        if (typeof switchAgentSubTab === 'function') switchAgentSubTab('team');
+        setTimeout(() => {
+          if (typeof teamEditAgent === 'function' && typeof teamAgents !== 'undefined') {
+            const match = (teamAgents || []).find(t => t && (t.id === agent.id || t.name === agent.name));
+            if (match) { teamEditAgent(match.id); return; }
+          }
+          showToast('Opened TEAM tab — matching editor not found for ' + agent.name, 'info');
+        }, 80);
+      } catch (err) {
+        showToast('Edit Agent: ' + err.message, 'error');
+      }
+      break;
+    case 'logs':
+      showAgentLogsModal(agent);
+      break;
+    case 'delete':
+      confirmDeleteAgent(agent);
+      break;
+  }
+}
+
+function showAgentLogsModal(agent) {
+  const overlay = document.getElementById('agent-logs-overlay');
+  const title = document.getElementById('agent-logs-title');
+  const body = document.getElementById('agent-logs-body');
+  if (!overlay || !title || !body) return;
+  title.textContent = 'AGENT LOGS — ' + (agent.name || 'UNKNOWN');
+  // Placeholder log entries
+  const now = Date.now();
+  const entries = [
+    { t: new Date(now - 1000 * 60 * 7).toISOString().substring(11, 19), m: 'Agent initialized.' },
+    { t: new Date(now - 1000 * 60 * 6).toISOString().substring(11, 19), m: 'QOPC sync registered.' },
+    { t: new Date(now - 1000 * 60 * 4).toISOString().substring(11, 19), m: 'Task received: ' + (agent.task || '—').substring(0, 60) },
+    { t: new Date(now - 1000 * 60 * 2).toISOString().substring(11, 19), m: 'Status: ' + (agent.status || 'idle') },
+    { t: new Date(now - 1000 * 30).toISOString().substring(11, 19),     m: 'Awaiting next cycle.' },
+  ];
+  body.innerHTML = entries.map(e =>
+    '<div class="agent-log-line"><span class="agent-log-ts">' + e.t + '</span><span class="agent-log-msg">' + (e.m) + '</span></div>'
+  ).join('');
+  overlay.classList.add('visible');
+}
+
+function closeAgentLogsModal() {
+  const overlay = document.getElementById('agent-logs-overlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
+function confirmDeleteAgent(agent) {
+  const overlay = document.getElementById('v3-confirm-overlay');
+  const title = document.getElementById('v3-confirm-title');
+  const msg = document.getElementById('v3-confirm-msg');
+  if (!overlay || !title || !msg) return;
+  title.textContent = 'DELETE AGENT';
+  msg.textContent = 'Delete ' + (agent.name || 'agent') + '? This cannot be undone.';
+  V3.pendingConfirm = () => {
+    try {
+      if (typeof removeAgent === 'function') removeAgent(agent.id);
+      else {
+        spawnedAgents = spawnedAgents.filter(a => a.id !== agent.id);
+        localStorage.setItem('aether_agents', JSON.stringify(spawnedAgents));
+      }
+      renderV3Canvas();
+    } catch (err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    }
+  };
+  overlay.classList.add('visible');
+}
+
+function v3ConfirmOK() {
+  const fn = V3.pendingConfirm;
+  V3.pendingConfirm = null;
+  const overlay = document.getElementById('v3-confirm-overlay');
+  if (overlay) overlay.classList.remove('visible');
+  if (typeof fn === 'function') fn();
+}
+
+function v3ConfirmCancel() {
+  V3.pendingConfirm = null;
+  const overlay = document.getElementById('v3-confirm-overlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
+// ─── TERMINAL button (stub) ──────────────────────────────────────
+function openTeamTerminal() {
+  console.log('team terminal: TODO');
+  showToast('Team Terminal \u2014 coming soon', 'info');
+}
+
+// ─── QOPC sync class ─────────────────────────────────────────────
+class AgentQOPCSync {
+  constructor(agentId, onRefresh) {
+    this.agentId = agentId;
+    this.onRefresh = onRefresh;
+    this.interval = null;
+  }
+  start() {
+    this.sync();
+    this.interval = setInterval(() => this.sync(), 30000);
+  }
+  async sync() {
+    try {
+      if (window.aether && window.aether.agent && typeof window.aether.agent.qopcRefresh === 'function') {
+        const result = await window.aether.agent.qopcRefresh(this.agentId);
+        if (result && typeof this.onRefresh === 'function') this.onRefresh(result);
+      }
+    } catch (err) {
+      console.warn('[QOPC] Agent ' + this.agentId + ' refresh failed:', err);
+    }
+  }
+  stop() {
+    if (this.interval) { clearInterval(this.interval); this.interval = null; }
+  }
 }
 
 // Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
@@ -8237,40 +10274,8 @@ function renderSpawnedAgentsSidebarEnhanced() {
 // Override renderSpawnedAgentsSidebar
 renderSpawnedAgentsSidebar = renderSpawnedAgentsSidebarEnhanced;
 
-// ── Enhanced Agent Orbit Panel (with Draft button) ──
-const _origRenderOrbit = renderAgentOrbitPanel;
-function renderAgentOrbitPanelEnhanced() {
-  const panel = document.getElementById('agent-orbit-panel');
-  if (!panel) return;
-  if (!spawnedAgents.length) {
-    panel.innerHTML = '<div style="background:var(--bg-2);border:1px solid var(--border-2);padding:12px;font-family:JetBrains Mono,monospace;font-size:10px;color:var(--text-muted);text-align:center;">No agents spawned<br><span style="color:var(--accent);cursor:pointer;" onclick="openSpawnModal()">+ Spawn Agent</span></div>';
-    return;
-  }
-  panel.innerHTML = spawnedAgents.map(a => {
-    const profile = toneProfiles[a.id];
-    const trainStatus = profile && profile.sampleSize > 0
-      ? `<span style="color:var(--green);font-size:8px;">\u2713 Trained (${profile.sampleSize} samples)</span>`
-      : '<span style="color:var(--amber);font-size:8px;">Untrained</span>';
-    return `<div class="agent-card">
-      <div class="agent-card-header">
-        <span class="agent-card-name">${a.icon} ${escH(a.name)}</span>
-        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
-      </div>
-      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
-      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | ${trainStatus}</div>
-      <div class="agent-card-actions">
-        <button class="agent-card-btn" onclick="openDraftModal(${a.id})" style="border-color:var(--accent);color:var(--accent);">Draft</button>
-        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
-        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
-        ${!profile || !profile.sampleSize ? `<button class="agent-card-btn" onclick="openToneWizard(${a.id})">Train</button>` : ''}
-        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// Override renderAgentOrbitPanel
-renderAgentOrbitPanel = renderAgentOrbitPanelEnhanced;
+// Enhanced Agent Orbit Panel override removed in V3.
+// The V3 canvas (renderV3Canvas) replaces the old agent-card list.
 
 // ── Enhanced runAgentTask (tone-injected) ────────────
 const _origRunAgentTask = runAgentTask;
