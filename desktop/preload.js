@@ -57,6 +57,9 @@ contextBridge.exposeInMainWorld('aether', {
   agentLoadProfiles: () => ipcRenderer.invoke('agent:loadProfiles'),
   agentSaveProfile:  (profile) => ipcRenderer.invoke('agent:saveProfile', profile),
   agentDeleteProfile:(id) => ipcRenderer.invoke('agent:deleteProfile', id),
+  // Tool Registry
+  agentLoadToolRegistry:  () => ipcRenderer.invoke('agent:loadToolRegistry'),
+  agentSaveToolRegistry:  (reg) => ipcRenderer.invoke('agent:saveToolRegistry', reg),
 });
 
 // ═══════════════════════════════════════════════════
