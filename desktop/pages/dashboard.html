@@ -2433,6 +2433,21 @@
   }
   .profile-search:focus { border-color:var(--accent); }
 
+  /* ── Aether Node Menu ────────────────────────────── */
+  .aether-menu-item {
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    border-radius:8px;cursor:pointer;font-size:12px;color:#94a3b8;
+    transition:all 100ms ease;
+  }
+  .aether-menu-item:hover { background:#1a1a26;color:#e2e8f0; }
+  .aether-menu-item:active { transform:scale(0.98); }
+  .aether-menu-icon { font-size:12px;color:#475569;width:16px;text-align:center;flex-shrink:0; }
+  .aether-menu-item:hover .aether-menu-icon { color:#06b6d4; }
+  @keyframes menuPop {
+    from { opacity:0; transform:scale(0.92) translateY(4px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+  }
+
   /* ── Agent Output Panel ──────────────────────────── */
   .output-panel {
     position:absolute;top:0;right:0;width:380px;height:100%;
@@ -2873,6 +2888,33 @@
       </div>
     </div>
     <!-- END AGENT MCP & SKILLS PANEL -->
+
+    <!-- AETHER NODE CONTEXT MENU -->
+    <div id="aether-node-menu" style="
+      position:fixed; z-index:900; width:200px; display:none;
+      background:#0d0d14; border:1px solid #1e2030; border-radius:12px;
+      padding:6px; box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      font-family:var(--font-sans),system-ui,sans-serif;
+    ">
+      <div style="padding:8px 10px 6px;display:flex;flex-direction:column;gap:1px;">
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.12em;color:#06b6d4;">AETHER</span>
+        <span style="font-size:10px;color:#334155;letter-spacing:0.06em;">orchestrator</span>
+      </div>
+      <div style="height:1px;background:#1e2030;margin:4px 2px;"></div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('add-agent')">
+        <span class="aether-menu-icon">＋</span><span>Add Agent</span>
+      </div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('configure')">
+        <span class="aether-menu-icon">⊙</span><span>Configure Team</span>
+      </div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('run-task')">
+        <span class="aether-menu-icon">▶</span><span>Run Task</span>
+      </div>
+      <div style="height:1px;background:#1e2030;margin:4px 2px;"></div>
+      <div class="aether-menu-item" onclick="aetherMenuAction('team-terminal')">
+        <span class="aether-menu-icon">⌨</span><span>Team Terminal</span>
+      </div>
+    </div>
 
     <!-- AGENT OUTPUT PANEL -->
     <div class="output-panel" id="agent-output-panel">
@@ -3415,6 +3457,36 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ════════════════════════════════════════════════════
 // CIRCUIT GRAPH ENGINE — Radial Quantum Layout
 // ════════════════════════════════════════════════════
+
+// ── Agent SVG icon cache for canvas rendering ─────
+var _agentIconImages = {}; // { iconName: Image }
+var _agentIconsLoaded = false;
+
+async function loadAgentIconsForCanvas() {
+  if (_agentIconsLoaded) return;
+  try {
+    var icons = await window.aether.agentLoadIcons();
+    icons.forEach(function(ic) {
+      var img = new Image();
+      var blob = new Blob([ic.svgContent], { type: 'image/svg+xml' });
+      var url = URL.createObjectURL(blob);
+      img.onload = function() { URL.revokeObjectURL(url); };
+      img.src = url;
+      _agentIconImages[ic.name] = img;
+    });
+    _agentIconsLoaded = true;
+  } catch(e) { console.error('[canvas] loadIcons', e); }
+}
+
+function getAgentAccentColor(agentId) {
+  var palette = ['#06b6d4','#10b981','#f59e0b','#a855f7','#ef4444','#3b82f6','#ec4899','#14b8a6'];
+  var hash = 0;
+  for (var i = 0; i < String(agentId).length; i++) {
+    hash = String(agentId).charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return palette[Math.abs(hash) % palette.length];
+}
+
 const CS = { nodes:[], edges:[], zoom:1, panX:0, panY:0, dragging:false, dsx:0, dsy:0, hoveredNode:null, selectedNode:null, focusedNode:null, prevView:null, highlightPath:[], cx:0, cy:0, edgeFromMap:{}, edgeToMap:{}, connectedSet:new Set(), nodeById:{}, pinnedNodes:new Set(), collapsedNodes:new Set(), draggingNode:null };
 
 // ════════════════════════════════════════════════════
@@ -3691,7 +3763,7 @@ function initCircuit() {
     if (currentViewMode === 'project' && node.isRoot) {
       document.getElementById('project-actions').classList.add('visible');
     } else if (currentViewMode === 'agent' && node.isRoot) {
-      openSpawnModal();
+      showAetherNodeMenu(e);
     } else if (currentViewMode === 'agent' && node.agentId) {
       showAgentDetail(node.agentId);
     } else if (currentViewMode === 'agent' && node.taskId) {
@@ -4070,6 +4142,19 @@ function drawNodeShape(ctx, n, nx, ny, color, isH, isS, isF, time) {
   } else {
     ctx.beginPath(); ctx.arc(nx, ny, radius, 0, Math.PI * 2); ctx.fill();
     ctx.stroke();
+    // Draw agent SVG icon inside the circle if available
+    if (n.agentIcon && _agentIconImages[n.agentIcon] && _agentIconImages[n.agentIcon].complete) {
+      var iconImg = _agentIconImages[n.agentIcon];
+      var iconSize = radius * 1.6;
+      ctx.save();
+      // Clip to circle
+      ctx.beginPath();
+      ctx.arc(nx, ny, radius - 1, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(iconImg, nx - iconSize/2, ny - iconSize/2, iconSize, iconSize);
+      ctx.restore();
+    }
   }
   if (isPinned) {
     ctx.shadowBlur = 0; ctx.fillStyle = '#f59e0b';
@@ -7059,7 +7144,7 @@ function renderAgentOrbitPanel() {
   panel.innerHTML = spawnedAgents.map(a => `
     <div class="agent-card">
       <div class="agent-card-header">
-        <span class="agent-card-name">${a.icon} ${escH(a.name)}</span>
+        <span class="agent-card-name"><span class="agent-card-icon-wrap" style="display:inline-block;width:16px;height:16px;vertical-align:middle;image-rendering:pixelated;margin-right:4px;">${_agentIconImages[a.icon] ? '<img src="' + _agentIconImages[a.icon].src + '" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;">' : a.icon}</span>${escH(a.name)}</span>
         <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
       </div>
       <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
@@ -7073,9 +7158,58 @@ function renderAgentOrbitPanel() {
   `).join('');
 }
 
+// ── Aether Node Context Menu ──────────────────────────
+function showAetherNodeMenu(clickEvent) {
+  var menu = document.getElementById('aether-node-menu');
+  if (!menu) return;
+  var x = clickEvent.clientX, y = clickEvent.clientY;
+  var mw = 200, mh = 200;
+  var left = x - mw / 2;
+  var top = y - mh - 12;
+  left = Math.max(8, Math.min(left, window.innerWidth - mw - 8));
+  top = Math.max(8, Math.min(top, window.innerHeight - mh - 8));
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.style.display = 'block';
+  menu.style.animation = 'menuPop 150ms cubic-bezier(0.34,1.56,0.64,1) forwards';
+  setTimeout(function() {
+    document.addEventListener('click', closeAetherNodeMenu, { once: true });
+  }, 10);
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { closeAetherNodeMenu(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+function closeAetherNodeMenu() {
+  var menu = document.getElementById('aether-node-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+window.aetherMenuAction = function(action) {
+  closeAetherNodeMenu();
+  switch(action) {
+    case 'add-agent':
+      switchAgentSubTab('team');
+      setTimeout(function() { if (typeof profileNew === 'function') profileNew(); }, 100);
+      break;
+    case 'configure':
+      switchAgentSubTab('team');
+      break;
+    case 'run-task':
+      switchAgentSubTab('team');
+      setTimeout(function() { if (typeof openRunTeamInput === 'function') openRunTeamInput(); }, 100);
+      break;
+    case 'team-terminal':
+      if (typeof openTeamTerminal === 'function') openTeamTerminal();
+      else if (typeof showToast === 'function') showToast('No agents configured yet', 'info');
+      break;
+  }
+};
+
 // Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
 function buildAgentOrbitVault() {
   if (window.resizeCanvas) window.resizeCanvas();
+  if (!_agentIconsLoaded) loadAgentIconsForCanvas();
 
   const N = [], E = [];
   let id = 0;
@@ -7087,11 +7221,18 @@ function buildAgentOrbitVault() {
   spawnedAgents.forEach(a => {
     const aid = id++;
     const statusType = a.status === 'active' ? 'Python' : a.status === 'processing' ? 'JSON' : a.status === 'error' ? 'Binary' : 'Config';
+    // Try to find a real SVG icon name - check if icon matches a loaded icon, otherwise keep emoji
+    var iconName = a.icon;
+    if (a.icon && !_agentIconImages[a.icon]) {
+      // icon is probably an emoji, try to find a profile with matching name
+      var matchProfile = (typeof getActiveTeamAgents === 'function') ? null : null;
+      // Use the icon field as-is — profiles will have SVG names like 'mushroom_agent'
+    }
     N.push({
       id:aid, name:a.name, dir:false, type:statusType,
       size:0, path:'agent://'+a.id,
       cx:0, cy:0, r:18,
-      agentId:a.id, agentStatus:a.status, agentIcon:a.icon
+      agentId:a.id, agentStatus:a.status, agentIcon:iconName
     });
     E.push({ from:0, to:aid });
 
