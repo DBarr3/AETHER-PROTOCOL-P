@@ -2714,6 +2714,22 @@
         <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
           // manage agent configurations
         </span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <button class="profile-btn primary" id="run-team-btn" onclick="openRunTeamInput()" style="font-size:9px;padding:4px 14px;">&#9654; RUN TEAM</button>
+        </div>
+      </div>
+      <!-- Run Team command bar (hidden by default) -->
+      <div id="run-team-bar" style="
+        display:none;padding:6px 16px;background:var(--bg-3);
+        border-bottom:1px solid var(--border);flex-shrink:0;
+        gap:8px;align-items:center;
+      ">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:0.1em;">AETHER &gt;</span>
+        <input id="run-team-input" class="profile-input" type="text" placeholder="Ask AETHER or enter a command..."
+          style="flex:1;font-size:11px;padding:6px 8px;background:var(--bg);border-color:var(--accent-border);"
+          onkeydown="if(event.key==='Enter')runTeamFromInput()">
+        <button class="profile-btn primary" onclick="runTeamFromInput()" style="font-size:9px;padding:4px 12px;">&#9654; RUN</button>
+        <button class="profile-btn outlined" onclick="closeRunTeamInput()" style="font-size:9px;padding:4px 10px;">&times;</button>
       </div>
 
       <!-- Body: sidebar + editor -->
@@ -11307,6 +11323,55 @@ window.getActiveTeamAgents = async function(teamFilter) {
     if (!teamFilter || teamFilter === 'all') return profiles;
     return profiles.filter(function(p) { return p.team === teamFilter; });
   } catch(e) { return []; }
+};
+
+// ── Run Team bar handlers ─────────────────────────────────────
+
+window.openRunTeamInput = function() {
+  var bar = document.getElementById('run-team-bar');
+  if (bar) { bar.style.display = 'flex'; }
+  var input = document.getElementById('run-team-input');
+  if (input) { input.value = ''; input.focus(); }
+};
+
+window.closeRunTeamInput = function() {
+  var bar = document.getElementById('run-team-bar');
+  if (bar) bar.style.display = 'none';
+};
+
+window.runTeamFromInput = async function() {
+  var input = document.getElementById('run-team-input');
+  if (!input) return;
+  var query = input.value.trim();
+  if (!query) return;
+
+  input.disabled = true;
+  var runBtn = document.querySelector('#run-team-bar .profile-btn.primary');
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'RUNNING...'; }
+
+  try {
+    // Load icons for output panel
+    if (typeof _orchLoadIcons === 'function') await _orchLoadIcons();
+
+    // Get agents from current team filter or all
+    var agents = await (typeof getActiveTeamAgents === 'function' ? getActiveTeamAgents() : Promise.resolve([]));
+    if (!agents.length) {
+      if (typeof showToast === 'function') showToast('No agents configured. Create agent profiles first.', 'error');
+      return;
+    }
+
+    // Determine team name from sidebar filter
+    var teamLabel = document.getElementById('profile-team-label');
+    var teamName = (teamLabel && teamLabel.textContent !== 'All Teams') ? teamLabel.textContent : 'Default Team';
+
+    await orchestrateAgentFlow(query, teamName, agents);
+    window.closeRunTeamInput();
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Run failed: ' + e.message, 'error');
+  } finally {
+    input.disabled = false;
+    if (runBtn) { runBtn.disabled = false; runBtn.textContent = '\u25B6 RUN'; }
+  }
 };
 
 })(); // end AGENT ORCHESTRATION PIPELINE IIFE
