@@ -752,6 +752,186 @@
     margin: 12px 0;
   }
 
+  /* ═══════════════════════════════════════════════════════════════
+     AGENT PRESENCE V7 — floating agent characters above chat input
+     Transparent, no tray, no background. Each card animates through
+     idle / thinking / working / complete / error states.
+     ═══════════════════════════════════════════════════════════════ */
+  .agent-presence {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 0 16px 8px;
+    background: transparent;
+    position: relative;
+  }
+  .agent-presence.hidden { display: none; }
+
+  @keyframes v7-presence-appear {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .agent-presence.visible {
+    animation: v7-presence-appear 200ms ease forwards;
+  }
+
+  .presence-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+  }
+
+  .presence-icon-wrap {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+  .presence-icon-wrap img,
+  .presence-icon-wrap svg {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    pointer-events: none;
+  }
+  .presence-icon-wrap .presence-glyph {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  /* IDLE — slow breathing (staggered via inline animation-delay per card) */
+  @keyframes v7-breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.05); }
+  }
+  .presence-card.idle .presence-icon-wrap {
+    animation: v7-breathe 3s ease-in-out infinite;
+  }
+
+  /* THINKING — head tilt, plays once */
+  @keyframes v7-think {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    30%      { transform: rotate(-7deg) scale(1.02); }
+    70%      { transform: rotate(4deg)  scale(1.02); }
+  }
+  .presence-card.thinking .presence-icon-wrap {
+    animation: v7-think 600ms ease forwards;
+  }
+
+  /* WORKING — continuous bob */
+  @keyframes v7-bob {
+    0%, 100% { transform: translateY(0)    scale(1); }
+    50%      { transform: translateY(-4px) scale(1.03); }
+  }
+  .presence-card.working .presence-icon-wrap {
+    animation: v7-bob 0.75s ease-in-out infinite;
+  }
+
+  /* COMPLETE — celebration bounce, plays once */
+  @keyframes v7-celebrate {
+    0%   { transform: translateY(0)    scale(1); }
+    25%  { transform: translateY(-8px) scale(1.08); }
+    50%  { transform: translateY(0)    scale(0.96); }
+    70%  { transform: translateY(-4px) scale(1.03); }
+    100% { transform: translateY(0)    scale(1); }
+  }
+  .presence-card.complete .presence-icon-wrap {
+    animation: v7-celebrate 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  /* ERROR — shake */
+  @keyframes v7-shake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-5px); }
+    40%      { transform: translateX(5px); }
+    60%      { transform: translateX(-3px); }
+    80%      { transform: translateX(3px); }
+  }
+  .presence-card.error .presence-icon-wrap {
+    animation: v7-shake 350ms ease forwards;
+  }
+  .presence-card.error .presence-icon-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9px;
+    background: rgba(239, 68, 68, 0.18);
+    pointer-events: none;
+  }
+
+  /* Dot zone */
+  .presence-dots {
+    height: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+  }
+  .presence-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: transparent;
+    transition: background 200ms;
+  }
+  @keyframes v7-dot-seq {
+    0%, 60%, 100% { transform: scale(1);   opacity: 0.25; }
+    30%           { transform: scale(1.6); opacity: 1; }
+  }
+  .presence-card.working .presence-dot { background: #f59e0b; }
+  .presence-card.working .presence-dot:nth-child(1) { animation: v7-dot-seq 0.9s ease infinite 0s; }
+  .presence-card.working .presence-dot:nth-child(2) { animation: v7-dot-seq 0.9s ease infinite 0.2s; }
+  .presence-card.working .presence-dot:nth-child(3) { animation: v7-dot-seq 0.9s ease infinite 0.4s; }
+
+  .presence-check {
+    font-size: 9px;
+    color: #10b981;
+    line-height: 1;
+    animation: v7-check-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @keyframes v7-check-pop {
+    0%   { transform: scale(0);   opacity: 0; }
+    70%  { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+  .presence-error-mark {
+    font-size: 9px;
+    color: #ef4444;
+    font-weight: bold;
+    line-height: 1;
+  }
+
+  /* Name label — mapped to dark HUD palette */
+  .presence-name {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-align: center;
+    transition: color 200ms;
+  }
+  .presence-card.working  .presence-name { color: #f59e0b; }
+  .presence-card.complete .presence-name { color: #10b981; }
+  .presence-card.error    .presence-name { color: #ef4444; }
+  .presence-card:hover    .presence-name { color: var(--text-secondary); }
+
+  /* Hover lift — suppressed while working/complete so the state animation wins */
+  .presence-card:hover .presence-icon-wrap { transform: translateY(-2px); }
+  .presence-card.working:hover  .presence-icon-wrap,
+  .presence-card.complete:hover .presence-icon-wrap { transform: none; }
+
   .input-bar {
     padding: 12px 16px;
     border-top: 1px solid var(--border);
@@ -3538,6 +3718,8 @@
       <div class="resp-text" id="response-text"></div>
     </div>
     <div id="tool-indicator"></div>
+    <!-- Agent Presence V7 — floating agent characters above the chat input bar -->
+    <div id="agent-presence" class="agent-presence hidden"></div>
     <div class="input-bar">
       <div class="input-bar-toggles">
         <div class="input-bar-toggle" id="toggle-plan" onclick="togglePlanMode()" title="Plan Mode: Agent executes immediately">
@@ -6662,6 +6844,12 @@ async function sendMessage() {
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
+  try {
+    if (typeof AgentPresence !== 'undefined') {
+      AgentPresence.setAllStates('thinking');
+      setTimeout(() => { try { AgentPresence.setAllStates('working'); } catch (_) {} }, 350);
+    }
+  } catch (_) {}
   addAgentLog('Query: ' + query.substring(0, 40) + (query.length > 40 ? '...' : ''), 'active');
   saveChatToHistory(query);
 
@@ -6789,6 +6977,7 @@ async function sendMessage() {
       saveAgentReply('Error: ' + errMsg);
       addAgentLog('Error', 'idle');
       setAgentStatus('Error', 'error');
+      if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
 
@@ -6812,6 +7001,7 @@ async function sendMessage() {
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
+      if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('complete');
 
       // Show which MCP tools fired
       if (result.tools_used && result.tools_used.length > 0) {
@@ -6835,6 +7025,7 @@ async function sendMessage() {
     saveAgentReply('Connection error: ' + e.message);
     addAgentLog('Connection error', 'idle');
     setAgentStatus('Error', 'error');
+    if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('error');
   }
   document.getElementById('send-btn').disabled = false;
   document.getElementById('chat-input').focus();
@@ -7903,6 +8094,7 @@ function spawnAgent(name, icon, task, schedule) {
   renderTaskTracker();
   addAgentLog(`Spawned: ${name}`, 'done');
   showToast(`Agent spawned: ${name}`, 'success');
+  if (typeof AgentPresence !== 'undefined') AgentPresence.setAgents(spawnedAgents);
 
   // If in agent mode, rebuild circuit with agent orbit nodes
   if (currentViewMode === 'agent') buildAgentOrbitVault();
@@ -7916,6 +8108,7 @@ function removeAgent(agentId) {
   renderAgentOrbitPanel();
   if (agent) showToast(`Removed: ${agent.name}`, 'info');
   if (currentViewMode === 'agent') buildAgentOrbitVault();
+  if (typeof AgentPresence !== 'undefined') AgentPresence.setAgents(spawnedAgents);
 }
 
 function toggleAgentStatus(agentId) {
@@ -8693,6 +8886,173 @@ class AgentQOPCSync {
     if (this.interval) { clearInterval(this.interval); this.interval = null; }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT PRESENCE V7 — floating character cards above chat input
+// Source = spawnedAgents. Card click is a stub toast until V6
+// agent terminal lands. No icon cache — reuses V3's img+fallback.
+// ═══════════════════════════════════════════════════════════════
+const AgentPresence = (function () {
+  let activeAgents = [];
+  const agentStates = {};
+  const returnTimers = {};
+  const BORDER_PALETTE = ['#06b6d4', '#f59e0b', '#22c55e', '#a855f7', '#ec4899', '#3b82f6'];
+
+  function borderColor(agentId) {
+    const s = String(agentId || '');
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return BORDER_PALETTE[h % BORDER_PALETTE.length];
+  }
+
+  function escH(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function iconHTML(agent) {
+    const raw = (agent.icon || '').toString();
+    const looksLikeFile = /^[a-z0-9_\-]+$/i.test(raw) && raw.length > 0;
+    if (looksLikeFile) {
+      const src = '../../agent/agents/' + raw + (raw.endsWith('.svg') ? '' : '.svg');
+      // onerror swaps the broken <img> with a plain glyph fallback
+      return '<img src="' + escH(src) + '" alt="' + escH(agent.name || '') +
+             '" onerror="this.outerHTML=\'<span class=&quot;presence-glyph&quot;>' + escH(raw) + '</span>\'">';
+    }
+    return '<span class="presence-glyph">' + escH(raw || '\u25C6') + '</span>';
+  }
+
+  function setAgents(profiles) {
+    activeAgents = Array.isArray(profiles) ? profiles.slice() : [];
+    // Reset states but preserve any that still apply
+    Object.keys(agentStates).forEach(k => {
+      if (!activeAgents.find(a => String(a.id) === k)) {
+        if (returnTimers[k]) { clearTimeout(returnTimers[k]); delete returnTimers[k]; }
+        delete agentStates[k];
+      }
+    });
+    activeAgents.forEach(a => {
+      const k = String(a.id);
+      if (!agentStates[k]) agentStates[k] = 'idle';
+    });
+    render();
+    toggle(activeAgents.length > 0);
+  }
+
+  function clearAgents() {
+    Object.keys(returnTimers).forEach(k => clearTimeout(returnTimers[k]));
+    for (const k in returnTimers) delete returnTimers[k];
+    for (const k in agentStates) delete agentStates[k];
+    activeAgents = [];
+    render();
+    toggle(false);
+  }
+
+  function setState(agentId, state) {
+    const k = String(agentId);
+    if (!(k in agentStates)) return;
+    agentStates[k] = state;
+    if (returnTimers[k]) { clearTimeout(returnTimers[k]); delete returnTimers[k]; }
+    updateCard(agentId, state);
+    if (state === 'complete' || state === 'error') {
+      returnTimers[k] = setTimeout(() => setState(agentId, 'idle'), 3000);
+    }
+  }
+
+  function setAllStates(state) {
+    activeAgents.forEach(a => setState(a.id, state));
+  }
+
+  function render() {
+    const el = document.getElementById('agent-presence');
+    if (!el) return;
+    if (activeAgents.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = activeAgents.map((agent, i) => {
+      const color = borderColor(agent.id);
+      const delay = (i * 0.45).toFixed(2);
+      return '' +
+        '<div class="presence-card idle" id="pcard-' + escH(agent.id) +
+        '" title="' + escH(agent.name || '') +
+        '" onclick="AgentPresence.onCardClick(\'' + escH(String(agent.id).replace(/\'/g, '')) + '\')">' +
+          '<div class="presence-icon-wrap" style="border-color:' + color + '50;animation-delay:' + delay + 's">' +
+            iconHTML(agent) +
+          '</div>' +
+          '<div class="presence-dots">' +
+            '<div class="presence-dot"></div>' +
+            '<div class="presence-dot"></div>' +
+            '<div class="presence-dot"></div>' +
+          '</div>' +
+          '<span class="presence-name">' + escH(agent.name || 'AGENT') + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function updateCard(agentId, state) {
+    const card = document.getElementById('pcard-' + agentId);
+    if (!card) return;
+    card.classList.remove('idle', 'thinking', 'working', 'complete', 'error');
+    card.classList.add(state);
+
+    const dots = card.querySelector('.presence-dots');
+    const wrap = card.querySelector('.presence-icon-wrap');
+    const color = borderColor(agentId);
+
+    if (!dots || !wrap) return;
+
+    if (state === 'complete') {
+      dots.innerHTML = '<span class="presence-check">\u2713</span>';
+      wrap.style.borderColor = '#10b98180';
+    } else if (state === 'error') {
+      dots.innerHTML = '<span class="presence-error-mark">!</span>';
+      wrap.style.borderColor = '#ef444480';
+    } else if (state === 'idle') {
+      dots.innerHTML =
+        '<div class="presence-dot"></div>' +
+        '<div class="presence-dot"></div>' +
+        '<div class="presence-dot"></div>';
+      wrap.style.borderColor = color + '50';
+    } else {
+      // thinking / working
+      dots.innerHTML =
+        '<div class="presence-dot"></div>' +
+        '<div class="presence-dot"></div>' +
+        '<div class="presence-dot"></div>';
+      wrap.style.borderColor = color + 'cc';
+    }
+  }
+
+  function toggle(show) {
+    const el = document.getElementById('agent-presence');
+    if (!el) return;
+    if (show) { el.classList.remove('hidden'); el.classList.add('visible'); }
+    else       { el.classList.add('hidden');    el.classList.remove('visible'); }
+  }
+
+  function onCardClick(agentIdStr) {
+    const agent = activeAgents.find(a => String(a.id) === String(agentIdStr));
+    if (!agent) return;
+    // TODO: wire to V6 agent terminal bridge when available
+    console.log('agent terminal: TODO', agent);
+    if (typeof showToast === 'function') {
+      showToast('Agent Terminal for ' + (agent.name || 'agent') + ' \u2014 coming soon', 'info');
+    }
+  }
+
+  return { setAgents, clearAgents, setState, setAllStates, onCardClick };
+})();
+
+// Initial populate — run after DOM is ready so #agent-presence exists
+(function initAgentPresence() {
+  function boot() {
+    try { AgentPresence.setAgents(spawnedAgents); } catch (e) { console.warn('AgentPresence init:', e); }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
 
 // Build agent-mode circuit: AETHER_MAIN center, ONLY spawned agents as branches
 function buildAgentOrbitVault() {
