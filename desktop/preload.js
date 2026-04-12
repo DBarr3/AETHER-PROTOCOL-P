@@ -52,6 +52,11 @@ contextBridge.exposeInMainWorld('aether', {
   // Local file plan execution — runs agent action plans on the user's machine
   execPlan:    (actions) => ipcRenderer.invoke('fs:execPlan', actions),
   previewPlan: (actions) => ipcRenderer.invoke('fs:previewPlan', actions),
+  // Agent Profile System
+  agentLoadIcons:    () => ipcRenderer.invoke('agent:loadIcons'),
+  agentLoadProfiles: () => ipcRenderer.invoke('agent:loadProfiles'),
+  agentSaveProfile:  (profile) => ipcRenderer.invoke('agent:saveProfile', profile),
+  agentDeleteProfile:(id) => ipcRenderer.invoke('agent:deleteProfile', id),
 });
 
 // ═══════════════════════════════════════════════════
