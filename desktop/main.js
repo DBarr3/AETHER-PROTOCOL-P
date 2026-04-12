@@ -377,6 +377,54 @@ ipcMain.handle('fs:previewPlan', async (_e, actions) => {
   });
 });
 
+// ── IPC: Agent Profile System ───────────────────────
+ipcMain.handle('agent:loadIcons', async () => {
+  const iconsPath = path.join(__dirname, '..', 'agent', 'agents');
+  try {
+    const files = fs.readdirSync(iconsPath).filter(f => f.endsWith('.svg'));
+    return files.map(file => ({
+      name: path.basename(file, '.svg'),
+      svgContent: fs.readFileSync(path.join(iconsPath, file), 'utf-8'),
+    }));
+  } catch (e) {
+    console.error('[agent:loadIcons]', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('agent:loadProfiles', async () => {
+  const profilesPath = path.join(__dirname, '..', 'agent', 'profiles');
+  try {
+    if (!fs.existsSync(profilesPath)) fs.mkdirSync(profilesPath, { recursive: true });
+    const files = fs.readdirSync(profilesPath).filter(f => f.endsWith('.json'));
+    return files.map(file => {
+      try { return JSON.parse(fs.readFileSync(path.join(profilesPath, file), 'utf-8')); }
+      catch { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    console.error('[agent:loadProfiles]', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('agent:saveProfile', async (_e, profile) => {
+  const profilesPath = path.join(__dirname, '..', 'agent', 'profiles');
+  if (!fs.existsSync(profilesPath)) fs.mkdirSync(profilesPath, { recursive: true });
+  const filePath = path.join(profilesPath, `${profile.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(profile, null, 2));
+  return { success: true, path: filePath };
+});
+
+ipcMain.handle('agent:deleteProfile', async (_e, profileId) => {
+  const filePath = path.join(__dirname, '..', 'agent', 'profiles', `${profileId}.json`);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // ── IPC: Vault ───────────────────────────────────────
 // hasAccess: true if a session token is stored (user is authenticated)
 ipcMain.handle('vault:hasAccess', () => {
