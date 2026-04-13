@@ -4469,17 +4469,24 @@
       ">
         <div style="
           width:7px; height:7px; border-radius:50%;
-          background:var(--accent); box-shadow:0 0 6px var(--accent);
+          background:var(--green); box-shadow:0 0 6px var(--green);
           animation:pulse 2.4s ease-in-out infinite;
         "></div>
-        <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;
-          letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);">
-          Agent Profiles
+        <span style="font-family:var(--font-mono);font-size:13px;font-weight:700;
+          letter-spacing:0.06em;color:var(--text-primary);">
+          Agent Studio
         </span>
-        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
-          // manage agent configurations
+        <span style="display:flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:9px;
+          padding:2px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);
+          color:#4ade80;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">
+          <span style="width:5px;height:5px;border-radius:50%;background:#4ade80;animation:pulse 2s ease-in-out infinite;"></span>
+          Live
         </span>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <button class="profile-btn primary" onclick="profileSave()" style="font-size:9px;padding:5px 16px;display:flex;align-items:center;gap:5px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Team
+          </button>
           <button class="profile-btn primary" id="run-team-btn" onclick="openRunTeamInput()" style="font-size:9px;padding:4px 14px;">&#9654; RUN TEAM</button>
           <button class="profile-btn outlined" onclick="openTeamTerminal()" style="font-size:9px;padding:4px 14px;">&#9638; TEAM TERMINAL</button>
         </div>
@@ -4520,8 +4527,34 @@
               </div>
             </div>
           </div>
+          <div class="as-team-pills" style="padding:0 10px;margin:6px 0 2px;">
+            <button class="as-pill" data-team="Default Team" onclick="profileSelectTeam('Default Team',event);this.parentElement.querySelectorAll('.as-pill').forEach(function(p){p.classList.remove('active')});this.classList.add('active');">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              Default
+            </button>
+            <button class="as-pill active" data-team="Research" onclick="profileSelectTeam('Research',event);this.parentElement.querySelectorAll('.as-pill').forEach(function(p){p.classList.remove('active')});this.classList.add('active');">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              Research
+            </button>
+            <button class="as-pill" data-team="Automation" onclick="profileSelectTeam('Automation',event);this.parentElement.querySelectorAll('.as-pill').forEach(function(p){p.classList.remove('active')});this.classList.add('active');">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Automation
+            </button>
+            <button class="as-pill" data-team="Security" onclick="profileSelectTeam('Security',event);this.parentElement.querySelectorAll('.as-pill').forEach(function(p){p.classList.remove('active')});this.classList.add('active');">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Security
+            </button>
+          </div>
           <button class="profile-new-btn" onclick="profileNew()">+ NEW AGENT</button>
-          <div class="profile-list" id="profile-list"></div>
+          <div style="display:flex;align-items:center;gap:4px;padding:0 4px;">
+            <button style="width:24px;height:24px;border-radius:50%;background:var(--bg-3);border:1px solid var(--border);
+              display:flex;align-items:center;justify-content:center;color:var(--text-muted);cursor:pointer;flex-shrink:0;
+              transition:all 0.15s;font-size:10px;" onclick="document.getElementById('profile-list').scrollBy({top:-120,behavior:'smooth'})" title="Scroll up">&#9650;</button>
+            <div class="profile-list" id="profile-list" style="flex:1;"></div>
+            <button style="width:24px;height:24px;border-radius:50%;background:var(--bg-3);border:1px solid var(--border);
+              display:flex;align-items:center;justify-content:center;color:var(--text-muted);cursor:pointer;flex-shrink:0;
+              transition:all 0.15s;font-size:10px;" onclick="document.getElementById('profile-list').scrollBy({top:120,behavior:'smooth'})" title="Scroll down">&#9660;</button>
+          </div>
         </div>
 
         <!-- Main editor area -->
