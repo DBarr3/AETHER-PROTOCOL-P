@@ -7461,6 +7461,9 @@ async function sendMessage() {
   const query = input.value.trim();
   if (!query) return;
 
+  // Check for QOPC correction signal
+  if (typeof checkQOPCCorrection === 'function') checkQOPCCorrection(query);
+
   // Autonomous project execution — intercept broad goal queries
   if (typeof detectProjectGoal === 'function' && detectProjectGoal(query)) {
     input.value = '';
@@ -9751,23 +9754,6 @@ const AgentPresence = (function () {
     boot();
   }
 })();
-
-  panel.innerHTML = spawnedAgents.map(a => `
-    <div class="agent-card">
-      <div class="agent-card-header">
-        <span class="agent-card-name"><span class="agent-card-icon-wrap" style="display:inline-block;width:16px;height:16px;vertical-align:middle;image-rendering:pixelated;margin-right:4px;">${_agentIconImages[a.icon] ? '<img src="' + _agentIconImages[a.icon].src + '" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;">' : a.icon}</span>${escH(a.name)}</span>
-        <span class="agent-card-status ${a.status}">${a.status.toUpperCase()}</span>
-      </div>
-      <div class="agent-card-task">${escH(a.task).substring(0,60)}${a.task.length>60?'...':''}</div>
-      <div style="font-size:8px;color:var(--text-muted);">Runs: ${a.runCount} | Schedule: ${a.schedule}</div>
-      <div class="agent-card-actions">
-        <button class="agent-card-btn" onclick="runAgentTask(${a.id})">Run</button>
-        <button class="agent-card-btn" onclick="toggleAgentStatus(${a.id})">${a.status==='active'?'Pause':'Start'}</button>
-        <button class="agent-card-btn danger" onclick="removeAgent(${a.id})">Delete</button>
-      </div>
-    </div>
-  `).join('');
-}
 
 // ── Aether Node Context Menu ──────────────────────────
 function showAetherNodeMenu(clickEvent) {
@@ -14069,6 +14055,14 @@ window.orchestrateAgentFlow = async function(userInput, teamName, agents) {
 
     var results = await Promise.all(promises);
 
+    // Record QOPC feedback for each agent result
+    results.forEach(function(r) {
+      if (r.agentId && typeof recordQOPCFeedback === 'function') {
+        var outcome = r.output && !r.output.startsWith('[Error') ? 'success' : 'error';
+        recordQOPCFeedback(r.agentId, r.mainTask, outcome, r.output, [], 0);
+      }
+    });
+
     // Step 3: AetherAI summarizes
     _orchState.phase = 'SUMMARIZING';
     displayAIResponse('[AETHER] All agents complete. Generating summary...', true);
@@ -14607,6 +14601,70 @@ if (document.readyState === 'complete') initStyleTracking();
 else window.addEventListener('load', initStyleTracking);
 
 })(); // end QOPC INTERACTION STYLE TRACKER IIFE
+
+// ═══════════════════════════════════════════════════════════════
+// QOPC PER-AGENT FEEDBACK RECORDER
+// ═══════════════════════════════════════════════════════════════
+(function() {
+
+var _lastQOPCRecord = null;
+
+// Correction detection patterns
+var CORRECTION_PATTERNS = [
+  'no,', 'wrong', "that's not", 'incorrect', 'not right',
+  'try again', 'redo', 'fix that', 'you missed', 'actually,',
+  'that is wrong', 'nope', 'not what i', "don't think so"
+];
+
+function estimateTokens(text) {
+  return Math.ceil((text || '').length / 4);
+}
+
+window.recordQOPCFeedback = async function(agentId, taskDesc, outcome, responseText, toolsUsed, durationMs) {
+  var record = {
+    agent_id: agentId,
+    task_type: taskDesc || 'analyze',
+    outcome: outcome || 'success',
+    tokens: estimateTokens(responseText),
+    tools_used: toolsUsed || [],
+    duration_ms: durationMs || 0,
+    corrected: false,
+  };
+  _lastQOPCRecord = record;
+  try {
+    await authFetch(API_BASE + '/agent/qopc/record', {
+      method: 'POST',
+      body: JSON.stringify(record),
+    });
+  } catch(e) { /* fire-and-forget */ }
+};
+
+// Check if a message looks like a correction of the previous response
+window.checkQOPCCorrection = function(userMessage) {
+  if (!_lastQOPCRecord) return;
+  var lower = (userMessage || '').toLowerCase().trim();
+  var isCorrection = CORRECTION_PATTERNS.some(function(p) {
+    return lower.startsWith(p) || lower.includes(p);
+  });
+  if (isCorrection) {
+    var correctionRecord = Object.assign({}, _lastQOPCRecord, { corrected: true });
+    authFetch(API_BASE + '/agent/qopc/record', {
+      method: 'POST',
+      body: JSON.stringify(correctionRecord),
+    }).catch(function() {});
+    _lastQOPCRecord = null; // Only mark once
+  }
+};
+
+// Fetch agent weights (used by profile editor and canvas)
+window.fetchAgentQOPCWeights = async function(agentId) {
+  try {
+    var r = await authFetch(API_BASE + '/agent/qopc/weights/' + encodeURIComponent(agentId));
+    return await safeJson(r);
+  } catch(e) { return null; }
+};
+
+})(); // end QOPC PER-AGENT FEEDBACK RECORDER IIFE
 
 // ═══════════════════════════════════════════════════════════════
 // AGENT ANIMATION ENGINE
