@@ -3786,6 +3786,39 @@
   .output-status .working { color:var(--amber); }
   .output-status .done { color:var(--green); }
 
+  /* ── QOPC Stats Section ──────────────────────────── */
+  .qopc-stats-grid {
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 14px;
+  }
+  .qopc-stat {
+    background:var(--bg-3);border:1px solid var(--border);
+    padding:8px 12px;display:flex;flex-direction:column;gap:2px;
+  }
+  .qopc-stat-label {
+    font-family:var(--font-mono);font-size:8px;color:var(--text-muted);
+    text-transform:uppercase;letter-spacing:0.08em;
+  }
+  .qopc-stat-value {
+    font-family:var(--font-mono);font-size:18px;font-weight:600;color:var(--accent);
+  }
+  .qopc-task-row {
+    display:flex;align-items:center;gap:8px;margin-bottom:5px;
+  }
+  .qopc-task-name {
+    font-family:var(--font-mono);font-size:10px;color:var(--text-muted);
+    width:80px;flex-shrink:0;text-transform:capitalize;
+  }
+  .qopc-task-bar {
+    flex:1;height:4px;background:var(--border);overflow:hidden;
+  }
+  .qopc-task-fill {
+    height:100%;transition:width 600ms ease;
+  }
+  .qopc-task-score {
+    font-family:var(--font-mono);font-size:9px;color:var(--text-muted);
+    width:30px;text-align:right;
+  }
+
   /* ── MCP & Skills Panel ──────────────────────────── */
   .tools-header-bar { display:flex;justify-content:space-between;align-items:center;gap:12px; }
   .tools-search {
@@ -13525,6 +13558,22 @@ function renderEditor(profile) {
       '</div>' +
     '</div>' +
 
+    // ── QOPC LEARNING STATS ──
+    '<div class="profile-section" id="qopc-stats-section">' +
+      '<div class="profile-section-header">QOPC LEARNING STATS' +
+        '<span class="profile-section-toggle" id="qopc-toggle" onclick="profileToggleSection(\'qopc\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="qopc-body" style="max-height:400px;">' +
+        '<div class="qopc-stats-grid">' +
+          '<div class="qopc-stat"><span class="qopc-stat-label">Efficiency</span><span class="qopc-stat-value" id="qopc-efficiency">\u2014</span></div>' +
+          '<div class="qopc-stat"><span class="qopc-stat-label">Reliability</span><span class="qopc-stat-value" id="qopc-reliability">\u2014</span></div>' +
+          '<div class="qopc-stat"><span class="qopc-stat-label">Tasks Learned</span><span class="qopc-stat-value" id="qopc-samples">\u2014</span></div>' +
+          '<div class="qopc-stat"><span class="qopc-stat-label">QOPC Cycles</span><span class="qopc-stat-value" id="qopc-cycles">\u2014</span></div>' +
+        '</div>' +
+        '<div id="qopc-top-tasks"></div>' +
+      '</div>' +
+    '</div>' +
+
     '</div>' +
 
     // ── SAVE BAR ──
@@ -13630,6 +13679,8 @@ window.profileEdit = function(id) {
   currentProfileId = id;
   renderSidebar();
   renderEditor(p);
+  // Load QOPC stats for this agent
+  loadQOPCStatsForAgent(p.id);
 };
 
 window.profileSelectIcon = function(iconName) {
@@ -13651,6 +13702,33 @@ window.profileSelectIcon = function(iconName) {
   });
   renderSidebar();
 };
+
+async function loadQOPCStatsForAgent(agentId) {
+  if (typeof fetchAgentQOPCWeights !== 'function') return;
+  var weights = await fetchAgentQOPCWeights(agentId);
+  if (!weights || weights.error) return;
+  var effEl = document.getElementById('qopc-efficiency');
+  var relEl = document.getElementById('qopc-reliability');
+  var samEl = document.getElementById('qopc-samples');
+  var cycEl = document.getElementById('qopc-cycles');
+  if (effEl) effEl.textContent = Math.round((weights.efficiency || 0) * 100) + '%';
+  if (relEl) relEl.textContent = Math.round((weights.reliability || 0) * 100) + '%';
+  if (samEl) samEl.textContent = weights.sample_count || 0;
+  if (cycEl) cycEl.textContent = weights.cycle_count || 0;
+  var topEl = document.getElementById('qopc-top-tasks');
+  if (topEl && weights.top_tasks && weights.top_tasks.length) {
+    topEl.innerHTML = weights.top_tasks.map(function(t) {
+      var name = t[0], score = t[1];
+      var pct = Math.round(score * 100);
+      var color = score > 0.7 ? 'var(--green)' : score > 0.4 ? 'var(--amber)' : 'var(--text-muted)';
+      return '<div class="qopc-task-row">' +
+        '<span class="qopc-task-name">' + name + '</span>' +
+        '<div class="qopc-task-bar"><div class="qopc-task-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>' +
+        '<span class="qopc-task-score">' + pct + '%</span>' +
+      '</div>';
+    }).join('');
+  }
+}
 
 window.profileUpdateCharCount = function() {
   const input = document.getElementById('profile-name');
@@ -13904,17 +13982,51 @@ function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&
 
 // ── Prompt builders ───────────────────────────────────────────
 
-function buildOrchestratorPrompt(userInput, team, agents) {
+function guessTaskType(input) {
+  var lower = (input || '').toLowerCase();
+  if (/email|gmail|inbox|send|reply/.test(lower))    return 'email';
+  if (/code|script|debug|function|implement/.test(lower)) return 'code';
+  if (/search|find|look up|research/.test(lower))    return 'research';
+  if (/summarize|summary|brief|tldr/.test(lower))    return 'summarize';
+  if (/analyze|analyse|examine/.test(lower))          return 'analyze';
+  if (/schedule|calendar|meeting/.test(lower))        return 'schedule';
+  if (/write|draft|compose/.test(lower))              return 'write';
+  if (/data|csv|excel|spreadsheet/.test(lower))       return 'data';
+  if (/monitor|watch|alert/.test(lower))              return 'monitor';
+  if (/automate|workflow|pipeline/.test(lower))       return 'automate';
+  return 'analyze';
+}
+
+async function buildOrchestratorPrompt(userInput, team, agents) {
+  // Fetch QOPC affinity rankings
+  var qopcRankings = {};
+  try {
+    var taskGuess = guessTaskType(userInput);
+    var agentIds = agents.map(function(a) { return a.id; });
+    var rankResp = await authFetch(API_BASE + '/agent/qopc/rank', {
+      method: 'POST',
+      body: JSON.stringify({ agent_ids: agentIds, task_type: taskGuess }),
+    });
+    var rankData = await safeJson(rankResp);
+    if (rankData && rankData.ranked) {
+      rankData.ranked.forEach(function(r) { qopcRankings[r.agent_id] = r.score; });
+    }
+  } catch(e) { /* QOPC ranking optional */ }
+
   const agentDescs = agents.map(function(a) {
     return '  Agent: ' + a.name + ' (id: ' + a.id + ')\n' +
       '  Description: ' + (a.description || 'No description') + '\n' +
       '  Skills: ' + (a.skills || []).join(', ') + '\n' +
-      '  MCP Tools: ' + (a.mcpAgents || []).join(', ');
+      '  MCP Tools: ' + (a.mcpAgents || []).join(', ') +
+      (qopcRankings[a.id] !== undefined ? '\n  QOPC Affinity: ' + Math.round(qopcRankings[a.id] * 100) + '% (historical performance)' : '');
   }).join('\n---\n');
 
   return AETHER_SYSTEM_PROMPT + '\n\n' +
     'ACTIVE TEAM: ' + (team || 'Default Team') + '\n' +
     'ACTIVE AGENTS (' + agents.length + '):\n' + agentDescs + '\n\n' +
+    'ROUTING GUIDANCE: Assign tasks to agents with higher QOPC affinity scores. ' +
+    'Agents above 70% are historically reliable for that task type. ' +
+    'Agents below 40% should get simpler subtasks.\n\n' +
     'USER INPUT:\n' + userInput + '\n\n' +
     'Decompose this input into specific tasks for the available agents. Return valid JSON only.';
 }
@@ -13985,7 +14097,7 @@ window.orchestrateAgentFlow = async function(userInput, teamName, agents) {
 
   try {
     // Step 1: AetherAI analyzes and assigns
-    var orchPrompt = buildOrchestratorPrompt(userInput, teamName, agents);
+    var orchPrompt = await buildOrchestratorPrompt(userInput, teamName, agents);
     var assignments = await chatAPIJson(orchPrompt);
 
     if (assignments.error) {
