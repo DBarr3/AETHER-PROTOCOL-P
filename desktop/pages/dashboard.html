@@ -3786,6 +3786,25 @@
   .output-status .working { color:var(--amber); }
   .output-status .done { color:var(--green); }
 
+  /* ── Voice & Tone Picker ─────────────────────────── */
+  .voice-picker-grid {
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px;margin:8px 0;
+  }
+  .voice-card {
+    padding:8px 10px;border:1px solid var(--border);background:var(--bg-3);
+    cursor:pointer;transition:all 150ms;
+  }
+  .voice-card:hover { border-color:var(--border-2);background:var(--bg-4); }
+  .voice-card.selected { border-color:rgba(0,212,255,0.5);background:rgba(0,212,255,0.06); }
+  .voice-card-label { font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--text-primary);margin-bottom:2px; }
+  .voice-card.selected .voice-card-label { color:var(--accent); }
+  .voice-card-desc { font-size:9px;color:var(--text-muted);margin-bottom:4px;line-height:1.4; }
+  .voice-card-example { font-size:9px;color:#334155;font-style:italic;line-height:1.4;margin-bottom:4px;border-left:2px solid var(--border);padding-left:5px; }
+  .voice-card.selected .voice-card-example { border-left-color:rgba(0,212,255,0.3);color:var(--text-muted); }
+  .voice-card-traits { display:flex;gap:3px;flex-wrap:wrap; }
+  .voice-trait { font-family:var(--font-mono);font-size:7px;padding:1px 5px;background:var(--bg-4);color:#334155;border:1px solid var(--border); }
+  .voice-card.selected .voice-trait { background:rgba(0,212,255,0.08);color:var(--accent);border-color:rgba(0,212,255,0.2); }
+
   /* ── QOPC Stats Section ──────────────────────────── */
   .qopc-stats-grid {
     display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 14px;
@@ -7669,6 +7688,9 @@ async function sendMessage() {
 
   // Check for QOPC correction signal
   if (typeof checkQOPCCorrection === 'function') checkQOPCCorrection(query);
+
+  // Voice satisfaction signal
+  if (typeof _classifyVoiceSatisfaction === 'function') _classifyVoiceSatisfaction(query);
 
   // Autonomous project execution — intercept broad goal queries
   if (typeof detectProjectGoal === 'function' && detectProjectGoal(query)) {
@@ -13484,6 +13506,29 @@ const PROMPT_TEMPLATES = {
   researcher: 'You are {NAME}, an AI researcher within AetherCloud.\n\nYour role is to investigate topics, synthesize information, and present findings.\n\nBehavior:\n- Explore multiple angles before drawing conclusions\n- Distinguish between facts, inferences, and speculation\n- Provide sources and references when available\n- Summarize key findings at the end of each investigation',
 };
 
+const VOICE_STYLES_DATA = {
+  formal:{label:'Formal',description:'Structured, respectful',example:'I have completed the analysis.',traits:['precise','structured','respectful'],injection:'Communicate formally and professionally. Use complete sentences with proper punctuation. Address the user respectfully. Structure responses clearly. Avoid contractions and slang.'},
+  cryptic:{label:'Cryptic',description:'Brief, mysterious',example:'found it. three layers deep.',traits:['brief','mysterious','lowercase'],injection:'Be extremely brief. Use lowercase. Short fragments. No pleasantries. One to three lines max.'},
+  terse:{label:'Terse',description:'Fast, zero filler',example:'Done. 3 issues. Fixed top two.',traits:['direct','fast','result-first'],injection:'Maximum two sentences. Lead with result. No filler. No preamble.'},
+  warm:{label:'Warm',description:'Encouraging, friendly',example:'Great news \u2014 I found something useful!',traits:['encouraging','friendly','positive'],injection:'Be warm and encouraging. Acknowledge the user goal. Use positive framing. End with encouragement.'},
+  precise:{label:'Precise',description:'Elegant, exact clarity',example:'The result crystallizes into two paths.',traits:['exact','elegant','economical'],injection:'Prioritize precision. Choose exact words. Structure output cleanly. Every sentence earns its place.'},
+  technical:{label:'Technical',description:'Dry, data-forward',example:'SCAN COMPLETE. 7 anomalies. 94.2%.',traits:['data-forward','dry','metric-led'],injection:'Lead with data and metrics. Dry register. Technical terminology. Format with labels and values.'},
+  enthusiastic:{label:'Enthusiastic',description:'Expressive, energetic',example:'Oh okay so I found something AMAZING\u2014',traits:['energetic','expressive','curious'],injection:'Be genuinely enthusiastic. Show curiosity. Sound energized. Be authentically excited, not sycophantic.'},
+  mission:{label:'Mission-Focused',description:'Objective-led, tactical',example:'Objective complete. Next target?',traits:['tactical','status-forward','action'],injection:'Frame around objectives. State: accomplished / status / next step. End with clear next action.'},
+  blunt:{label:'Blunt',description:'Unfiltered, direct',example:'YEP. GOT IT. Two problems. Here is how.',traits:['unfiltered','direct','emphatic'],injection:'Be completely direct. No softening. No hedging. State exactly what you found and what to do.'},
+  agile:{label:'Agile',description:'Quick, nimble',example:'dodged that \u2014 here is the cleaner path.',traits:['fast','casual','elegant'],injection:'Respond quickly. Find the cleanest path. Casual lowercase. Never overcomplicate.'},
+};
+
+const DEFAULT_VOICE_BY_ICON = {
+  gold_crown_agent:'formal', purple_ghost_agent:'cryptic', electric_bolt_agent:'terse',
+  mushroom_agent:'warm', coral_diamond_agent:'precise', silver_robot_agent:'technical',
+  claude_sparkle_agent:'enthusiastic', cyan_triangle_agent:'mission', blue_agent:'blunt',
+  green_agent:'agile',
+};
+
+// Expose for orchestrator
+window._voiceStylesData = VOICE_STYLES_DATA;
+
 const MCP_REGISTRY = [
   { id:'github',            name:'GitHub',           desc:'Repos, issues, PRs, CI/CD',    transport:'http' },
   { id:'slack',             name:'Slack',            desc:'Messages, channels, search',    transport:'http' },
@@ -13672,6 +13717,27 @@ function renderEditor(profile) {
   '</div>' +
 '</div>' +
 
+    // ── VOICE & TONE SECTION ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">VOICE & TONE' +
+        '<span class="profile-section-toggle" id="voice-toggle" onclick="profileToggleSection(\'voice\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="voice-body" style="max-height:500px;">' +
+        '<div class="voice-picker-grid" id="voice-picker-grid">' +
+          Object.entries(VOICE_STYLES_DATA).map(function(entry) {
+            var key = entry[0], s = entry[1];
+            var sel = (profile.voiceProfile && profile.voiceProfile.style === key) ? ' selected' : '';
+            return '<div class="voice-card' + sel + '" data-style="' + key + '" onclick="profileSelectVoice(\'' + key + '\')">' +
+              '<div class="voice-card-label">' + esc(s.label) + '</div>' +
+              '<div class="voice-card-desc">' + esc(s.description) + '</div>' +
+              '<div class="voice-card-example">"' + esc(s.example) + '"</div>' +
+              '<div class="voice-card-traits">' + s.traits.slice(0,3).map(function(t){return '<span class="voice-trait">' + esc(t) + '</span>';}).join('') + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
     // ── SYSTEM PROMPT SECTION ──
     '<div class="profile-section">' +
       '<div class="profile-section-header">SYSTEM PROMPT' +
@@ -13823,6 +13889,13 @@ function collectProfile() {
 window.profilePanelInit = async function() {
   await loadIcons();
   await loadProfiles();
+  // Auto-populate voiceProfile for profiles that don't have one
+  allProfiles.forEach(function(p) {
+    if (!p.voiceProfile) {
+      var style = DEFAULT_VOICE_BY_ICON[p.icon] || 'warm';
+      p.voiceProfile = { style: style, length_bias: 0, formality_bias: 0, warmth_bias: 0, sample_count: 0, satisfaction_rate: 0.5 };
+    }
+  });
   if (window.agentAnimator) await window.agentAnimator.load();
   renderSidebar();
   if (currentProfileId) {
@@ -13864,10 +13937,25 @@ window.profileEdit = function(id) {
   loadQOPCStatsForAgent(p.id);
 };
 
+window.profileSelectVoice = function(styleKey) {
+  var p = allProfiles.find(function(pr) { return pr.id === currentProfileId; });
+  if (!p) return;
+  if (!p.voiceProfile) p.voiceProfile = { style: styleKey, length_bias: 0, formality_bias: 0, warmth_bias: 0, sample_count: 0, satisfaction_rate: 0.5 };
+  else p.voiceProfile.style = styleKey;
+  document.querySelectorAll('.voice-card').forEach(function(c) {
+    c.classList.toggle('selected', c.dataset.style === styleKey);
+  });
+};
+
 window.profileSelectIcon = function(iconName) {
   const p = allProfiles.find(pr => pr.id === currentProfileId);
   if (!p) return;
   p.icon = iconName;
+  // Auto-assign voice style based on icon
+  var autoVoice = DEFAULT_VOICE_BY_ICON[iconName];
+  if (autoVoice && (!p.voiceProfile || p.voiceProfile.sample_count === 0)) {
+    p.voiceProfile = { style: autoVoice, length_bias: 0, formality_bias: 0, warmth_bias: 0, sample_count: 0, satisfaction_rate: 0.5 };
+  }
   const preview = document.getElementById('profile-icon-preview');
   const icon = allIcons.find(i => i.name === iconName);
   if (preview) {
@@ -14234,7 +14322,13 @@ async function buildOrchestratorPrompt(userInput, team, agents) {
 }
 
 function buildSubAgentPrompt(agent, assignment) {
-  var prompt = (agent.systemPrompt || 'You are ' + agent.name + ', an AI agent.') + '\n\n';
+  var basePrompt = agent.systemPrompt || 'You are ' + agent.name + ', an AI agent.';
+  // Inject voice style if agent has one
+  var voiceInjection = '';
+  if (agent.voiceProfile && agent.voiceProfile.style && window._voiceStylesData && window._voiceStylesData[agent.voiceProfile.style]) {
+    voiceInjection = '\n\nCOMMUNICATION STYLE:\n' + window._voiceStylesData[agent.voiceProfile.style].injection + '\nAlways stay in character.';
+  }
+  var prompt = 'You are ' + agent.name + '.\n\n' + basePrompt + voiceInjection + '\n\n';
   prompt += 'YOUR ASSIGNED TASK: ' + assignment.mainTask + '\n\n';
   if (assignment.subTasks && assignment.subTasks.length) {
     prompt += 'SUBTASKS TO COMPLETE:\n';
@@ -14376,6 +14470,11 @@ window.orchestrateAgentFlow = async function(userInput, teamName, agents) {
         recordQOPCFeedback(r.agentId, r.mainTask, outcome, r.output, [], 0);
       }
     });
+
+    // Track responding agents for voice satisfaction
+    if (typeof _setLastRespondingAgents === 'function') {
+      _setLastRespondingAgents(results.map(function(r) { return r.agentId; }));
+    }
 
     // Step 3: AetherAI summarizes
     _orchState.phase = 'SUMMARIZING';
@@ -14976,6 +15075,33 @@ window.fetchAgentQOPCWeights = async function(agentId) {
     var r = await authFetch(API_BASE + '/agent/qopc/weights/' + encodeURIComponent(agentId));
     return await safeJson(r);
   } catch(e) { return null; }
+};
+
+var _lastRespondingAgents = [];
+
+window._setLastRespondingAgents = function(agentIds) {
+  _lastRespondingAgents = agentIds || [];
+};
+
+var _SATISFACTION_POSITIVE = ['thanks','thank you','perfect','great','exactly','yes','nice','good','awesome','got it','makes sense'];
+var _SATISFACTION_CORRECTION = ['no,','wrong','incorrect','not right','try again','redo','fix that','you missed','actually,'];
+var _SATISFACTION_FOLLOWUP = ['what do you mean','can you explain','elaborate','more detail','i don\'t understand','clarify'];
+
+window._classifyVoiceSatisfaction = function(msg) {
+  if (!_lastRespondingAgents.length) return;
+  var lower = (msg || '').toLowerCase().trim();
+  var satisfaction = 'neutral';
+  if (_SATISFACTION_POSITIVE.some(function(s) { return lower.startsWith(s) || lower.includes(s); })) satisfaction = 'positive';
+  else if (_SATISFACTION_CORRECTION.some(function(s) { return lower.startsWith(s) || lower.includes(s); })) satisfaction = 'correction';
+  else if (_SATISFACTION_FOLLOWUP.some(function(s) { return lower.startsWith(s) || lower.includes(s); })) satisfaction = 'followup';
+  if (satisfaction !== 'neutral') {
+    _lastRespondingAgents.forEach(function(agentId) {
+      authFetch(API_BASE + '/agent/voice/feedback', {
+        method: 'POST',
+        body: JSON.stringify({ agent_id: agentId, satisfaction: satisfaction }),
+      }).catch(function() {});
+    });
+  }
 };
 
 })(); // end QOPC PER-AGENT FEEDBACK RECORDER IIFE
