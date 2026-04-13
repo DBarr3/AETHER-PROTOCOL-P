@@ -81,6 +81,7 @@ from agent.task_scheduler import (
 )
 from agent.task_qopc import TaskQOPC, TaskSignal
 from agent.qopc_interaction_style import InteractionStyleProfile, analyze_query_signals, analyze_response_signals
+from agent.qopc_agent import QOPCRegistry
 from aether_protocol.audit import AuditLog
 
 log = logging.getLogger("aethercloud.api")
@@ -2546,6 +2547,60 @@ async def get_interaction_style(token: str = Depends(get_session_token)):
     username = get_username_from_token(token)
     profile = InteractionStyleProfile(username, _USER_DATA_DIR)
     return profile.get_dimensions_dict()
+
+
+# ── Per-Agent QOPC Learning ──────────────────────
+
+
+@app.post("/agent/qopc/record")
+async def qopc_agent_record(request: Request, token: str = Depends(get_session_token)):
+    """Record a task outcome for per-agent QOPC learning."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    body = await request.json()
+    QOPCRegistry.record(
+        agent_id=body.get("agent_id", ""),
+        task_type=body.get("task_type", "analyze"),
+        outcome=body.get("outcome", "success"),
+        tokens=body.get("tokens", 0),
+        tools_used=body.get("tools_used", []),
+        duration_ms=body.get("duration_ms", 0),
+        corrected=body.get("corrected", False),
+    )
+    return {"status": "recorded", "agent_id": body.get("agent_id")}
+
+
+@app.get("/agent/qopc/weights/{agent_id}")
+async def qopc_agent_weights(agent_id: str, token: str = Depends(get_session_token)):
+    """Get QOPC weight summary for a specific agent."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return QOPCRegistry.get(agent_id).get_summary()
+
+
+@app.get("/agent/qopc/all")
+async def qopc_agent_all(token: str = Depends(get_session_token)):
+    """Get QOPC weight summaries for all agents."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"agents": QOPCRegistry.get_all_summaries()}
+
+
+@app.post("/agent/qopc/rank")
+async def qopc_agent_rank(request: Request, token: str = Depends(get_session_token)):
+    """Rank agents by affinity for a task type. Used by orchestrator."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    body = await request.json()
+    ranked = QOPCRegistry.rank_agents_for_task(
+        agent_ids=body.get("agent_ids", []),
+        task_type=body.get("task_type", "analyze"),
+    )
+    return {"ranked": [{"agent_id": aid, "score": round(s, 3)} for aid, s in ranked]}
 
 
 # ── Status ────────────────────────────────────────
