@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from agent.voice_profiles import VoiceProfile, get_voice_injection, VOICE_STYLES
+
 logger = logging.getLogger("aethercloud.qopc_agent")
 
 # ================================================================
@@ -79,6 +81,7 @@ class TaskRecord:
     tools_used: List[str]
     duration_ms: int
     corrected: bool
+    satisfaction_signal: str = 'neutral'  # 'positive' | 'neutral' | 'correction' | 'followup'
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -93,6 +96,8 @@ class AgentWeights:
     last_qiskit_seed: int = 0
     last_updated: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     sample_count: int = 0
+    voice_profile: Optional[dict] = None
+    style_satisfaction: float = 0.5
 
 
 # ================================================================
@@ -134,6 +139,11 @@ class ProtocolCRNG:
 # ================================================================
 # MATH HELPERS
 # ================================================================
+
+def ema_update(prev: float, new_val: float, alpha: float = EMA_ALPHA) -> float:
+    """Exponential moving average update."""
+    return alpha * new_val + (1.0 - alpha) * prev
+
 
 def rbf_similarity(a: List[float], b: List[float], sigma: float = RBF_SIGMA) -> float:
     """
@@ -291,6 +301,8 @@ class QOPCAgentLearner:
                     last_qiskit_seed=raw.get("last_qiskit_seed", 0),
                     last_updated=raw.get("last_updated", ""),
                     sample_count=raw.get("sample_count", 0),
+                    voice_profile=raw.get("voice_profile", None),
+                    style_satisfaction=raw.get("style_satisfaction", 0.5),
                 )
                 logger.debug("Loaded weights for agent %s", self.agent_id)
             except (json.JSONDecodeError, KeyError) as exc:
@@ -508,7 +520,40 @@ class QOPCAgentLearner:
             "top_affinities": {k: v for k, v in top_types},
             "last_updated": self.weights.last_updated,
             "total_records": len(self.records),
+            "voice_style":        self.weights.voice_profile.get('style', 'warm') if self.weights.voice_profile else 'warm',
+            "style_satisfaction": round(self.weights.style_satisfaction, 3) if hasattr(self.weights, 'style_satisfaction') else 0.5,
         }
+
+    def record_style_feedback(self, satisfaction: str):
+        score_map = {
+            'positive':   1.0,
+            'neutral':    0.5,
+            'followup':   0.3,
+            'correction': 0.0,
+        }
+        score = score_map.get(satisfaction, 0.5)
+        vp = self._get_voice_profile()
+        vp.sample_count += 1
+        vp.satisfaction_rate = ema_update(vp.satisfaction_rate, score)
+        if vp.satisfaction_rate < 0.35:
+            vp.length_bias = max(-1.0, vp.length_bias - 0.1)
+            vp.warmth_bias = max(-1.0, vp.warmth_bias - 0.05)
+            vp.formality_bias = max(-1.0, vp.formality_bias - 0.05)
+        self.weights.voice_profile = asdict(vp)
+        self.weights.style_satisfaction = vp.satisfaction_rate
+        self._save()
+
+    def _get_voice_profile(self) -> VoiceProfile:
+        if self.weights.voice_profile:
+            try:
+                return VoiceProfile(**self.weights.voice_profile)
+            except Exception:
+                pass
+        return VoiceProfile(style='warm')
+
+    def get_voice_injection(self) -> str:
+        vp = self._get_voice_profile()
+        return get_voice_injection(vp, self.agent_id)
 
 
 # ================================================================
