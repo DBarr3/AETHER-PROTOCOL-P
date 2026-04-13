@@ -48,6 +48,7 @@ env.py
 secrets.json
 *_secret*
 *_private*
+tmp_msg.json
 
 # WireGuard keys — never commit
 deploy/wg/mesh-keys.txt

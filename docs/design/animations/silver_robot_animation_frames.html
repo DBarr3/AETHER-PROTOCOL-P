@@ -1,0 +1,225 @@
+
+<style>
+  body { background:#0a0a0f; }
+  .wrap { padding:24px 16px; font-family:'IBM Plex Mono',monospace; }
+  .frames-row { display:flex; gap:20px; align-items:flex-end; justify-content:center; flex-wrap:wrap; margin-bottom:28px; }
+  .frame-col { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .frame-label { font-size:10px; color:#475569; letter-spacing:0.1em; }
+  .frame-name  { font-size:9px; color:#334155; text-align:center; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  .bar { width:440px; height:3px; background:#1e2030; border-radius:2px; margin:0 auto 6px; }
+  .bar-label { font-size:9px; color:#334155; text-align:center; letter-spacing:0.12em; margin-bottom:20px; }
+  .preview-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:24px; }
+  .preview-label { font-size:10px; color:#475569; letter-spacing:0.1em; }
+  .preview-stage { width:440px; height:100px; position:relative; overflow:hidden; }
+  .preview-bot { position:absolute; bottom:0; image-rendering:pixelated; }
+  .controls { display:flex; gap:10px; justify-content:center; }
+  button { font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; color:#06b6d4; background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.25); border-radius:4px; padding:5px 14px; cursor:pointer; }
+  button:hover { background:rgba(6,182,212,0.15); }
+  button.active { background:rgba(6,182,212,0.2); border-color:rgba(6,182,212,0.5); }
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-bot" width="110" height="100" style="image-rendering:pixelated"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-duck" class="active">DUCK LOOP</button>
+  <button id="btn-walk">WALK</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P  = 10;
+const G  = '#78909C';
+const Y  = '#FFD600';
+const LG = '#B0BEC5'; // highlight
+const DG = '#546E7A'; // shadow
+
+// BASE pixels — [x, y, color]
+const BASE = [
+  // antenna
+  [5,0,Y],[5,1,Y],
+  // head rows 2-5
+  [2,2,G],[3,2,G],[4,2,G],[5,2,G],[6,2,G],[7,2,G],[8,2,G],
+  [2,3,G],[3,3,G],[4,3,G],[5,3,G],[6,3,G],[7,3,G],[8,3,G],
+  [2,4,G],[3,4,G],        [5,4,G],        [7,4,G],[8,4,G], // eyes gap at 4,6
+  [2,5,G],[3,5,G],[4,5,G],[5,5,G],[6,5,G],[7,5,G],[8,5,G],
+  // body + arms row 6-7
+  [0,6,G],[1,6,G],[2,6,G],[3,6,G],[4,6,G],[5,6,G],[6,6,G],[7,6,G],[8,6,G],[9,6,G],[10,6,G],
+  [0,7,G],[1,7,G],[2,7,G],[3,7,G],[4,7,G],        [6,7,G],[7,7,G],[8,7,G],[9,7,G],[10,7,G],
+  // legs row 8-9
+  [2,8,G],[3,8,G],[4,8,G],[5,8,G],[6,8,G],[7,8,G],[8,8,G],
+  [2,9,G],        [4,9,G],        [6,9,G],        [8,9,G],
+];
+
+// Eye pixels (row 4, x=4 and x=6) rendered as accent color per frame
+// arms at row 6-7, x=0,1 (left) and x=9,10 (right)
+
+function buildFrame(pixels, yShift, squishLegs, armRaise, antennaBob) {
+  return pixels.map(([x,y,c]) => {
+    let ny = y;
+    // whole body shift
+    ny += yShift;
+    // squish legs (rows 8-9) upward for crouch
+    if (squishLegs && y >= 8) {
+      ny = 8 + Math.round((y-8) * squishLegs) + yShift;
+    }
+    // arm raise: arms at y=6-7, x<=1 or x>=9 shift up
+    if (armRaise && (y===6||y===7) && (x<=1||x>=9)) {
+      ny = ny - armRaise;
+    }
+    // antenna bob
+    if (antennaBob && (y===0||y===1)) {
+      ny = ny + antennaBob;
+    }
+    return [x, ny, c];
+  });
+}
+
+// Eye pixels added separately so we can change color per frame
+function addEyes(pixels, color, yShift) {
+  return pixels.concat([
+    [4, 4+yShift, color],
+    [6, 4+yShift, color],
+  ]);
+}
+
+const FRAMES = [
+  {
+    label:'F1', name:'idle',
+    pixels: addEyes(buildFrame(BASE,0,1,0,0), '#00E5FF', 0)
+  },
+  {
+    label:'F2', name:'crouch',
+    pixels: addEyes(buildFrame(BASE,1,0.6,0,1), '#00E5FF', 1)
+  },
+  {
+    label:'F3', name:'duck',
+    pixels: addEyes(buildFrame(BASE,3,0.3,0,2), '#FF6B6B', 3)  // eyes red when ducked
+  },
+  {
+    label:'F4', name:'pop up',
+    pixels: addEyes(buildFrame(BASE,-2,1,2,0), '#69FF47', -2) // arms raised, eyes green
+  },
+  {
+    label:'F5', name:'land',
+    pixels: addEyes(buildFrame(BASE,0,0.7,0,0), '#00E5FF', 0)
+  },
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c]) => {
+    if (y<0||x<0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach(f => {
+  const col = document.createElement('div');
+  col.className = 'frame-col';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  const cv = document.createElement('canvas');
+  cv.width  = 11*P;
+  cv.height = 11*P;
+  cv.style.width  = (11*P)+'px';
+  cv.style.height = (11*P)+'px';
+  cv.style.imageRendering = 'pixelated';
+
+  const nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+const live    = document.getElementById('live');
+const liveCtx = live.getContext('2d');
+
+let mode='duck', raf=null, lastTime=0, duckStep=0, walkX=165, dir=1, idlePhase=0;
+
+const DUCK_SEQ   = [0,1,2,2,3,4,4,0];
+const DUCK_DELAY = [320,140,140,160,120,180,320,320];
+
+function setPos(x) {
+  live.style.left   = x+'px';
+  live.style.bottom = '4px';
+}
+
+function animDuck(ts) {
+  if (ts-lastTime > DUCK_DELAY[duckStep]) {
+    lastTime=ts;
+    drawFrame(liveCtx, FRAMES[DUCK_SEQ[duckStep]].pixels);
+    duckStep=(duckStep+1)%DUCK_SEQ.length;
+  }
+  setPos(165);
+  raf=requestAnimationFrame(animDuck);
+}
+
+function animWalk(ts) {
+  if (ts-lastTime > 130) {
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    drawFrame(liveCtx, FRAMES[idlePhase===0?0:4].pixels);
+    walkX+=dir*24;
+    if(walkX>310) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  setPos(walkX);
+  raf=requestAnimationFrame(animWalk);
+}
+
+function animIdle(ts) {
+  if (ts-lastTime > 900) {
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    drawFrame(liveCtx, FRAMES[idlePhase===0?0:1].pixels);
+  }
+  setPos(165);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode=m;
+  if(raf) cancelAnimationFrame(raf);
+  duckStep=0; walkX=165; dir=1; idlePhase=0; lastTime=0;
+  drawFrame(liveCtx, FRAMES[0].pixels);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='duck') raf=requestAnimationFrame(animDuck);
+  if(m==='walk') raf=requestAnimationFrame(animWalk);
+  if(m==='idle') raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-duck').onclick=()=>startAnim('duck');
+document.getElementById('btn-walk').onclick=()=>startAnim('walk');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165);
+startAnim('duck');
+</script>
