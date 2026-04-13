@@ -3786,6 +3786,137 @@
   .output-status .working { color:var(--amber); }
   .output-status .done { color:var(--green); }
 
+  /* ── Agent Studio UI ─────────────────────────────── */
+  .as-team-pills { display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px; }
+  .as-pill {
+    display:flex;align-items:center;gap:5px;padding:5px 13px;
+    background:var(--bg-3);border:1px solid var(--border);
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    color:var(--text-muted);cursor:pointer;transition:all 0.15s;
+    border-radius:999px;
+  }
+  .as-pill:hover { border-color:var(--accent-border);color:var(--text-primary); }
+  .as-pill.active { background:rgba(0,212,255,0.08);border-color:var(--accent);color:var(--accent); }
+  .as-pill-new {
+    display:flex;align-items:center;gap:5px;padding:5px 13px;
+    background:transparent;border:1px dashed var(--border);
+    font-family:var(--font-mono);font-size:10px;color:var(--text-muted);
+    cursor:pointer;transition:all 0.15s;border-radius:999px;
+  }
+  .as-pill-new:hover { border-color:var(--accent);color:var(--accent); }
+  .as-carousel {
+    display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;
+    scrollbar-width:none;scroll-behavior:smooth;
+  }
+  .as-carousel::-webkit-scrollbar { display:none; }
+  .as-agent-card {
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    padding:10px 8px 8px;background:var(--bg-3);border:1px solid var(--border);
+    cursor:pointer;transition:all 0.18s;min-width:90px;max-width:90px;flex-shrink:0;
+    position:relative;
+  }
+  .as-agent-card:hover { transform:translateY(-2px);border-color:var(--border-2);box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+  .as-agent-card.selected { transform:translateY(-3px);border-color:var(--accent);box-shadow:0 6px 24px rgba(0,212,255,0.15);background:var(--bg-4); }
+  .as-agent-tile {
+    width:52px;height:52px;display:flex;align-items:center;justify-content:center;
+    image-rendering:pixelated;overflow:hidden;
+  }
+  .as-agent-tile svg { width:40px;height:auto; }
+  .as-agent-name { font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--text-primary);text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .as-agent-role { font-size:8px;color:var(--text-muted);text-align:center; }
+  .as-sel-dot { position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;transition:opacity 0.15s; }
+  .as-agent-card.selected .as-sel-dot { opacity:1; }
+  .as-card-new {
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    padding:10px 8px;background:transparent;border:1px dashed var(--border);
+    cursor:pointer;transition:all 0.15s;min-width:90px;max-width:90px;min-height:90px;
+    color:var(--text-muted);font-family:var(--font-mono);font-size:9px;flex-shrink:0;
+  }
+  .as-card-new:hover { border-color:var(--accent);color:var(--accent); }
+  .as-editor-header { display:flex;gap:14px;align-items:flex-start; }
+  .as-tile-btn {
+    width:64px;height:64px;flex-shrink:0;border:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg-3);border:1px solid var(--border);position:relative;
+    transition:all 0.15s;image-rendering:pixelated;
+  }
+  .as-tile-btn:hover { transform:scale(1.04);border-color:var(--accent-border); }
+  .as-tile-btn::after {
+    content:'\\270E';position:absolute;bottom:-3px;right:-3px;
+    width:16px;height:16px;background:var(--bg-2);border:1px solid var(--border-2);
+    border-radius:50%;font-size:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--text-muted);
+  }
+  .as-tile-btn svg { width:44px;height:auto; }
+  .as-editor-meta { display:flex;flex-direction:column;gap:8px;flex:1; }
+  .as-name-input {
+    background:transparent;border:none;border-bottom:1px solid var(--border);
+    padding:4px 0;font-family:var(--font-mono);font-size:16px;font-weight:600;
+    color:var(--text-primary);width:100%;outline:none;transition:border-color 0.15s;
+    letter-spacing:0.02em;
+  }
+  .as-name-input:focus { border-color:var(--accent); }
+  .as-name-input::placeholder { color:var(--text-muted); }
+  .as-desc-input {
+    background:var(--bg);border:1px solid var(--border);padding:8px 10px;
+    font-family:var(--font-mono);font-size:11px;color:var(--text-primary);
+    width:100%;outline:none;resize:none;min-height:48px;transition:border-color 0.15s;
+    line-height:1.5;
+  }
+  .as-desc-input:focus { border-color:var(--accent); }
+  .as-desc-input::placeholder { color:var(--text-muted); }
+  .as-model-pills { display:flex;flex-wrap:wrap;gap:6px; }
+  .as-model-pill {
+    display:flex;flex-direction:column;align-items:flex-start;padding:7px 12px;
+    background:var(--bg);border:1px solid var(--border);cursor:pointer;
+    transition:all 0.15s;gap:1px;min-width:100px;
+  }
+  .as-model-pill:hover { border-color:var(--border-2); }
+  .as-model-pill.selected { border-color:var(--accent);background:rgba(0,212,255,0.06); }
+  .as-model-pill-name { font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text-primary); }
+  .as-model-pill.selected .as-model-pill-name { color:var(--accent); }
+  .as-model-pill-desc { font-size:9px;color:var(--text-muted); }
+  .as-slider-row { display:flex;align-items:center;gap:10px; }
+  .as-slider-label { font-family:var(--font-mono);font-size:10px;color:var(--text-primary);min-width:80px; }
+  .as-slider {
+    flex:1;-webkit-appearance:none;appearance:none;height:3px;
+    background:var(--border);outline:none;cursor:pointer;border-radius:999px;
+  }
+  .as-slider::-webkit-slider-thumb {
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:2px solid var(--bg-2);
+  }
+  .as-slider::-moz-range-thumb { width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg-2); }
+  .as-slider-readout { font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--accent);min-width:36px;text-align:right; }
+  .as-slider-sub { display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px; }
+  .as-action-row { display:flex;gap:8px; }
+  .as-btn-outline {
+    flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 16px;border:1px solid var(--border-2);font-family:var(--font-mono);
+    font-size:10px;font-weight:500;color:var(--text-primary);background:transparent;
+    transition:all 0.15s;cursor:pointer;text-transform:uppercase;letter-spacing:0.08em;
+  }
+  .as-btn-outline:hover { border-color:var(--accent);color:var(--accent); }
+  .as-btn-deploy {
+    flex:2;display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 20px;background:linear-gradient(135deg,var(--accent) 0%,#6366f1 100%);
+    font-family:var(--font-mono);font-size:10px;font-weight:700;color:#000;
+    transition:all 0.15s;cursor:pointer;text-transform:uppercase;letter-spacing:0.08em;
+    box-shadow:0 2px 12px rgba(0,212,255,0.25);border:none;
+  }
+  .as-btn-deploy:hover { box-shadow:0 4px 20px rgba(0,212,255,0.4);transform:translateY(-1px); }
+  .as-mcp-chips { display:flex;flex-wrap:wrap;gap:6px; }
+  .as-mcp-chip {
+    display:flex;align-items:center;gap:5px;padding:5px 11px;
+    border-radius:999px;font-family:var(--font-mono);font-size:10px;font-weight:500;
+    cursor:pointer;border:1px solid var(--border);background:var(--bg);
+    color:var(--text-muted);transition:all 0.15s;
+  }
+  .as-mcp-chip:hover { border-color:var(--border-2);color:var(--text-primary); }
+  .as-mcp-chip.active { background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.4);color:var(--accent); }
+  .as-chip-dot { width:6px;height:6px;border-radius:50%;background:var(--border);transition:background 0.15s;flex-shrink:0; }
+  .as-mcp-chip.active .as-chip-dot { background:var(--accent); }
+
   /* ── Voice & Tone Picker ─────────────────────────── */
   .voice-picker-grid {
     display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px;margin:8px 0;
@@ -13823,6 +13954,52 @@ function renderEditor(profile) {
 
     '</div>' +
 
+    // ── MODEL & BEHAVIOR ──
+    '<div class="profile-section">' +
+      '<div class="profile-section-header">MODEL & BEHAVIOR' +
+        '<span class="profile-section-toggle" id="model-toggle" onclick="profileToggleSection(\'model\')">EXPAND</span>' +
+      '</div>' +
+      '<div class="profile-collapsible collapsed" id="model-body" style="max-height:400px;">' +
+        '<div class="as-model-pills" id="as-model-pills">' +
+          ['sonnet','opus','haiku','custom'].map(function(m) {
+            var labels = {sonnet:'Sonnet 4.6',opus:'Opus 4.6',haiku:'Haiku 4.5',custom:'Custom'};
+            var descs = {sonnet:'Fast & balanced',opus:'Highest reasoning',haiku:'Ultra-fast, lean',custom:'Self-hosted / other'};
+            var sel = (profile.model || 'sonnet') === m ? ' selected' : '';
+            return '<div class="as-model-pill' + sel + '" data-model="' + m + '" onclick="profileSelectModel(\'' + m + '\')">' +
+              '<span class="as-model-pill-name">' + labels[m] + '</span>' +
+              '<span class="as-model-pill-desc">' + descs[m] + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">' +
+          '<div>' +
+            '<div class="as-slider-row">' +
+              '<span class="as-slider-label">Temperature</span>' +
+              '<input type="range" class="as-slider" id="as-temp-slider" min="0" max="100" value="' + Math.round((profile.temperature || 0.4) * 100) + '" step="1" oninput="profileUpdateTemp(this.value)">' +
+              '<span class="as-slider-readout" id="as-temp-readout">' + (profile.temperature || 0.4).toFixed(2) + '</span>' +
+            '</div>' +
+            '<div class="as-slider-sub"><span>Deterministic</span><span>Creative</span></div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="as-slider-row">' +
+              '<span class="as-slider-label">Max Tokens</span>' +
+              '<input type="range" class="as-slider" id="as-tokens-slider" min="256" max="8192" value="' + (profile.maxTokens || 4096) + '" step="128" oninput="profileUpdateTokens(this.value)">' +
+              '<span class="as-slider-readout" id="as-tokens-readout">' + (profile.maxTokens || 4096).toLocaleString() + '</span>' +
+            '</div>' +
+            '<div class="as-slider-sub"><span>256</span><span>8,192</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── ACTION ROW ──
+    '<div class="profile-section" style="border-bottom:none;padding-bottom:0;margin-bottom:0;">' +
+      '<div class="as-action-row">' +
+        '<button class="as-btn-outline" onclick="profileOpenTerminal()">&#9655; Test Agent</button>' +
+        '<button class="as-btn-deploy" onclick="profileSave()">&#9992; Deploy Team &#8594;</button>' +
+      '</div>' +
+    '</div>' +
+
     // ── SAVE BAR ──
     '<div class="profile-save-bar">' +
       '<button class="profile-btn primary" onclick="profileSave()">SAVE AGENT</button>' +
@@ -13839,6 +14016,11 @@ function renderEditor(profile) {
       var preview = document.getElementById('profile-icon-preview');
       if (preview) window.agentAnimator.animate(preview, profile.icon, { size: 72, sequence: 'duck' });
     }
+    // Init slider fills
+    var ts = document.getElementById('as-temp-slider');
+    if (ts) { var pct = ((ts.value - ts.min) / (ts.max - ts.min)) * 100; ts.style.background = 'linear-gradient(to right, var(--accent) ' + pct + '%, var(--border) ' + pct + '%)'; }
+    var tks = document.getElementById('as-tokens-slider');
+    if (tks) { var pct2 = ((tks.value - tks.min) / (tks.max - tks.min)) * 100; tks.style.background = 'linear-gradient(to right, var(--accent) ' + pct2 + '%, var(--border) ' + pct2 + '%)'; }
   }, 0);
 }
 
@@ -13881,6 +14063,13 @@ function collectProfile() {
   p.systemPrompt = (document.getElementById('profile-prompt')?.value || '');
   const teamSel = document.getElementById('profile-team-select');
   if (teamSel) p.team = teamSel.value;
+  // Model & behavior
+  var modelPill = document.querySelector('.as-model-pill.selected');
+  if (modelPill) p.model = modelPill.dataset.model;
+  var tempSlider = document.getElementById('as-temp-slider');
+  if (tempSlider) p.temperature = parseFloat(tempSlider.value) / 100;
+  var tokensSlider = document.getElementById('as-tokens-slider');
+  if (tokensSlider) p.maxTokens = parseInt(tokensSlider.value);
   return p;
 }
 
@@ -13917,6 +14106,9 @@ window.profileNew = function() {
     tasks: [],
     mcpAgents: [],
     skills: [],
+    model: 'sonnet',
+    temperature: 0.4,
+    maxTokens: 4096,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -13935,6 +14127,41 @@ window.profileEdit = function(id) {
   renderEditor(p);
   // Load QOPC stats for this agent
   loadQOPCStatsForAgent(p.id);
+};
+
+window.profileSelectModel = function(model) {
+  var p = allProfiles.find(function(pr) { return pr.id === currentProfileId; });
+  if (!p) return;
+  p.model = model;
+  document.querySelectorAll('.as-model-pill').forEach(function(pill) {
+    pill.classList.toggle('selected', pill.dataset.model === model);
+  });
+};
+
+window.profileUpdateTemp = function(val) {
+  var p = allProfiles.find(function(pr) { return pr.id === currentProfileId; });
+  if (!p) return;
+  p.temperature = parseFloat(val) / 100;
+  var readout = document.getElementById('as-temp-readout');
+  if (readout) readout.textContent = p.temperature.toFixed(2);
+  var slider = document.getElementById('as-temp-slider');
+  if (slider) {
+    var pct = ((val - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.background = 'linear-gradient(to right, var(--accent) ' + pct + '%, var(--border) ' + pct + '%)';
+  }
+};
+
+window.profileUpdateTokens = function(val) {
+  var p = allProfiles.find(function(pr) { return pr.id === currentProfileId; });
+  if (!p) return;
+  p.maxTokens = parseInt(val);
+  var readout = document.getElementById('as-tokens-readout');
+  if (readout) readout.textContent = p.maxTokens.toLocaleString();
+  var slider = document.getElementById('as-tokens-slider');
+  if (slider) {
+    var pct = ((val - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.background = 'linear-gradient(to right, var(--accent) ' + pct + '%, var(--border) ' + pct + '%)';
+  }
 };
 
 window.profileSelectVoice = function(styleKey) {
