@@ -1,0 +1,215 @@
+
+<style>
+  body { background: #0a0a0f; }
+  .wrap { padding: 24px 16px; font-family: 'IBM Plex Mono', monospace; }
+  .frames-row { display: flex; gap: 20px; align-items: flex-end; justify-content: center; flex-wrap: wrap; margin-bottom: 28px; }
+  .frame-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .frame-label { font-size: 10px; color: #475569; letter-spacing: 0.1em; }
+  .frame-name  { font-size: 9px;  color: #334155; text-align: center; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .bar { width: 440px; height: 3px; background: #1e2030; border-radius: 2px; margin: 0 auto 24px; }
+  .bar-label { font-size: 9px; color: #334155; text-align: center; letter-spacing: 0.12em; margin-bottom: 6px; }
+  .preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 28px; }
+  .preview-label { font-size: 10px; color: #475569; letter-spacing: 0.1em; }
+  .preview-bar { width: 440px; height: 3px; background: #1e2030; border-radius: 2px; position: relative; }
+  .preview-stage { width: 440px; height: 80px; position: relative; overflow: hidden; }
+  .preview-shroom { position: absolute; bottom: 0; image-rendering: pixelated; }
+  .controls { display: flex; gap: 10px; justify-content: center; }
+  button { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #06b6d4; background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.25); border-radius: 4px; padding: 5px 14px; cursor: pointer; }
+  button:hover { background: rgba(6,182,212,0.15); }
+  button.active { background: rgba(6,182,212,0.2); border-color: rgba(6,182,212,0.5); }
+</style>
+
+<div class="wrap">
+
+<div class="frames-row" id="frames-row"></div>
+
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-shroom" width="110" height="90" style="image-rendering:pixelated"></canvas>
+  </div>
+  <div class="preview-bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-duck" class="active">DUCK LOOP</button>
+  <button id="btn-walk">WALK</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+
+</div>
+
+<script>
+const P = 10;
+const R='#D32F2F', S='#FFCDD2', W='#EFEBE9';
+
+// Full frame: array of [x,y,color]
+const BASE = [
+  [3,0,R],[4,0,R],[5,0,R],[6,0,R],[7,0,R],
+  [2,1,R],[4,1,R],[5,1,R],[6,1,R],[8,1,R],
+  [1,2,R],[2,2,R],[3,2,R],[4,2,R],[6,2,R],[7,2,R],[8,2,R],[9,2,R],
+  [0,3,R],[1,3,R],[3,3,R],[4,3,R],[5,3,R],[6,3,R],[7,3,R],[9,3,R],[10,3,R],
+  [3,1,S],[7,1,S],[5,2,S],[2,3,S],[8,3,S],
+  [3,4,W],[4,4,W],[5,4,W],[6,4,W],[7,4,W],
+  [3,5,W],[4,5,W],[6,5,W],[7,5,W],
+  [3,6,W],[4,6,W],[5,6,W],[6,6,W],[7,6,W],
+  [3,7,W],[4,7,W],[6,7,W],[7,7,W],
+  [3,8,W],[5,8,W],[7,8,W],
+];
+
+// Frame definitions: each pixel gets a y-offset (duck = shift pixels down, clip body)
+// Frame 1: IDLE — full character standing
+// Frame 2: CROUCH START — body squishes, cap stays
+// Frame 3: DUCK — fully ducked under bar (only cap visible, shifted down)
+// Frame 4: POP UP — jumping back up, slightly above normal
+// Frame 5: LAND — slight squish on landing, return to idle
+
+function makeFrame(pixels, yShift, squishBody, jumpCap) {
+  // yShift: whole character offset
+  // squishBody: compress body rows (5-8) upward
+  // jumpCap: shift cap up by N extra pixels
+  return pixels.map(([x, y, c]) => {
+    let ny = y + yShift;
+    const isBody = y >= 4;
+    const isCap  = y <= 3;
+    if (squishBody && isBody) {
+      ny = 4 + Math.round((y - 4) * squishBody) + yShift;
+    }
+    if (jumpCap && isCap) {
+      ny = ny - jumpCap;
+    }
+    return [x, ny, c];
+  });
+}
+
+const FRAMES = [
+  { label: 'F1', name: 'idle',         pixels: makeFrame(BASE, 0, 1, 0) },
+  { label: 'F2', name: 'crouch',       pixels: makeFrame(BASE, 1, 0.7, 0) },
+  { label: 'F3', name: 'duck',         pixels: makeFrame(BASE, 3, 0.4, 0) },
+  { label: 'F4', name: 'pop up',       pixels: makeFrame(BASE, -2, 1, 2) },
+  { label: 'F5', name: 'land',         pixels: makeFrame(BASE, 0, 0.75, 0) },
+];
+
+function drawFrame(ctx, pixels, scale) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  const s = scale || P;
+  pixels.forEach(([x,y,c]) => {
+    if (y < 0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*s, y*s, s, s);
+  });
+}
+
+// Render static frame cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach((f, i) => {
+  const col = document.createElement('div');
+  col.className = 'frame-col';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  const cv = document.createElement('canvas');
+  cv.width  = 11 * P;
+  cv.height = 10 * P;
+  cv.style.width  = (11*P) + 'px';
+  cv.style.height = (10*P) + 'px';
+  cv.style.imageRendering = 'pixelated';
+
+  const nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  const ctx = cv.getContext('2d');
+  drawFrame(ctx, f.pixels, P);
+});
+
+// Live preview animation
+const live    = document.getElementById('live');
+const liveCtx = live.getContext('2d');
+const stage   = document.getElementById('stage');
+
+let mode       = 'duck';
+let frameIdx   = 0;
+let walkX      = 0;
+let dir        = 1;
+let raf        = null;
+let lastTime   = 0;
+let frameDur   = 180;
+
+// Duck sequence: 0,1,2,3,4,3,2,1,0 — idle→crouch→duck→pop→land→...
+const DUCK_SEQ   = [0,1,2,2,3,4,4,0];
+const DUCK_DELAY = [300,140,140,140,120,180,300,300];
+let duckStep = 0;
+
+function setLivePos(x, yBottom) {
+  live.style.left   = x + 'px';
+  live.style.bottom = yBottom + 'px';
+}
+
+function animDuck(ts) {
+  if (ts - lastTime > DUCK_DELAY[duckStep]) {
+    lastTime = ts;
+    const fi = DUCK_SEQ[duckStep];
+    drawFrame(liveCtx, FRAMES[fi].pixels, P);
+    duckStep = (duckStep + 1) % DUCK_SEQ.length;
+  }
+  setLivePos(165, 4);
+  raf = requestAnimationFrame(animDuck);
+}
+
+function animWalk(ts) {
+  if (ts - lastTime > 120) {
+    lastTime = ts;
+    frameIdx = (frameIdx + 1) % 2; // alternate frame 0 and 5 (walk legs)
+    drawFrame(liveCtx, FRAMES[frameIdx === 0 ? 0 : 4].pixels, P);
+    walkX += dir * 22;
+    if (walkX > 320) dir = -1;
+    if (walkX < 0)   dir = 1;
+  }
+  setLivePos(walkX, 4);
+  raf = requestAnimationFrame(animWalk);
+}
+
+function animIdle(ts) {
+  if (ts - lastTime > 900) {
+    lastTime = ts;
+    frameIdx = frameIdx === 0 ? 1 : 0;
+    drawFrame(liveCtx, FRAMES[frameIdx].pixels, P);
+  }
+  setLivePos(165, 4);
+  raf = requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode = m;
+  if (raf) cancelAnimationFrame(raf);
+  duckStep = 0; walkX = 165; dir = 1; frameIdx = 0; lastTime = 0;
+  drawFrame(liveCtx, FRAMES[0].pixels, P);
+
+  document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+
+  if (m === 'duck') raf = requestAnimationFrame(animDuck);
+  if (m === 'walk') raf = requestAnimationFrame(animWalk);
+  if (m === 'idle') raf = requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-duck').onclick = () => startAnim('duck');
+document.getElementById('btn-walk').onclick = () => startAnim('walk');
+document.getElementById('btn-idle').onclick = () => startAnim('idle');
+
+setLivePos(165, 4);
+startAnim('duck');
+</script>

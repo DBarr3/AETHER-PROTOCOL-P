@@ -1,0 +1,241 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:20px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#334155;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:110px;position:relative;overflow:hidden}
+  .preview-ghost{position:absolute;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#ce93d8;background:rgba(156,39,176,0.08);border:1px solid rgba(156,39,176,0.3);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(156,39,176,0.15)}
+  button.active{background:rgba(156,39,176,0.22);border-color:rgba(206,147,216,0.6)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-ghost" width="110" height="100" style="image-rendering:pixelated"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-phase" class="active">PHASE LOOP</button>
+  <button id="btn-float">FLOAT</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P  = 10;
+const PU = '#9C27B0';   // main purple
+const LP = '#CE93D8';   // light purple — eyes / highlights
+const WH = '#FFFFFF';   // eye whites
+const GL = '#E040FB';   // glow purple — used when phasing
+
+// Base ghost pixels [x, y, color]
+const BASE = [
+  // head top
+  [4,0,PU],[5,0,PU],[6,0,PU],
+  [3,1,PU],[4,1,PU],[5,1,PU],[6,1,PU],[7,1,PU],
+  [2,2,PU],[3,2,PU],[4,2,PU],[5,2,PU],[6,2,PU],[7,2,PU],[8,2,PU],
+  // eye row — gaps at x=4,6 (eye sockets filled by eye pixels below)
+  [2,3,PU],[3,3,PU],[5,3,PU],[7,3,PU],[8,3,PU],
+  // body
+  [2,4,PU],[3,4,PU],[4,4,PU],[5,4,PU],[6,4,PU],[7,4,PU],[8,4,PU],
+  [2,5,PU],[3,5,PU],[4,5,PU],[6,5,PU],[7,5,PU],[8,5,PU],
+  [2,6,PU],[3,6,PU],[4,6,PU],[5,6,PU],[6,6,PU],[7,6,PU],[8,6,PU],
+  [2,7,PU],[3,7,PU],[4,7,PU],[5,7,PU],[6,7,PU],[7,7,PU],[8,7,PU],
+  // tentacle bottom — alternating
+  [2,8,PU],[4,8,PU],[6,8,PU],[8,8,PU],
+];
+
+// Eyes: [x, y] — added per frame with color
+const EYES = [[4,3],[6,3]];
+// Tentacle tips for float wave: rows 7-8
+const TENT = [[2,8],[4,8],[6,8],[8,8]];
+
+function shiftPixels(pixels, yShift, alphaFade) {
+  // alphaFade 0-1 affects tentacles (rows 6-8) dissolving
+  return pixels.map(([x,y,c]) => {
+    let ny = y + yShift;
+    // tentacles fade/dissolve when phasing down
+    if (alphaFade < 1 && y >= 6) {
+      // drop lower tentacle pixels when dissolving
+      if (alphaFade < 0.5 && y === 8) return null;
+      if (alphaFade < 0.2 && y === 7) return null;
+    }
+    return [x, ny, c];
+  }).filter(Boolean);
+}
+
+function waveTentacles(pixels, waveOffset) {
+  // alternate tentacle tips up/down for float animation
+  return pixels.map(([x,y,c]) => {
+    if (y === 8) {
+      const idx = Math.floor(x/2);
+      const wy = (idx + waveOffset) % 2 === 0 ? y - 1 : y;
+      return [x, wy, c];
+    }
+    return [x,y,c];
+  });
+}
+
+// 5 frames:
+// F1 — idle floating, normal eyes (LP)
+// F2 — start phase: ghost shifts down 1, tentacles start dissolving, eyes go wide (WH)
+// F3 — mid phase: shifted down 3, bottom half gone, eyes glow (GL)
+// F4 — emerge: shoots up -2 above normal, full body restored, eyes bright (GL)
+// F5 — settle: back to normal +0, tentacles wave, eyes back to LP
+
+const FRAME_DEFS = [
+  { label:'F1', name:'idle',       yShift:0,  eyeColor:LP,  alpha:1,   wave:0 },
+  { label:'F2', name:'sink',       yShift:1,  eyeColor:WH,  alpha:0.7, wave:0 },
+  { label:'F3', name:'phase',      yShift:3,  eyeColor:GL,  alpha:0.2, wave:0 },
+  { label:'F4', name:'emerge',     yShift:-2, eyeColor:GL,  alpha:1,   wave:0 },
+  { label:'F5', name:'settle',     yShift:0,  eyeColor:LP,  alpha:1,   wave:1 },
+];
+
+function buildFrame(def) {
+  let pixels = shiftPixels(BASE, def.yShift, def.alpha);
+  if (def.wave) pixels = waveTentacles(pixels, 0);
+  // add eyes
+  EYES.forEach(([ex,ey]) => {
+    pixels.push([ex, ey + def.yShift, def.eyeColor]);
+  });
+  return pixels;
+}
+
+const FRAMES = FRAME_DEFS.map(d => ({ ...d, pixels: buildFrame(d) }));
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c]) => {
+    if (y < 0 || x < 0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach(f => {
+  const col = document.createElement('div');
+  col.className = 'frame-col';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  const cv = document.createElement('canvas');
+  cv.width  = 11*P;
+  cv.height = 11*P;
+  cv.style.cssText = `width:${11*P}px;height:${11*P}px;image-rendering:pixelated`;
+
+  const nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+const live    = document.getElementById('live');
+const liveCtx = live.getContext('2d');
+
+let mode='phase', raf=null, lastTime=0, step=0, walkX=165, dir=1, idleWave=0;
+
+// Phase sequence with timing
+const PHASE_SEQ   = [0,0,1,2,2,3,4,4,0];
+const PHASE_DELAY = [400,400,160,160,200,140,200,400,400];
+
+// Float wave — alternate between F1 and wave variant
+let wavePixels0, wavePixels1;
+(function buildWave(){
+  // wave variant: tentacles shifted
+  let p = shiftPixels(BASE,0,1);
+  p = waveTentacles(p, 1); // opposite wave
+  EYES.forEach(([ex,ey]) => p.push([ex,ey,LP]));
+  wavePixels0 = FRAMES[0].pixels;
+  wavePixels1 = p;
+})();
+
+function setPos(x, bottom) {
+  live.style.left   = x+'px';
+  live.style.bottom = (bottom||4)+'px';
+}
+
+function animPhase(ts) {
+  if (ts-lastTime > PHASE_DELAY[step]) {
+    lastTime=ts;
+    drawFrame(liveCtx, FRAMES[PHASE_SEQ[step]].pixels);
+    step=(step+1)%PHASE_SEQ.length;
+  }
+  setPos(165);
+  raf=requestAnimationFrame(animPhase);
+}
+
+function animFloat(ts) {
+  if (ts-lastTime > 160) {
+    lastTime=ts;
+    idleWave=1-idleWave;
+    drawFrame(liveCtx, idleWave===0 ? wavePixels0 : wavePixels1);
+    walkX += dir*18;
+    if(walkX>310) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  // ghost floats slightly above bar — sine bob
+  const bob = Math.sin(Date.now()/600)*4;
+  setPos(walkX, 10+bob);
+  raf=requestAnimationFrame(animFloat);
+}
+
+function animIdle(ts) {
+  if (ts-lastTime > 700) {
+    lastTime=ts;
+    idleWave=1-idleWave;
+    drawFrame(liveCtx, idleWave===0 ? wavePixels0 : wavePixels1);
+  }
+  const bob = Math.sin(Date.now()/700)*3;
+  setPos(165, 10+bob);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode=m;
+  if(raf) cancelAnimationFrame(raf);
+  step=0; walkX=165; dir=1; idleWave=0; lastTime=0;
+  drawFrame(liveCtx, FRAMES[0].pixels);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='phase') raf=requestAnimationFrame(animPhase);
+  if(m==='float') raf=requestAnimationFrame(animFloat);
+  if(m==='idle')  raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-phase').onclick=()=>startAnim('phase');
+document.getElementById('btn-float').onclick=()=>startAnim('float');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165, 10);
+startAnim('phase');
+</script>

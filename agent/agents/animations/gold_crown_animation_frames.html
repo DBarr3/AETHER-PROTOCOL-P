@@ -1,0 +1,167 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:20px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#5a4a00;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:110px;position:relative;overflow:hidden}
+  .preview-agent{position:absolute;bottom:0;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#FFC107;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(255,193,7,0.15)}
+  button.active{background:rgba(255,193,7,0.2);border-color:rgba(255,193,7,0.5)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-agent" width="110" height="100"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-primary" class="active">REIGN LOOP</button>
+  <button id="btn-walk">STRUT</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P = 10;
+
+const FRAMES = [
+  {label:'F1',name:'idle',pixels:[[1,0,'#FFC107'],[5,0,'#FFC107'],[9,0,'#FFC107'],[1,1,'#FFC107'],[3,1,'#FFC107'],[5,1,'#FFC107'],[7,1,'#FFC107'],[9,1,'#FFC107'],[1,2,'#FFC107'],[2,2,'#FFC107'],[3,2,'#FFC107'],[4,2,'#FFC107'],[5,2,'#FFC107'],[6,2,'#FFC107'],[7,2,'#FFC107'],[8,2,'#FFC107'],[9,2,'#FFC107'],[1,3,'#FFC107'],[2,3,'#FFC107'],[3,3,'#FFC107'],[4,3,'#FFC107'],[5,3,'#FFC107'],[6,3,'#FFC107'],[7,3,'#FFC107'],[8,3,'#FFC107'],[9,3,'#FFC107'],[2,4,'#FFC107'],[3,4,'#FFC107'],[4,4,'#FFC107'],[5,4,'#FFC107'],[6,4,'#FFC107'],[7,4,'#FFC107'],[8,4,'#FFC107'],[2,5,'#FFC107'],[3,5,'#FFC107'],[5,5,'#FFC107'],[7,5,'#FFC107'],[8,5,'#FFC107'],[2,6,'#FFC107'],[3,6,'#FFC107'],[4,6,'#FFC107'],[5,6,'#FFC107'],[6,6,'#FFC107'],[7,6,'#FFC107'],[8,6,'#FFC107'],[2,7,'#FFC107'],[3,7,'#FFC107'],[4,7,'#FFC107'],[6,7,'#FFC107'],[7,7,'#FFC107'],[8,7,'#FFC107'],[3,8,'#FFC107'],[4,8,'#FFC107'],[5,8,'#FFC107'],[6,8,'#FFC107'],[7,8,'#FFC107'],[3,9,'#FFC107'],[5,9,'#FFC107'],[7,9,'#FFC107'],[4,5,'#FFD54F'],[6,5,'#FFD54F']]},
+  {label:'F2',name:'left_gleam',pixels:[[1,-1,'#FF1744'],[5,-1,'#FF8F00'],[9,-1,'#FF8F00'],[1,0,'#FF1744'],[3,0,'#FFD54F'],[5,0,'#FF8F00'],[7,0,'#FFD54F'],[9,0,'#FF8F00'],[1,1,'#FFD54F'],[2,1,'#FFD54F'],[3,1,'#FFD54F'],[4,1,'#FFD54F'],[5,1,'#FFD54F'],[6,1,'#FFD54F'],[7,1,'#FFD54F'],[8,1,'#FFD54F'],[9,1,'#FFD54F'],[1,2,'#FFD54F'],[2,2,'#FFD54F'],[3,2,'#FFD54F'],[4,2,'#FFD54F'],[5,2,'#FFD54F'],[6,2,'#FFD54F'],[7,2,'#FFD54F'],[8,2,'#FFD54F'],[9,2,'#FFD54F'],[2,3,'#FFC107'],[3,3,'#FFC107'],[4,3,'#FFC107'],[5,3,'#FFC107'],[6,3,'#FFC107'],[7,3,'#FFC107'],[8,3,'#FFC107'],[2,4,'#FFC107'],[3,4,'#FFC107'],[5,4,'#FFC107'],[7,4,'#FFC107'],[8,4,'#FFC107'],[2,5,'#FFC107'],[3,5,'#FFC107'],[4,5,'#FFC107'],[5,5,'#FFC107'],[6,5,'#FFC107'],[7,5,'#FFC107'],[8,5,'#FFC107'],[2,6,'#FFC107'],[3,6,'#FFC107'],[4,6,'#FFC107'],[6,6,'#FFC107'],[7,6,'#FFC107'],[8,6,'#FFC107'],[3,7,'#FFC107'],[4,7,'#FFC107'],[5,7,'#FFC107'],[6,7,'#FFC107'],[7,7,'#FFC107'],[3,8,'#FFC107'],[5,8,'#FFC107'],[7,8,'#FFC107'],[4,4,'#00E5FF'],[6,4,'#00E5FF']]},
+  {label:'F3',name:'center_blaze',pixels:[[1,-1,'#FFD54F'],[5,-1,'#FFFDE7'],[9,-1,'#FFD54F'],[1,0,'#FFD54F'],[3,0,'#FFFDE7'],[5,0,'#FFFDE7'],[7,0,'#FFFDE7'],[9,0,'#FFD54F'],[1,1,'#FFFDE7'],[2,1,'#FFFDE7'],[3,1,'#FFFDE7'],[4,1,'#FFFDE7'],[5,1,'#FFFDE7'],[6,1,'#FFFDE7'],[7,1,'#FFFDE7'],[8,1,'#FFFDE7'],[9,1,'#FFFDE7'],[1,2,'#FFD54F'],[2,2,'#FFD54F'],[3,2,'#FFD54F'],[4,2,'#FFD54F'],[5,2,'#FFD54F'],[6,2,'#FFD54F'],[7,2,'#FFD54F'],[8,2,'#FFD54F'],[9,2,'#FFD54F'],[2,3,'#FFD54F'],[3,3,'#FFD54F'],[4,3,'#FFD54F'],[5,3,'#FFD54F'],[6,3,'#FFD54F'],[7,3,'#FFD54F'],[8,3,'#FFD54F'],[2,4,'#FFD54F'],[3,4,'#FFD54F'],[5,4,'#FFD54F'],[7,4,'#FFD54F'],[8,4,'#FFD54F'],[2,5,'#FFD54F'],[3,5,'#FFD54F'],[4,5,'#FFD54F'],[5,5,'#FFD54F'],[6,5,'#FFD54F'],[7,5,'#FFD54F'],[8,5,'#FFD54F'],[2,6,'#FFD54F'],[3,6,'#FFD54F'],[4,6,'#FFD54F'],[6,6,'#FFD54F'],[7,6,'#FFD54F'],[8,6,'#FFD54F'],[3,7,'#FFD54F'],[4,7,'#FFD54F'],[5,7,'#FFD54F'],[6,7,'#FFD54F'],[7,7,'#FFD54F'],[3,8,'#FFD54F'],[5,8,'#FFD54F'],[7,8,'#FFD54F'],[4,4,'#FFFDE7'],[6,4,'#FFFDE7']]},
+  {label:'F4',name:'right_gleam',pixels:[[1,-1,'#FF8F00'],[5,-1,'#FF8F00'],[9,-1,'#00E676'],[1,0,'#FF8F00'],[3,0,'#FFD54F'],[5,0,'#FF8F00'],[7,0,'#FFD54F'],[9,0,'#00E676'],[1,1,'#FFD54F'],[2,1,'#FFD54F'],[3,1,'#FFD54F'],[4,1,'#FFD54F'],[5,1,'#FFD54F'],[6,1,'#FFD54F'],[7,1,'#FFD54F'],[8,1,'#FFD54F'],[9,1,'#FFD54F'],[1,2,'#FFD54F'],[2,2,'#FFD54F'],[3,2,'#FFD54F'],[4,2,'#FFD54F'],[5,2,'#FFD54F'],[6,2,'#FFD54F'],[7,2,'#FFD54F'],[8,2,'#FFD54F'],[9,2,'#FFD54F'],[2,3,'#FFC107'],[3,3,'#FFC107'],[4,3,'#FFC107'],[5,3,'#FFC107'],[6,3,'#FFC107'],[7,3,'#FFC107'],[8,3,'#FFC107'],[2,4,'#FFC107'],[3,4,'#FFC107'],[5,4,'#FFC107'],[7,4,'#FFC107'],[8,4,'#FFC107'],[2,5,'#FFC107'],[3,5,'#FFC107'],[4,5,'#FFC107'],[5,5,'#FFC107'],[6,5,'#FFC107'],[7,5,'#FFC107'],[8,5,'#FFC107'],[2,6,'#FFC107'],[3,6,'#FFC107'],[4,6,'#FFC107'],[6,6,'#FFC107'],[7,6,'#FFC107'],[8,6,'#FFC107'],[3,7,'#FFC107'],[4,7,'#FFC107'],[5,7,'#FFC107'],[6,7,'#FFC107'],[7,7,'#FFC107'],[3,8,'#FFC107'],[5,8,'#FFC107'],[7,8,'#FFC107'],[4,4,'#FF1744'],[6,4,'#FF1744']]},
+  {label:'F5',name:'full_blaze',pixels:[[1,-2,'#FF1744'],[5,-2,'#FFFFFF'],[9,-2,'#00E676'],[1,-1,'#FF1744'],[3,-1,'#FFFDE7'],[5,-1,'#FFFFFF'],[7,-1,'#FFFDE7'],[9,-1,'#00E676'],[1,0,'#FFFDE7'],[2,0,'#FFFDE7'],[3,0,'#FFFDE7'],[4,0,'#FFFDE7'],[5,0,'#FFFDE7'],[6,0,'#FFFDE7'],[7,0,'#FFFDE7'],[8,0,'#FFFDE7'],[9,0,'#FFFDE7'],[1,1,'#FFFDE7'],[2,1,'#FFFDE7'],[3,1,'#FFFDE7'],[4,1,'#FFFDE7'],[5,1,'#FFFDE7'],[6,1,'#FFFDE7'],[7,1,'#FFFDE7'],[8,1,'#FFFDE7'],[9,1,'#FFFDE7'],[2,2,'#FFFDE7'],[3,2,'#FFFDE7'],[4,2,'#FFFDE7'],[5,2,'#FFFDE7'],[6,2,'#FFFDE7'],[7,2,'#FFFDE7'],[8,2,'#FFFDE7'],[2,3,'#FFFDE7'],[3,3,'#FFFDE7'],[5,3,'#FFFDE7'],[7,3,'#FFFDE7'],[8,3,'#FFFDE7'],[2,4,'#FFFDE7'],[3,4,'#FFFDE7'],[4,4,'#FFFDE7'],[5,4,'#FFFDE7'],[6,4,'#FFFDE7'],[7,4,'#FFFDE7'],[8,4,'#FFFDE7'],[2,5,'#FFFDE7'],[3,5,'#FFFDE7'],[4,5,'#FFFDE7'],[6,5,'#FFFDE7'],[7,5,'#FFFDE7'],[8,5,'#FFFDE7'],[3,6,'#FFFDE7'],[4,6,'#FFFDE7'],[5,6,'#FFFDE7'],[6,6,'#FFFDE7'],[7,6,'#FFFDE7'],[3,7,'#FFFDE7'],[5,7,'#FFFDE7'],[7,7,'#FFFDE7'],[4,3,'#FFFFFF'],[6,3,'#FFFFFF'],[0,0,'#FF1744'],[2,0,'#FFFFFF'],[4,0,'#FFFFFF'],[6,0,'#FFFFFF'],[8,0,'#FFFFFF'],[10,0,'#00E676']]}
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(function(p) {
+    var x=p[0], y=p[1], c=p[2];
+    if(y<0||x<0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+var row = document.getElementById('frames-row');
+FRAMES.forEach(function(f) {
+  var col = document.createElement('div');
+  col.className = 'frame-col';
+
+  var lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  var cv = document.createElement('canvas');
+  cv.width = 11*P; cv.height = 10*P;
+  cv.style.cssText = 'width:'+11*P+'px;height:'+10*P+'px;image-rendering:pixelated';
+
+  var nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+var live = document.getElementById('live');
+var liveCtx = live.getContext('2d');
+
+var mode='primary', raf=null, lastTime=0, step=0;
+var walkX=165, dir=1, idlePhase=0;
+
+// Primary animation sequence
+var PRIMARY_SEQ = [0,1,2,3,4,2,1,0];
+var PRIMARY_DELAY = [500,140,120,140,180,120,140,600];
+
+// Walk sequence
+var WALK_SEQ = [1,2,3,2];
+var WALK_DELAY = [160,160,160,160];
+
+// Idle sequence
+var IDLE_SEQ = [0,2,0,2];
+var IDLE_DELAY = [1200,1200,1200,1200];
+
+function setPos(x, bottom) {
+  live.style.left = x + 'px';
+  live.style.bottom = (bottom||4) + 'px';
+}
+
+function animPrimary(ts) {
+  if(ts - lastTime > PRIMARY_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[PRIMARY_SEQ[step]].pixels);
+    step = (step+1) % PRIMARY_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animPrimary);
+}
+
+function animWalk(ts) {
+  if(ts - lastTime > WALK_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[WALK_SEQ[step]].pixels);
+    step = (step+1) % WALK_SEQ.length;
+    walkX += dir * 24;
+    if(walkX > 310) dir = -1;
+    if(walkX < 10) dir = 1;
+  }
+  setPos(walkX);
+  raf = requestAnimationFrame(animWalk);
+}
+
+function animIdle(ts) {
+  if(ts - lastTime > IDLE_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[IDLE_SEQ[step]].pixels);
+    step = (step+1) % IDLE_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode = m;
+  if(raf) cancelAnimationFrame(raf);
+  step=0; walkX=165; dir=1; idlePhase=0; lastTime=0;
+  drawFrame(liveCtx, FRAMES[0].pixels);
+  document.querySelectorAll('button').forEach(function(b){b.classList.remove('active')});
+  if(m==='primary') document.getElementById('btn-primary').classList.add('active');
+  if(m==='walk') document.getElementById('btn-walk').classList.add('active');
+  if(m==='idle') document.getElementById('btn-idle').classList.add('active');
+  if(m==='primary') raf = requestAnimationFrame(animPrimary);
+  if(m==='walk') raf = requestAnimationFrame(animWalk);
+  if(m==='idle') raf = requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-primary').onclick = function(){startAnim('primary')};
+document.getElementById('btn-walk').onclick = function(){startAnim('walk')};
+document.getElementById('btn-idle').onclick = function(){startAnim('idle')};
+
+setPos(165);
+startAnim('primary');
+</script>
