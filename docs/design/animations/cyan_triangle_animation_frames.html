@@ -1,0 +1,168 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:20px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#334155;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:160px;position:relative;overflow:hidden}
+  .preview-agent{position:absolute;bottom:0;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#00BCD4;background:rgba(0,188,212,0.08);border:1px solid rgba(0,188,212,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(0,188,212,0.15)}
+  button.active{background:rgba(0,188,212,0.2);border-color:rgba(0,188,212,0.5)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-agent" width="110" height="150"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-primary" class="active">LAUNCH LOOP</button>
+  <button id="btn-walk">CRUISE</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P = 10;
+
+const FRAMES = [
+  {label:'F1',name:'idle',pixels:[[5,0,'#00BCD4'],[4,1,'#00BCD4'],[5,1,'#00BCD4'],[6,1,'#00BCD4'],[3,2,'#00BCD4'],[4,2,'#00BCD4'],[5,2,'#00BCD4'],[6,2,'#00BCD4'],[7,2,'#00BCD4'],[2,3,'#00BCD4'],[3,3,'#00BCD4'],[4,3,'#00BCD4'],[5,3,'#00BCD4'],[6,3,'#00BCD4'],[7,3,'#00BCD4'],[8,3,'#00BCD4'],[2,4,'#00BCD4'],[3,4,'#00BCD4'],[5,4,'#00BCD4'],[7,4,'#00BCD4'],[8,4,'#00BCD4'],[1,5,'#00BCD4'],[2,5,'#00BCD4'],[3,5,'#00BCD4'],[4,5,'#00BCD4'],[5,5,'#00BCD4'],[6,5,'#00BCD4'],[7,5,'#00BCD4'],[8,5,'#00BCD4'],[9,5,'#00BCD4'],[1,6,'#00BCD4'],[2,6,'#00BCD4'],[3,6,'#00BCD4'],[4,6,'#00BCD4'],[6,6,'#00BCD4'],[7,6,'#00BCD4'],[8,6,'#00BCD4'],[9,6,'#00BCD4'],[0,7,'#00BCD4'],[1,7,'#00BCD4'],[2,7,'#00BCD4'],[3,7,'#00BCD4'],[4,7,'#00BCD4'],[5,7,'#00BCD4'],[6,7,'#00BCD4'],[7,7,'#00BCD4'],[8,7,'#00BCD4'],[9,7,'#00BCD4'],[10,7,'#00BCD4'],[2,8,'#00BCD4'],[8,8,'#00BCD4'],[2,9,'#00BCD4'],[8,9,'#00BCD4'],[4,4,'#4DD0E1'],[6,4,'#4DD0E1']]},
+  {label:'F2',name:'charge',pixels:[[5,1,'#E0F7FA'],[4,2,'#E0F7FA'],[5,2,'#E0F7FA'],[6,2,'#E0F7FA'],[3,3,'#00BCD4'],[4,3,'#00BCD4'],[5,3,'#00BCD4'],[6,3,'#00BCD4'],[7,3,'#00BCD4'],[2,4,'#00BCD4'],[3,4,'#00BCD4'],[4,4,'#00BCD4'],[5,4,'#00BCD4'],[6,4,'#00BCD4'],[7,4,'#00BCD4'],[8,4,'#00BCD4'],[2,5,'#00BCD4'],[3,5,'#00BCD4'],[5,5,'#00BCD4'],[7,5,'#00BCD4'],[8,5,'#00BCD4'],[1,6,'#00BCD4'],[2,6,'#00BCD4'],[3,6,'#00BCD4'],[4,6,'#00BCD4'],[5,6,'#00BCD4'],[6,6,'#00BCD4'],[7,6,'#00BCD4'],[8,6,'#00BCD4'],[9,6,'#00BCD4'],[1,7,'#00BCD4'],[2,7,'#00BCD4'],[3,7,'#00BCD4'],[4,7,'#00BCD4'],[6,7,'#00BCD4'],[7,7,'#00BCD4'],[8,7,'#00BCD4'],[9,7,'#00BCD4'],[0,8,'#E040FB'],[1,8,'#E040FB'],[2,8,'#E040FB'],[3,8,'#E040FB'],[4,8,'#E040FB'],[5,8,'#E040FB'],[6,8,'#E040FB'],[7,8,'#E040FB'],[8,8,'#E040FB'],[9,8,'#E040FB'],[10,8,'#E040FB'],[2,9,'#E040FB'],[8,9,'#E040FB'],[2,10,'#E040FB'],[8,10,'#E040FB'],[4,5,'#E040FB'],[6,5,'#E040FB'],[2,11,'#E040FB'],[8,11,'#E040FB'],[3,12,'#E040FB'],[7,12,'#E040FB']]},
+  {label:'F3',name:'ignition',pixels:[[5,-3,'#E0F7FA'],[4,-2,'#E0F7FA'],[5,-2,'#E0F7FA'],[6,-2,'#E0F7FA'],[3,-1,'#E0F7FA'],[4,-1,'#E0F7FA'],[5,-1,'#E0F7FA'],[6,-1,'#E0F7FA'],[7,-1,'#E0F7FA'],[2,0,'#00BCD4'],[3,0,'#00BCD4'],[4,0,'#00BCD4'],[5,0,'#00BCD4'],[6,0,'#00BCD4'],[7,0,'#00BCD4'],[8,0,'#00BCD4'],[2,1,'#00BCD4'],[3,1,'#00BCD4'],[5,1,'#00BCD4'],[7,1,'#00BCD4'],[8,1,'#00BCD4'],[1,2,'#00BCD4'],[2,2,'#00BCD4'],[3,2,'#00BCD4'],[4,2,'#00BCD4'],[5,2,'#00BCD4'],[6,2,'#00BCD4'],[7,2,'#00BCD4'],[8,2,'#00BCD4'],[9,2,'#00BCD4'],[1,3,'#4DD0E1'],[2,3,'#4DD0E1'],[3,3,'#4DD0E1'],[4,3,'#4DD0E1'],[6,3,'#4DD0E1'],[7,3,'#4DD0E1'],[8,3,'#4DD0E1'],[9,3,'#4DD0E1'],[0,4,'#4DD0E1'],[1,4,'#4DD0E1'],[2,4,'#4DD0E1'],[3,4,'#4DD0E1'],[4,4,'#4DD0E1'],[5,4,'#4DD0E1'],[6,4,'#4DD0E1'],[7,4,'#4DD0E1'],[8,4,'#4DD0E1'],[9,4,'#4DD0E1'],[10,4,'#4DD0E1'],[2,5,'#4DD0E1'],[8,5,'#4DD0E1'],[2,6,'#4DD0E1'],[8,6,'#4DD0E1'],[4,1,'#E0F7FA'],[6,1,'#E0F7FA'],[1,7,'#FF6D00'],[2,7,'#FFD740'],[3,7,'#FF6D00'],[7,7,'#FFD740'],[8,7,'#FF6D00'],[9,7,'#FFD740'],[2,8,'#FF6D00'],[8,8,'#FFD740'],[3,9,'#FF6D00'],[5,9,'#FFD740'],[7,9,'#FF6D00'],[4,10,'#FFD740'],[6,10,'#FF6D00'],[5,11,'#FFD740']]},
+  {label:'F4',name:'peak',pixels:[[5,-5,'#E0F7FA'],[4,-4,'#E0F7FA'],[5,-4,'#E0F7FA'],[6,-4,'#E0F7FA'],[3,-3,'#E0F7FA'],[4,-3,'#E0F7FA'],[5,-3,'#E0F7FA'],[6,-3,'#E0F7FA'],[7,-3,'#E0F7FA'],[2,-2,'#E0F7FA'],[3,-2,'#E0F7FA'],[4,-2,'#E0F7FA'],[5,-2,'#E0F7FA'],[6,-2,'#E0F7FA'],[7,-2,'#E0F7FA'],[8,-2,'#E0F7FA'],[2,-1,'#4DD0E1'],[3,-1,'#4DD0E1'],[5,-1,'#4DD0E1'],[7,-1,'#4DD0E1'],[8,-1,'#4DD0E1'],[1,0,'#4DD0E1'],[2,0,'#4DD0E1'],[3,0,'#4DD0E1'],[4,0,'#4DD0E1'],[5,0,'#4DD0E1'],[6,0,'#4DD0E1'],[7,0,'#4DD0E1'],[8,0,'#4DD0E1'],[9,0,'#4DD0E1'],[1,1,'#4DD0E1'],[2,1,'#4DD0E1'],[3,1,'#4DD0E1'],[4,1,'#4DD0E1'],[6,1,'#4DD0E1'],[7,1,'#4DD0E1'],[8,1,'#4DD0E1'],[9,1,'#4DD0E1'],[0,2,'#4DD0E1'],[1,2,'#4DD0E1'],[2,2,'#4DD0E1'],[3,2,'#4DD0E1'],[4,2,'#4DD0E1'],[5,2,'#4DD0E1'],[6,2,'#4DD0E1'],[7,2,'#4DD0E1'],[8,2,'#4DD0E1'],[9,2,'#4DD0E1'],[10,2,'#4DD0E1'],[2,3,'#4DD0E1'],[8,3,'#4DD0E1'],[2,4,'#4DD0E1'],[8,4,'#4DD0E1'],[4,-1,'#E0F7FA'],[6,-1,'#E0F7FA'],[2,5,'#FFD740'],[8,5,'#FFD740'],[2,6,'#FF6D00'],[8,6,'#FF6D00'],[3,7,'#FF6D00'],[5,7,'#FF6D00'],[7,7,'#FF6D00'],[4,8,'#FF6D00'],[6,8,'#FF6D00']]},
+  {label:'F5',name:'land',pixels:[[5,1,'#4DD0E1'],[4,2,'#4DD0E1'],[5,2,'#4DD0E1'],[6,2,'#4DD0E1'],[3,3,'#00BCD4'],[4,3,'#00BCD4'],[5,3,'#00BCD4'],[6,3,'#00BCD4'],[7,3,'#00BCD4'],[2,4,'#00BCD4'],[3,4,'#00BCD4'],[4,4,'#00BCD4'],[5,4,'#00BCD4'],[6,4,'#00BCD4'],[7,4,'#00BCD4'],[8,4,'#00BCD4'],[2,5,'#00BCD4'],[3,5,'#00BCD4'],[5,5,'#00BCD4'],[7,5,'#00BCD4'],[8,5,'#00BCD4'],[1,6,'#00BCD4'],[2,6,'#00BCD4'],[3,6,'#00BCD4'],[4,6,'#00BCD4'],[5,6,'#00BCD4'],[6,6,'#00BCD4'],[7,6,'#00BCD4'],[8,6,'#00BCD4'],[9,6,'#00BCD4'],[1,7,'#00BCD4'],[2,7,'#00BCD4'],[3,7,'#00BCD4'],[4,7,'#00BCD4'],[6,7,'#00BCD4'],[7,7,'#00BCD4'],[8,7,'#00BCD4'],[9,7,'#00BCD4'],[0,8,'#006064'],[1,8,'#006064'],[2,8,'#006064'],[3,8,'#006064'],[4,8,'#006064'],[5,8,'#006064'],[6,8,'#006064'],[7,8,'#006064'],[8,8,'#006064'],[9,8,'#006064'],[10,8,'#006064'],[2,9,'#006064'],[8,9,'#006064'],[2,10,'#006064'],[8,10,'#006064'],[4,5,'#4DD0E1'],[6,5,'#4DD0E1'],[0,10,'#006064'],[1,10,'#006064'],[3,10,'#006064'],[7,10,'#006064'],[9,10,'#006064'],[10,10,'#006064']]},
+  {label:'F6',name:'idle_bright',pixels:[[5,0,'#E0F7FA'],[4,1,'#E0F7FA'],[5,1,'#E0F7FA'],[6,1,'#E0F7FA'],[3,2,'#4DD0E1'],[4,2,'#4DD0E1'],[5,2,'#4DD0E1'],[6,2,'#4DD0E1'],[7,2,'#4DD0E1'],[2,3,'#4DD0E1'],[3,3,'#4DD0E1'],[4,3,'#4DD0E1'],[5,3,'#4DD0E1'],[6,3,'#4DD0E1'],[7,3,'#4DD0E1'],[8,3,'#4DD0E1'],[2,4,'#4DD0E1'],[3,4,'#4DD0E1'],[5,4,'#4DD0E1'],[7,4,'#4DD0E1'],[8,4,'#4DD0E1'],[1,5,'#4DD0E1'],[2,5,'#4DD0E1'],[3,5,'#4DD0E1'],[4,5,'#4DD0E1'],[5,5,'#4DD0E1'],[6,5,'#4DD0E1'],[7,5,'#4DD0E1'],[8,5,'#4DD0E1'],[9,5,'#4DD0E1'],[1,6,'#4DD0E1'],[2,6,'#4DD0E1'],[3,6,'#4DD0E1'],[4,6,'#4DD0E1'],[6,6,'#4DD0E1'],[7,6,'#4DD0E1'],[8,6,'#4DD0E1'],[9,6,'#4DD0E1'],[0,7,'#4DD0E1'],[1,7,'#4DD0E1'],[2,7,'#4DD0E1'],[3,7,'#4DD0E1'],[4,7,'#4DD0E1'],[5,7,'#4DD0E1'],[6,7,'#4DD0E1'],[7,7,'#4DD0E1'],[8,7,'#4DD0E1'],[9,7,'#4DD0E1'],[10,7,'#4DD0E1'],[2,8,'#4DD0E1'],[8,8,'#4DD0E1'],[2,9,'#4DD0E1'],[8,9,'#4DD0E1'],[4,4,'#E0F7FA'],[6,4,'#E0F7FA']]}
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(function(p) {
+    var x=p[0], y=p[1], c=p[2];
+    if(y<0||x<0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+var row = document.getElementById('frames-row');
+FRAMES.forEach(function(f) {
+  var col = document.createElement('div');
+  col.className = 'frame-col';
+
+  var lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  var cv = document.createElement('canvas');
+  cv.width = 11*P; cv.height = 15*P;
+  cv.style.cssText = 'width:'+11*P+'px;height:'+15*P+'px;image-rendering:pixelated';
+
+  var nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+var live = document.getElementById('live');
+var liveCtx = live.getContext('2d');
+
+var mode='primary', raf=null, lastTime=0, step=0;
+var walkX=165, dir=1, idlePhase=0;
+
+// Primary animation sequence
+var PRIMARY_SEQ = [0,1,2,3,4,0];
+var PRIMARY_DELAY = [500,140,120,200,120,500];
+
+// Walk sequence
+var WALK_SEQ = [2,3,2,3];
+var WALK_DELAY = [110,110,110,110];
+
+// Idle sequence
+var IDLE_SEQ = [0,5,0,5];
+var IDLE_DELAY = [900,900,900,900];
+
+function setPos(x, bottom) {
+  live.style.left = x + 'px';
+  live.style.bottom = (bottom||4) + 'px';
+}
+
+function animPrimary(ts) {
+  if(ts - lastTime > PRIMARY_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[PRIMARY_SEQ[step]].pixels);
+    step = (step+1) % PRIMARY_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animPrimary);
+}
+
+function animWalk(ts) {
+  if(ts - lastTime > WALK_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[WALK_SEQ[step]].pixels);
+    step = (step+1) % WALK_SEQ.length;
+    walkX += dir * 24;
+    if(walkX > 310) dir = -1;
+    if(walkX < 10) dir = 1;
+  }
+  setPos(walkX);
+  raf = requestAnimationFrame(animWalk);
+}
+
+function animIdle(ts) {
+  if(ts - lastTime > IDLE_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[IDLE_SEQ[step]].pixels);
+    step = (step+1) % IDLE_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode = m;
+  if(raf) cancelAnimationFrame(raf);
+  step=0; walkX=165; dir=1; idlePhase=0; lastTime=0;
+  drawFrame(liveCtx, FRAMES[0].pixels);
+  document.querySelectorAll('button').forEach(function(b){b.classList.remove('active')});
+  if(m==='primary') document.getElementById('btn-primary').classList.add('active');
+  if(m==='walk') document.getElementById('btn-walk').classList.add('active');
+  if(m==='idle') document.getElementById('btn-idle').classList.add('active');
+  if(m==='primary') raf = requestAnimationFrame(animPrimary);
+  if(m==='walk') raf = requestAnimationFrame(animWalk);
+  if(m==='idle') raf = requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-primary').onclick = function(){startAnim('primary')};
+document.getElementById('btn-walk').onclick = function(){startAnim('walk')};
+document.getElementById('btn-idle').onclick = function(){startAnim('idle')};
+
+setPos(165);
+startAnim('primary');
+</script>

@@ -1,0 +1,168 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:20px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#334155;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:110px;position:relative;overflow:hidden}
+  .preview-agent{position:absolute;bottom:0;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#7B68EE;background:rgba(123,104,238,0.08);border:1px solid rgba(123,104,238,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(123,104,238,0.15)}
+  button.active{background:rgba(123,104,238,0.2);border-color:rgba(123,104,238,0.5)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage" id="stage">
+    <canvas id="live" class="preview-agent" width="110" height="100"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-primary" class="active">SPARKLE LOOP</button>
+  <button id="btn-walk">DRIFT</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P = 10;
+
+const FRAMES = [
+  {label:'F1',name:'idle',pixels:[[5,0,'#D4845C'],[3,1,'#D4845C'],[5,1,'#D4845C'],[7,1,'#D4845C'],[3,2,'#D4845C'],[4,2,'#D4845C'],[5,2,'#D4845C'],[6,2,'#D4845C'],[7,2,'#D4845C'],[2,3,'#D4845C'],[3,3,'#D4845C'],[4,3,'#D4845C'],[5,3,'#D4845C'],[6,3,'#D4845C'],[7,3,'#D4845C'],[8,3,'#D4845C'],[2,4,'#D4845C'],[3,4,'#D4845C'],[5,4,'#D4845C'],[7,4,'#D4845C'],[8,4,'#D4845C'],[1,5,'#D4845C'],[2,5,'#D4845C'],[3,5,'#D4845C'],[4,5,'#D4845C'],[5,5,'#D4845C'],[6,5,'#D4845C'],[7,5,'#D4845C'],[8,5,'#D4845C'],[9,5,'#D4845C'],[1,6,'#D4845C'],[2,6,'#D4845C'],[3,6,'#D4845C'],[4,6,'#D4845C'],[6,6,'#D4845C'],[7,6,'#D4845C'],[8,6,'#D4845C'],[9,6,'#D4845C'],[2,7,'#D4845C'],[3,7,'#D4845C'],[4,7,'#D4845C'],[5,7,'#D4845C'],[6,7,'#D4845C'],[7,7,'#D4845C'],[8,7,'#D4845C'],[3,8,'#D4845C'],[5,8,'#D4845C'],[7,8,'#D4845C'],[5,9,'#D4845C'],[4,4,'#E8A87C'],[6,4,'#E8A87C']]},
+  {label:'F2',name:'shimmy_left',pixels:[[4,0,'#E8A87C'],[2,1,'#E8A87C'],[4,1,'#E8A87C'],[6,1,'#E8A87C'],[2,2,'#E8A87C'],[3,2,'#E8A87C'],[4,2,'#E8A87C'],[5,2,'#E8A87C'],[6,2,'#E8A87C'],[1,3,'#E8A87C'],[2,3,'#E8A87C'],[3,3,'#E8A87C'],[4,3,'#E8A87C'],[5,3,'#E8A87C'],[6,3,'#E8A87C'],[7,3,'#E8A87C'],[1,4,'#E8A87C'],[2,4,'#E8A87C'],[7,4,'#E8A87C'],[0,5,'#E8A87C'],[1,5,'#E8A87C'],[2,5,'#E8A87C'],[3,5,'#E8A87C'],[4,5,'#E8A87C'],[5,5,'#E8A87C'],[6,5,'#E8A87C'],[7,5,'#E8A87C'],[8,5,'#E8A87C'],[0,6,'#E8A87C'],[1,6,'#E8A87C'],[2,6,'#E8A87C'],[3,6,'#E8A87C'],[5,6,'#E8A87C'],[6,6,'#E8A87C'],[7,6,'#E8A87C'],[8,6,'#E8A87C'],[1,7,'#E8A87C'],[2,7,'#E8A87C'],[3,7,'#E8A87C'],[4,7,'#E8A87C'],[5,7,'#E8A87C'],[6,7,'#E8A87C'],[7,7,'#E8A87C'],[2,8,'#E8A87C'],[4,8,'#E8A87C'],[6,8,'#E8A87C'],[4,9,'#E8A87C'],[4,4,'#FF6B9D'],[6,4,'#FF6B9D'],[9,5,'#B5623A'],[9,6,'#B5623A'],[8,3,'#B5623A']]},
+  {label:'F3',name:'sparkle_pop',pixels:[[5,-1,'#D4845C'],[3,0,'#D4845C'],[5,0,'#D4845C'],[7,0,'#D4845C'],[3,1,'#D4845C'],[4,1,'#D4845C'],[5,1,'#D4845C'],[6,1,'#D4845C'],[7,1,'#D4845C'],[2,2,'#D4845C'],[3,2,'#D4845C'],[4,2,'#D4845C'],[5,2,'#D4845C'],[6,2,'#D4845C'],[7,2,'#D4845C'],[8,2,'#D4845C'],[2,3,'#D4845C'],[3,3,'#D4845C'],[5,3,'#D4845C'],[7,3,'#D4845C'],[8,3,'#D4845C'],[1,4,'#D4845C'],[2,4,'#D4845C'],[3,4,'#D4845C'],[4,4,'#D4845C'],[5,4,'#D4845C'],[6,4,'#D4845C'],[7,4,'#D4845C'],[8,4,'#D4845C'],[9,4,'#D4845C'],[1,5,'#D4845C'],[2,5,'#D4845C'],[3,5,'#D4845C'],[4,5,'#D4845C'],[6,5,'#D4845C'],[7,5,'#D4845C'],[8,5,'#D4845C'],[9,5,'#D4845C'],[2,6,'#D4845C'],[3,6,'#D4845C'],[4,6,'#D4845C'],[5,6,'#D4845C'],[6,6,'#D4845C'],[7,6,'#D4845C'],[8,6,'#D4845C'],[3,7,'#D4845C'],[5,7,'#D4845C'],[7,7,'#D4845C'],[5,8,'#D4845C'],[4,3,'#FFF8F0'],[6,3,'#FFF8F0'],[4,0,'#FFD700'],[6,0,'#FFD700'],[2,1,'#FFD700'],[8,1,'#FFD700'],[5,0,'#FFF8F0']]},
+  {label:'F4',name:'shimmy_right',pixels:[[6,0,'#E8A87C'],[4,1,'#E8A87C'],[6,1,'#E8A87C'],[8,1,'#E8A87C'],[4,2,'#E8A87C'],[5,2,'#E8A87C'],[6,2,'#E8A87C'],[7,2,'#E8A87C'],[8,2,'#E8A87C'],[3,3,'#E8A87C'],[4,3,'#E8A87C'],[5,3,'#E8A87C'],[6,3,'#E8A87C'],[7,3,'#E8A87C'],[8,3,'#E8A87C'],[9,3,'#E8A87C'],[3,4,'#E8A87C'],[8,4,'#E8A87C'],[9,4,'#E8A87C'],[2,5,'#E8A87C'],[3,5,'#E8A87C'],[4,5,'#E8A87C'],[5,5,'#E8A87C'],[6,5,'#E8A87C'],[7,5,'#E8A87C'],[8,5,'#E8A87C'],[9,5,'#E8A87C'],[10,5,'#E8A87C'],[2,6,'#E8A87C'],[3,6,'#E8A87C'],[4,6,'#E8A87C'],[5,6,'#E8A87C'],[7,6,'#E8A87C'],[8,6,'#E8A87C'],[9,6,'#E8A87C'],[10,6,'#E8A87C'],[3,7,'#E8A87C'],[4,7,'#E8A87C'],[5,7,'#E8A87C'],[6,7,'#E8A87C'],[7,7,'#E8A87C'],[8,7,'#E8A87C'],[9,7,'#E8A87C'],[4,8,'#E8A87C'],[6,8,'#E8A87C'],[8,8,'#E8A87C'],[6,9,'#E8A87C'],[4,4,'#00E5FF'],[6,4,'#00E5FF'],[1,5,'#B5623A'],[1,6,'#B5623A'],[2,3,'#B5623A']]},
+  {label:'F5',name:'full_burst',pixels:[[5,-1,'#FFF8F0'],[3,0,'#FFF8F0'],[5,0,'#FFF8F0'],[7,0,'#FFF8F0'],[3,1,'#FFF8F0'],[4,1,'#FFF8F0'],[5,1,'#FFF8F0'],[6,1,'#FFF8F0'],[7,1,'#FFF8F0'],[2,2,'#FFF8F0'],[3,2,'#FFF8F0'],[4,2,'#FFF8F0'],[5,2,'#FFF8F0'],[6,2,'#FFF8F0'],[7,2,'#FFF8F0'],[8,2,'#FFF8F0'],[2,3,'#FFF8F0'],[3,3,'#FFF8F0'],[5,3,'#FFF8F0'],[7,3,'#FFF8F0'],[8,3,'#FFF8F0'],[1,4,'#FFF8F0'],[2,4,'#FFF8F0'],[3,4,'#FFF8F0'],[4,4,'#FFF8F0'],[5,4,'#FFF8F0'],[6,4,'#FFF8F0'],[7,4,'#FFF8F0'],[8,4,'#FFF8F0'],[9,4,'#FFF8F0'],[1,5,'#FFF8F0'],[2,5,'#FFF8F0'],[3,5,'#FFF8F0'],[4,5,'#FFF8F0'],[6,5,'#FFF8F0'],[7,5,'#FFF8F0'],[8,5,'#FFF8F0'],[9,5,'#FFF8F0'],[2,6,'#FFF8F0'],[3,6,'#FFF8F0'],[4,6,'#FFF8F0'],[5,6,'#FFF8F0'],[6,6,'#FFF8F0'],[7,6,'#FFF8F0'],[8,6,'#FFF8F0'],[3,7,'#FFF8F0'],[5,7,'#FFF8F0'],[7,7,'#FFF8F0'],[5,8,'#FFF8F0'],[4,3,'#FFD700'],[6,3,'#FFD700'],[4,0,'#FFD700'],[6,0,'#FFD700'],[2,1,'#FFD700'],[8,1,'#FFD700'],[1,0,'#00E5FF'],[9,0,'#00E5FF'],[0,2,'#00E5FF'],[10,2,'#00E5FF'],[3,0,'#00E5FF'],[7,0,'#00E5FF'],[5,0,'#FFF8F0'],[4,0,'#FFF8F0'],[6,0,'#FFF8F0']]},
+  {label:'F6',name:'idle_warm',pixels:[[5,0,'#E8A87C'],[3,1,'#E8A87C'],[5,1,'#E8A87C'],[7,1,'#E8A87C'],[3,2,'#E8A87C'],[4,2,'#E8A87C'],[5,2,'#E8A87C'],[6,2,'#E8A87C'],[7,2,'#E8A87C'],[2,3,'#E8A87C'],[3,3,'#E8A87C'],[4,3,'#E8A87C'],[5,3,'#E8A87C'],[6,3,'#E8A87C'],[7,3,'#E8A87C'],[8,3,'#E8A87C'],[2,4,'#E8A87C'],[3,4,'#E8A87C'],[5,4,'#E8A87C'],[7,4,'#E8A87C'],[8,4,'#E8A87C'],[1,5,'#E8A87C'],[2,5,'#E8A87C'],[3,5,'#E8A87C'],[4,5,'#E8A87C'],[5,5,'#E8A87C'],[6,5,'#E8A87C'],[7,5,'#E8A87C'],[8,5,'#E8A87C'],[9,5,'#E8A87C'],[1,6,'#E8A87C'],[2,6,'#E8A87C'],[3,6,'#E8A87C'],[4,6,'#E8A87C'],[6,6,'#E8A87C'],[7,6,'#E8A87C'],[8,6,'#E8A87C'],[9,6,'#E8A87C'],[2,7,'#E8A87C'],[3,7,'#E8A87C'],[4,7,'#E8A87C'],[5,7,'#E8A87C'],[6,7,'#E8A87C'],[7,7,'#E8A87C'],[8,7,'#E8A87C'],[3,8,'#E8A87C'],[5,8,'#E8A87C'],[7,8,'#E8A87C'],[5,9,'#E8A87C'],[4,4,'#FFD700'],[6,4,'#FFD700']]}
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(function(p) {
+    var x=p[0], y=p[1], c=p[2];
+    if(y<0||x<0) return;
+    ctx.fillStyle = c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+var row = document.getElementById('frames-row');
+FRAMES.forEach(function(f) {
+  var col = document.createElement('div');
+  col.className = 'frame-col';
+
+  var lbl = document.createElement('div');
+  lbl.className = 'frame-label';
+  lbl.textContent = f.label;
+
+  var cv = document.createElement('canvas');
+  cv.width = 11*P; cv.height = 10*P;
+  cv.style.cssText = 'width:'+11*P+'px;height:'+10*P+'px;image-rendering:pixelated';
+
+  var nm = document.createElement('div');
+  nm.className = 'frame-name';
+  nm.textContent = f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+var live = document.getElementById('live');
+var liveCtx = live.getContext('2d');
+
+var mode='primary', raf=null, lastTime=0, step=0;
+var walkX=165, dir=1, idlePhase=0;
+
+// Primary animation sequence
+var PRIMARY_SEQ = [0,1,2,3,4,2,1,0];
+var PRIMARY_DELAY = [400,110,120,110,140,100,110,450];
+
+// Walk sequence
+var WALK_SEQ = [0,1,0,3,0,3];
+var WALK_DELAY = [120,120,120,120,120,120];
+
+// Idle sequence
+var IDLE_SEQ = [0,5,0,5];
+var IDLE_DELAY = [1000,1000,1000,1000];
+
+function setPos(x, bottom) {
+  live.style.left = x + 'px';
+  live.style.bottom = (bottom||4) + 'px';
+}
+
+function animPrimary(ts) {
+  if(ts - lastTime > PRIMARY_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[PRIMARY_SEQ[step]].pixels);
+    step = (step+1) % PRIMARY_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animPrimary);
+}
+
+function animWalk(ts) {
+  if(ts - lastTime > WALK_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[WALK_SEQ[step]].pixels);
+    step = (step+1) % WALK_SEQ.length;
+    walkX += dir * 24;
+    if(walkX > 310) dir = -1;
+    if(walkX < 10) dir = 1;
+  }
+  setPos(walkX);
+  raf = requestAnimationFrame(animWalk);
+}
+
+function animIdle(ts) {
+  if(ts - lastTime > IDLE_DELAY[step]) {
+    lastTime = ts;
+    drawFrame(liveCtx, FRAMES[IDLE_SEQ[step]].pixels);
+    step = (step+1) % IDLE_SEQ.length;
+  }
+  setPos(165);
+  raf = requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  mode = m;
+  if(raf) cancelAnimationFrame(raf);
+  step=0; walkX=165; dir=1; idlePhase=0; lastTime=0;
+  drawFrame(liveCtx, FRAMES[0].pixels);
+  document.querySelectorAll('button').forEach(function(b){b.classList.remove('active')});
+  if(m==='primary') document.getElementById('btn-primary').classList.add('active');
+  if(m==='walk') document.getElementById('btn-walk').classList.add('active');
+  if(m==='idle') document.getElementById('btn-idle').classList.add('active');
+  if(m==='primary') raf = requestAnimationFrame(animPrimary);
+  if(m==='walk') raf = requestAnimationFrame(animWalk);
+  if(m==='idle') raf = requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-primary').onclick = function(){startAnim('primary')};
+document.getElementById('btn-walk').onclick = function(){startAnim('walk')};
+document.getElementById('btn-idle').onclick = function(){startAnim('idle')};
+
+setPos(165);
+startAnim('primary');
+</script>
