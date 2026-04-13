@@ -82,6 +82,7 @@ from agent.task_scheduler import (
 from agent.task_qopc import TaskQOPC, TaskSignal
 from agent.qopc_interaction_style import InteractionStyleProfile, analyze_query_signals, analyze_response_signals
 from agent.qopc_agent import QOPCRegistry
+from agent.voice_profiles import VOICE_STYLES, VoiceProfile, build_full_system_prompt, get_default_voice_for_icon, DEFAULT_VOICE_BY_ICON
 from aether_protocol.audit import AuditLog
 
 log = logging.getLogger("aethercloud.api")
@@ -2601,6 +2602,43 @@ async def qopc_agent_rank(request: Request, token: str = Depends(get_session_tok
         task_type=body.get("task_type", "analyze"),
     )
     return {"ranked": [{"agent_id": aid, "score": round(s, 3)} for aid, s in ranked]}
+
+
+# ── Voice Styles ──────────────────────────────────
+
+
+@app.get("/agent/voice/styles")
+async def get_voice_styles(request: Request, token: str = Depends(get_session_token)):
+    """Return all available voice styles for the frontend picker."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {
+        "styles": {
+            k: {
+                "label": v["label"],
+                "description": v["description"],
+                "traits": v["traits"],
+                "example": v["example"],
+            }
+            for k, v in VOICE_STYLES.items()
+        },
+        "defaultsByIcon": DEFAULT_VOICE_BY_ICON,
+    }
+
+
+@app.post("/agent/voice/feedback")
+async def voice_feedback(request: Request, token: str = Depends(get_session_token)):
+    """Record style satisfaction signal from user interaction."""
+    username = get_username_from_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    body = await request.json()
+    agent_id = body.get("agent_id", "")
+    satisfaction = body.get("satisfaction", "neutral")
+    if agent_id:
+        QOPCRegistry.get(agent_id).record_style_feedback(satisfaction)
+    return {"status": "ok"}
 
 
 # ── Status ────────────────────────────────────────
