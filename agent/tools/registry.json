@@ -1,0 +1,488 @@
+{
+  "mcpServers": [
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "description": "Read, send, and search emails via Google",
+      "category": "Communication",
+      "status": "active",
+      "transport": "SSE",
+      "installCommand": null,
+      "source": "built-in"
+    },
+    {
+      "id": "google-calendar",
+      "name": "Google Calendar",
+      "description": "Manage events and scheduling",
+      "category": "Productivity",
+      "status": "active",
+      "transport": "SSE",
+      "installCommand": null,
+      "source": "built-in"
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "description": "Real-time library documentation injection — stops API hallucinations for React, Next.js, etc.",
+      "category": "Dev Tools",
+      "status": "active",
+      "transport": "STDIO",
+      "installCommand": "npx -y @upstash/context7-mcp",
+      "source": "npm:@upstash/context7-mcp"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Access repos, issues, PRs, CI/CD workflows",
+      "category": "Dev Tools",
+      "status": "active",
+      "transport": "STDIO",
+      "installCommand": "npx -y @modelcontextprotocol/server-github",
+      "source": "npm:@modelcontextprotocol/server-github"
+    },
+    {
+      "id": "desktop-commander",
+      "name": "Desktop Commander",
+      "description": "Terminal commands, file ops, process management",
+      "category": "System",
+      "status": "active",
+      "transport": "STDIO",
+      "installCommand": "npx -y @wonderwhy-er/desktop-commander",
+      "source": "npm:@wonderwhy-er/desktop-commander"
+    },
+    {
+      "id": "excalidraw",
+      "name": "Excalidraw",
+      "description": "Create diagrams and whiteboard drawings from language",
+      "category": "Design",
+      "status": "active",
+      "transport": "STDIO",
+      "installCommand": "npx -y @cmd8/excalidraw-mcp",
+      "source": "npm:@cmd8/excalidraw-mcp"
+    },
+    {
+      "id": "fal-ai",
+      "name": "fal.ai",
+      "description": "1000+ image/video AI models — generation, upscaling, editing",
+      "category": "AI Tools",
+      "status": "active",
+      "transport": "HTTP",
+      "installCommand": null,
+      "source": "https://mcp.fal.ai/mcp"
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright MCP",
+      "description": "Browser automation — click buttons, fill forms, take screenshots, navigate pages",
+      "category": "Automation",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-playwright",
+      "source": "npm:@anthropic-ai/mcp-server-playwright"
+    },
+    {
+      "id": "tavily",
+      "name": "Tavily",
+      "description": "AI-native search engine — returns clean structured data instead of messy HTML",
+      "category": "Research",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y tavily-mcp@latest",
+      "source": "npm:tavily-mcp",
+      "requiresKey": "TAVILY_API_KEY"
+    },
+    {
+      "id": "memory",
+      "name": "Codebase Memory MCP",
+      "description": "Persistent long-term memory for project structure, file relationships, and knowledge",
+      "category": "AI Tools",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-memory",
+      "source": "npm:@anthropic-ai/mcp-server-memory"
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "description": "Read and write local files with sandboxed access",
+      "category": "System",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-filesystem",
+      "source": "npm:@anthropic-ai/mcp-server-filesystem"
+    },
+    {
+      "id": "fetch",
+      "name": "Fetch / HTTP",
+      "description": "Make HTTP requests to any URL — APIs, webhooks, scraping",
+      "category": "Dev Tools",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-fetch",
+      "source": "npm:@anthropic-ai/mcp-server-fetch"
+    },
+    {
+      "id": "brave-search",
+      "name": "Brave Search",
+      "description": "Privacy-focused web search with structured results",
+      "category": "Research",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-brave-search",
+      "source": "npm:@anthropic-ai/mcp-server-brave-search",
+      "requiresKey": "BRAVE_API_KEY"
+    },
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl",
+      "description": "Turn any URL into LLM-ready markdown or structured data instantly",
+      "category": "Research",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y firecrawl-mcp",
+      "source": "npm:firecrawl-mcp",
+      "requiresKey": "FIRECRAWL_API_KEY"
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "description": "Bridge to Obsidian vault — auto-tagging, linking, note search",
+      "category": "Productivity",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y obsidian-mcp",
+      "source": "npm:obsidian-mcp"
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "description": "Natural language SQL queries against Postgres databases",
+      "category": "Data",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-postgres",
+      "source": "npm:@anthropic-ai/mcp-server-postgres"
+    },
+    {
+      "id": "puppeteer",
+      "name": "Puppeteer",
+      "description": "Headless Chrome browser automation and screenshot capture",
+      "category": "Automation",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y @anthropic-ai/mcp-server-puppeteer",
+      "source": "npm:@anthropic-ai/mcp-server-puppeteer"
+    },
+    {
+      "id": "taskmaster",
+      "name": "Taskmaster AI",
+      "description": "Break PRDs into structured tasks with complexity scores, dependencies, and subtasks",
+      "category": "Productivity",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y task-master-ai",
+      "source": "npm:task-master-ai",
+      "requiresKey": "ANTHROPIC_API_KEY"
+    },
+    {
+      "id": "promptfoo",
+      "name": "Promptfoo",
+      "description": "Security testing for prompts — injection attacks, edge cases, red teaming",
+      "category": "Security",
+      "status": "installed",
+      "transport": "STDIO",
+      "installCommand": "npx -y promptfoo@latest mcp",
+      "source": "npm:promptfoo"
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Send and read Slack messages, search channels",
+      "category": "Communication",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": null,
+      "source": "oauth"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Read and write Notion pages and databases",
+      "category": "Productivity",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": null,
+      "source": "oauth"
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "description": "Create and manage issues, sprints, and projects",
+      "category": "Dev Tools",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": null,
+      "source": "oauth"
+    },
+    {
+      "id": "n8n",
+      "name": "n8n",
+      "description": "Open-source workflow automation with 400+ native AI integrations",
+      "category": "Automation",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": "npm install n8n -g",
+      "source": "npm:n8n"
+    },
+    {
+      "id": "langflow",
+      "name": "Langflow",
+      "description": "Visual drag-and-drop interface for building AI agent pipelines",
+      "category": "AI Tools",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": "pip install langflow",
+      "source": "pypi:langflow"
+    },
+    {
+      "id": "claude-squad",
+      "name": "Claude Squad",
+      "description": "Run multiple Claude Code agents in parallel for multitasking",
+      "category": "AI Tools",
+      "status": "available",
+      "transport": "CLI",
+      "installCommand": "go install github.com/smtg-ai/claude-squad@latest",
+      "source": "github:smtg-ai/claude-squad"
+    },
+    {
+      "id": "dagger",
+      "name": "Dagger (Container-Use)",
+      "description": "Sandbox agents in isolated containers so they can't break your system",
+      "category": "Security",
+      "status": "available",
+      "transport": "CLI",
+      "installCommand": "curl -fsSL https://dl.dagger.io/dagger/install.sh | sh",
+      "source": "github:dagger/dagger"
+    },
+    {
+      "id": "gpt-researcher",
+      "name": "GPT Researcher",
+      "description": "Autonomous research agent that compiles full professional reports",
+      "category": "Research",
+      "status": "available",
+      "transport": "HTTP",
+      "installCommand": "pip install gpt-researcher",
+      "source": "pypi:gpt-researcher"
+    },
+    {
+      "id": "remotion",
+      "name": "Remotion",
+      "description": "Generate motion graphics and marketing videos programmatically with React",
+      "category": "Design",
+      "status": "available",
+      "transport": "CLI",
+      "installCommand": "npx create-video@latest",
+      "source": "npm:remotion"
+    }
+  ],
+  "skills": [
+    {
+      "id": "frontend-design",
+      "name": "Frontend Design",
+      "description": "Prevents AI slop — enforces bold typography, intentional design palettes, no generic layouts",
+      "category": "Design",
+      "status": "available",
+      "source": "superpowers:brainstorming",
+      "promptInjection": "Follow intentional design principles: bold typography hierarchy, deliberate color palette with max 3 accent colors, generous whitespace, no generic card grids. Every element must justify its existence."
+    },
+    {
+      "id": "tdd-enforcement",
+      "name": "TDD Enforcement (Superpowers)",
+      "description": "Strict test-driven development — write failing test first, then implement, then refactor",
+      "category": "Dev Tools",
+      "status": "available",
+      "source": "superpowers:test-driven-development",
+      "promptInjection": "Follow strict TDD: 1) Write a failing test that describes the behavior. 2) Run it to confirm it fails. 3) Write the minimum code to pass. 4) Run tests to confirm green. 5) Refactor. Never write implementation before tests."
+    },
+    {
+      "id": "deep-research",
+      "name": "Deep Research",
+      "description": "8-phase research pipeline — source discovery, credibility scoring, cross-referencing, synthesis",
+      "category": "Research",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "When researching, follow the 8-phase pipeline: 1) Define scope 2) Source discovery (min 5 sources) 3) Credibility scoring per source 4) Extract key claims 5) Cross-reference claims across sources 6) Identify conflicts 7) Synthesize findings 8) Generate confidence-rated summary with citations."
+    },
+    {
+      "id": "pdf-processing",
+      "name": "PDF Processing",
+      "description": "High-speed table extraction, merging, splitting, watermarking of PDF documents",
+      "category": "Documents",
+      "status": "available",
+      "source": "anthropic-skills:pdf",
+      "promptInjection": "You can process PDF files: extract text and tables, merge multiple PDFs, split pages, add watermarks, and create new PDFs."
+    },
+    {
+      "id": "xlsx",
+      "name": "XLSX Spreadsheets",
+      "description": "Build spreadsheets and analyze data using plain English — no Excel needed",
+      "category": "Data",
+      "status": "available",
+      "source": "anthropic-skills:xlsx",
+      "promptInjection": "You can create, read, and edit Excel spreadsheets (.xlsx). Generate charts, pivot tables, and formulas from natural language descriptions."
+    },
+    {
+      "id": "pptx",
+      "name": "PPTX Presentations",
+      "description": "Generate full slide decks with layouts, themes, and speaker notes from a prompt",
+      "category": "Documents",
+      "status": "available",
+      "source": "anthropic-skills:pptx",
+      "promptInjection": "You can create PowerPoint presentations (.pptx) with professional layouts, speaker notes, and themed styling."
+    },
+    {
+      "id": "doc-coauthoring",
+      "name": "Doc Co-Authoring",
+      "description": "Collaborative document writing — structured workflow for specs, proposals, reports",
+      "category": "Documents",
+      "status": "available",
+      "source": "anthropic-skills:doc-coauthoring",
+      "promptInjection": "You can co-author documents through a structured workflow: gather context, outline, draft sections, review, and refine."
+    },
+    {
+      "id": "web-artifacts",
+      "name": "Web Artifacts Builder",
+      "description": "Build interactive dashboards, widgets, and web apps with React + Tailwind + shadcn/ui",
+      "category": "Dev Tools",
+      "status": "available",
+      "source": "anthropic-skills:web-artifacts-builder",
+      "promptInjection": "You can build interactive web artifacts using React, Tailwind CSS, and shadcn/ui components."
+    },
+    {
+      "id": "algorithmic-art",
+      "name": "Canvas / Algorithmic Art",
+      "description": "Create generative art, particle systems, flow fields using p5.js with seeded randomness",
+      "category": "Design",
+      "status": "available",
+      "source": "anthropic-skills:algorithmic-art",
+      "promptInjection": "You can create algorithmic art using p5.js: flow fields, particle systems, generative patterns with reproducible seeded randomness."
+    },
+    {
+      "id": "brand-guidelines",
+      "name": "Brand Guidelines",
+      "description": "Encode voice, colors, typography to auto-apply across all generated content",
+      "category": "Design",
+      "status": "available",
+      "source": "anthropic-skills:theme-factory",
+      "promptInjection": "Apply brand guidelines consistently: use the defined color palette, typography scale, voice tone, and spacing system across all outputs."
+    },
+    {
+      "id": "seo-audit",
+      "name": "SEO Audit",
+      "description": "Full site audits — schema validation, meta tags, structured data, performance scoring",
+      "category": "Marketing",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "When auditing SEO: check meta titles/descriptions, Open Graph tags, schema.org markup, canonical URLs, sitemap, robots.txt, Core Web Vitals, mobile responsiveness, and internal linking structure."
+    },
+    {
+      "id": "email-marketing",
+      "name": "Email Marketing",
+      "description": "Generate email sequences, subject line variants, and conversion-optimized copy",
+      "category": "Marketing",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "When writing email sequences: include subject line A/B variants, preview text, clear CTAs, mobile-optimized formatting, and follow AIDA (Attention, Interest, Desire, Action) framework."
+    },
+    {
+      "id": "copywriting",
+      "name": "Copywriting Suite",
+      "description": "Landing pages, ad copy, product descriptions with conversion frameworks",
+      "category": "Marketing",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Apply proven copywriting frameworks: PAS (Problem-Agitate-Solve) for pain points, AIDA for conversion pages, BAB (Before-After-Bridge) for transformations. Include power words and social proof."
+    },
+    {
+      "id": "context-optimization",
+      "name": "Context Optimization",
+      "description": "Reduce token usage through caching tricks, prompt compression, and context windowing",
+      "category": "AI Tools",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Optimize context usage: summarize long inputs before processing, use structured references instead of repeating content, leverage system prompt caching, and batch related operations."
+    },
+    {
+      "id": "skill-creator",
+      "name": "Skill Creator",
+      "description": "Official Anthropic tool to build new Claude skills by describing them in English",
+      "category": "Dev Tools",
+      "status": "available",
+      "source": "anthropic-skills:skill-creator",
+      "promptInjection": "You can create new Claude Code skills: define the trigger conditions, instructions, and tool usage patterns. Skills are markdown files with frontmatter."
+    },
+    {
+      "id": "auto-researcher",
+      "name": "Auto Researcher",
+      "description": "Autonomous experiment runner for model/landing page optimization — runs 24/7",
+      "category": "Research",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Run autonomous research experiments: define hypothesis, set up A/B variants, collect metrics, analyze results, and iterate. Document all findings with statistical significance."
+    },
+    {
+      "id": "g-stack",
+      "name": "G-Stack (VC Framework)",
+      "description": "Structure Claude into CEO/Designer/Manager roles for product development — Garry Tan methodology",
+      "category": "Productivity",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Operate in G-Stack mode: separate concerns into CEO (strategy/vision), Designer (UX/aesthetics), and Manager (execution/tasks) perspectives. Each role critiques the others before finalizing."
+    },
+    {
+      "id": "systematic-debugging",
+      "name": "Systematic Debugging",
+      "description": "Structured bug investigation — reproduce, isolate, hypothesize, verify, fix",
+      "category": "Dev Tools",
+      "status": "available",
+      "source": "superpowers:systematic-debugging",
+      "promptInjection": "Debug systematically: 1) Reproduce the bug reliably 2) Isolate the failing component 3) Form a hypothesis 4) Verify with evidence 5) Fix the root cause 6) Verify the fix 7) Check for regressions."
+    },
+    {
+      "id": "code-review",
+      "name": "Code Review",
+      "description": "Structured code review with severity levels, actionable feedback, and verification",
+      "category": "Dev Tools",
+      "status": "available",
+      "source": "superpowers:requesting-code-review",
+      "promptInjection": "Review code for: correctness, security vulnerabilities, performance bottlenecks, naming clarity, test coverage, and adherence to project patterns. Rate issues as Critical/Important/Minor."
+    },
+    {
+      "id": "translator",
+      "name": "Translator",
+      "description": "Translate between languages with context-aware accuracy",
+      "category": "Language",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Translate with cultural context awareness. Preserve idioms where possible, flag untranslatable concepts, and maintain the original tone and register."
+    },
+    {
+      "id": "report-writer",
+      "name": "Report Writer",
+      "description": "Generate structured markdown reports with sections, tables, charts, and findings",
+      "category": "Documents",
+      "status": "available",
+      "source": "custom",
+      "promptInjection": "Generate reports with: executive summary, methodology, findings (with data tables), analysis, recommendations, and appendices. Use markdown formatting with proper heading hierarchy."
+    },
+    {
+      "id": "task-planner",
+      "name": "Task Planner",
+      "description": "Break complex goals into actionable task lists with priorities and dependencies",
+      "category": "Productivity",
+      "status": "available",
+      "source": "superpowers:writing-plans",
+      "promptInjection": "Decompose goals into tasks: define clear acceptance criteria per task, estimate complexity (S/M/L/XL), identify dependencies, and sequence for optimal parallelization."
+    }
+  ]
+}
