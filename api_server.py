@@ -930,6 +930,7 @@ class TaskCreateRequest(BaseModel):
     schedule_label: Optional[str] = None
     agent_type: str = "custom"
     mcp_servers: Optional[list] = []
+    requires_browser_sandbox: bool = False
     enabled: bool = True
 
 
@@ -1579,6 +1580,136 @@ def _summarize_query(query: str, max_len: int = 120) -> str:
     return q[:max_len] + "…" if len(q) > max_len else q
 
 
+BROWSER_TOOL_NAMES = {"browser_navigate", "browser_interact", "browser_snapshot", "browser_end"}
+
+
+async def _process_browser_tool_loop(
+    data: dict,
+    payload: dict,
+    headers: dict,
+    api_key: str,
+    browser_tools: list,
+    browser_session_id: str | None,
+    credential_token: str | None,
+    response_text_parts: list,
+    tools_used: list,
+) -> dict:
+    """
+    Handle browser tool_use blocks in the Claude response.
+
+    If Claude's response contains browser tool calls, execute them via
+    aetherbrowser_client and feed the results back in a tool-use loop.
+    Returns the final API response (which may be the original if no
+    browser tools were used).
+    """
+    import httpx as _httpx
+    from agent import aetherbrowser_client as _browser
+
+    max_iterations = 25  # safety cap on tool-use loops
+
+    for _iteration in range(max_iterations):
+        # Check if any content block is a browser tool_use
+        browser_calls = [
+            b for b in data.get("content", [])
+            if b.get("type") == "tool_use" and b.get("name") in BROWSER_TOOL_NAMES
+        ]
+        if not browser_calls:
+            return data  # No browser tools — pass through
+
+        # Collect text blocks from this turn
+        for block in data.get("content", []):
+            if block.get("type") == "text":
+                response_text_parts.append(block.get("text", ""))
+
+        # Process each browser tool call
+        tool_results = []
+        for call in browser_calls:
+            tool_name = call["name"]
+            tool_input = call.get("input", {})
+            tool_id = call.get("id", "")
+            tools_used.append(tool_name)
+
+            try:
+                if tool_name == "browser_navigate":
+                    if not browser_session_id:
+                        browser_session_id = await _browser.create_session()
+                    result = await _browser.navigate(
+                        browser_session_id,
+                        tool_input.get("url", ""),
+                        credential_token=credential_token,
+                    )
+                    credential_token = None  # only pass on first navigate
+
+                elif tool_name == "browser_snapshot":
+                    if not browser_session_id:
+                        result = {"error": "No active browser session"}
+                    else:
+                        result = await _browser.snapshot(browser_session_id)
+
+                elif tool_name == "browser_interact":
+                    if not browser_session_id:
+                        result = {"error": "No active browser session"}
+                    else:
+                        result = await _browser.interact(
+                            browser_session_id,
+                            action=tool_input.get("action", "click"),
+                            target=tool_input.get("target", {}),
+                            text=tool_input.get("text"),
+                        )
+
+                elif tool_name == "browser_end":
+                    if browser_session_id:
+                        await _browser.end_session(browser_session_id)
+                        browser_session_id = None
+                    result = {"status": "ok", "message": "Browser session ended."}
+
+                else:
+                    result = {"error": f"Unknown browser tool: {tool_name}"}
+
+            except _browser.BrowserCapacityError as exc:
+                result = {
+                    "status": "capacity_exceeded",
+                    "retry_after_seconds": exc.retry_after,
+                    "message": str(exc),
+                }
+            except Exception as exc:
+                log.warning("Browser tool %s failed: %s", tool_name, exc)
+                result = {"error": str(exc)}
+
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool_id,
+                "content": json.dumps(result) if isinstance(result, dict) else str(result),
+            })
+
+        # Feed tool results back to Claude for the next turn
+        messages = list(payload.get("messages", []))
+        messages.append({"role": "assistant", "content": data["content"]})
+        messages.append({"role": "user", "content": tool_results})
+
+        loop_payload = dict(payload)
+        loop_payload["messages"] = messages
+
+        try:
+            async with _httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json=loop_payload,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as e:
+            log.warning("Browser tool loop API call failed: %s", e)
+            return data
+
+        # If Claude stopped without another tool call, we're done
+        if data.get("stop_reason") != "tool_use":
+            return data
+
+    return data
+
+
 @app.post("/agent/mcp-chat", response_model=MCPAgentResponse)
 @limiter.limit("20/minute;100/hour")
 async def agent_mcp_chat(
@@ -1595,6 +1726,7 @@ async def agent_mcp_chat(
     """
     import httpx
     from agent.mcp_registry import detect_required_servers
+    from agent.browser_tool_injector import inject_browser_tools
     import asyncio
 
     username = get_username_from_token(token)
@@ -1618,6 +1750,11 @@ async def agent_mcp_chat(
         system = _build_system_prompt(None, req.vault_context, username)
         server_name = mcp_servers[0].get("name", "mcp") if mcp_servers else "mcp"
         status_agent_id = f"{username}_{server_name}_{str(uuid.uuid4())[:8]}"
+
+    # ── Browser tool injection (if agent requires sandbox) ────
+    browser_tools: list = []
+    if routed_agent:
+        browser_tools, system = inject_browser_tools(routed_agent, browser_tools, system)
 
     # ── Priority 2: Fire status bar event ─────────────────────
     await status_manager.agent_start(
@@ -1674,6 +1811,8 @@ async def agent_mcp_chat(
             if mcp_servers:
                 payload["mcp_servers"] = mcp_servers
                 headers["anthropic-beta"] = "mcp-client-2025-04-04"
+            if browser_tools:
+                payload.setdefault("tools", []).extend(browser_tools)
 
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
@@ -1688,12 +1827,32 @@ async def agent_mcp_chat(
                 log.warning("MCP agent direct call failed: %s", e)
                 raise HTTPException(status_code=502, detail="Agent worker unavailable")
 
-            for block in data.get("content", []):
-                btype = block.get("type", "")
-                if btype == "text":
-                    response_text += block.get("text", "")
-                elif btype in ("tool_use", "mcp_tool_use"):
-                    tools_used.append(block.get("name", "unknown"))
+            # Process response and handle browser tool calls
+            browser_session_id = None
+            browser_credential_token = None  # set externally if auth needed
+            try:
+                data = await _process_browser_tool_loop(
+                    data, payload, headers, api_key, browser_tools,
+                    browser_session_id, browser_credential_token,
+                    response_text_parts := [],
+                    tools_used,
+                )
+                for block in data.get("content", []):
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        response_text += block.get("text", "")
+                    elif btype in ("tool_use", "mcp_tool_use"):
+                        name = block.get("name", "unknown")
+                        if name not in tools_used:
+                            tools_used.append(name)
+                # Include text collected during tool loop
+                response_text = "".join(response_text_parts) + response_text
+            finally:
+                # Always clean up browser session if one was created
+                if browser_session_id:
+                    from agent.aetherbrowser_client import end_session as _end_browser
+                    await _end_browser(browser_session_id)
+
             commitment_hash = _commitment_hash(response_text)
 
         await status_manager.agent_done(status_agent_id)

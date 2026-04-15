@@ -4,6 +4,41 @@
 
 ---
 
+## v1.0.0 — AetherBrowser Integration + AetherForge Deployment (2026-04-14)
+
+### Browser Automation (NEW)
+- **AetherBrowser client** (`agent/aetherbrowser_client.py`) — async HTTP client for all AetherCloud-to-AetherBrowser communication with typed exceptions, session lifecycle management, and automatic cleanup in finally blocks
+- **Browser tool injector** (`agent/browser_tool_injector.py`) — dynamically appends `browser_navigate`, `browser_interact`, `browser_snapshot`, `browser_end` tools to Claude's context when `requires_browser_sandbox=True`
+- **Browser Operating Manual** — injected into Claude's system prompt with viewport rules, tool priority hierarchy (API tools first, browser fallback), and interaction guidelines
+- **Browser tool routing** — `_process_browser_tool_loop()` in `api_server.py` intercepts Claude's browser tool calls, routes them through `aetherbrowser_client.py`, and feeds results back in a multi-turn tool-use loop
+- **`requires_browser_sandbox`** flag on `ResolvedAgent` (mcp_router.py) and `TaskCreateRequest` (api_server.py) — gates all browser tool injection, default false
+
+### Vault Credential Pipeline (NEW)
+- **Browser credential tokens** (`vault/browser_credential.py`) — one-time signed JWT tokens using Protocol-C ephemeral ECDSA, 60-second expiry, JTI-based replay prevention
+- **Token lifecycle** — `issue_browser_credential_token()` creates tokens bound to credential key + session ID; `redeem_browser_credential_token()` validates signature, checks expiry, enforces one-time use
+- **In-memory JTI tracking** — redeemed token IDs stored in a set, cleared on restart (expired tokens are already invalid)
+
+### Infrastructure
+- **AetherBrowser deployed to VPS5** — port 8092, Tailscale reachable at 100.84.205.12
+- **AetherForge deployed to VPS5** — port 8091, Tailscale reachable at 100.84.205.12
+- **Environment wiring** — `AETHERBROWSER_URL`, `AETHERBROWSER_BEARER_TOKEN`, `AETHERFORGE_URL`, `AETHERFORGE_SECRET` added to VPS2 `.env`
+- **UFW hardened** — ports 8091/8092 restricted to wg0 interface on VPS5, port 80 outbound locked after install
+
+### Files Added
+| File | Lines | Purpose |
+|------|-------|---------|
+| `agent/aetherbrowser_client.py` | 128 | Async HTTP client for browser automation |
+| `agent/browser_tool_injector.py` | 146 | Dynamic tool injection + operating manual |
+| `vault/browser_credential.py` | 148 | One-time credential token service |
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `api_server.py` | Added `requires_browser_sandbox` to TaskCreateRequest, browser tool injection call, `_process_browser_tool_loop()` tool routing, browser tool definitions |
+| `mcp_router.py` | Added `requires_browser_sandbox: bool = False` to ResolvedAgent, populated from team.json config |
+
+---
+
 ## v0.9.2 — Security Hardening Release (2026-03-26)
 
 ### Security

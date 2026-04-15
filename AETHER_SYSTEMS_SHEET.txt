@@ -1,0 +1,155 @@
+Aether AI Systems
+================================================================================
+
+  Aether Security
+    Aether Predator - Autonomous Red Team CEV tool for security vulnerabilities
+    Aether Scrambler - Quantum-AI Hybrid Moving Target Defense & Cyber Security System
+
+  Aether Protocol
+    Protocol-C - CSPRNG seed
+    Protocol-L - IBM Quantum Seed
+    Protocol-T - Hardware attestation quote from Intel SGX or AMD SEV-SNP.
+                 MRENCLAVE SHA-256 of the exact binary that ran.
+
+  Aether Cloud (v1.0.0)
+    Aether MCP Server - MCP tools and skills hosted on Aether's secure VPS tunnel proxy
+      Aether MCP Tool Generator - Autonomous MCP tool creation from Aether Agent team
+                                  constantly creating
+    Aether Browser (v1.0.0) - Browser automation service giving AI agents real Chromium
+                               control inside isolated Docker containers on VPS5
+    Aether Forge (v1.0.0) - Autonomous MCP tool pipeline on VPS5 — scan, analyze, spec,
+                             build, publish
+
+Patents
+================================================================================
+  QOPC Learning Systems - Qiskit python circuit that allows AI Agents to learn
+    and create predictive and learning traits for autonomous reasoning.
+  Protocol-L Quantum seeded PRNG
+  Q-C-Q Barcode Quantum Sweep for Convergence
+
+Projects
+================================================================================
+  Aether Cloud
+    MCP Tool Generator
+  Aether Predator 2.0
+  Aether Scrambler 2.0
+
+Priorities
+================================================================================
+  AetherCloud build - 13 vulnerabilities (4 low, 1 moderate, 8 high)
+
+================================================================================
+AETHER CLOUD — PATCH NOTES
+================================================================================
+
+2026-04-06 — Null Guard & Stability Patch
+  - Fixed null DOM crashes during vault scan and render
+  - Added null guards to all remaining unguarded innerHTML writes
+
+2026-04-07 — Agent Local Execution
+  - Agent local file execution pipeline
+
+2026-04-08 — MCP Full Priority Patch
+  - MCP agent live status bar + SSE pipeline
+  - Circuit node lighting + per-action execution feedback
+  - Agent Team Config Panel added to dashboard
+  - Added /agent/team, /agent/test, /agent/key routes + storage helpers
+  - MCP routing, status, keys, tools, activity, pipeline
+
+2026-04-09 — Autonomous Project System & Bug Fixes
+  - Autonomous Project Execution System — goal decomposition, task DAG, SSE streaming
+  - Response panel typography + markdown renderer
+  - Version mismatch banner + live installer version in title bar
+  - Fixed: version check blocking initCircuit — fire-and-forget fetch
+  - Fixed: 36 pytest failures across auth, MFA, and vault scan/browse
+  - Fixed: app=FastAPI() before route decorators (NameError on VPS2)
+  - Fixed: MFAManager fixture state leak via tmp_path isolation
+
+2026-04-10 — Planning Endpoint
+  - Dedicated plan-day endpoint and planning intent detection
+
+2026-04-12 — Agent System V3 + QOPC Learning (Major)
+  - Agent Profile System — full editor with icon grid, system prompt, tasks, MCP tool assignment
+  - Agent Profile IPC handlers, preload bridge, and persistent storage directories
+  - Agent Page V3 — live team canvas with status system + QOPC sync
+  - Agent Presence V7 — floating animated characters above chat input bar
+  - Agent Terminal Window — memory and MCP tool support with IPC bridge
+  - Agent Orchestration Pipeline — prompt builder, dispatch, and output panel
+  - RUN TEAM button + command bar in profile panel header
+  - MCP & Skills Library — tool assignment panel with 35-tool registry and agent chips
+  - Agent Animation Engine — pixel-art sprite animations (idle, walk, duck sequences)
+    - 20 custom pixel-art agent SVGs with per-frame animation JSON data
+    - Animations: mushroom duck/idle/walk, blue stomp/march, claude sparkle shimmy,
+      coral diamond spin/float, cyan triangle launch/cruise, gold crown gleam/strut,
+      green dodge/dart, electric bolt zap/dash, silver robot, purple ghost
+  - QOPC Interaction Style Engine — learns user communication preferences
+  - QOPC Per-Agent Learning — EMA feedback loop with Protocol-C seeded weights
+  - QOPC Per-Agent API endpoints — record, weights, rank
+  - QOPC-aware orchestrator routing + stats in agent profile editor
+  - Real SVG icons rendered on canvas agent nodes + Aether node click menu
+  - Resolved merge conflicts between main and cool-stonebraker branch
+
+2026-04-13 — Agent Studio UI + Voice Engine + Presets (Major)
+  - Agent Studio UI — model selector (Sonnet/Opus/Haiku/Custom), temperature slider,
+    max tokens slider, deploy button, polished dark theme styling
+  - Agent Studio header — LIVE badge, team icon pills (Default/Research/Automation/Security),
+    sidebar scroll nav, Save Team / Run Team / Team Terminal buttons
+  - Agent Voice Personality Engine — 10 voice styles (warm, direct, analytical, creative,
+    formal, casual, technical, motivational, socratic, minimal)
+  - Voice & Tone Picker — auto-assign voice by icon type, satisfaction detection,
+    orchestrator voice injection into system prompts
+  - Voice style API endpoints + QOPC voice bias learning with satisfaction EMA
+  - 17 MCP servers installed + 35-tool registry populated for agent system
+  - All 20 agent animations completed (HTML animation files for all agents)
+  - Extracted AetherForge to standalone repo — removed all references from AetherCloud
+  - Agent Preset Carousel — 8 pre-built agent templates (Monarch, Vanguard, Cipher,
+    Forge, Pixel, Canvas, Quill, Atlas) with full system prompts, bios, tags
+  - Preset Preview Panel — two-column layout showing identity, bio, tags, and
+    syntax-highlighted system prompt preview
+  - Add-to-Team flow — one-click agent creation from presets with animated pixel-art icons
+  - Agent Presence bar wired to saved profiles with idle pixel-art animations
+  - Fixed: escaped apostrophe in profile editor broke JS parsing
+  - Fixed: HTML animation files moved to correct path
+
+2026-04-14 — AetherBrowser + AetherForge Deployment (Major) [v1.0.0]
+  AetherBrowser — Built and Deployed
+  - Full browser automation service scaffolded from scratch (17 files)
+  - worker.py — container-side Chromium launcher with CDP on configurable ports
+  - Host networking mode — containers bind CDP directly to localhost (9222-9250)
+  - Warm container pool — 1 pre-initialized container for instant session startup
+  - Stealth browser contexts — Chrome 120 UA, anti-bot evasion via playwright-stealth
+  - Accessibility tree via CDP protocol (Accessibility.getFullAXTree)
+  - Vision budget tracking — 20 screenshots per session, enforced per-snapshot
+  - Click correction grid — 6-offset retry on coordinate click miss
+  - Captcha detection — post-interaction a11y scan for captcha/turnstile/recaptcha
+  - Credential injection — one-time vault token on first navigate
+  - Structured error responses — budget_exceeded, captcha_blocked, click_failed,
+    nav_timeout, credential_failed (all HTTP 200 with status field)
+  - Orphan cleanup on startup — force-removes stale containers from previous crashes
+  - Deployed to VPS5:8092, smoke-tested: session create → navigate → screenshot → end
+  AetherCloud Integration
+  - aetherbrowser_client.py — async HTTP client with typed exceptions, 30s nav timeout
+  - browser_tool_injector.py — injects 4 browser tools into Claude context when
+    requires_browser_sandbox=True on agent profile
+  - Browser Operating Manual injected into system prompt (viewport rules, tool priority,
+    interaction guidelines)
+  - Browser tool routing loop in api_server.py — intercepts Claude's browser_navigate,
+    browser_interact, browser_snapshot, browser_end calls and routes through client
+  - vault/browser_credential.py — one-time signed JWT tokens using Protocol-C ephemeral
+    ECDSA, 60-second expiry, JTI replay prevention
+  - requires_browser_sandbox flag on ResolvedAgent and TaskCreateRequest
+  AetherForge — Deployed
+  - Fixed dependency conflicts (pydantic 2.7→2.8+, fastapi unpinned for mcp==1.0.0)
+  - Deployed to VPS5:8091, health check verified
+  Infrastructure
+  - VPS5 fully configured — Docker, Python venvs, systemd services for both services
+  - UFW hardened — 8091/8092 on wg0 only, port 80 outbound locked after install
+  - VPS2 env wired — AETHERBROWSER_URL, AETHERBROWSER_BEARER_TOKEN, AETHERFORGE_URL,
+    AETHERFORGE_SECRET added to /opt/aether-cloud/.env
+  - Cross-VPS connectivity verified over Tailscale (100.84.205.12)
+  Fixed
+  - Docker bridge networking blocked by UFW iptables DROP — switched to host networking
+  - playwright-stealth API change — stealth_async() → Stealth().apply_stealth_async()
+  - Playwright accessibility API removed — replaced with CDP Accessibility.getFullAXTree
+  - Chromium binary path changed — chrome-linux → chrome-linux64 glob pattern fix
+  - AetherForge pydantic/starlette version conflicts resolved

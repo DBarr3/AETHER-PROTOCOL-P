@@ -30,6 +30,7 @@ class ResolvedAgent:
     system_prompt: str = ""
     perms: dict = field(default_factory=dict)
     score: float = 0.0
+    requires_browser_sandbox: bool = False
 
 
 # ── Known server → MCP URL fallbacks ──────────────────────────
@@ -91,6 +92,7 @@ class MCPRouter:
                     system_prompt=a.get("prompt", ""),
                     perms=a.get("perms", {}),
                     score=float(score),
+                    requires_browser_sandbox=bool(a.get("requires_browser_sandbox", False)),
                 )
 
         if best:
