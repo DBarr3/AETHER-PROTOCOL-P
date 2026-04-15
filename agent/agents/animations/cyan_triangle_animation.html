@@ -1,0 +1,253 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:16px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#006064;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:130px;position:relative;overflow:hidden}
+  .preview-tri{position:absolute;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#00E5FF;background:rgba(0,188,212,0.07);border:1px solid rgba(0,188,212,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(0,188,212,0.15)}
+  button.active{background:rgba(0,188,212,0.22);border-color:rgba(0,229,255,0.6)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage">
+    <canvas id="live" class="preview-tri" width="110" height="130"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-launch" class="active">LAUNCH LOOP</button>
+  <button id="btn-cruise">CRUISE</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P  = 10;
+const CY = '#00BCD4';  // main cyan
+const LC = '#4DD0E1';  // light cyan — tip highlight
+const DC = '#006064';  // dark cyan — shadow / base
+const WH = '#E0F7FA';  // near white — peak flash
+const OR = '#FF6D00';  // orange — exhaust flame
+const YL = '#FFD740';  // yellow — exhaust core
+const MG = '#E040FB';  // magenta — charged engines
+
+// Full body pixels [x,y]
+const BODY = [
+  [5,0],
+  [4,1],[5,1],[6,1],
+  [3,2],[4,2],[5,2],[6,2],[7,2],
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+  [2,4],[3,4],      [5,4],      [7,4],[8,4],
+  [1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],
+  [1,6],[2,6],[3,6],[4,6],      [6,6],[7,6],[8,6],[9,6],
+  [0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],
+  // feet
+  [2,8],[8,8],
+  [2,9],[8,9],
+];
+
+const EYES = [[4,4],[6,4]];
+function isEye(x,y){ return EYES.some(([ex,ey])=>ex===x&&ey===y); }
+
+// Exhaust pixels — appear below feet during launch
+const EXHAUST_SMALL = [
+  [2,10],[8,10],
+  [3,11],[7,11],
+];
+const EXHAUST_MED = [
+  [2,10],[8,10],
+  [2,11],[8,11],
+  [3,12],[5,12],[7,12],
+  [4,13],[6,13],
+];
+const EXHAUST_FULL = [
+  [1,10],[2,10],[3,10],[7,10],[8,10],[9,10],
+  [2,11],[8,11],
+  [3,12],[5,12],[7,12],
+  [4,13],[6,13],
+  [5,14],
+];
+
+function makeFrame(bodyColor, eyeColor, yShift, exhaust, exColors) {
+  yShift = yShift||0;
+  const out = [];
+  BODY.forEach(([x,y])=>{
+    if(isEye(x,y)) return;
+    out.push([x, y+yShift, bodyColor(x,y)]);
+  });
+  EYES.forEach(([x,y])=>out.push([x,y+yShift,eyeColor]));
+  if(exhaust) {
+    exhaust.forEach(([x,y],i)=>{
+      const c = exColors[i % exColors.length];
+      out.push([x, y+yShift, c]);
+    });
+  }
+  return out;
+}
+
+// F1 — IDLE: flat cyan, soft eyes, standing
+const F1 = makeFrame(()=>CY, LC, 0, null, []);
+
+// F2 — CHARGE: engines glow magenta at base, tip brightens, body crouches +1
+const F2 = makeFrame(
+  (x,y)=>{ if(y<=1) return WH; if(y>=7) return MG; return CY; },
+  MG, 1,
+  EXHAUST_SMALL, [MG, MG, MG]
+);
+
+// F3 — IGNITION: launches up -3, full exhaust orange/yellow, tip white
+const F3 = makeFrame(
+  (x,y)=>{ if(y<=2) return WH; if(y>=6) return LC; return CY; },
+  WH, -3,
+  EXHAUST_FULL, [OR,YL,OR,YL,OR,YL,OR,YL,OR,YL,OR]
+);
+
+// F4 — PEAK: way up -5, tiny exhaust trail, tip flaring, body bright
+const F4 = makeFrame(
+  (x,y)=>{ if(y<=3) return WH; return LC; },
+  WH, -5,
+  EXHAUST_MED, [YL,YL,OR,OR,OR,OR,OR,OR]
+);
+
+// F5 — LAND: slams back down +1 (impact), exhaust gone, feet spread wide
+const F5_BASE = makeFrame(
+  (x,y)=>{ if(y>=7) return DC; if(y<=1) return LC; return CY; },
+  LC, 1, null, []
+);
+// add impact dust pixels beside feet
+const F5 = [
+  ...F5_BASE,
+  [0,10,DC],[1,10,DC],[3,10,DC],   // left dust
+  [7,10,DC],[9,10,DC],[10,10,DC],  // right dust
+];
+
+const FRAMES = [
+  { label:'F1', name:'idle',     pixels: F1 },
+  { label:'F2', name:'charge',   pixels: F2 },
+  { label:'F3', name:'ignition', pixels: F3 },
+  { label:'F4', name:'peak',     pixels: F4 },
+  { label:'F5', name:'land',     pixels: F5 },
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c])=>{
+    if(y<0||y>12||x<0||x>10) return;
+    ctx.fillStyle=c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach(f=>{
+  const col=document.createElement('div');
+  col.className='frame-col';
+  const lbl=document.createElement('div');
+  lbl.className='frame-label';
+  lbl.textContent=f.label;
+  const cv=document.createElement('canvas');
+  cv.width=11*P; cv.height=13*P;
+  cv.style.cssText=`width:${11*P}px;height:${13*P}px;image-rendering:pixelated`;
+  const nm=document.createElement('div');
+  nm.className='frame-name';
+  nm.textContent=f.name;
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+  drawFrame(cv.getContext('2d'),f.pixels);
+});
+
+// Live preview
+const live=document.getElementById('live');
+const liveCtx=live.getContext('2d');
+let raf=null,lastTime=0,step=0,walkX=165,dir=1,idlePhase=0;
+let posY=10;
+
+// Launch sequence
+const LAUNCH_SEQ   = [0,1,2,3,4,0];
+const LAUNCH_DELAY = [500,140,120,200,120,500];
+
+function setPos(x,bot){
+  live.style.left=x+'px';
+  live.style.bottom=(bot||8)+'px';
+}
+
+function animLaunch(ts){
+  if(ts-lastTime>LAUNCH_DELAY[step]){
+    lastTime=ts;
+    drawFrame(liveCtx,FRAMES[LAUNCH_SEQ[step]].pixels);
+    step=(step+1)%LAUNCH_SEQ.length;
+  }
+  const bob=Math.sin(ts/700)*2;
+  setPos(165, 10+bob);
+  raf=requestAnimationFrame(animLaunch);
+}
+
+function animCruise(ts){
+  if(ts-lastTime>110){
+    lastTime=ts;
+    // alternate F3 and F4 for flying look
+    idlePhase=1-idlePhase;
+    drawFrame(liveCtx, idlePhase===0?F3:F4);
+    walkX+=dir*22;
+    if(walkX>310) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  // cruise high above bar
+  const bob=Math.sin(ts/350)*4;
+  setPos(walkX, 30+bob);
+  raf=requestAnimationFrame(animCruise);
+}
+
+function animIdle(ts){
+  if(ts-lastTime>900){
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    // pulse between F1 and a brightened version
+    const bright = makeFrame((x,y)=>y<=1?WH:LC, WH, 0, null,[]);
+    drawFrame(liveCtx, idlePhase===0?F1:bright);
+  }
+  const bob=Math.sin(ts/600)*2;
+  setPos(165, 10+bob);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m){
+  if(raf) cancelAnimationFrame(raf);
+  step=0;walkX=165;dir=1;idlePhase=0;lastTime=0;
+  drawFrame(liveCtx,F1);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='launch') raf=requestAnimationFrame(animLaunch);
+  if(m==='cruise') raf=requestAnimationFrame(animCruise);
+  if(m==='idle')   raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-launch').onclick=()=>startAnim('launch');
+document.getElementById('btn-cruise').onclick=()=>startAnim('cruise');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165,10);
+startAnim('launch');
+</script>

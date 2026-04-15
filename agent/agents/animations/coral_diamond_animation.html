@@ -1,0 +1,236 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:16px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#BF360C;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:120px;position:relative;overflow:hidden}
+  .preview-gem{position:absolute;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#FF7043;background:rgba(255,87,34,0.07);border:1px solid rgba(255,87,34,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(255,87,34,0.15)}
+  button.active{background:rgba(255,87,34,0.22);border-color:rgba(255,112,67,0.6)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage">
+    <canvas id="live" class="preview-gem" width="110" height="110"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-spin" class="active">GEM SPIN</button>
+  <button id="btn-float">FLOAT</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P  = 10;
+const CR = '#FF5722';  // coral main
+const LC = '#FF8A65';  // light coral — left facet highlight
+const DC = '#BF360C';  // dark coral — right facet shadow
+const WH = '#FFFFFF';  // white — top facet flash
+const GL = '#FFD54F';  // gold — refraction glint
+const CY = '#00E5FF';  // cyan — deep facet shimmer
+const PK = '#FF4081';  // pink — inner fire
+
+// Full diamond body [x,y]
+const BODY = [
+  [5,0],
+  [4,1],[5,1],[6,1],
+  [3,2],[4,2],[5,2],[6,2],[7,2],
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+  [2,4],[3,4],      [5,4],      [7,4],[8,4],
+  [2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],
+  [2,6],[3,6],[4,6],      [6,6],[7,6],[8,6],
+  [3,7],[4,7],[5,7],[6,7],[7,7],
+  [4,8],[5,8],[6,8],
+  [5,9],
+];
+
+// Eye positions (row 4 gaps)
+const EYES = [[4,4],[6,4]];
+
+// Facet groups for color variation
+const TOP_FACET   = BODY.filter(([x,y])=>y<=2);
+const MID_FACET   = BODY.filter(([x,y])=>y>=3&&y<=5);
+const BOT_FACET   = BODY.filter(([x,y])=>y>=6);
+const LEFT_FACET  = BODY.filter(([x,y])=>x<=4&&y>=3&&y<=7);
+const RIGHT_FACET = BODY.filter(([x,y])=>x>=6&&y>=3&&y<=7);
+
+function isEye(x,y) { return EYES.some(([ex,ey])=>ex===x&&ey===y); }
+
+function buildGem(colorMap, eyeColor, yShift) {
+  yShift = yShift||0;
+  const out = [];
+  BODY.forEach(([x,y])=>{
+    if(isEye(x,y)) return;
+    const col = colorMap(x,y) || CR;
+    out.push([x, y+yShift, col]);
+  });
+  EYES.forEach(([x,y])=>out.push([x,y+yShift, eyeColor]));
+  return out;
+}
+
+// F1 — IDLE: flat coral, soft eye glow
+const F1 = buildGem((x,y)=>CR, LC, 0);
+
+// F2 — TILT LEFT: left facets lighten (catching light), right darken, top flashes
+const F2 = buildGem((x,y)=>{
+  if(y<=1) return WH;                          // top tip catches full light
+  if(LEFT_FACET.some(([lx,ly])=>lx===x&&ly===y)) return LC;
+  if(RIGHT_FACET.some(([rx,ry])=>rx===x&&ry===y)) return DC;
+  return CR;
+}, GL, 0);
+
+// F3 — FLASH: entire gem flares bright — top WHITE, mid gold, bottom coral
+const F3 = buildGem((x,y)=>{
+  if(y<=2) return WH;
+  if(y<=5) return GL;
+  return LC;
+}, WH, -1);  // float up 1 on flash
+
+// F4 — TILT RIGHT: right facets catch light, left go dark, inner fire shows
+const F4 = buildGem((x,y)=>{
+  if(y<=1) return WH;
+  if(RIGHT_FACET.some(([rx,ry])=>rx===x&&ry===y)) return LC;
+  if(LEFT_FACET.some(([lx,ly])=>lx===x&&ly===y)) return DC;
+  if(y>=3&&y<=5&&x===5) return PK;             // center column inner fire
+  return CR;
+}, CY, 0);
+
+// F5 — DEEP SHIMMER: cyan bleeds through center, gold tip, dark edges
+const F5 = buildGem((x,y)=>{
+  if(y===0) return GL;
+  if(y<=2 && x===5) return WH;
+  if(MID_FACET.some(([mx,my])=>mx===x&&my===y) && x>=4&&x<=6) return CY;
+  if(BOT_FACET.some(([bx,by])=>bx===x&&by===y)) return DC;
+  return CR;
+}, PK, 0);
+
+const FRAMES = [
+  { label:'F1', name:'idle',        pixels: F1 },
+  { label:'F2', name:'tilt left',   pixels: F2 },
+  { label:'F3', name:'flash',       pixels: F3 },
+  { label:'F4', name:'tilt right',  pixels: F4 },
+  { label:'F5', name:'shimmer',     pixels: F5 },
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c])=>{
+    if(y<0||x<0||x>10) return;
+    ctx.fillStyle=c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach(f=>{
+  const col=document.createElement('div');
+  col.className='frame-col';
+  const lbl=document.createElement('div');
+  lbl.className='frame-label';
+  lbl.textContent=f.label;
+  const cv=document.createElement('canvas');
+  cv.width=11*P; cv.height=11*P;
+  cv.style.cssText=`width:${11*P}px;height:${11*P}px;image-rendering:pixelated`;
+  const nm=document.createElement('div');
+  nm.className='frame-name';
+  nm.textContent=f.name;
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+  drawFrame(cv.getContext('2d'),f.pixels);
+});
+
+// Live preview
+const live=document.getElementById('live');
+const liveCtx=live.getContext('2d');
+let raf=null,lastTime=0,step=0,walkX=165,dir=1,idlePhase=0;
+
+// Spin sequence: F1→F2→F3→F4→F5→F4→F3→F2→F1
+const SPIN_SEQ   = [0,1,2,3,4,3,2,1,0];
+const SPIN_DELAY = [400,120,80,120,160,120,80,120,400];
+
+function setPos(x,bot){
+  live.style.left=x+'px';
+  live.style.bottom=(bot||6)+'px';
+}
+
+function animSpin(ts){
+  if(ts-lastTime>SPIN_DELAY[step]){
+    lastTime=ts;
+    drawFrame(liveCtx,FRAMES[SPIN_SEQ[step]].pixels);
+    step=(step+1)%SPIN_SEQ.length;
+  }
+  // gentle hover while spinning
+  const bob=Math.sin(ts/600)*3;
+  setPos(165,8+bob);
+  raf=requestAnimationFrame(animSpin);
+}
+
+function animFloat(ts){
+  if(ts-lastTime>150){
+    lastTime=ts;
+    idlePhase=(idlePhase+1)%4;
+    // cycle tilt L → flash → tilt R → flash for a spinning drift
+    const seq=[1,2,3,2];
+    drawFrame(liveCtx,FRAMES[seq[idlePhase]].pixels);
+    walkX+=dir*14;
+    if(walkX>310) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  const bob=Math.sin(ts/400)*5;
+  setPos(walkX,8+bob);
+  raf=requestAnimationFrame(animFloat);
+}
+
+// Idle — slow pulse between F1 and F5 (shimmer)
+function animIdle(ts){
+  if(ts-lastTime>1100){
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    drawFrame(liveCtx,idlePhase===0?F1:F5);
+  }
+  const bob=Math.sin(ts/800)*2;
+  setPos(165,8+bob);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m){
+  if(raf) cancelAnimationFrame(raf);
+  step=0;walkX=165;dir=1;idlePhase=0;lastTime=0;
+  drawFrame(liveCtx,F1);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='spin')  raf=requestAnimationFrame(animSpin);
+  if(m==='float') raf=requestAnimationFrame(animFloat);
+  if(m==='idle')  raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-spin').onclick=()=>startAnim('spin');
+document.getElementById('btn-float').onclick=()=>startAnim('float');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165,8);
+startAnim('spin');
+</script>

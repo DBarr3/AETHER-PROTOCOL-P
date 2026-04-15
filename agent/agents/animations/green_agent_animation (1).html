@@ -1,0 +1,225 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:16px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#1B5E20;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:110px;position:relative;overflow:hidden}
+  .preview-g{position:absolute;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#69F0AE;background:rgba(76,175,80,0.07);border:1px solid rgba(76,175,80,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(76,175,80,0.15)}
+  button.active{background:rgba(76,175,80,0.22);border-color:rgba(105,240,174,0.6)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage">
+    <canvas id="live" class="preview-g" width="110" height="100"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-dodge" class="active">DODGE LOOP</button>
+  <button id="btn-dart">DART</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P  = 10;
+const GR = '#4CAF50';  // main green
+const LG = '#A5D6A7';  // light green — highlight
+const DG = '#1B5E20';  // dark green — shadow
+const CY = '#00E5FF';  // cyan — eyes when dodging
+const YL = '#FFEB3B';  // yellow — eyes when alert
+const WH = '#F1F8E9';  // near white — flash
+const NE = '#69F0AE';  // neon green — charged
+
+// Base body [x,y] — same structure as blue invader
+const BODY = [
+  [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
+  [2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
+  [2,2],      [4,2],[5,2],[6,2],      [8,2],
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+  [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+  [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+  [2,6],[4,6],[6,6],[8,6],
+  [2,7],[4,7],[6,7],[8,7],
+];
+const EYES = [[3,2],[7,2]];
+function isEye(x,y){ return EYES.some(([ex,ey])=>ex===x&&ey===y); }
+
+// Dodge LEFT — body shifts 2px left, right arm trails, squish legs right
+function shiftBody(xys, dx, dy) {
+  return xys.map(([x,y])=>[x+dx, y+(dy||0)]);
+}
+
+function makeFrame(pixels, eyeColor, bodyColor, yShift) {
+  yShift=yShift||0;
+  const out=[];
+  pixels.forEach(([x,y])=>{
+    if(isEye(x,y)) return;
+    if(x<0||x>10) return;
+    out.push([x,y+yShift,bodyColor]);
+  });
+  EYES.forEach(([x,y])=>out.push([x,y+yShift,eyeColor]));
+  return out;
+}
+
+// F1 — IDLE: normal green, lime eyes
+const F1 = makeFrame(BODY, LG, GR, 0);
+
+// F2 — LEAN RIGHT (anticipate): body shifts +1 right, arms still wide
+//      right arm leads, right eye goes yellow (alert)
+const BODY_R1 = shiftBody(BODY, 1, 0);
+const F2 = [
+  ...makeFrame(BODY_R1.filter(([x])=>x<=10), YL, GR, 0),
+  // speed trail on left side
+  [1,4,DG],[1,5,DG],[2,4,DG],
+];
+
+// F3 — FULL DODGE RIGHT: body slams right +2, compresses vertically
+//      arms curl up (raise), eyes cyan, neon streak left
+const BODY_R2 = shiftBody(BODY, 2, 0);
+const ARMS_UP_R = [
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3], // arms shift up a row
+  [2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+  [2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+];
+const F3_BASE = makeFrame(BODY_R2.filter(([x])=>x<=10), CY, NE, 0);
+const F3 = [
+  ...F3_BASE,
+  // neon speed trail streaking left
+  [0,4,NE],[0,5,NE],[1,4,DG],[1,5,DG],[0,3,DG],
+];
+
+// F4 — SNAP BACK: body returns to center +0, arms still slightly raised
+//      flash frame — body goes bright, eyes white
+const F4_BASE = makeFrame(BODY, WH, LG, -1); // pop up 1 on snap
+const F4 = [
+  ...F4_BASE,
+  // afterimage echoes left and right fading
+  [1,4,DG],[9,4,DG],[1,5,DG],[9,5,DG],
+];
+
+// F5 — SETTLE: back to normal, arms down, legs normal, eyes go green
+const F5 = makeFrame(BODY, LG, GR, 0);
+
+const FRAMES = [
+  { label:'F1', name:'idle',        pixels: F1 },
+  { label:'F2', name:'lean right',  pixels: F2 },
+  { label:'F3', name:'full dodge',  pixels: F3 },
+  { label:'F4', name:'snap back',   pixels: F4 },
+  { label:'F5', name:'settle',      pixels: F5 },
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c])=>{
+    if(y<0||y>9||x<0||x>10) return;
+    ctx.fillStyle=c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static cards
+const row=document.getElementById('frames-row');
+FRAMES.forEach(f=>{
+  const col=document.createElement('div');
+  col.className='frame-col';
+  const lbl=document.createElement('div');
+  lbl.className='frame-label'; lbl.textContent=f.label;
+  const cv=document.createElement('canvas');
+  cv.width=11*P; cv.height=10*P;
+  cv.style.cssText=`width:${11*P}px;height:${10*P}px;image-rendering:pixelated`;
+  const nm=document.createElement('div');
+  nm.className='frame-name'; nm.textContent=f.name;
+  col.appendChild(lbl); col.appendChild(cv); col.appendChild(nm);
+  row.appendChild(col);
+  drawFrame(cv.getContext('2d'),f.pixels);
+});
+
+// Live preview
+const live=document.getElementById('live');
+const liveCtx=live.getContext('2d');
+let raf=null,lastTime=0,step=0,walkX=165,dir=1,idlePhase=0;
+
+// Dodge sequence: idle → lean → dodge → snap → settle → idle
+const DODGE_SEQ   = [0,1,2,3,4,0];
+const DODGE_DELAY = [450,100,90,80,120,450];
+
+function setPos(x,bot){
+  live.style.left=x+'px';
+  live.style.bottom=(bot||4)+'px';
+}
+
+function animDodge(ts){
+  if(ts-lastTime>DODGE_DELAY[step]){
+    lastTime=ts;
+    drawFrame(liveCtx,FRAMES[DODGE_SEQ[step]].pixels);
+    step=(step+1)%DODGE_SEQ.length;
+  }
+  setPos(165);
+  raf=requestAnimationFrame(animDodge);
+}
+
+function animDart(ts){
+  if(ts-lastTime>85){
+    lastTime=ts;
+    // dart: alternate lean and dodge frames very fast — blurry speed
+    idlePhase=(idlePhase+1)%4;
+    const seq=[1,2,1,0];
+    drawFrame(liveCtx,FRAMES[seq[idlePhase]].pixels);
+    walkX+=dir*30; // darts fast
+    if(walkX>300) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  setPos(walkX);
+  raf=requestAnimationFrame(animDart);
+}
+
+// Idle: slow eye flicker between LG and CY
+function animIdle(ts){
+  if(ts-lastTime>800){
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    const px=makeFrame(BODY, idlePhase===0?LG:CY, GR, 0);
+    drawFrame(liveCtx,px);
+  }
+  setPos(165);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m){
+  if(raf) cancelAnimationFrame(raf);
+  step=0;walkX=165;dir=1;idlePhase=0;lastTime=0;
+  drawFrame(liveCtx,F1);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='dodge') raf=requestAnimationFrame(animDodge);
+  if(m==='dart')  raf=requestAnimationFrame(animDart);
+  if(m==='idle')  raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-dodge').onclick=()=>startAnim('dodge');
+document.getElementById('btn-dart').onclick=()=>startAnim('dart');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165);
+startAnim('dodge');
+</script>

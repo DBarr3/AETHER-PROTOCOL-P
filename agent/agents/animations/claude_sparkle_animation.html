@@ -1,0 +1,253 @@
+
+<style>
+  body{background:#0a0a0f}
+  .wrap{padding:24px 16px;font-family:'IBM Plex Mono',monospace}
+  .frames-row{display:flex;gap:16px;align-items:flex-end;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .frame-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .frame-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .frame-name{font-size:9px;color:#8B4513;text-align:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .bar{width:440px;height:3px;background:#1e2030;border-radius:2px;margin:0 auto 6px}
+  .bar-label{font-size:9px;color:#334155;text-align:center;letter-spacing:0.12em;margin-bottom:20px}
+  .preview-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:24px}
+  .preview-label{font-size:10px;color:#475569;letter-spacing:0.1em}
+  .preview-stage{width:440px;height:120px;position:relative;overflow:hidden}
+  .preview-spr{position:absolute;image-rendering:pixelated}
+  .controls{display:flex;gap:10px;justify-content:center}
+  button{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#D4845C;background:rgba(212,132,92,0.07);border:1px solid rgba(212,132,92,0.25);border-radius:4px;padding:5px 14px;cursor:pointer}
+  button:hover{background:rgba(212,132,92,0.15)}
+  button.active{background:rgba(212,132,92,0.22);border-color:rgba(212,132,92,0.6)}
+</style>
+
+<div class="wrap">
+<div class="frames-row" id="frames-row"></div>
+<div class="bar-label">INPUT BAR</div>
+<div class="bar"></div>
+
+<div class="preview-wrap">
+  <div class="preview-label">LIVE PREVIEW</div>
+  <div class="preview-stage">
+    <canvas id="live" class="preview-spr" width="110" height="110"></canvas>
+  </div>
+  <div class="bar"></div>
+  <div class="bar-label">INPUT BAR</div>
+</div>
+
+<div class="controls">
+  <button id="btn-sparkle" class="active">SPARKLE LOOP</button>
+  <button id="btn-drift">DRIFT</button>
+  <button id="btn-idle">IDLE</button>
+</div>
+</div>
+
+<script>
+const P   = 10;
+const C   = '#D4845C';   // main coral
+const LC  = '#E8A87C';   // light coral — shimmy left
+const DC  = '#B5623A';   // dark coral — shimmy right / shadow
+const GL  = '#FFD700';   // gold — sparkle burst pixels
+const WH  = '#FFF8F0';   // warm white — peak flash
+const PK  = '#FF6B9D';   // pink — funky accent on shimmy
+const TL  = '#00E5FF';   // teal — sparkle tips contrasting
+
+// Base body pixels [x,y]
+const BODY = [
+  // sparkle top
+  [5,0],
+  [3,1],[5,1],[7,1],
+  [3,2],[4,2],[5,2],[6,2],[7,2],
+  [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+  // eye row
+  [2,4],[3,4],      [5,4],      [7,4],[8,4],
+  // body wide
+  [1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],
+  [1,6],[2,6],[3,6],[4,6],      [6,6],[7,6],[8,6],[9,6],
+  // lower body
+  [2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],
+  // legs/tail
+  [3,8],[5,8],[7,8],
+  [5,9],
+];
+
+// Eye positions
+const EYES = [[4,4],[6,4]];
+
+// Sparkle burst pixels — radiate from top (around 5,0)
+const SPARK_NEAR = [
+  [4,0],[6,0],   // sides of tip row 0
+  [2,1],[8,1],   // outer sides row 1
+];
+const SPARK_FAR = [
+  [1,0],[9,0],   // far sides
+  [0,2],[10,2],  // arm tips
+  [3,0],[7,0],
+];
+
+// Shimmy left — body shifts 1px left
+const BODY_L = BODY.map(([x,y]) => [x-1, y]);
+const BODY_R = BODY.map(([x,y]) => [x+1, y]);
+
+function px(xys, color) {
+  return xys.filter(([x,y])=>x>=0&&x<=10&&y>=0).map(([x,y])=>[x,y,color]);
+}
+
+function makeBase(bodyXY, eyeColor, bodyColor, yShift) {
+  yShift = yShift||0;
+  const out = [];
+  bodyXY.forEach(([x,y])=>{
+    if(EYES.some(([ex,ey])=>ex===x&&ey===y)) return; // skip eye positions
+    out.push([x, y+yShift, bodyColor]);
+  });
+  EYES.forEach(([x,y])=>out.push([x, y+yShift, eyeColor]));
+  return out;
+}
+
+// F1 — IDLE: normal coral, warm eyes
+const F1 = makeBase(BODY, LC, C, 0);
+
+// F2 — SHIMMY LEFT: body leans left, eyes go pink, slight shrink
+const F2 = [
+  ...makeBase(BODY_L, PK, LC, 0),
+  // add motion blur ghost on right
+  ...px([[9,5],[9,6],[8,3]], DC),
+];
+
+// F3 — SPARKLE BURST: body normal, gold sparks erupt from tip, eyes flash white
+const F3 = [
+  ...makeBase(BODY, WH, C, -1),   // body floats up 1px
+  ...px(SPARK_NEAR, GL),
+  ...px([[5,0]], WH),              // tip goes white hot
+];
+
+// F4 — SHIMMY RIGHT: body leans right, eyes teal, funky
+const F4 = [
+  ...makeBase(BODY_R, TL, LC, 0),
+  ...px([[1,5],[1,6],[2,3]], DC),  // ghost on left
+];
+
+// F5 — FULL BURST: sparks far + near, body flashes coral→gold, eyes gold
+const F5 = [
+  ...makeBase(BODY, GL, WH, -1),
+  ...px(SPARK_NEAR, GL),
+  ...px(SPARK_FAR,  TL),
+  ...px([[5,0],[4,0],[6,0]], WH),
+];
+
+const FRAMES = [
+  { label:'F1', name:'idle',          pixels: F1 },
+  { label:'F2', name:'shimmy left',   pixels: F2 },
+  { label:'F3', name:'sparkle pop',   pixels: F3 },
+  { label:'F4', name:'shimmy right',  pixels: F4 },
+  { label:'F5', name:'full burst',    pixels: F5 },
+];
+
+function drawFrame(ctx, pixels) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  pixels.forEach(([x,y,c])=>{
+    if(y<0||x<0||x>10) return;
+    ctx.fillStyle=c;
+    ctx.fillRect(x*P, y*P, P, P);
+  });
+}
+
+// Static frame cards
+const row = document.getElementById('frames-row');
+FRAMES.forEach(f=>{
+  const col = document.createElement('div');
+  col.className='frame-col';
+
+  const lbl=document.createElement('div');
+  lbl.className='frame-label';
+  lbl.textContent=f.label;
+
+  const cv=document.createElement('canvas');
+  cv.width=11*P; cv.height=11*P;
+  cv.style.cssText=`width:${11*P}px;height:${11*P}px;image-rendering:pixelated`;
+
+  const nm=document.createElement('div');
+  nm.className='frame-name';
+  nm.textContent=f.name;
+
+  col.appendChild(lbl);
+  col.appendChild(cv);
+  col.appendChild(nm);
+  row.appendChild(col);
+
+  drawFrame(cv.getContext('2d'), f.pixels);
+});
+
+// Live preview
+const live    = document.getElementById('live');
+const liveCtx = live.getContext('2d');
+
+let raf=null, lastTime=0, step=0, walkX=165, dir=1, idlePhase=0;
+let bobY = 0;
+
+// Sparkle sequence: idle → shimmy L → burst → shimmy R → FULL BURST → idle
+const SPARK_SEQ   = [0, 1, 2, 3, 4, 2, 1, 0];
+const SPARK_DELAY = [400, 110, 120, 110, 140, 100, 110, 450];
+
+function setPos(x, bot) {
+  live.style.left=(x)+'px';
+  live.style.bottom=(bot||6)+'px';
+}
+
+function animSparkle(ts) {
+  if(ts-lastTime > SPARK_DELAY[step]) {
+    lastTime=ts;
+    drawFrame(liveCtx, FRAMES[SPARK_SEQ[step]].pixels);
+    step=(step+1)%SPARK_SEQ.length;
+  }
+  // gentle hover bob while sparkle plays
+  const bob = Math.sin(ts/500)*3;
+  setPos(165, 8+bob);
+  raf=requestAnimationFrame(animSparkle);
+}
+
+function animDrift(ts) {
+  if(ts-lastTime > 120) {
+    lastTime=ts;
+    idlePhase=(idlePhase+1)%6;
+    // cycle F1→F2→F1→F4→F1→F4 for a groovy drift walk
+    const seq=[0,1,0,3,0,3];
+    drawFrame(liveCtx, FRAMES[seq[idlePhase]].pixels);
+    walkX+=dir*16;
+    if(walkX>310) dir=-1;
+    if(walkX<10)  dir=1;
+  }
+  const bob = Math.sin(ts/300)*4;
+  setPos(walkX, 8+bob);
+  raf=requestAnimationFrame(animDrift);
+}
+
+// Idle — slow colour pulse between F1 and a warm tinted variant
+const F1_WARM = makeBase(BODY, GL, LC, 0); // warm gold-eye variant
+function animIdle(ts) {
+  if(ts-lastTime > 1000) {
+    lastTime=ts;
+    idlePhase=1-idlePhase;
+    drawFrame(liveCtx, idlePhase===0 ? F1 : F1_WARM);
+  }
+  const bob = Math.sin(ts/700)*2;
+  setPos(165, 8+bob);
+  raf=requestAnimationFrame(animIdle);
+}
+
+function startAnim(m) {
+  if(raf) cancelAnimationFrame(raf);
+  step=0; walkX=165; dir=1; idlePhase=0; lastTime=0;
+  drawFrame(liveCtx, F1);
+  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='sparkle') raf=requestAnimationFrame(animSparkle);
+  if(m==='drift')   raf=requestAnimationFrame(animDrift);
+  if(m==='idle')    raf=requestAnimationFrame(animIdle);
+}
+
+document.getElementById('btn-sparkle').onclick=()=>startAnim('sparkle');
+document.getElementById('btn-drift').onclick=()=>startAnim('drift');
+document.getElementById('btn-idle').onclick=()=>startAnim('idle');
+
+setPos(165, 8);
+startAnim('sparkle');
+</script>

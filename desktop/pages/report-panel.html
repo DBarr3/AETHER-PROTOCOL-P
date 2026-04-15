@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Intelligence Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   AETHER MARKET INTELLIGENCE REPORT — SEALED DOCUMENT
+   Base: #090b10 | Accent: #00d4d8 | Native to AetherCloud-L
+   ═══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --base:         #090b10;
+  --bg2:          #0c1019;
+  --surface:      #101520;
+  --surface2:     #151a27;
+  --border-dim:   #1c2740;
+  --border-mid:   #233050;
+  --accent:       #00d4d8;
+  --accent-dim:   rgba(0,212,216,0.15);
+  --accent-glow:  rgba(0,212,216,0.35);
+  --accent-bright:rgba(0,212,216,0.6);
+  --text-primary: #d4ddf0;
+  --text-muted:   #8897b8;
+  --text-dim:     #4a5878;
+  --border:       rgba(0,212,216,0.08);
+  --border-bright:rgba(0,212,216,0.2);
+  --card-bg:      rgba(0,212,216,0.03);
+  --font-h:       'Space Grotesk', sans-serif;
+  --font-b:       'DM Sans', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  --font:         'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--base);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══ AMBIENT BACKGROUND ════════════════════════════════ */
+#report-root {
+  position: relative;
+  min-height: 100vh;
+  padding: 0 0 40px;
+}
+#report-root::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 50vh;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,212,216,0.06) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+#report-root::after {
+  content: '';
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 30vh;
+  background: radial-gradient(ellipse at 30% 100%, rgba(0,212,216,0.03) 0%, transparent 50%),
+              radial-gradient(ellipse at 70% 100%, rgba(99,102,241,0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══ METRICS STRIP ═════════════════════════════════════ */
+#metrics-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+#metrics-strip.visible { opacity: 1; }
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.metric-label { color: var(--text-dim); }
+.metric-value { color: var(--accent); font-weight: 500; }
+.metric-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--border-bright);
+  flex-shrink: 0;
+}
+
+/* ═══ SESSION BADGE ═════════════════════════════════════ */
+#session-badge {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+}
+
+/* ═══ AGENT SECTIONS ════════════════════════════════════ */
+#agent-sections {
+  position: relative;
+  z-index: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-section {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeSlideIn 400ms ease forwards;
+}
+@keyframes fadeSlideIn {
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Avatar ── */
+.agent-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,212,216,0.3);
+  background: rgba(0,212,216,0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  animation: avatarIdle 2.8s ease-in-out infinite;
+}
+.agent-avatar img,
+.agent-avatar svg {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+.agent-avatar-fallback {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* Avatar states */
+@keyframes avatarIdle {
+  0%, 100% { transform: translateY(0); box-shadow: 0 0 8px rgba(0,212,216,0.15); }
+  50% { transform: translateY(-3px); box-shadow: 0 0 14px rgba(0,212,216,0.25); }
+}
+@keyframes avatarActive {
+  0%, 100% { transform: translateY(0); box-shadow: 0 0 12px var(--accent-glow); }
+  50% { transform: translateY(-4px); box-shadow: 0 0 24px var(--accent-bright); }
+}
+.agent-avatar.active {
+  animation: avatarActive 1.2s ease-in-out infinite;
+  border-color: var(--accent);
+}
+.agent-avatar.completing {
+  transition: box-shadow 600ms ease, border-color 600ms ease;
+  animation: avatarIdle 2.8s ease-in-out infinite;
+  border-color: rgba(0,212,216,0.3);
+}
+
+/* Glitch shimmer */
+@keyframes glitchShimmer {
+  0%   { transform: translateX(0); opacity: 1; filter: none; }
+  20%  { transform: translateX(2px); opacity: 0.7; }
+  40%  { transform: translateX(-2px); opacity: 1; filter: hue-rotate(15deg); }
+  60%  { transform: translateX(1px); opacity: 0.7; }
+  80%  { transform: translateX(-1px); opacity: 1; filter: none; }
+  100% { transform: translateX(0); opacity: 1; filter: none; }
+}
+.agent-avatar.glitching {
+  animation: glitchShimmer 180ms ease !important;
+}
+
+/* ── Agent Content ── */
+.agent-content {
+  flex: 1;
+  min-width: 0;
+}
+.agent-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.agent-name {
+  font-family: var(--font-h);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.agent-task {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+.agent-output {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.agent-output-raw {
+  display: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(0,0,0,0.3);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.agent-section.telemetry-active .agent-output { display: none; }
+.agent-section.telemetry-active .agent-output-raw { display: block; }
+
+/* Byline label */
+.agent-byline {
+  display: none;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.agent-section.telemetry-active .agent-byline { display: block; }
+
+/* ═══ ORCHESTRATOR VERDICT ══════════════════════════════ */
+#orchestrator-verdict {
+  position: relative;
+  z-index: 1;
+  margin: 8px 24px 0;
+  padding: 24px;
+  border: 1px solid var(--border-bright);
+  background: rgba(0,212,216,0.02);
+  border-radius: 2px;
+}
+.verdict-label {
+  font-family: var(--font-h);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.verdict-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 1px;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+#verdict-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+/* Decrypt lines */
+.decrypt-line {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.decrypt-line.revealed {
+  opacity: 1;
+  transform: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.decrypt-line.scrambling {
+  opacity: 0.7;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══ TELEMETRY TOGGLE ══════════════════════════════════ */
+#telemetry-toggle {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: rgba(9,11,16,0.8);
+  border-radius: 2px;
+  transition: color 200ms, border-color 200ms, background 200ms;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+#telemetry-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+#telemetry-toggle.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ═══ FULLSCREEN TOGGLE ═════════════════════════════════ */
+#fullscreen-toggle {
+  position: fixed;
+  top: 14px;
+  right: 54px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 14px;
+  border: 1px solid var(--border);
+  background: rgba(9,11,16,0.8);
+  border-radius: 2px;
+  transition: color 200ms, border-color 200ms;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+#fullscreen-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+/* ═══ RESPONSIVE ════════════════════════════════════════ */
+@media (max-width: 600px) {
+  .agent-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .agent-avatar {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 4px;
+  }
+  .agent-avatar img,
+  .agent-avatar svg {
+    width: 30px;
+    height: 30px;
+  }
+  #agent-sections { padding: 16px; }
+  #orchestrator-verdict { margin: 8px 16px 0; padding: 16px; }
+  #metrics-strip { padding: 10px 16px; gap: 16px; flex-wrap: wrap; }
+}
+
+/* ═══ SCROLLBAR ═════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,212,216,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,212,216,0.3); }
+</style>
+</head>
+<body>
+
+<div id="report-root">
+  <!-- Metrics Strip -->
+  <div id="metrics-strip">
+    <div class="metric-item">
+      <span class="metric-label">Agents</span>
+      <span class="metric-value" id="m-agents">--</span>
+    </div>
+    <div class="metric-sep"></div>
+    <div class="metric-item">
+      <span class="metric-label">Tokens</span>
+      <span class="metric-value" id="m-tokens">--</span>
+    </div>
+    <div class="metric-sep"></div>
+    <div class="metric-item">
+      <span class="metric-label">Elapsed</span>
+      <span class="metric-value" id="m-elapsed">--</span>
+    </div>
+    <span id="session-badge"></span>
+  </div>
+
+  <!-- Agent Sections -->
+  <div id="agent-sections"></div>
+
+  <!-- Orchestrator Verdict -->
+  <div id="orchestrator-verdict" style="display:none;">
+    <div class="verdict-label">ORCHESTRATOR VERDICT</div>
+    <div id="verdict-content"></div>
+  </div>
+</div>
+
+<!-- Telemetry Toggle -->
+<div id="telemetry-toggle" title="Toggle raw telemetry">&gt;_</div>
+
+<!-- Fullscreen Toggle (communicated to parent) -->
+<div id="fullscreen-toggle" title="Toggle fullscreen">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="2,6 2,2 6,2"/>
+    <polyline points="10,2 14,2 14,6"/>
+    <polyline points="14,10 14,14 10,14"/>
+    <polyline points="6,14 2,14 2,10"/>
+  </svg>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// AETHER REPORT PANEL — postMessage Interface
+// ════════════════════════════════════════════════════════════
+
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*';
+
+const state = {
+  sessionId: null,
+  agents: {},
+  metricsData: null,
+  telemetryVisible: false,
+  decryptSkipped: false,
+  rawPayloads: {},
+  glitchTimers: {},
+  lastGlitchTime: 0
+};
+
+// ── Utilities ────────────────────────────────────────────
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function randomChars(len) {
+  let s = '';
+  for (let i = 0; i < len; i++) {
+    s += CHARS[Math.floor(Math.random() * CHARS.length)];
+  }
+  return s;
+}
+
+function escH(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatElapsed(ms) {
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+function formatTokens(n) {
+  if (!n || n <= 0) return '--';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+// ── postMessage Listener ─────────────────────────────────
+
+window.addEventListener('message', function(e) {
+  var msg = e.data;
+  if (!msg || !msg.type) return;
+
+  switch (msg.type) {
+    case 'INIT':
+      handleInit(msg);
+      break;
+    case 'RESET':
+      handleReset();
+      break;
+    case 'AGENT_DATA':
+      handleAgentData(msg);
+      break;
+    case 'AGENT_ACTIVE':
+      handleAgentActive(msg);
+      break;
+    case 'AGENT_COMPLETE':
+      handleAgentComplete(msg);
+      break;
+    case 'ORCHESTRATOR_COMPLETE':
+      handleOrchestratorComplete(msg);
+      break;
+    case 'METRICS':
+      handleMetrics(msg);
+      break;
+  }
+});
+
+// ── Handlers ─────────────────────────────────────────────
+
+function handleInit(msg) {
+  state.sessionId = msg.sessionId || null;
+  state.decryptSkipped = false;
+  document.getElementById('session-badge').textContent = state.sessionId || '';
+  handleReset();
+}
+
+function handleReset() {
+  state.agents = {};
+  state.metricsData = null;
+  state.rawPayloads = {};
+  state.telemetryVisible = false;
+  state.decryptSkipped = false;
+
+  // Clear glitch timers
+  Object.values(state.glitchTimers).forEach(function(t) { clearTimeout(t); });
+  state.glitchTimers = {};
+  state.lastGlitchTime = 0;
+
+  document.getElementById('agent-sections').innerHTML = '';
+  document.getElementById('verdict-content').innerHTML = '';
+  document.getElementById('orchestrator-verdict').style.display = 'none';
+  document.getElementById('metrics-strip').classList.remove('visible');
+  document.getElementById('m-agents').textContent = '--';
+  document.getElementById('m-tokens').textContent = '--';
+  document.getElementById('m-elapsed').textContent = '--';
+  document.getElementById('telemetry-toggle').classList.remove('active');
+}
+
+function handleAgentData(msg) {
+  var agentId = msg.agentId;
+  var data = msg.data || {};
+
+  // Store raw payload for telemetry
+  if (data.rawJson) {
+    state.rawPayloads[agentId] = data.rawJson;
+  }
+
+  var container = document.getElementById('agent-sections');
+  var section = document.querySelector('.agent-section[data-agent="' + agentId + '"]');
+
+  if (!section) {
+    // Create new agent section
+    section = document.createElement('div');
+    section.className = 'agent-section';
+    section.dataset.agent = agentId;
+
+    var avatarHtml = '<div class="agent-avatar" data-agent="' + escH(agentId) + '">';
+    // iconSvg is inline SVG string passed from parent (fetched via Electron IPC).
+    // It is trusted content and rendered as HTML. If absent, fall back to initial letter.
+    if (data.iconSvg && typeof data.iconSvg === 'string' && data.iconSvg.indexOf('<svg') !== -1) {
+      avatarHtml += data.iconSvg;
+    } else {
+      avatarHtml += '<span class="agent-avatar-fallback">' + escH((data.agentName || '?')[0].toUpperCase()) + '</span>';
+    }
+    avatarHtml += '</div>';
+
+    section.innerHTML = avatarHtml +
+      '<div class="agent-content">' +
+        '<div class="agent-header">' +
+          '<span class="agent-name">' + escH(data.agentName || agentId) + '</span>' +
+          '<span class="agent-task">' + escH(data.mainTask || '') + '</span>' +
+        '</div>' +
+        '<div class="agent-output"></div>' +
+        '<div class="agent-output-raw"></div>' +
+        '<div class="agent-byline">[RAW]</div>' +
+      '</div>';
+
+    container.appendChild(section);
+    state.agents[agentId] = { el: section, name: data.agentName };
+
+    // Schedule glitch shimmer
+    scheduleGlitch(agentId);
+
+    // Apply telemetry state if active
+    if (state.telemetryVisible) {
+      section.classList.add('telemetry-active');
+    }
+  }
+
+  // Update content
+  var outputEl = section.querySelector('.agent-output');
+  var rawEl = section.querySelector('.agent-output-raw');
+
+  if (data.output) {
+    outputEl.textContent = data.output;
+  }
+  if (data.rawJson) {
+    try {
+      rawEl.textContent = JSON.stringify(JSON.parse(data.rawJson), null, 2);
+    } catch (_) {
+      rawEl.textContent = data.rawJson;
+    }
+  }
+}
+
+function handleAgentActive(msg) {
+  var avatar = document.querySelector('.agent-avatar[data-agent="' + msg.agentId + '"]');
+  if (avatar) {
+    avatar.classList.remove('completing');
+    avatar.classList.add('active');
+  }
+}
+
+function handleAgentComplete(msg) {
+  var avatar = document.querySelector('.agent-avatar[data-agent="' + msg.agentId + '"]');
+  if (avatar) {
+    avatar.classList.remove('active');
+    avatar.classList.add('completing');
+    // Remove completing class after transition
+    setTimeout(function() {
+      avatar.classList.remove('completing');
+    }, 600);
+  }
+}
+
+function handleOrchestratorComplete(msg) {
+  var verdictEl = document.getElementById('orchestrator-verdict');
+  var contentEl = document.getElementById('verdict-content');
+  verdictEl.style.display = '';
+
+  // Store orchestrator raw payload for telemetry toggle
+  if (msg.rawJson) {
+    state.rawPayloads['__orchestrator__'] = msg.rawJson;
+  }
+
+  var text = msg.verdictText || '';
+
+  if (msg.skipDecrypt) {
+    // Instant reveal
+    contentEl.innerHTML = '';
+    var lines = text.split('\n');
+    lines.forEach(function(line) {
+      var div = document.createElement('div');
+      div.className = 'decrypt-line revealed';
+      div.textContent = line;
+      contentEl.appendChild(div);
+    });
+  } else {
+    // Run decrypt sequence
+    runDecryptSequence(text, contentEl);
+  }
+}
+
+function handleMetrics(msg) {
+  var data = msg.data || {};
+  document.getElementById('m-agents').textContent = data.agentCount || '--';
+  document.getElementById('m-tokens').textContent = formatTokens(data.totalTokens);
+  document.getElementById('m-elapsed').textContent = formatElapsed(data.elapsedMs || 0);
+  document.getElementById('metrics-strip').classList.add('visible');
+}
+
+// ── Decrypt Sequence ─────────────────────────────────────
+
+async function runDecryptSequence(text, container) {
+  container.innerHTML = '';
+  state.decryptSkipped = false;
+
+  var lines = text.split('\n');
+  if (!lines.length) return;
+
+  // Build all line elements first
+  var lineEls = [];
+  lines.forEach(function(line) {
+    var div = document.createElement('div');
+    div.className = 'decrypt-line';
+    div.dataset.final = line;
+    container.appendChild(div);
+    lineEls.push(div);
+  });
+
+  // Skip handler
+  var skipHandler = function() { state.decryptSkipped = true; };
+  document.addEventListener('click', skipHandler);
+  document.addEventListener('keypress', skipHandler);
+
+  for (var i = 0; i < lineEls.length; i++) {
+    var el = lineEls[i];
+    var finalText = el.dataset.final;
+
+    if (state.decryptSkipped) {
+      // Reveal all remaining instantly
+      for (var j = i; j < lineEls.length; j++) {
+        lineEls[j].textContent = lineEls[j].dataset.final;
+        lineEls[j].classList.remove('scrambling');
+        lineEls[j].classList.add('revealed');
+      }
+      break;
+    }
+
+    // Scramble phase: 280ms
+    el.classList.add('scrambling');
+    el.style.opacity = '0.7';
+    var scrambleEnd = Date.now() + 280;
+    while (Date.now() < scrambleEnd && !state.decryptSkipped) {
+      el.textContent = randomChars(Math.max(finalText.length, 1));
+      await sleep(40);
+    }
+
+    // Lock to final
+    el.textContent = finalText;
+    el.classList.remove('scrambling');
+    el.classList.add('revealed');
+
+    // 90ms gap before next line
+    if (i < lineEls.length - 1 && !state.decryptSkipped) {
+      await sleep(90);
+    }
+  }
+
+  // Cleanup
+  document.removeEventListener('click', skipHandler);
+  document.removeEventListener('keypress', skipHandler);
+}
+
+// ── Glitch Shimmer Scheduler ─────────────────────────────
+
+function scheduleGlitch(agentId) {
+  var delay = 8000 + Math.random() * 4000; // 8-12s
+
+  state.glitchTimers[agentId] = setTimeout(function() {
+    // Enforce 2-second minimum gap between any two glitches
+    var now = Date.now();
+    if (now - state.lastGlitchTime < 2000) {
+      // Reschedule with offset
+      scheduleGlitch(agentId);
+      return;
+    }
+
+    var avatar = document.querySelector('.agent-avatar[data-agent="' + agentId + '"]');
+    if (avatar && !avatar.classList.contains('active')) {
+      state.lastGlitchTime = now;
+      avatar.classList.add('glitching');
+      avatar.addEventListener('animationend', function handler() {
+        avatar.classList.remove('glitching');
+        avatar.removeEventListener('animationend', handler);
+      });
+    }
+
+    // Reschedule
+    scheduleGlitch(agentId);
+  }, delay);
+}
+
+// ── Telemetry Toggle ─────────────────────────────────────
+
+document.getElementById('telemetry-toggle').addEventListener('click', function() {
+  state.telemetryVisible = !state.telemetryVisible;
+  this.classList.toggle('active', state.telemetryVisible);
+
+  var sections = document.querySelectorAll('.agent-section');
+  sections.forEach(function(s) {
+    if (state.telemetryVisible) {
+      s.classList.add('telemetry-active');
+    } else {
+      s.classList.remove('telemetry-active');
+    }
+  });
+});
+
+// ── Fullscreen Toggle (notify parent) ────────────────────
+
+document.getElementById('fullscreen-toggle').addEventListener('click', function() {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'REPORT_FULLSCREEN_TOGGLE' }, '*');
+  }
+});
+
+</script>
+</body>
+</html>
