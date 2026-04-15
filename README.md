@@ -77,7 +77,7 @@ Electron Desktop App
 | **Auth** | 4 modules — bcrypt login, quantum-seeded sessions, MFA | ~500 |
 | **API Server** | FastAPI REST — 24 endpoints, Pydantic models, per-user data isolation | ~1,600 |
 | **Desktop** | Electron app — preload bridge, secure key manager, 4 HTML pages | ~7,500 |
-| **Tests** | 19 test files, **576 tests**, zero external dependencies | ~5,000 |
+| **Tests** | 24 test files, **643 tests**, zero external dependencies | ~6,200 |
 
 **Total: ~68 Python files, ~23,000+ lines of application code**
 
@@ -355,4 +355,4 @@ python -m pytest tests/ -q
 ---
 
 *Aether Systems LLC — Patent Pending*
-*Version 0.8.9 | See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version history*
+*Version 0.9.5 | See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version history*

@@ -4,7 +4,24 @@
 
 ---
 
-## v1.0.0 — AetherBrowser Integration + AetherForge Deployment (2026-04-14)
+## v0.9.5 — AetherBrowser Integration + Project Orchestrator Wiring Fix (2026-04-15)
+
+First shipped release after v0.9.4. Rolls two separate bodies of work into one version: the AetherBrowser / AetherForge infrastructure work (originally drafted as "v1.0.0" but never released) and the project orchestrator wiring fix.
+
+### Fixed — Project Orchestrator Frontend↔Backend Wiring
+- **Project orchestrator was fully broken on v0.9.4.** Every autonomous-goal chat query (`launchProject`) silently failed because four integration bugs in [desktop/pages/dashboard.html](desktop/pages/dashboard.html) prevented any request from reaching the backend.
+  - `launchProject`, `connectProjectStream`, `loadProjectContext` used relative URLs (`/project/start`, `/project/stream/...`, `/project/context/...`). Pages are loaded via `file://`, so these resolved to `file:///project/...` and never reached VPS2.
+  - Session tokens were read from `sessionStorage` / `localStorage` — keys that are **never populated anywhere** in the app. The real token lives in encrypted electron-store and is exposed via `window.aetherAPI.authGet()` / `getSessionToken()`.
+  - `POST /project/answer` was being called for agent question prompts, but **no such endpoint existed** in [project_routes.py](project_routes.py) — and `project_orchestrator.py` never emitted `question` events to begin with, making the entire answer-UI path unreachable dead code.
+- **Rewired all three hot-path calls** to use `authFetch(API_BASE + '/project/...')` with proper token resolution, and **removed the dead question-answer UI** (`renderOpenQuestion`, `answerProjectQuestion`, `case 'question'`) rather than stub a fake backend endpoint.
+
+### Verification — Orchestrator Fix
+- All 5 post-fix grep audits pass with zero matches (no relative `/project/` URLs, no `sessionStorage.session_token`, no `/project/answer`, no `renderOpenQuestion`/`answerProjectQuestion`, no `case 'question'` handlers).
+- SSE event-shape contract re-validated: every field the frontend reads (`ev.task_id`, `ev.title`, `ev.qopc_score`, `ev.error`, `ev.status`, `ev.done`, `ev.total`) is emitted by [project_orchestrator.py](project_orchestrator.py).
+- `/project/start` response-shape contract re-validated: `{project_id, task_count, tasks, message}` matches frontend reads.
+- `node -c` clean on `main.js`, `preload.js`, and extracted `dashboard.html` inline JS.
+- Backend pytest: **636 passed · 2 failed · 5 skipped** (the 2 failures are pre-existing stale tests in [tests/test_marketing_agent.py:572](tests/test_marketing_agent.py:572) and [tests/test_security_fixes.py:341](tests/test_security_fixes.py:341), unrelated to this fix).
+- Electron IPC contract re-audited: all 47 channels in [desktop/preload.js](desktop/preload.js) match `ipcMain.handle` / `on` declarations in [desktop/main.js](desktop/main.js).
 
 ### Browser Automation (NEW)
 - **AetherBrowser client** (`agent/aetherbrowser_client.py`) — async HTTP client for all AetherCloud-to-AetherBrowser communication with typed exceptions, session lifecycle management, and automatic cleanup in finally blocks
@@ -30,12 +47,22 @@
 | `agent/aetherbrowser_client.py` | 128 | Async HTTP client for browser automation |
 | `agent/browser_tool_injector.py` | 146 | Dynamic tool injection + operating manual |
 | `vault/browser_credential.py` | 148 | One-time credential token service |
+| `docs/SMOKE_TEST_v0.9.5.md` | — | 4-phase manual smoke-test plan for this release |
 
 ### Files Modified
 | File | Change |
 |------|--------|
+| `desktop/pages/dashboard.html` | Fixed `launchProject` / `connectProjectStream` / `loadProjectContext`; removed 36 lines of dead question-answer UI |
+| `project_routes.py` | Synced `DASHBOARD_PROJECT_JS` template string so future re-embeds stay consistent with the fixed dashboard code |
 | `api_server.py` | Added `requires_browser_sandbox` to TaskCreateRequest, browser tool injection call, `_process_browser_tool_loop()` tool routing, browser tool definitions |
 | `mcp_router.py` | Added `requires_browser_sandbox: bool = False` to ResolvedAgent, populated from team.json config |
+| `desktop/package.json` | Version bump 0.9.4 → 0.9.5 |
+| `README.md` | Version footer + test counts refreshed (643 tests) |
+
+### Known Non-Blockers (deferred)
+- [desktop/pages/terminal.html:280](desktop/pages/terminal.html:280) — MCP-routed terminal queries call `window.aether.authGet()` but `authGet` is exposed on `window.aetherAPI`. Error is swallowed by try/catch, leaving MCP requests unauthenticated. Non-blocking (non-MCP path still works via `aetherAPI.chat`) but should be fixed next patch.
+- Two stale test assertions: `test_total_suffix_count` expects 9 (current count is 10), `test_totp_code_is_8_digits` expects 8 (TOTP is 6-digit per RFC 6238). Tests need updating, not code.
+- One commit in the merged AetherBrowser work is tagged `(v1.0.0)` in its message (`96f4d29`) — that was a draft version name that never shipped. The actual released version is v0.9.5.
 
 ---
 

@@ -203,19 +203,15 @@ let _activeProject = null;
 let _projectEventSource = null;
 
 async function launchProject(goal) {
-  const token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
+  const token = await getSessionToken();
   if (!token) { showToast('Not logged in', 'error'); return; }
 
   showToast('Decomposing goal…', 'info', 4000);
   switchViewMode('agents');
 
   try {
-    const resp = await fetch('/project/start', {
+    const resp = await authFetch(`${API_BASE}/project/start`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
-      },
       body: JSON.stringify({ goal }),
     });
     if (!resp.ok) throw new Error(await resp.text());
@@ -232,7 +228,7 @@ async function launchProject(goal) {
 
 function connectProjectStream(projectId, token) {
   if (_projectEventSource) _projectEventSource.close();
-  const url = `/project/stream/${projectId}?token=${encodeURIComponent(token)}`;
+  const url = `${API_BASE}/project/stream/${projectId}?token=${encodeURIComponent(token)}`;
   _projectEventSource = new EventSource(url);
   _projectEventSource.onmessage = e => {
     try { handleProjectEvent(JSON.parse(e.data)); } catch (_) {}
@@ -267,9 +263,6 @@ function handleProjectEvent(ev) {
       showToast(msg, ok ? 'success' : 'warning', 5000);
       break;
     }
-    case 'question':
-      renderOpenQuestion(ev);
-      break;
   }
 }
 
@@ -329,44 +322,9 @@ function _setTaskStatus(taskId, status, ev) {
   if (status === 'failed' && ev && ev.error) card.title = ev.error;
 }
 
-function renderOpenQuestion(question) {
-  const container = document.querySelector('#chat-output, .chat-output');
-  if (!container) return;
-  const card = document.createElement('div');
-  card.style.cssText = 'background:#1a1a2e;border:1px solid #7c3aed;border-radius:8px;padding:12px;margin:8px 0;';
-  card.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;">
-      🤔 Agent needs input (${question.task_id||''})
-    </div>
-    <div style="font-size:12px;color:#eee;margin-bottom:8px;">${question.question||''}</div>
-    <div style="display:flex;gap:6px;">
-      <input id="pq-${question.question_id}" type="text" placeholder="Your answer…"
-             style="flex:1;background:#111;border:1px solid #333;border-radius:4px;padding:6px 8px;color:#eee;font-size:11px;">
-      <button onclick="answerProjectQuestion('${question.project_id}','${question.question_id}',document.getElementById('pq-${question.question_id}').value)"
-              style="background:#7c3aed;border:none;border-radius:4px;padding:6px 10px;color:#fff;font-size:11px;cursor:pointer;">
-        Answer
-      </button>
-    </div>`;
-  container.appendChild(card);
-  container.scrollTop = container.scrollHeight;
-}
-
-async function answerProjectQuestion(projectId, questionId, answer) {
-  const token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
-  try {
-    await fetch('/project/answer', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify({project_id:projectId, question_id:questionId, answer}),
-    });
-  } catch(e) { console.warn('[project] answer failed:', e); }
-}
-
 async function loadProjectContext(projectId) {
-  const token = sessionStorage.getItem('session_token') || localStorage.getItem('session_token');
   try {
-    const resp = await fetch(`/project/context/${projectId}?token=${encodeURIComponent(token)}`,
-      {headers: {'Authorization':'Bearer '+token}});
+    const resp = await authFetch(`${API_BASE}/project/context/${projectId}`);
     return resp.ok ? await resp.json() : null;
   } catch(e) { return null; }
 }
