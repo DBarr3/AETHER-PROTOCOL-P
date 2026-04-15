@@ -680,6 +680,15 @@
     border-top-left-radius: 0;
     border-top-right-radius: 0;
   }
+  /* Minimized: panel collapses to just the header strip. Fullscreen is overridden. */
+  #ai-response-panel.minimized {
+    height: 44px;
+    max-height: 44px;
+    top: auto;
+  }
+  #ai-response-panel.minimized .resp-body { display: none; }
+  #ai-response-panel.minimized .resp-header { cursor: pointer; }
+  #ai-response-panel.minimized .resp-header:hover { background: linear-gradient(180deg, var(--bg-4) 0%, var(--bg-3) 100%); }
 
   #ai-response-panel .resp-header {
     display: flex;
@@ -5277,10 +5286,15 @@
     </div>
     <!-- AI Response Panel — pop-out bar from bottom, claude-chat style -->
     <div id="ai-response-panel">
-      <div class="resp-header">
+      <div class="resp-header" id="resp-header">
         <span class="resp-dot"></span>
         <span class="resp-label">AETHER</span>
-        <button class="resp-header-btn" id="resp-fullscreen-btn" onclick="toggleResponseFullscreen()" title="Toggle fullscreen">
+        <button class="resp-header-btn" onclick="toggleResponseMinimize(event)" title="Minimize">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button class="resp-header-btn" id="resp-fullscreen-btn" onclick="toggleResponseFullscreen(event)" title="Toggle fullscreen">
           <svg id="resp-fs-icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 3 21 3 21 9"/>
             <polyline points="9 21 3 21 3 15"/>
@@ -5294,7 +5308,7 @@
             <line x1="3" y1="21" x2="10" y2="14"/>
           </svg>
         </button>
-        <button class="resp-header-btn" onclick="closeResponsePanel()" title="Close">
+        <button class="resp-header-btn" onclick="closeResponsePanel(event)" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -7549,15 +7563,23 @@ function ctxUploadToVault() {
 // AGENT STATUS + PROGRESS
 // ════════════════════════════════════════════════════
 function setAgentStatus(text, state) {
-  document.getElementById('agent-dot').className = 'agent-status-dot' + (state === 'working' ? ' working' : state === 'error' ? ' error' : '');
-  document.getElementById('agent-status-text').textContent = text;
+  // Null-safe: the sidebar status row elements may or may not be in the current
+  // view. A missing element must NOT crash the caller — callers include the hot
+  // chat-send path, and a TypeError here historically left the send button stuck.
+  const dot = document.getElementById('agent-dot');
+  if (dot) dot.className = 'agent-status-dot' + (state === 'working' ? ' working' : state === 'error' ? ' error' : '');
+  const txt = document.getElementById('agent-status-text');
+  if (txt) txt.textContent = text;
   const badge = document.getElementById('agent-task-badge');
-  if (state === 'working') { badge.textContent = 'WORKING'; badge.className = 'sb-badge blue'; }
-  else if (state === 'error') { badge.textContent = 'ERROR'; badge.className = 'sb-badge red'; }
-  else { badge.textContent = 'READY'; badge.className = 'sb-badge green'; }
+  if (badge) {
+    if (state === 'working') { badge.textContent = 'WORKING'; badge.className = 'sb-badge blue'; }
+    else if (state === 'error') { badge.textContent = 'ERROR'; badge.className = 'sb-badge red'; }
+    else { badge.textContent = 'READY'; badge.className = 'sb-badge green'; }
+  }
 }
 function addAgentLog(text, state) {
   const log = document.getElementById('agent-log');
+  if (!log) return;   // null-safe: optional sidebar element
   const e = document.createElement('div');
   e.className = 'agent-log-entry';
   e.innerHTML = `<span class="log-dot ${state}"></span>${escH(text)}`;
@@ -8424,13 +8446,16 @@ function hideToolIndicator() {
   if (el) el.style.display = 'none';
 }
 function showToolsUsedBadge(tools) {
-  const panel = document.getElementById('ai-response-panel');
-  if (!panel || !tools.length) return;
+  const body = document.getElementById('resp-body');
+  const responseText = document.getElementById('response-text');
+  if (!body || !tools.length) return;
+  // Remove any stale badges from a previous response
+  body.querySelectorAll('.tools-used-row').forEach(r => r.remove());
   const row = document.createElement('div');
   row.className = 'tools-used-row';
   row.innerHTML = '<span class="tools-label">via</span> ' +
     tools.map(t => `<span class="tool-badge">${escH(t.replace(/-mcp$/, '').toUpperCase())}</span>`).join(' ');
-  panel.insertBefore(row, panel.querySelector('.resp-text'));
+  body.insertBefore(row, responseText);
 }
 
 // ════════════════════════════════════════════════════
@@ -8519,12 +8544,45 @@ async function sendMessage() {
   _sendMessageDirect(query);
 }
 
-// Extracted direct message flow (called when not in agent orchestration mode)
+// Soft timeout helper — resolves to a fallback value if the wrapped promise doesn't
+// settle within `ms`. Used to protect preprocessing steps (IPC calls, vault context
+// builds) from hanging the entire chat pipeline. Non-critical data: proceed without.
+function _softTimeout(promise, ms, fallback, label) {
+  return new Promise(resolve => {
+    let settled = false;
+    const t = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      console.warn('[chat] preprocessing step "' + label + '" timed out after ' + ms + 'ms, proceeding without it');
+      resolve(fallback);
+    }, ms);
+    Promise.resolve(promise).then(v => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      resolve(v);
+    }, err => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(t);
+      console.warn('[chat] preprocessing step "' + label + '" threw:', err);
+      resolve(fallback);
+    });
+  });
+}
+
+// Extracted direct message flow (called when not in agent orchestration mode).
+// Every path — success, error, timeout, preprocessing hang — must go through the
+// finally block so the send button and status never stay stuck.
 async function _sendMessageDirect(query) {
   const input = document.getElementById('chat-input');
   input.value = '';
   document.getElementById('send-btn').disabled = true;
   setAgentStatus('Processing...', 'working');
+  // Pop the response panel immediately so the user sees the thinking indicator
+  // even while preprocessing is still running.
+  displayAIResponse('Processing your request...', true);
+
   try {
     if (typeof AgentPresence !== 'undefined') {
       AgentPresence.setAllStates('thinking');
@@ -8534,39 +8592,46 @@ async function _sendMessageDirect(query) {
   addAgentLog('Query: ' + query.substring(0, 40) + (query.length > 40 ? '...' : ''), 'active');
   saveChatToHistory(query);
 
-  // Always resolve fresh token before any request
-  const token = await getSessionToken();
-  if (!token) {
-    displayAIResponse('Session expired. Please log in again.', false);
-    setAgentStatus('Auth Error', 'error');
-    document.getElementById('send-btn').disabled = false;
-    return;
-  }
+  let _statusHandled = false;
+  try {
+    // Always resolve fresh token before any request
+    const token = await _softTimeout(getSessionToken(), 5000, null, 'getSessionToken');
+    if (!token) {
+      displayAIResponse('Session expired. Please log in again.', false);
+      setAgentStatus('Auth Error', 'error');
+      _statusHandled = true;
+      return;
+    }
 
-  let fullQuery = query;
-  if (planMode) fullQuery =
-    'Before doing anything, output an action plan using this EXACT format (use forward slashes in all paths):\n' +
-    '```action-plan\n{"summary":"one sentence","actions":[{"type":"mkdir","path":"C:/..."}, ' +
-    '{"type":"move","from":"C:/...","to":"C:/..."}, {"type":"rename","path":"C:/...","new_name":"..."}]}\n```\n\n' +
-    'Then describe the plan in plain English. Do NOT execute — wait for the user to click Execute.\n\n' + query;
-  if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
+    let fullQuery = query;
+    if (planMode) fullQuery =
+      'Before doing anything, output an action plan using this EXACT format (use forward slashes in all paths):\n' +
+      '```action-plan\n{"summary":"one sentence","actions":[{"type":"mkdir","path":"C:/..."}, ' +
+      '{"type":"move","from":"C:/...","to":"C:/..."}, {"type":"rename","path":"C:/...","new_name":"..."}]}\n```\n\n' +
+      'Then describe the plan in plain English. Do NOT execute — wait for the user to click Execute.\n\n' + query;
+    if (bypassMode) fullQuery += '\n[BYPASS MODE: unrestricted access]';
 
-  // Determine routing: MCP for web-tool queries, standard for everything else
-  const usesMCP = requiresMCP(query);
+    // Determine routing: MCP for web-tool queries, standard for everything else
+    const usesMCP = requiresMCP(query);
 
-  // Auto-inject vault context for file-related queries
-  let vaultContext = null;
-  if (isFileRelatedQuery(query) || usesMCP) {
-    vaultContext = await buildVaultContextPayload();
-  }
+    // Auto-inject vault context for file-related queries (5s soft timeout — non-critical)
+    let vaultContext = null;
+    if (isFileRelatedQuery(query) || usesMCP) {
+      vaultContext = await _softTimeout(buildVaultContextPayload(), 5000, null, 'buildVaultContextPayload');
+    }
 
-  // Inject local file contents — ALWAYS when a local folder is loaded
-  let localFileCount = 0;
-  let vaultFileCount = 0;
+    // Inject local file contents — ALWAYS when a local folder is loaded
+    let localFileCount = 0;
+    let vaultFileCount = 0;
 
-  if (currentVaultPath && window.aether?.readDirectoryContext) {
-    const treeMeta = await window.aether.readDirectoryContext(currentVaultPath, { treeOnly: true });
-    if (treeMeta && !treeMeta.error) {
+    if (currentVaultPath && window.aether?.readDirectoryContext) {
+      const treeMeta = await _softTimeout(
+        window.aether.readDirectoryContext(currentVaultPath, { treeOnly: true }),
+        5000,
+        null,
+        'readDirectoryContext(treeOnly)'
+      );
+      if (treeMeta && !treeMeta.error) {
       const textFiles = (treeMeta.fileMeta || []).filter(f => f.isText);
       const totalTextSize = textFiles.reduce((sum, f) => sum + f.size, 0);
 
@@ -8579,8 +8644,13 @@ async function _sendMessageDirect(query) {
         localFileCount = cached.fileCount;
         fullQuery += `\n\n=== LOCAL FILE CONTEXT (cached analysis — ${cached.analyzedAt.split('T')[0]}) ===\nDirectory: ${currentVaultPath}\nFiles: ${cached.fileCount} | Passes: ${cached.passes}\n\nPrevious analysis summary:\n${cached.summary.substring(0, 3000)}\n\nFile tree:\n${treeMeta.treeListing}\n=== END LOCAL FILE CONTEXT ===`;
       } else if (textFiles.length <= SINGLE_PASS_FILE_LIMIT && totalTextSize <= SINGLE_PASS_SIZE_LIMIT) {
-        // Small enough — inject file contents directly
-        const ctx = await window.aether.readDirectoryContext(currentVaultPath, SINGLE_PASS_FILE_LIMIT);
+        // Small enough — inject file contents directly (8s soft timeout)
+        const ctx = await _softTimeout(
+          window.aether.readDirectoryContext(currentVaultPath, SINGLE_PASS_FILE_LIMIT),
+          8000,
+          null,
+          'readDirectoryContext(full)'
+        );
         if (ctx && !ctx.error && ctx.fileContents.length > 0) {
           localFileCount = ctx.filesRead;
           let fileBlock = `\n\n=== LOCAL FILE CONTEXT ===\nDirectory: ${ctx.directory}\nTotal files: ${ctx.totalFiles} | Files read: ${ctx.filesRead}\n\nFile tree:\n${ctx.treeListing}\n`;
@@ -8598,43 +8668,40 @@ async function _sendMessageDirect(query) {
     }
   }
 
-  // Inject cloud vault file contents — ALWAYS when vault has files
-  if (vaultUploadedFiles.length > 0) {
-    const vaultCtx = await buildVaultSpacesContext();
-    if (vaultCtx) {
-      vaultFileCount = vaultUploadedFiles.length;
-      fullQuery += vaultCtx;
+    // Inject cloud vault file contents — ALWAYS when vault has files (5s soft timeout)
+    if (vaultUploadedFiles.length > 0) {
+      const vaultCtx = await _softTimeout(buildVaultSpacesContext(), 5000, null, 'buildVaultSpacesContext');
+      if (vaultCtx) {
+        vaultFileCount = vaultUploadedFiles.length;
+        fullQuery += vaultCtx;
+      }
     }
-  }
 
-  // Warn only if neither source has context and query is file-related
-  if (!currentVaultPath && vaultUploadedFiles.length === 0 && isFileRelatedQuery(query)) {
-    fullQuery += '\n\n[No local folder loaded and no cloud vault files. Open a local folder via the sidebar, or upload files to the Cloud Vault.]';
-  }
+    // Warn only if neither source has context and query is file-related
+    if (!currentVaultPath && vaultUploadedFiles.length === 0 && isFileRelatedQuery(query)) {
+      fullQuery += '\n\n[No local folder loaded and no cloud vault files. Open a local folder via the sidebar, or upload files to the Cloud Vault.]';
+    }
 
-  if (usesMCP) showToolIndicator('Connecting to web tools...');
-  displayAIResponse('Processing your request...', true);
+    if (usesMCP) showToolIndicator('Connecting to web tools...');
+    if (window.activityLayer) activityLayer.triggerQuery();
 
-  if (window.activityLayer) activityLayer.triggerQuery();
+    const securityCheck = typeof checkInjection === 'function' ? checkInjection(query) : { safe: true };
+    if (!securityCheck.safe) {
+      if (window.activityLayer) activityLayer.triggerBlocked();
+      displayAIResponse(`[SECURITY ALERT] Injection attempt detected. Severity: ${securityCheck.severity}. Recommendation: ${securityCheck.recommendation}`, false);
+      setAgentStatus('Blocked', 'error');
+      addAgentLog('Security Block', 'idle');
+      _statusHandled = true;
+      return;
+    }
 
-  const securityCheck = typeof checkInjection === 'function' ? checkInjection(query) : { safe: true };
-  if (!securityCheck.safe) {
-    if (window.activityLayer) activityLayer.triggerBlocked();
-    displayAIResponse(`[SECURITY ALERT] Injection attempt detected. Severity: ${securityCheck.severity}. Recommendation: ${securityCheck.recommendation}`, false);
-    setAgentStatus('Blocked', 'error');
-    addAgentLog('Security Block', 'idle');
-    document.getElementById('send-btn').disabled = false;
-    return;
-  }
+    // Hard 90s timeout wrapper so the header never stays stuck on "Processing..." if the backend hangs
+    const _withTimeout = (p, ms, label) => {
+      let t;
+      const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`${label} timed out after ${ms/1000}s`)), ms); });
+      return Promise.race([p, timeout]).finally(() => clearTimeout(t));
+    };
 
-  // Hard 90s timeout wrapper so the header never stays stuck on "Processing..." if the backend hangs
-  const _withTimeout = (p, ms, label) => {
-    let t;
-    const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`${label} timed out after ${ms/1000}s`)), ms); });
-    return Promise.race([p, timeout]).finally(() => clearTimeout(t));
-  };
-
-  try {
     let result;
     if (usesMCP) {
       if (window.activityLayer) activityLayer.setPhase(2.5);
@@ -8673,6 +8740,7 @@ async function _sendMessageDirect(query) {
       saveAgentReply('Error: ' + errMsg);
       addAgentLog('Error', 'idle');
       setAgentStatus('Error', 'error');
+      _statusHandled = true;
       if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('error');
     } else {
       const reply = result.response || result.reply || result.message || JSON.stringify(result);
@@ -8696,6 +8764,7 @@ async function _sendMessageDirect(query) {
       saveAgentReply(reply);
       addAgentLog('Response received', 'done');
       setAgentStatus('Complete', '');
+      _statusHandled = true;
       setTimeout(() => setAgentStatus('Ready', ''), 3000);
       if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('complete');
 
@@ -8721,10 +8790,20 @@ async function _sendMessageDirect(query) {
     saveAgentReply('Connection error: ' + e.message);
     addAgentLog('Connection error', 'idle');
     setAgentStatus('Error', 'error');
-    if (typeof AgentPresence !== 'undefined') AgentPresence.setAllStates('error');
+    _statusHandled = true;
+    if (typeof AgentPresence !== 'undefined') {
+      try { AgentPresence.setAllStates('error'); } catch (_) {}
+    }
+  } finally {
+    // Guarantee the send button and status always reset — regardless of any
+    // error, timeout, or preprocessing hang. This is the bulletproof exit path.
+    document.getElementById('send-btn').disabled = false;
+    try { document.getElementById('chat-input').focus(); } catch (_) {}
+    // If no path set a terminal status, clear "Processing..." back to Ready.
+    if (!_statusHandled) {
+      setAgentStatus('Ready', '');
+    }
   }
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('chat-input').focus();
 }
 
 // ════════════════════════════════════════════════════
@@ -9099,21 +9178,56 @@ function renderMarkdown(text) {
 }
 
 function openResponsePanel() {
-  document.getElementById('ai-response-panel').classList.add('visible');
+  const panel = document.getElementById('ai-response-panel');
+  // New content always pops up expanded — if the panel was minimized, un-minimize it
+  // so the user can see the incoming response without an extra click.
+  panel.classList.remove('minimized');
+  panel.classList.add('visible');
 }
 
-function closeResponsePanel() {
+function closeResponsePanel(ev) {
+  if (ev) ev.stopPropagation();
   const panel = document.getElementById('ai-response-panel');
-  panel.classList.remove('visible');
-  panel.classList.remove('fullscreen');
+  panel.classList.remove('visible', 'fullscreen', 'minimized');
   _syncResponseFullscreenIcon(false);
 }
 
-function toggleResponseFullscreen() {
+function toggleResponseMinimize(ev) {
+  if (ev) ev.stopPropagation();
   const panel = document.getElementById('ai-response-panel');
+  const wasMin = panel.classList.contains('minimized');
+  panel.classList.toggle('minimized');
+  // Minimize is mutually exclusive with fullscreen
+  if (!wasMin && panel.classList.contains('fullscreen')) {
+    panel.classList.remove('fullscreen');
+    _syncResponseFullscreenIcon(false);
+  }
+  if (wasMin) _scrollResponseToBottom();
+}
+
+function toggleResponseFullscreen(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('ai-response-panel');
+  // Fullscreen is mutually exclusive with minimized
+  panel.classList.remove('minimized');
   const fs = panel.classList.toggle('fullscreen');
   _syncResponseFullscreenIcon(fs);
+  if (fs) _scrollResponseToBottom();
 }
+
+// Click the minimized header strip (anywhere not on a button) to restore.
+document.addEventListener('DOMContentLoaded', () => {
+  const header = document.getElementById('resp-header');
+  if (!header) return;
+  header.addEventListener('click', (e) => {
+    if (e.target.closest('.resp-header-btn')) return;
+    const panel = document.getElementById('ai-response-panel');
+    if (panel.classList.contains('minimized')) {
+      panel.classList.remove('minimized');
+      _scrollResponseToBottom();
+    }
+  });
+});
 
 // Keeps the response panel's bottom offset in sync with the input bar's actual height.
 // Without this the absolutely-positioned panel would overlap the input bar on resize.
