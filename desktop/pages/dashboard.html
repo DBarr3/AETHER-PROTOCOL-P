@@ -3366,9 +3366,6 @@
     font-family: var(--font-mono);
   }
 
-  /* ── Agent Team Panel ──────────────────────────────────── */
-  .team-agent-row {
-
   /* ── Agent Profile Panel ─────────────────────────── */
   .profile-sidebar {
     width:240px;flex-shrink:0;border-right:1px solid var(--border);
@@ -13770,6 +13767,17 @@ document.addEventListener('keydown', (e) => {
 // ════════════════════════════════════════════════════
 // VERSION UPDATE BANNER
 // ════════════════════════════════════════════════════
+// Returns -1 if a<b, 0 if equal, 1 if a>b. Ignores non-numeric suffixes.
+function _cmpSemver(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
 function _showUpdateBanner(installed, latest) {
   const existing = document.getElementById('aether-update-banner');
   if (existing) existing.remove();
@@ -13783,8 +13791,8 @@ function _showUpdateBanner(installed, latest) {
     'padding:5px 40px','cursor:pointer','box-shadow:0 2px 8px rgba(0,0,0,.4)',
   ].join(';');
   bar.innerHTML =
-    `⬆ Update available — backend v${latest} / installed v${installed}. ` +
-    `Rebuild and reinstall AetherCloud-L-Setup-${latest}.exe. ` +
+    `\u2B06 Update available \u2014 backend v${latest} is newer than installed v${installed}. ` +
+    `Download and install AetherCloud-L-Setup-${latest}.exe. ` +
     `<span style="opacity:.6;font-weight:400;">(click to dismiss)</span>`;
   bar.onclick = () => bar.remove();
   document.body.appendChild(bar);
@@ -13797,7 +13805,7 @@ window.addEventListener('load', async () => {
   // Ensure session token is hydrated from electron-store before anything else
   await getSessionToken();
   document.getElementById('status-user').textContent = username;
-  const CURRENT_BACKEND_VERSION = '0.9.4'; // bumped each release
+  const CURRENT_BACKEND_VERSION = '0.9.5'; // fallback only; real value comes from /status
   let installerVersion = null;
   if (window.aether?.getVersion) {
     installerVersion = await window.aether.getVersion();
@@ -13806,14 +13814,19 @@ window.addEventListener('load', async () => {
     const tvEl = document.getElementById('title-bar-version');
     if (tvEl) tvEl.textContent = `AetherCloud-L v${installerVersion}`;
   }
-  // Version mismatch check — fire and forget, never blocks initCircuit
+  // Version mismatch check — only fire the banner when backend > installed.
+  // If installed >= backend, the user is either current or running a newer
+  // client than the VPS reports (e.g. backend not yet redeployed). Telling
+  // them to "install the backend's version" would be a downgrade — never do it.
   const _installedVer = installerVersion || '0.0.0';
   fetch(`${API_BASE}/status`)
     .then(r => r.ok ? r.json() : null)
     .then(d => {
       if (!d) return;
       const backendVer = d.version || CURRENT_BACKEND_VERSION;
-      if (backendVer !== _installedVer) _showUpdateBanner(_installedVer, backendVer);
+      if (_cmpSemver(backendVer, _installedVer) > 0) {
+        _showUpdateBanner(_installedVer, backendVer);
+      }
     })
     .catch(() => {}); // silently ignore — don't block startup
   if (localStorage.getItem('sidebar_collapsed') === 'true') {

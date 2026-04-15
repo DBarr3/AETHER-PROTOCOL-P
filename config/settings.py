@@ -61,7 +61,7 @@ CATEGORIES = frozenset({
 
 # ─── UI ─────────────────────────────────────────────────
 APP_NAME = "AetherCloud-L"
-APP_VERSION = "0.9.4"
+APP_VERSION = "0.9.5"
 APP_BANNER = f"""
 ╔══════════════════════════════════════════════╗
 ║   AETHER CLOUD-L  v{APP_VERSION}                     ║
