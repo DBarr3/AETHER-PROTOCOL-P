@@ -14528,7 +14528,7 @@ window.addEventListener('load', async () => {
   // Ensure session token is hydrated from electron-store before anything else
   await getSessionToken();
   document.getElementById('status-user').textContent = username;
-  const CURRENT_BACKEND_VERSION = '0.9.5'; // fallback only; real value comes from /status
+  const CURRENT_BACKEND_VERSION = '0.9.6'; // fallback only; real value comes from /status
   let installerVersion = null;
   if (window.aether?.getVersion) {
     installerVersion = await window.aether.getVersion();
