@@ -1037,14 +1037,14 @@
   .presence-icon-wrap {
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    border: 1.5px solid transparent;
+    border-radius: 0;
+    border: none;
     background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    transition: border-color 200ms ease, transform 200ms ease;
+    transition: transform 200ms ease;
   }
   .presence-icon-wrap img,
   .presence-icon-wrap svg {
@@ -10862,7 +10862,7 @@ const AgentPresence = (function () {
         '<div class="presence-card idle" id="pcard-' + escH(agent.id) +
         '" title="' + escH(agent.name || '') +
         '" onclick="AgentPresence.onCardClick(\'' + escH(String(agent.id).replace(/\'/g, '')) + '\')">' +
-          '<div class="presence-icon-wrap" style="border-color:' + color + '50;animation-delay:' + delay + 's">' +
+          '<div class="presence-icon-wrap" style="animation-delay:' + delay + 's">' +
             iconHTML(agent) +
           '</div>' +
           '<div class="presence-dots">' +
@@ -10874,7 +10874,9 @@ const AgentPresence = (function () {
         '</div>';
     }).join('');
 
-    // Post-render: animate pixel-art icons in presence bar
+    // Post-render: animate pixel-art icons in presence bar with random sequence cycling.
+    // Each agent continuously cycles through all 3 of its built-in sequences
+    // (e.g. Monarch: reign → strut → idle → reign → ...) with random pauses between.
     setTimeout(function() {
       if (!window.agentAnimator) return;
       activeAgents.forEach(function(agent) {
@@ -10883,7 +10885,7 @@ const AgentPresence = (function () {
           var card = document.getElementById('pcard-' + agent.id);
           if (card) {
             var wrap = card.querySelector('.presence-icon-wrap');
-            if (wrap) window.agentAnimator.animate(wrap, iName, { size: 26, sequence: 'idle' });
+            if (wrap) window.agentAnimator.animateRandomCycle(wrap, iName, { size: 26 });
           }
         }
       });
@@ -14681,7 +14683,7 @@ function renderSidebar() {
         cards.forEach(function(card) {
           if (card.getAttribute('onclick') && card.getAttribute('onclick').includes(p.id)) {
             var iconDiv = card.querySelector('.profile-card-icon');
-            if (iconDiv) window.agentAnimator.animate(iconDiv, p.icon, { size: 36, sequence: 'idle' });
+            if (iconDiv) window.agentAnimator.animateRandomCycle(iconDiv, p.icon, { size: 36 });
           }
         });
       }
@@ -14975,7 +14977,7 @@ function renderEditor(profile) {
   setTimeout(function() {
     if (window.agentAnimator && window.agentAnimator.hasAnimation(profile.icon)) {
       var preview = document.getElementById('profile-icon-preview');
-      if (preview) window.agentAnimator.animate(preview, profile.icon, { size: 72, sequence: 'duck' });
+      if (preview) window.agentAnimator.animateRandomCycle(preview, profile.icon, { size: 72 });
     }
     // Init slider fills
     var ts = document.getElementById('as-temp-slider');
@@ -15126,7 +15128,7 @@ function renderPresetCarousel() {
     // Animate if data available
     if (window.agentAnimator && window.agentAnimator.hasAnimation(a.iconName)) {
       var tileEl = card.querySelector('.as-pcard-tile');
-      if (tileEl) window.agentAnimator.animate(tileEl, a.iconName, { size: 36, sequence: 'idle' });
+      if (tileEl) window.agentAnimator.animateRandomCycle(tileEl, a.iconName, { size: 36 });
     }
   });
 
@@ -15171,7 +15173,7 @@ function selectPreset(id) {
   // Animate preview icon
   if (window.agentAnimator && window.agentAnimator.hasAnimation(a.iconName)) {
     var previewTile = left.querySelector('.as-preview-tile');
-    if (previewTile) window.agentAnimator.animate(previewTile, a.iconName, { size: 40, sequence: 'duck' });
+    if (previewTile) window.agentAnimator.animateRandomCycle(previewTile, a.iconName, { size: 40 });
   }
 
   // Format prompt with tags highlighted
@@ -15379,7 +15381,7 @@ window.profileSelectIcon = function(iconName) {
   if (preview) {
     // Check for animation — animate if available, otherwise static SVG
     if (window.agentAnimator && window.agentAnimator.hasAnimation(iconName)) {
-      window.agentAnimator.animate(preview, iconName, { size: 72, sequence: 'duck' });
+      window.agentAnimator.animateRandomCycle(preview, iconName, { size: 72 });
     } else if (icon) {
       preview.innerHTML = icon.svgContent;
     }
@@ -16762,9 +16764,98 @@ function animate(container, iconName, opts) {
 function hasAnimation(iconName) { return !!_animData[iconName]; }
 function stopAll() { _activeAnims.forEach(function(h) { h.stop(); }); _activeAnims = []; }
 
+/**
+ * Randomly cycles through ALL sequences for an agent on a continuous loop.
+ * Plays one sequence, waits a random pause (2-6s), picks another randomly, repeats.
+ * This gives each agent a unique, organic idle behavior using the 3 built-in
+ * sequences from the animation HTML files (e.g. reign/strut/idle for Monarch).
+ */
+function animateRandomCycle(container, iconName, opts) {
+  opts = opts || {};
+  var config = _animData[iconName];
+  if (!config) return null;
+
+  var size = opts.size || 72;
+  var seqNames = Object.keys(config.sequences || {});
+  if (seqNames.length === 0) return null;
+
+  var gridW = config.gridWidth || 11;
+  var gridH = (config.gridHeight || 9) + 4;
+  var scale = Math.max(1, Math.floor(size / Math.max(gridW, gridH)));
+
+  var canvas = document.createElement('canvas');
+  canvas.width = gridW * scale;
+  canvas.height = gridH * scale;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  canvas.style.display = 'block';
+
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  var ctx = canvas.getContext('2d');
+  var running = true;
+  var timer = null;
+  var lastSeqName = null;
+
+  function pickRandomSeq() {
+    // Avoid repeating the same sequence twice in a row when possible
+    if (seqNames.length <= 1) return seqNames[0];
+    var pool = seqNames.filter(function(n) { return n !== lastSeqName; });
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function playSequence(seqName, onDone) {
+    lastSeqName = seqName;
+    var seq = config.sequences[seqName];
+    if (!seq || !seq.frames || seq.frames.length === 0) { onDone(); return; }
+    var step = 0;
+    var totalFrames = seq.frames.length;
+
+    function tick() {
+      if (!running) return;
+      var frameIdx = seq.frames[step];
+      var pixels = computeFrame(config, frameIdx);
+      drawPixels(ctx, pixels, scale);
+      step++;
+      if (step >= totalFrames) {
+        // Sequence complete — callback after the last frame holds
+        onDone();
+      } else {
+        timer = setTimeout(tick, seq.delays[step] || 200);
+      }
+    }
+    tick();
+  }
+
+  function cycle() {
+    if (!running) return;
+    var seqName = pickRandomSeq();
+    playSequence(seqName, function() {
+      if (!running) return;
+      // Random pause between sequences: 2-6 seconds
+      var pause = 2000 + Math.floor(Math.random() * 4000);
+      timer = setTimeout(cycle, pause);
+    });
+  }
+
+  // Start immediately with a random sequence
+  cycle();
+
+  var handle = {
+    stop: function() { running = false; if (timer) clearTimeout(timer); },
+    canvas: canvas,
+    iconName: iconName,
+  };
+  _activeAnims.push(handle);
+  return handle;
+}
+
 window.agentAnimator = {
   load: loadAnimations,
   animate: animate,
+  animateRandomCycle: animateRandomCycle,
   hasAnimation: hasAnimation,
   stopAll: stopAll,
   getData: function() { return _animData; },
