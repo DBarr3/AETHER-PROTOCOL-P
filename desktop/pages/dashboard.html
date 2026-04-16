@@ -1699,6 +1699,76 @@
     min-height: 10px;
   }
 
+  /* ── Empty slot node (+) — shows when no agent assigned to a category ── */
+  .orbit-slot-empty {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    z-index: 5;
+    transition: transform 200ms ease;
+  }
+  .orbit-slot-empty:hover { transform: translate(-50%, -50%) scale(1.08); }
+  .orbit-slot-empty:hover .orbit-slot-icon { border-color: var(--accent); color: var(--accent); }
+  .orbit-slot-icon {
+    width: 52px;
+    height: 52px;
+    border: 2px dashed var(--border-2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 22px;
+    font-weight: 300;
+    transition: border-color 160ms ease, color 160ms ease;
+    background: rgba(255,255,255,0.02);
+  }
+  .orbit-slot-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    text-align: center;
+    max-width: 80px;
+  }
+
+  /* ── Sub-agent (+) node — branches off active agents ────────── */
+  .orbit-subagent {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 6;
+    cursor: pointer;
+    transition: transform 160ms ease;
+  }
+  .orbit-subagent:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .orbit-subagent-circle {
+    width: 28px;
+    height: 28px;
+    border: 1.5px dashed var(--border-2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 300;
+    background: transparent;
+    transition: border-color 140ms ease, color 140ms ease;
+  }
+  .orbit-subagent:hover .orbit-subagent-circle {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   /* ── Agent node ──────────────────────────────────────────────── */
   .agent-node-v3 {
     position: absolute;
@@ -10433,6 +10503,26 @@ function orchMenuAddAgent() {
   }, 100);
 }
 
+// ── Slot click handlers — route to the appropriate creation flow ───
+function _orbitSlotClick(slotKey) {
+  if (slotKey === 'mcp') {
+    // Open spawn modal for MCP agents (email, analyzer, etc.)
+    if (typeof openSpawnModal === 'function') openSpawnModal();
+  } else if (slotKey === 'prebuilt') {
+    // Switch to Profiles tab and show the preset carousel
+    if (typeof switchAgentSubTab === 'function') switchAgentSubTab('profiles');
+    setTimeout(function() {
+      if (typeof showEmptyState === 'function') showEmptyState();
+    }, 100);
+  } else {
+    // custom / extra — open full custom agent editor
+    if (typeof switchAgentSubTab === 'function') switchAgentSubTab('profiles');
+    setTimeout(function() {
+      if (typeof profileNew === 'function') profileNew();
+    }, 100);
+  }
+}
+
 function orchMenuViewLogs() {
   _closeOrchMenu();
   // Show the task panel sidebar and scroll to the output section
@@ -10440,6 +10530,26 @@ function orchMenuViewLogs() {
   if (output) output.scrollIntoView({ behavior: 'smooth', block: 'center' });
   var panel = document.getElementById('v3-task-panel');
   if (panel) panel.style.display = 'flex';
+}
+
+// ── Fixed 4-slot category layout ────────────────────────────────────
+// Slots always visible: top=custom, left=MCP, right=prebuilt, bottom=overflow
+// Empty slots show (+) placeholder; filled slots show agent + sub-agent branches.
+var ORBIT_SLOTS = [
+  { key: 'custom',   label: 'CUSTOM',   angle: -90 },   // top
+  { key: 'mcp',      label: 'MCP',      angle: 180 },   // left
+  { key: 'prebuilt', label: 'PREBUILT', angle: 0 },      // right
+  { key: 'extra',    label: 'AGENT',    angle: 90 },     // bottom
+];
+
+function _classifyAgent(agent) {
+  // Determine slot category from agent properties
+  if (agent.mcpAgents && agent.mcpAgents.length > 0) return 'mcp';
+  // Check if it matches a preset name
+  var presetNames = (typeof AGENT_PRESETS !== 'undefined' && Array.isArray(AGENT_PRESETS))
+    ? AGENT_PRESETS.map(function(p) { return p.name; }) : [];
+  if (presetNames.indexOf(agent.name) !== -1) return 'prebuilt';
+  return 'custom';
 }
 
 function renderV3Canvas() {
@@ -10452,7 +10562,7 @@ function renderV3Canvas() {
   const orch = document.getElementById('v3-orch');
   if (!canvas || !layer || !lines || !emptyState || !orch) return;
 
-  // Reconcile agent states (drop states for removed agents)
+  // Reconcile agent states
   const aliveIds = new Set(spawnedAgents.map(a => a.id));
   for (const id of Array.from(V3.agentStates.keys())) {
     if (!aliveIds.has(id)) V3.agentStates.delete(id);
@@ -10460,64 +10570,165 @@ function renderV3Canvas() {
   for (const id of Array.from(V3.agentPos.keys())) {
     if (!aliveIds.has(id)) V3.agentPos.delete(id);
   }
-  // Reconcile QOPC syncs
   for (const [id, sync] of Array.from(V3.qopcSyncs.entries())) {
     if (!aliveIds.has(id)) { try { sync.stop(); } catch(_){} V3.qopcSyncs.delete(id); V3.lastSync.delete(id); }
   }
 
-  // Clear layer + lines
   layer.innerHTML = '';
   lines.innerHTML = '';
 
-  // Empty state
-  if (spawnedAgents.length === 0) {
-    emptyState.style.display = 'flex';
-    orch.style.display = 'none';
-    v3RenderTaskPanel();
-    return;
-  }
+  // Always show AETHER center + the 4 category slots
   emptyState.style.display = 'none';
   orch.style.display = 'flex';
 
-  // Compute agent positions radially around center
   const rect = canvas.getBoundingClientRect();
   const cx = rect.width / 2;
   const cy = rect.height / 2;
-  const radius = Math.max(120, Math.min(rect.width, rect.height) * 0.28);
-  const positions = v3LayoutRadial(spawnedAgents.length, cx, cy, radius);
+  const radius = Math.max(130, Math.min(rect.width, rect.height) * 0.30);
 
-  // Render each agent node + its connection line
-  spawnedAgents.forEach((agent, i) => {
-    const pos = positions[i];
-    V3.agentPos.set(agent.id, pos);
-    if (!V3.agentStates.has(agent.id)) V3.agentStates.set(agent.id, 'IDLE');
-
-    const state = V3.agentStates.get(agent.id);
-    const node = v3BuildAgentNode(agent, state);
-    node.style.left = pos.x + 'px';
-    node.style.top = pos.y + 'px';
-    layer.appendChild(node);
-
-    // Connection line (orchestrator center to node)
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(cx));
-    line.setAttribute('y1', String(cy));
-    line.setAttribute('x2', String(pos.x));
-    line.setAttribute('y2', String(pos.y));
-    line.setAttribute('data-agent-id', String(agent.id));
-    line.setAttribute('data-state', state);
-    lines.appendChild(line);
-
-    // Ensure QOPC sync is running for this agent
-    if (!V3.qopcSyncs.has(agent.id)) {
-      const sync = new AgentQOPCSync(agent.id, (result) => {
-        V3.lastSync.set(agent.id, Date.now());
-        v3UpdateSyncLabel(agent.id);
-      });
-      sync.start();
-      V3.qopcSyncs.set(agent.id, sync);
+  // Classify agents into category buckets
+  var buckets = { custom: [], mcp: [], prebuilt: [], extra: [] };
+  spawnedAgents.forEach(function(agent) {
+    var cat = _classifyAgent(agent);
+    if (buckets[cat].length === 0) {
+      buckets[cat].push(agent);
+    } else {
+      // Overflow to 'extra' slot or append to existing
+      if (buckets.extra.length === 0) buckets.extra.push(agent);
+      else buckets[cat].push(agent);
     }
   });
+
+  // Render each slot
+  ORBIT_SLOTS.forEach(function(slot) {
+    var angleRad = slot.angle * Math.PI / 180;
+    var sx = cx + Math.cos(angleRad) * radius;
+    var sy = cy + Math.sin(angleRad) * radius;
+
+    // Draw connection line from center to slot position
+    var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(cx));
+    line.setAttribute('y1', String(cy));
+    line.setAttribute('x2', String(sx));
+    line.setAttribute('y2', String(sy));
+    line.setAttribute('stroke', 'rgba(0,212,216,0.12)');
+    line.setAttribute('stroke-width', '1');
+    line.setAttribute('stroke-dasharray', '4 4');
+    lines.appendChild(line);
+
+    var agents = buckets[slot.key] || [];
+
+    if (agents.length === 0) {
+      // ── EMPTY SLOT: show (+) placeholder ──
+      var emptyNode = document.createElement('div');
+      emptyNode.className = 'orbit-slot-empty';
+      emptyNode.style.left = sx + 'px';
+      emptyNode.style.top = sy + 'px';
+      emptyNode.innerHTML =
+        '<div class="orbit-slot-icon">+</div>' +
+        '<div class="orbit-slot-label">' + slot.label + '</div>';
+      emptyNode.addEventListener('click', (function(slotKey) {
+        return function() { _orbitSlotClick(slotKey); };
+      })(slot.key));
+      layer.appendChild(emptyNode);
+    } else {
+      // ── FILLED SLOT: show agent node + sub-agent branches ──
+      var primary = agents[0];
+      V3.agentPos.set(primary.id, { x: sx, y: sy });
+      if (!V3.agentStates.has(primary.id)) V3.agentStates.set(primary.id, 'IDLE');
+      var state = V3.agentStates.get(primary.id);
+      var node = v3BuildAgentNode(primary, state);
+      node.style.left = sx + 'px';
+      node.style.top = sy + 'px';
+      layer.appendChild(node);
+
+      // Update connection line to solid for active agents
+      line.setAttribute('stroke', 'rgba(0,212,216,0.25)');
+      line.setAttribute('stroke-dasharray', 'none');
+
+      // QOPC sync
+      if (!V3.qopcSyncs.has(primary.id)) {
+        var sync = new AgentQOPCSync(primary.id, function(result) {
+          V3.lastSync.set(primary.id, Date.now());
+          v3UpdateSyncLabel(primary.id);
+        });
+        sync.start();
+        V3.qopcSyncs.set(primary.id, sync);
+      }
+
+      // ── SUB-AGENT BRANCHES: small (+) nodes radiating off the agent ──
+      var subRadius = 60;
+      var subAngles = [angleRad - 0.6, angleRad + 0.6]; // two branches at ±35° offset
+      subAngles.forEach(function(subAngle, si) {
+        var bx = sx + Math.cos(subAngle) * subRadius;
+        var by = sy + Math.sin(subAngle) * subRadius;
+
+        // Sub-agent connection line
+        var subLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        subLine.setAttribute('x1', String(sx));
+        subLine.setAttribute('y1', String(sy));
+        subLine.setAttribute('x2', String(bx));
+        subLine.setAttribute('y2', String(by));
+        subLine.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+        subLine.setAttribute('stroke-width', '1');
+        subLine.setAttribute('stroke-dasharray', '3 3');
+        lines.appendChild(subLine);
+
+        // Check if there's an additional agent for this sub-slot
+        var subAgent = agents[si + 1];
+        if (subAgent) {
+          V3.agentPos.set(subAgent.id, { x: bx, y: by });
+          if (!V3.agentStates.has(subAgent.id)) V3.agentStates.set(subAgent.id, 'IDLE');
+          var subState = V3.agentStates.get(subAgent.id);
+          var subNode = v3BuildAgentNode(subAgent, subState);
+          subNode.style.left = bx + 'px';
+          subNode.style.top = by + 'px';
+          subNode.style.transform = 'translate(-50%, -50%) scale(0.8)';
+          layer.appendChild(subNode);
+        } else {
+          // Empty sub-agent slot
+          var subEmpty = document.createElement('div');
+          subEmpty.className = 'orbit-subagent';
+          subEmpty.style.left = bx + 'px';
+          subEmpty.style.top = by + 'px';
+          subEmpty.innerHTML = '<div class="orbit-subagent-circle">+</div>';
+          subEmpty.addEventListener('click', (function(slotKey) {
+            return function() { _orbitSlotClick(slotKey); };
+          })(slot.key));
+          layer.appendChild(subEmpty);
+        }
+      });
+    }
+  });
+
+  // Also render any agents beyond the 4 slots as extra radial nodes
+  var extraAgents = [];
+  spawnedAgents.forEach(function(agent) {
+    var rendered = false;
+    V3.agentPos.forEach(function(pos, id) { if (id === agent.id) rendered = true; });
+    if (!rendered) extraAgents.push(agent);
+  });
+  if (extraAgents.length > 0) {
+    var extraPositions = v3LayoutRadial(extraAgents.length, cx, cy, radius * 1.5);
+    extraAgents.forEach(function(agent, i) {
+      var pos = extraPositions[i];
+      V3.agentPos.set(agent.id, pos);
+      if (!V3.agentStates.has(agent.id)) V3.agentStates.set(agent.id, 'IDLE');
+      var state = V3.agentStates.get(agent.id);
+      var node = v3BuildAgentNode(agent, state);
+      node.style.left = pos.x + 'px';
+      node.style.top = pos.y + 'px';
+      layer.appendChild(node);
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', String(cx));
+      line.setAttribute('y1', String(cy));
+      line.setAttribute('x2', String(pos.x));
+      line.setAttribute('y2', String(pos.y));
+      line.setAttribute('stroke', 'rgba(0,212,216,0.15)');
+      line.setAttribute('stroke-width', '1');
+      lines.appendChild(line);
+    });
+  }
 
   // Attach ResizeObserver once
   if (!V3.resizeObserver && typeof ResizeObserver !== 'undefined') {
@@ -10529,7 +10740,6 @@ function renderV3Canvas() {
     V3.resizeObserver.observe(canvas);
   }
 
-  // Start the sync-label refresh ticker (updates "sync Ns ago" every 5s)
   if (!V3.syncTicker) {
     V3.syncTicker = setInterval(() => {
       spawnedAgents.forEach(a => v3UpdateSyncLabel(a.id));
