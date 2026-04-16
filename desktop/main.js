@@ -388,7 +388,9 @@ ipcMain.handle('fs:previewPlan', async (_e, actions) => {
 
 // ── IPC: Agent Profile System ───────────────────────
 ipcMain.handle('agent:loadIcons', async () => {
-  const iconsPath = path.join(__dirname, '..', 'agent', 'agents');
+  // Icons are packaged inside desktop/assets/agents/ so they're available
+  // in both development (electron .) and installed builds (inside asar).
+  const iconsPath = path.join(__dirname, 'assets', 'agents');
   try {
     const files = fs.readdirSync(iconsPath).filter(f => f.endsWith('.svg'));
     return files.map(file => ({
