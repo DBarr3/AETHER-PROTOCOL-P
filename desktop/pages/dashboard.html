@@ -1522,6 +1522,104 @@
     overflow: hidden;
   }
 
+  /* ── Orbit Team Header Bar ────────────────────────────────────── */
+  .orbit-team-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    flex-shrink: 0;
+  }
+  .orbit-team-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .orbit-team-select {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #fff;
+    background: var(--blue);
+    border: none;
+    border-radius: 20px;
+    padding: 5px 14px 5px 10px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
+    min-width: 120px;
+    transition: box-shadow 140ms ease, background 140ms ease;
+  }
+  .orbit-team-select:hover {
+    box-shadow: 0 2px 12px rgba(59,130,246,0.4);
+  }
+  .orbit-team-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.5);
+  }
+
+  /* ── AETHER Click Menu ─────────────────────────────────────────── */
+  .orch-click-menu {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + 56px);
+    transform: translateX(-50%);
+    z-index: 80;
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    padding: 4px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 170px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    animation: orchMenuAppear 150ms ease forwards;
+  }
+  .orch-click-menu.open { display: flex; }
+  @keyframes orchMenuAppear {
+    from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .orch-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--text-primary);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .orch-menu-item:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .orch-menu-item svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .orch-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 2px 8px;
+  }
+
   .v3-canvas {
     position: relative;
     flex: 1;
@@ -1547,6 +1645,11 @@
     display: flex; flex-direction: column; align-items: center; gap: 8px;
     z-index: 4;
     pointer-events: auto;
+    cursor: pointer;
+  }
+  .v3-orchestrator:hover .orch-lock-svg {
+    filter: drop-shadow(0 0 14px rgba(0,212,216,0.6));
+    transform: scale(1.05);
   }
   .orch-pulse-ring {
     position: relative;
@@ -4833,9 +4936,16 @@
       <div class="agent-detail" id="agent-detail"></div>
       <!-- Agent Mode Orbit Panel (V3 — live team canvas) -->
       <div class="agent-orbit-panel" id="agent-orbit-panel">
+        <!-- Team header bar with active team + blue dropdown switcher -->
+        <div class="orbit-team-bar" id="orbit-team-bar">
+          <span class="orbit-team-label" id="orbit-team-label">TEAM</span>
+          <select class="orbit-team-select" id="orbit-team-select" onchange="orbitSwitchTeam(this.value)">
+            <option value="all">All Teams</option>
+          </select>
+        </div>
         <div class="v3-canvas" id="v3-canvas">
           <svg class="v3-lines" id="v3-lines" xmlns="http://www.w3.org/2000/svg"></svg>
-          <div class="v3-orchestrator" id="v3-orch" data-orch="IDLE">
+          <div class="v3-orchestrator" id="v3-orch" data-orch="IDLE" onclick="toggleOrchMenu(event)">
             <div class="orch-pulse-ring">
               <svg class="orch-lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="4" y="11" width="16" height="10" rx="2"></rect>
@@ -4845,6 +4955,26 @@
             </div>
             <div class="orch-label">AETHER</div>
             <div class="orch-sublabel" id="v3-orch-sublabel">IDLE</div>
+          </div>
+          <!-- AETHER click menu: add agent / view logs -->
+          <div class="orch-click-menu" id="orch-click-menu">
+            <div class="orch-menu-item" onclick="orchMenuAddAgent()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Add Agent
+            </div>
+            <div class="orch-menu-divider"></div>
+            <div class="orch-menu-item" onclick="orchMenuViewLogs()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="8" y1="9" x2="16" y2="9"/>
+                <line x1="8" y1="13" x2="13" y2="13"/>
+              </svg>
+              View Logs
+            </div>
           </div>
           <div class="v3-agent-layer" id="v3-agent-layer"></div>
           <div class="v3-empty-state" id="v3-empty-state" style="display:none;">
@@ -10241,7 +10371,75 @@ const V3 = {
 };
 
 function renderAgentOrbitPanel() {
+  populateOrbitTeamDropdown();
   renderV3Canvas();
+}
+
+// ── Orbit Team Header ──────────────────────────────────────────────
+function populateOrbitTeamDropdown() {
+  var sel = document.getElementById('orbit-team-select');
+  var label = document.getElementById('orbit-team-label');
+  if (!sel) return;
+  var teams = (typeof TEAMS !== 'undefined') ? TEAMS : ['Default Team'];
+  sel.innerHTML = '<option value="all">All Teams</option>' +
+    teams.map(function(t) {
+      var selected = (typeof currentTeamFilter !== 'undefined' && currentTeamFilter === t) ? ' selected' : '';
+      return '<option value="' + t + '"' + selected + '>' + t + '</option>';
+    }).join('');
+  // Update header label
+  if (label) {
+    var active = sel.value === 'all' ? 'ALL TEAMS' : sel.value.toUpperCase();
+    label.textContent = active;
+  }
+}
+
+function orbitSwitchTeam(value) {
+  if (typeof currentTeamFilter !== 'undefined') {
+    currentTeamFilter = value === 'all' ? 'all' : value;
+  }
+  var label = document.getElementById('orbit-team-label');
+  if (label) label.textContent = value === 'all' ? 'ALL TEAMS' : value.toUpperCase();
+  // Re-render orbit + sidebar with the new team filter
+  renderV3Canvas();
+  if (typeof renderSidebar === 'function') renderSidebar();
+}
+
+// ── AETHER Click Menu ──────────────────────────────────────────────
+function toggleOrchMenu(ev) {
+  ev.stopPropagation();
+  var menu = document.getElementById('orch-click-menu');
+  if (!menu) return;
+  var isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open');
+  // Close on next outside click
+  if (!isOpen) {
+    setTimeout(function() {
+      document.addEventListener('click', _closeOrchMenu, { once: true });
+    }, 0);
+  }
+}
+
+function _closeOrchMenu() {
+  var menu = document.getElementById('orch-click-menu');
+  if (menu) menu.classList.remove('open');
+}
+
+function orchMenuAddAgent() {
+  _closeOrchMenu();
+  // Switch to the Profiles sub-tab and open the new-agent editor
+  if (typeof switchAgentSubTab === 'function') switchAgentSubTab('profiles');
+  setTimeout(function() {
+    if (typeof profileNew === 'function') profileNew();
+  }, 100);
+}
+
+function orchMenuViewLogs() {
+  _closeOrchMenu();
+  // Show the task panel sidebar and scroll to the output section
+  var output = document.getElementById('v3-tp-output');
+  if (output) output.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  var panel = document.getElementById('v3-task-panel');
+  if (panel) panel.style.display = 'flex';
 }
 
 function renderV3Canvas() {
