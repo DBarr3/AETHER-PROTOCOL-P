@@ -404,7 +404,9 @@ ipcMain.handle('agent:loadIcons', async () => {
 });
 
 ipcMain.handle('agent:loadAnimations', async () => {
-  const animPath = path.join(__dirname, '..', 'agent', 'agents', 'animations');
+  // Animation JSON data is packaged inside desktop/assets/agents/animations/
+  // so it's available in both development and installed builds.
+  const animPath = path.join(__dirname, 'assets', 'agents', 'animations');
   try {
     if (!fs.existsSync(animPath)) return {};
     const files = fs.readdirSync(animPath).filter(f => f.endsWith('.json'));
