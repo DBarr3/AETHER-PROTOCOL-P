@@ -1365,8 +1365,8 @@ async def agent_chat(request: Request, req: ChatRequest, token: str = Depends(ge
         else:
             response_text = svc.agent.chat(query)
     except Exception as e:
-        log.warning("agent.chat failed: %s", e)
-        response_text = "Agent encountered an error — please try again."
+        log.warning("agent.chat failed: %s", e, exc_info=True)
+        response_text = f"Agent error: {type(e).__name__}: {str(e)[:200]}"
 
     verified = hasattr(svc.agent, 'is_hardened') and svc.agent.is_hardened
 

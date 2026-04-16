@@ -225,6 +225,22 @@ class AetherFileAgent:
         except Exception as e:
             suggestion["action"] = f"error: {e}"
 
+    @staticmethod
+    def _is_planning_query(query: str) -> bool:
+        """Detect planning-intent queries using the AetherClaudeAgent static method."""
+        try:
+            from agent.claude_agent import AetherClaudeAgent
+            return AetherClaudeAgent._is_planning_query(query)
+        except Exception:
+            return False
+
+    def plan_day(self, query: str) -> str:
+        """Delegate daily planning to the inner Claude agent."""
+        if self._claude_available and self._claude_agent and hasattr(self._claude_agent, 'plan_day'):
+            return self._claude_agent.plan_day(query)
+        # Fallback: route through normal chat which handles it internally
+        return self.chat(query)
+
     def chat(self, query: str) -> str:
         """
         Natural language interface to the vault.
