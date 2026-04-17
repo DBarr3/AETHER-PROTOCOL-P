@@ -1,0 +1,75 @@
+# AetherCloud Supabase project config.
+# Linked project: cjjcdwrnpzwlvradbros — https://cjjcdwrnpzwlvradbros.supabase.co
+#
+# To deploy edge functions: supabase functions deploy <name>
+# To set secrets:           supabase secrets set KEY=value
+# To run locally:           supabase start && supabase functions serve
+
+project_id = "cjjcdwrnpzwlvradbros"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "https://aethersystems.net"
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "https://aethersystems.net/auth/callback",
+  "https://aethersystems.io/auth/callback",
+]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+# ── Edge Functions ─────────────────────────────────────────
+
+[functions.stripe-webhook]
+# Public endpoint — Stripe POSTs here. Signature-verified inside the function.
+verify_jwt = false
+
+[functions.ingest-install-event]
+# Public endpoint — Electron installer POSTs telemetry. No JWT (anonymous users).
+verify_jwt = false
+
+[functions.activate-license]
+# Authenticated — dashboard calls this to bind a license to a machine.
+verify_jwt = true
+
+[functions.create-checkout-session]
+# Website calls this to start a Stripe checkout flow.
+verify_jwt = false
+
+[functions.ingest-contact]
+# Marketing site contact form → contact_submissions.
+verify_jwt = false
+
+[functions.waitlist-signup]
+# Marketing site waitlist form → waitlist table.
+verify_jwt = false
