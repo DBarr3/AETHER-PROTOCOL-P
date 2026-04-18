@@ -40,6 +40,14 @@ pydantic>=2.0.0
 python-multipart>=0.0.18
 slowapi>=0.1.9
 
+# ─── Supabase (license validation backend) ──────
+# Python client for querying public.users in the AetherCloud Supabase
+# project. Floor pinned to 2.9; upper bound <3.0 locks out the next
+# major-version bump until we re-test. Added 2026-04-18 (Sequence 1:
+# license validation route). Transitive deps include httpx, gotrue,
+# postgrest, storage3, realtime — see PR description for dry-run output.
+supabase>=2.9,<3.0
+
 # ─── Development / Testing ───────────────────────
 pytest>=7.0.0
 pytest-asyncio>=0.21.0

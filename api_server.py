@@ -34,6 +34,11 @@ from project_routes import project_router
 import project_routes as _proj_routes
 from security.prompt_guard import get_prompt_guard, ThreatLevel
 from agent.persistence import AgentPersistence
+from lib.license_validation import (
+    validate_license,
+    MalformedKeyError,
+    UpstreamError,
+)
 load_all_keys()
 
 from contextlib import asynccontextmanager
@@ -3281,6 +3286,50 @@ async def prompt_guard_stats(token: str = Depends(get_session_token)):
     """Return prompt guard statistics (scans, blocks, block rate)."""
     guard = get_prompt_guard(svc.audit_log)
     return guard.stats
+
+
+# ═══════════════════════════════════════════════════
+# LICENSE VALIDATION (backend for license.aethersystems.net)
+# ═══════════════════════════════════════════════════
+# Desktop clients POST here at startup to verify their AETH-CLD-* key.
+# Cloudflare Tunnel for license.aethersystems.net forwards to this host
+# with NO path rewriting — FastAPI sees the full path as the client
+# constructs it. See: license_client.py, desktop/main.js, Sequence 1 brief.
+
+
+class LicenseValidateRequest(BaseModel):
+    key: str
+    # Reserved for future client-version gating. Accepted but currently unused.
+    version: Optional[str] = None
+
+
+async def _handle_license_validate(req: LicenseValidateRequest):
+    """Shared handler for the legacy and v2 license-validate paths.
+
+    Both routes delegate here. The legacy path is retained indefinitely as
+    a shim for existing desktop installs; v2 is the path new desktop
+    releases will migrate to.
+    """
+    from fastapi.responses import JSONResponse
+    try:
+        return validate_license(req.key)
+    except MalformedKeyError:
+        return JSONResponse(status_code=400, content={"error": "malformed_key"})
+    except UpstreamError:
+        return JSONResponse(status_code=500, content={"error": "upstream_error"})
+
+
+# Legacy path. Matches the URL license_client.py:81 constructs today
+# (double /license/ is intentional — a quirk in the client's URL assembly
+# that we match on the server instead of changing the client).
+@app.post("/api/license/license/cloud/validate")
+@limiter.limit("10/hour")
+async def license_validate_legacy(
+    request: Request,
+    req: LicenseValidateRequest,
+):
+    """License validation — legacy path. Kept for existing desktop installs."""
+    return await _handle_license_validate(req)
 
 
 # ═══════════════════════════════════════════════════
