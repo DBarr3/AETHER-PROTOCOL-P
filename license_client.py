@@ -36,7 +36,7 @@ class CloudLicenseClient:
         self.key = (license_key or os.getenv("AETHERCLOUD_LICENSE_KEY", "") or "").strip()
         self.server = os.getenv(
             "AETHER_LICENSE_SERVER",
-            "https://aethersecurity.net/api/license",
+            "https://license.aethersystems.net/api/license",
         ).rstrip("/")
         self.cache_path = os.getenv(
             "AETHERCLOUD_LICENSE_CACHE",
@@ -78,6 +78,11 @@ class CloudLicenseClient:
             }
 
     def _validate_remote(self) -> dict:
+        # TODO(license-v2): migrate to /api/license/v2/validate in desktop v0.9.7.
+        # Legacy path /license/cloud/validate (double-prefixed once combined
+        # with self.server's /api/license suffix) is retained server-side as
+        # a shim — remove once telemetry shows zero traffic on the legacy
+        # path. See: api_server.py license_validate_legacy / license_validate_v2.
         url = f"{self.server}/license/cloud/validate"
         payload = json.dumps({
             "key": self.key,

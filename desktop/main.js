@@ -370,7 +370,7 @@ const CSP_POLICY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data:",
-  "connect-src 'self' https://api.aethersystems.net https://license.aethersystems.net https://aethersecurity.net",
+  "connect-src 'self' https://api.aethersystems.net https://license.aethersystems.net",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -506,7 +506,6 @@ ipcMain.handle('browse-folder', async () => {
 const ALLOWED_EXTERNAL_HOSTS = new Set([
   'aethersystems.net',
   'aethersystems.io',
-  'aethersecurity.net',
 ]);
 function isSafeExternalUrl(url) {
   try {
