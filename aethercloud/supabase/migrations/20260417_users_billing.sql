@@ -35,3 +35,25 @@ create trigger users_set_updated_at
 
 -- Service role bypasses RLS; no user-facing policies yet.
 alter table public.users enable row level security;
+
+-- ───────────────────────────────────────────────────────────
+-- Added 2026-04-17: 4-tier support + rate-limit table
+-- ───────────────────────────────────────────────────────────
+
+-- Allow 'free' tier (original CHECK was 'solo','team','pro')
+alter table public.users drop constraint if exists users_tier_check;
+alter table public.users add constraint users_tier_check
+  check (tier in ('free','solo','pro','team'));
+alter table public.users alter column tier set default 'free';
+
+-- Signup attempts (IP rate limit for free-signup)
+create table if not exists public.signup_attempts (
+  id uuid primary key default gen_random_uuid(),
+  ip text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists signup_attempts_ip_created_idx
+  on public.signup_attempts(ip, created_at desc);
+
+alter table public.signup_attempts enable row level security;
+-- Service role bypasses RLS; no user-facing policies.
