@@ -3332,6 +3332,20 @@ async def license_validate_legacy(
     return await _handle_license_validate(req)
 
 
+# Clean path for future desktop releases. Same handler, same contract —
+# exists so new desktop versions don't have to carry the legacy URL
+# quirk. Both paths must coexist until telemetry confirms no traffic on
+# the legacy path, then the legacy handler can be removed.
+@app.post("/api/license/v2/validate")
+@limiter.limit("10/hour")
+async def license_validate_v2(
+    request: Request,
+    req: LicenseValidateRequest,
+):
+    """License validation — clean v2 path. Identical contract to legacy."""
+    return await _handle_license_validate(req)
+
+
 # ═══════════════════════════════════════════════════
 # ENTRY POINT
 # ═══════════════════════════════════════════════════

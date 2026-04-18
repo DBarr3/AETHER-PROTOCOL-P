@@ -91,7 +91,7 @@ def _patch_client(rows=None, raises=None):
 
 
 LEGACY_PATH = "/api/license/license/cloud/validate"
-# V2_PATH = "/api/license/v2/validate"  # added in Commit 4
+V2_PATH = "/api/license/v2/validate"
 
 
 # ═══════════════════════════════════════════════════
@@ -418,8 +418,29 @@ def test_13_logs_redact_license_key_last4(client, caplog):
 
 # ═══════════════════════════════════════════════════
 # 14: legacy and v2 paths behave identically
-#     (deferred to Commit 4 — v2 route does not exist yet in this commit)
 # ═══════════════════════════════════════════════════
+
+def test_14_legacy_and_v2_return_identical_responses(client):
+    """POST the same key to both paths → identical response body + status."""
+    rows = [{
+        "tier": "solo",
+        "subscription_status": "active",
+        "email": "i@example.com",
+        "current_period_end": "2026-05-18T00:00:00+00:00",
+    }]
+    body = {"key": "AETH-CLD-ABCD-EFGH-1234", "version": "0.9.7"}
+    ctx, _ = _patch_client(rows=rows)
+    with ctx:
+        legacy = client.post(
+            LEGACY_PATH, json=body,
+            headers={"Authorization": "Bearer test-14a"},
+        )
+        v2 = client.post(
+            V2_PATH, json=body,
+            headers={"Authorization": "Bearer test-14b"},
+        )
+    assert legacy.status_code == v2.status_code
+    assert legacy.json() == v2.json()
 
 
 # ═══════════════════════════════════════════════════
@@ -428,8 +449,8 @@ def test_13_logs_redact_license_key_last4(client, caplog):
 
 def test_15_get_method_returns_405(client):
     """Keys must never appear in URLs/query strings/logs — GET is rejected."""
-    # v2 path coverage added in Commit 4 alongside the route itself.
-    resp = client.get(LEGACY_PATH)
-    assert resp.status_code == 405, (
-        f"GET {LEGACY_PATH} should return 405, got {resp.status_code}"
-    )
+    for path in (LEGACY_PATH, V2_PATH):
+        resp = client.get(path)
+        assert resp.status_code == 405, (
+            f"GET {path} should return 405, got {resp.status_code}"
+        )
