@@ -50,7 +50,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
   const priceId = full.line_items?.data?.[0]?.price?.id ?? null;
-  const tier = tierForPrice(priceId) ?? "solo";
+  const tier = tierForPrice(priceId);
+  if (!tier) {
+    console.error("unknown price_id in checkout.session.completed:", priceId, "— skipping upsert");
+    return;
+  }
   const customerId = typeof full.customer === "string" ? full.customer : full.customer?.id ?? null;
   const subscriptionId = typeof full.subscription === "string"
     ? full.subscription
