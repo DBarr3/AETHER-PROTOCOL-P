@@ -175,6 +175,15 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 contextBridge.exposeInMainWorld('aetherAPI', {
+  // Generic token-free API bridge. Migration target for follow-up #10 —
+  // renderer code (dashboard.html / login.html / terminal.html) currently
+  // reads the raw sessionToken via authGet() and builds Authorization
+  // headers manually, which gives any XSS direct access to the token.
+  // New code should call apiCall(endpoint, options) instead: the
+  // Authorization header is injected here (in the preload) and the raw
+  // token never enters renderer scope.
+  apiCall: (endpoint, options = {}) => apiFetch(endpoint, options),
+
   getStatus: () => apiFetch('/status'),
 
   login: async (username, password, licenseKey) => {
@@ -244,7 +253,14 @@ contextBridge.exposeInMainWorld('aetherAPI', {
   adminApiKeyRevoke:   (data) => ipcRenderer.invoke('admin:apikey:revoke', data),
 
   // ── Auth Persistence ──────────────────────────
+  // NOTE: authGet() still returns sessionToken + licenseKey for legacy
+  // renderer code that issues direct fetch() calls. Every XSS in the
+  // renderer can also call this and exfiltrate. New code SHOULD use
+  // authStatus() (no secrets) and apiFetch (tokens auto-injected by
+  // preload). Migration target: remove authGet's secret fields once
+  // dashboard.html / terminal.html / login.html stop reading them.
   authGet:    () => ipcRenderer.invoke('auth:get'),
+  authStatus: () => ipcRenderer.invoke('auth:status'),
   authSet:    (data) => ipcRenderer.invoke('auth:set', data),
   authClear:  () => ipcRenderer.invoke('auth:clear'),
   authClearAll: () => ipcRenderer.invoke('auth:clearAll'),

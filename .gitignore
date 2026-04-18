@@ -5,6 +5,10 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+# ...but desktop/build/ holds shipping electron-builder hooks (fuses.js,
+# check-signing.js) — those are source code, not transient build output.
+!desktop/build/
+!desktop/build/**
 *.egg
 .eggs/
 

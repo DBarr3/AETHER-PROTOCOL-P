@@ -33,6 +33,82 @@ SPACES_SECRET = os.environ.get("DO_SPACES_SECRET", "")
 # Max single-file upload size (50 MB)
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
+# ── Upload MIME hardening ─────────────────────────
+# A user-uploaded file is later served back by the API, inline-linkable via
+# /vault/spaces/download/<name>. Without a type allowlist, an attacker with
+# a valid session can upload "x.html" as text/html and weaponize it into
+# stored XSS against any other browser that fetches the URL (including
+# the Electron renderer itself, if loaded in an <iframe> or new window).
+#
+# The policy below rejects active content at upload time. Download still
+# forces Content-Disposition: attachment + X-Content-Type-Options: nosniff
+# (see api_server.py) as defense-in-depth — but the primary fix is here.
+DANGEROUS_UPLOAD_EXTS = frozenset({
+    # Executable / script
+    ".exe", ".bat", ".cmd", ".com", ".ps1", ".vbs", ".vbe", ".js", ".jse",
+    ".ws", ".wsf", ".wsh", ".msh", ".hta", ".scr", ".msi", ".msp", ".lnk",
+    ".url", ".reg", ".dll", ".chm", ".cpl", ".pif", ".jar", ".appx",
+    ".appxbundle",
+    # Browser-renderable active content (stored-XSS vectors)
+    ".html", ".htm", ".xhtml", ".xml", ".xsl", ".xslt", ".svg", ".mhtml",
+    ".mht",
+    # Server-side script
+    ".php", ".phtml", ".asp", ".aspx", ".jsp", ".py", ".rb", ".sh",
+    # Office macro-enabled (users tend to trust .docx but .docm/.xlsm execute)
+    ".docm", ".xlsm", ".pptm", ".dotm", ".xltm", ".potm",
+})
+
+# Set of MIME types that force `application/octet-stream` rewrite regardless
+# of what the extension says — catches poly-glot and server-side-guessed
+# types that could still be rendered as HTML/JS.
+RISKY_MIME_TYPES = frozenset({
+    "text/html", "application/xhtml+xml", "image/svg+xml",
+    "text/javascript", "application/javascript", "application/ecmascript",
+    "text/xml", "application/xml", "application/xslt+xml",
+})
+
+
+def _sanitize_filename(filename: str) -> str:
+    """
+    Strip path separators, CR/LF (prevents Content-Disposition header
+    injection on download), NUL, and leading/trailing whitespace. Returns
+    a name that's safe to use as both an S3 key suffix and an
+    attachment filename.
+    """
+    if not isinstance(filename, str):
+        raise ValueError("filename must be a string")
+    # Kill path separators and traversal sequences
+    name = filename.replace("/", "_").replace("\\", "_").replace("..", "_")
+    # Kill characters that would corrupt HTTP headers or log lines
+    for ch in ("\r", "\n", "\x00", '"'):
+        name = name.replace(ch, "_")
+    name = name.strip().lstrip(".")  # no leading dot → no hidden files
+    if not name:
+        raise ValueError("filename empty after sanitization")
+    if len(name) > 255:
+        raise ValueError(f"filename too long ({len(name)} chars, max 255)")
+    return name
+
+
+def _classify_upload(safe_name: str) -> tuple[str, str]:
+    """
+    Given a sanitized filename, return (ext, content_type) or raise
+    ValueError for disallowed types. Content-type is always server-derived;
+    the client's supplied content_type is intentionally ignored.
+    """
+    # Split on the LAST dot so "archive.tar.gz" → ".gz"
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext in DANGEROUS_UPLOAD_EXTS:
+        raise ValueError(f"file type not permitted: {ext}")
+
+    guessed = mimetypes.guess_type(safe_name)[0]
+    if not guessed or guessed.lower() in RISKY_MIME_TYPES:
+        # Force opaque type: no browser will try to render it inline.
+        content_type = "application/octet-stream"
+    else:
+        content_type = guessed
+    return ext, content_type
+
 
 class VaultSpacesClient:
     """S3-compatible client for DigitalOcean Spaces vault storage."""
@@ -89,7 +165,16 @@ class VaultSpacesClient:
         data: bytes,
         content_type: Optional[str] = None,
     ) -> dict:
-        """Upload a file to the user's vault. Returns metadata dict on success."""
+        """
+        Upload a file to the user's vault. Returns metadata dict on success.
+
+        Security:
+          * filename is sanitized (no path traversal, no CRLF, no NUL)
+          * extension is checked against DANGEROUS_UPLOAD_EXTS — dangerous
+            types raise ValueError before the object hits storage
+          * content_type is ALWAYS derived server-side; any client-supplied
+            value is ignored to prevent polyglot/stored-XSS attacks
+        """
         self._ensure_client()
         if not self._ready:
             raise RuntimeError("DO Spaces not configured")
@@ -97,17 +182,25 @@ class VaultSpacesClient:
         if len(data) > MAX_UPLOAD_BYTES:
             raise ValueError(f"File too large ({len(data)} bytes, max {MAX_UPLOAD_BYTES})")
 
-        safe_name = filename.replace("/", "_").replace("\\", "_")
+        safe_name = _sanitize_filename(filename)
+        _ext, server_content_type = _classify_upload(safe_name)
         key = self._user_prefix(username) + safe_name
 
-        if not content_type:
-            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        # Discard client-supplied content_type: trusting it enables stored-XSS
+        # via attacker-chosen text/html. Keeping the arg in the signature for
+        # API compatibility but only for logging.
+        if content_type and content_type != server_content_type:
+            log.info(
+                "Upload content_type override: client=%r server=%r for %s",
+                content_type, server_content_type, safe_name,
+            )
 
         self._client.put_object(
             Bucket=SPACES_BUCKET,
             Key=key,
             Body=data,
-            ContentType=content_type,
+            ContentType=server_content_type,
+            ContentDisposition=f'attachment; filename="{safe_name}"',
             ACL="private",
             Metadata={
                 "uploaded-by": username,
@@ -115,13 +208,14 @@ class VaultSpacesClient:
             },
         )
 
-        log.info("Uploaded %s (%d bytes) → %s", safe_name, len(data), key)
+        log.info("Uploaded %s (%d bytes, %s) → %s",
+                 safe_name, len(data), server_content_type, key)
 
         return {
             "key": key,
             "filename": safe_name,
             "size": len(data),
-            "content_type": content_type,
+            "content_type": server_content_type,
             "uploaded_at": datetime.now(timezone.utc).isoformat(),
         }
 

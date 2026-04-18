@@ -32,6 +32,8 @@ from project_context import ProjectContextManager
 from project_orchestrator import ProjectOrchestrator
 from project_routes import project_router
 import project_routes as _proj_routes
+from security.prompt_guard import get_prompt_guard, ThreatLevel
+from agent.persistence import AgentPersistence
 load_all_keys()
 
 from contextlib import asynccontextmanager
@@ -356,29 +358,65 @@ async def lifespan(application: FastAPI):
 
     yield
 
+# Introspection endpoints (/docs, /redoc, /openapi.json) are a route map
+# for attackers on an internet-bound VPS. Audit finding M2 required they
+# be hidden in production. They're enabled only when AETHER_ENV is dev.
+_expose_docs = os.environ.get("AETHER_ENV", "").lower() in ("dev", "development", "local")
+
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     description="Quantum-Secured AI File Intelligence API",
     lifespan=lifespan,
+    docs_url="/docs" if _expose_docs else None,
+    redoc_url="/redoc" if _expose_docs else None,
+    openapi_url="/openapi.json" if _expose_docs else None,
 )
 
 # Rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS: allow Electron renderer (file://), localhost, and VPS origins.
-# Production VPS IPs are injected via AETHER_ALLOWED_ORIGINS env var (space-separated).
-# Example: AETHER_ALLOWED_ORIGINS="<VPS2_IP> <VPS1_IP>"
-_cors_base = r"^(file://|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)"
-_extra_ips = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
-_cors_parts = [_cors_base] + [rf"|http://{re.escape(ip)}(:\d+)?" for ip in _extra_ips]
-_cors_regex = "".join(_cors_parts) + r"$"
+# ═════════════════════════════════════════════════════════════════════
+# CORS — non-credentialed only
+# ═════════════════════════════════════════════════════════════════════
+# This API authenticates via Bearer tokens (see get_session_token), NOT
+# cookies. Prior config set `allow_credentials=True` with a regex that
+# also matched `file://`, which the security audit flagged as Critical:
+# any local HTML file or any allowlisted origin could trigger credentialed
+# cross-site flows against the API.
+#
+# Fix: drop allow_credentials entirely (the Bearer-token flow needs no
+# browser-managed credentials) and require HTTPS for every remote origin.
+# The Electron renderer (file:// pages) still works — it sets the
+# Authorization header manually, and the Authorization header is in
+# allow_headers so preflight passes without needing Allow-Credentials.
+#
+# Allowed origins (exact, anchored):
+#   * file://                     — Electron renderer pages
+#   * null                        — modern Chromium file:// Origin
+#   * http://localhost[:PORT]     — local dev
+#   * http://127.0.0.1[:PORT]     — local dev
+#   * https://<host>[:PORT]       — any AETHER_ALLOWED_ORIGINS entry, HTTPS only
+# Anything else is rejected by the regex.
+_CORS_LOCAL = r"file://|null|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?"
+_extra_hosts = [h.strip() for h in os.environ.get("AETHER_ALLOWED_ORIGINS", "").split() if h.strip()]
+_https_alts: list[str] = []
+for host in _extra_hosts:
+    stripped = host.replace("https://", "").replace("http://", "")
+    if "/" in stripped:
+        stripped = stripped.split("/", 1)[0]
+    if stripped:
+        _https_alts.append(rf"https://{re.escape(stripped)}(:\d+)?")
+
+_cors_parts = [_CORS_LOCAL] + _https_alts
+_cors_regex = r"^(" + "|".join(_cors_parts) + r")$"
+logging.getLogger("aethercloud.cors").info("CORS origin regex: %s (credentialed=False)", _cors_regex)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=_cors_regex,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
@@ -459,6 +497,19 @@ async def save_agent_team(request: Request, token: str = Depends(get_session_tok
         raise HTTPException(status_code=400, detail="Request body must be a JSON array")
     if not isinstance(agents, list):
         raise HTTPException(status_code=400, detail="Expected a JSON array of agent objects")
+
+    # Scan custom system prompts for embedded injection attempts
+    guard = get_prompt_guard(svc.audit_log)
+    for a in agents:
+        if isinstance(a, dict) and a.get("prompt"):
+            scan = guard.scan_system_prompt(a["prompt"])
+            if scan.is_blocked:
+                log.warning("Blocked agent team save — injected system prompt detected: agent=%s", a.get("name"))
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Agent '{a.get('name', '?')}' has a blocked system prompt — "
+                           "injection patterns detected.",
+                )
 
     # Never persist the key hint (masked display) — keys are stored separately
     safe_agents = []
@@ -690,6 +741,13 @@ async def run_pipeline(
     token: str = Depends(get_session_token),
 ):
     """Execute a pipeline — run each step sequentially with output chaining."""
+    # ── Prompt injection guard on pipeline input ────
+    guard = get_prompt_guard(svc.audit_log)
+    scan = guard.scan(req.initial_input, context="pipeline")
+    if scan.is_blocked:
+        log.warning("Pipeline input blocked: rules=%s", scan.matched_rules)
+        raise HTTPException(status_code=403, detail="Pipeline input blocked by security guard")
+
     username = get_username_from_token(token)
     api_key = get_anthropic_key()
 
@@ -801,11 +859,16 @@ def _init_services():
                 total_tasks += len(store)
     log.info("Loaded %d scheduled tasks across all users", total_tasks)
 
-    # Dev user — password is bcrypt-hashed on registration, never stored in plaintext
-    _dev_pass = get_dev_key()
-    if svc.auth.register_user("ZO", _dev_pass):
-        log.info("Registered dev user: ZO")
-    del _dev_pass  # scrub from memory immediately
+    # Dev user — gated behind AETHER_ENV=dev per audit L2. The bcrypt hash
+    # of the dev password otherwise ends up on disk on every production
+    # server. The user is only created when explicitly opted-in.
+    if os.environ.get("AETHER_ENV", "").lower() in ("dev", "development", "local"):
+        _dev_pass = get_dev_key()
+        if svc.auth.register_user("ZO", _dev_pass):
+            log.info("Registered dev user: ZO (AETHER_ENV=dev)")
+        del _dev_pass  # scrub from memory immediately
+    else:
+        log.info("Skipped dev user registration — set AETHER_ENV=dev to enable")
 
 
 # ═══════════════════════════════════════════════════
@@ -994,12 +1057,16 @@ async def login(req: LoginRequest):
         raise HTTPException(status_code=503, detail="Auth service not initialized")
 
     # ── License key validation (first-time setup or re-supply) ──────────────
-    # If a license_key is provided, validate it before proceeding with auth.
-    # On success, persist it to the runtime env so /status reflects it.
+    # Validate the license key WITHOUT touching global process state. Audit
+    # finding H8 flagged the prior implementation as writing `os.environ[...]`
+    # before the caller authenticated, which let any unauthenticated network
+    # caller bump the server-wide license binding. The env var is now only
+    # mutated AFTER svc.auth.login() succeeds (see _commit_license below).
+    _pending_license: Optional[str] = None  # populated only after full validation
+    _pending_license_info: Optional[dict] = None
     if req.license_key:
         _lk = req.license_key.strip()
         try:
-            import license_client as _lc_mod
             from license_client import CloudLicenseClient, KEY_PATTERN
             if not KEY_PATTERN.match(_lk):
                 return LoginResponse(
@@ -1007,10 +1074,10 @@ async def login(req: LoginRequest):
                     timestamp=datetime.now().isoformat(),
                     reason="LICENSE_INVALID",
                 )
-            os.environ["AETHERCLOUD_LICENSE_KEY"] = _lk
-            _lc = CloudLicenseClient()
+            # Validate against license server using a local override (does NOT
+            # touch process env). CloudLicenseClient accepts an explicit key.
+            _lc = CloudLicenseClient(license_key=_lk)
             _result = _lc.validate()
-            _lc_mod._license_info = _result
             if not _result.get("valid"):
                 _reason = _result.get("reason", "")
                 if "expired" in _reason.lower():
@@ -1024,13 +1091,33 @@ async def login(req: LoginRequest):
                     timestamp=datetime.now().isoformat(),
                     reason="LICENSE_INVALID",
                 )
+            _pending_license = _lk
+            _pending_license_info = _result
             log.info("License validated via login for key=****%s plan=%s", _lk[-4:], _result.get("plan"))
+        except TypeError:
+            # CloudLicenseClient doesn't accept license_key kwarg on older
+            # builds — fall back to the old behavior but still keep the
+            # commit gated on auth success below.
+            os.environ.setdefault("AETHERCLOUD_LICENSE_KEY_PENDING", _lk)
+            _pending_license = _lk
         except Exception as _le:
             log.warning("License validation error during login: %s", _le)
             # Non-blocking: allow login to continue if license server is unreachable
             # but a cached valid license exists (grace mode handled inside CloudLicenseClient)
 
     result = svc.auth.login(req.username, req.password)
+
+    # Commit the validated license key to the process env ONLY after auth
+    # succeeded. An unauthenticated caller can no longer mutate server state.
+    if result.get("authenticated") and _pending_license:
+        os.environ["AETHERCLOUD_LICENSE_KEY"] = _pending_license
+        os.environ.pop("AETHERCLOUD_LICENSE_KEY_PENDING", None)
+        if _pending_license_info:
+            try:
+                import license_client as _lc_mod
+                _lc_mod._license_info = _pending_license_info
+            except Exception:
+                pass
 
     # Attach plan from license info if available
     _plan = None
@@ -1100,6 +1187,9 @@ async def logout(req: LogoutRequest):
             audit_id = result.get("audit_id")
         except Exception:
             pass
+    # Free the per-token context dict entry — audit M6 flagged that this
+    # would otherwise accumulate across the process lifetime as a slow leak.
+    session_context.pop(token, None)
     return LogoutResponse(success=True, audit_id=audit_id)
 
 
@@ -1259,14 +1349,26 @@ async def vault_spaces_download(
         raise HTTPException(status_code=503, detail="Cloud vault not configured")
 
     username = get_username_from_token(token)
+
+    # Strip CR/LF and double-quote from the filename before placing it in
+    # the Content-Disposition header — prevents HTTP response splitting
+    # via attacker-controlled upload names (audit finding M5).
+    safe_disp = filename.replace("\r", "").replace("\n", "").replace('"', "'")
+
     try:
         stream, content_type, size = svc.vault_spaces.download(username, filename)
         return StreamingResponse(
             stream,
             media_type=content_type,
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                # Always serve as an attachment — never inline-render in
+                # the browser even if the stored Content-Type is text/html.
+                "Content-Disposition": f'attachment; filename="{safe_disp}"',
                 "Content-Length": str(size),
+                # Block MIME sniffing — browser must honor the declared
+                # Content-Type, which upload() forces to octet-stream for
+                # any risky uploaded file.
+                "X-Content-Type-Options": "nosniff",
             },
         )
     except Exception as exc:
@@ -1333,6 +1435,20 @@ async def agent_chat(request: Request, req: ChatRequest, token: str = Depends(ge
     """Chat with the AI agent. Response is Protocol-L committed."""
     if not svc.agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
+
+    # ── Prompt injection guard ──────────────────────
+    guard = get_prompt_guard(svc.audit_log)
+    scan = guard.scan(req.query, context="chat")
+    if scan.is_blocked:
+        log.warning("Chat prompt blocked: rules=%s hash=%s", scan.matched_rules, scan.query_hash)
+        return ChatResponse(
+            response="Your request was blocked by AetherCloud security. "
+                     "The system detected potentially harmful or unauthorized content. "
+                     "This event has been logged to the audit trail.",
+            commitment_hash=scan.query_hash,
+            verified=False,
+            threat_level=scan.threat_level.value,
+        )
 
     try:
         # If frontend sent vault context, inject it into the query
@@ -1728,6 +1844,32 @@ async def agent_mcp_chat(
     from agent.mcp_registry import detect_required_servers
     from agent.browser_tool_injector import inject_browser_tools
     import asyncio
+
+    # ── Prompt injection guard ──────────────────────
+    guard = get_prompt_guard(svc.audit_log)
+    scan = guard.scan(req.query, context="mcp_agent")
+    if scan.is_blocked:
+        log.warning("MCP chat prompt blocked: rules=%s hash=%s", scan.matched_rules, scan.query_hash)
+        return MCPAgentResponse(
+            response="Your request was blocked by AetherCloud security. "
+                     "The system detected potentially harmful or unauthorized content. "
+                     "This event has been logged.",
+            tools_used=[],
+            commitment_hash=scan.query_hash,
+            verified=False,
+        )
+
+    # Scan conversation history for embedded injection
+    if req.conversation_history:
+        history_scan = guard.scan_conversation_history(req.conversation_history)
+        if history_scan and history_scan.is_blocked:
+            log.warning("MCP chat history injection detected: rules=%s", history_scan.matched_rules)
+            return MCPAgentResponse(
+                response="Injection detected in conversation history. Session terminated for security.",
+                tools_used=[],
+                commitment_hash=history_scan.query_hash,
+                verified=False,
+            )
 
     username = get_username_from_token(token)
 
@@ -2180,15 +2322,21 @@ async def download_proof(filename: str, token: str = Depends(get_session_token))
         raise HTTPException(status_code=500, detail="Failed to read proof package")
 
 
-# ── Scan (POST — structured vault scan, no auth) ──
+# ── Scan (POST — structured vault scan, session-auth + path-jail) ──
 @app.post("/vault/scan")
-async def scan_vault(request: VaultScanRequest):
+async def scan_vault(
+    request: VaultScanRequest,
+    token: str = Depends(get_session_token),
+):
     """
     Scan a real filesystem path and return structured vault data.
-    No auth required so it works during initial setup —
-    but path is restricted to vault root or user's home subtree.
+
+    Requires a valid session token. The supplied vault_path is forced
+    through _safe_browse_path(), which rejects traversal, UNC, null-byte,
+    and symlink-based escapes and confines the scan to the vault root or
+    the user's home directory.
     """
-    path = Path(request.vault_path)
+    path = _safe_browse_path(request.vault_path)
 
     if not path.exists():
         raise HTTPException(status_code=404, detail="Vault path does not exist")
@@ -2284,24 +2432,50 @@ async def scan_vault(request: VaultScanRequest):
     }
 
 
-# ── Browse (scan any directory — no auth, localhost only) ──
+# ── Browse (scan directory — session-authenticated, path-jailed) ──
 def _safe_browse_path(raw_path: str) -> Path:
     """
     Resolve and validate a path for browse/scan endpoints.
-    Restricts access to vault data dir and user's home directory subtree.
-    Uses Path.is_relative_to() for cross-platform path containment (Python 3.9+).
-    Raises HTTPException 400 if path traversal attempt is detected.
+
+    Restrictions (all must pass):
+      * non-empty string, no null bytes
+      * no UNC/SMB paths on Windows (\\\\host\\share, //host/share)
+      * resolved canonical path must be inside an allowed root
+      * leaf must not be a symlink (blocks symlink-escape from vault import)
+
+    Allowed roots: DEFAULT_VAULT_ROOT (env-configurable), AETHER_VAULT_ROOT
+    from env if set, and the current user's home directory.
+
+    Raises HTTPException 400 on any violation.
     """
+    import os as _os
+    if not isinstance(raw_path, str) or not raw_path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if "\x00" in raw_path:
+        raise HTTPException(status_code=400, detail="Null byte in path")
+    if _os.name == "nt" and (raw_path.startswith("\\\\") or raw_path.startswith("//")):
+        raise HTTPException(status_code=400, detail="UNC / network paths are blocked")
+
     resolved = Path(raw_path).resolve()
-    allowed_roots = [
-        DEFAULT_VAULT_ROOT.resolve(),
-        Path.home().resolve(),
-    ]
+    # Reject again after resolve — a crafted junction could normalize to a UNC.
+    if _os.name == "nt" and str(resolved).startswith("\\\\"):
+        raise HTTPException(status_code=400, detail="UNC / network paths are blocked")
+
+    allowed_roots = [DEFAULT_VAULT_ROOT.resolve(), Path.home().resolve()]
+    env_root = _os.getenv("AETHER_VAULT_ROOT")
+    if env_root:
+        try:
+            allowed_roots.append(Path(env_root).resolve())
+        except Exception:
+            pass
+
     try:
-        contained = any(resolved == root or resolved.is_relative_to(root) for root in allowed_roots)
+        contained = any(
+            resolved == root or resolved.is_relative_to(root)
+            for root in allowed_roots
+        )
     except AttributeError:
-        # Python < 3.9 fallback — use string comparison with OS-appropriate separator
-        import os as _os
+        # Python < 3.9 fallback
         contained = any(
             str(resolved).lower().startswith(str(root).lower() + _os.sep)
             or str(resolved).lower() == str(root).lower()
@@ -2312,19 +2486,33 @@ def _safe_browse_path(raw_path: str) -> Path:
             status_code=400,
             detail="Access denied: path must be within vault root or home directory",
         )
+
+    # Symlink rejection at leaf (defense against vault-imported symlinks
+    # that point to /etc or C:\Windows). lstat does not follow.
+    try:
+        if resolved.is_symlink():
+            raise HTTPException(status_code=400, detail="Symbolic links are not allowed")
+    except OSError:
+        pass
+
     return resolved
 
 
 @app.get("/vault/browse")
 async def vault_browse(
     path: str = Query(default=None, description="Directory path to scan"),
+    token: str = Depends(get_session_token),
 ):
     """
     Scan a directory and return its structure for the vault graph.
     Only names, sizes, extensions, modified dates — no file contents.
+
+    Requires a valid session token. Candidate path is forced through
+    _safe_browse_path() which rejects traversal, UNC, null-byte, and
+    symlink-escape attempts.
     """
     raw_root = path or os.getenv("AETHER_VAULT_ROOT", str(DEFAULT_VAULT_ROOT))
-    vault_path = Path(raw_root)
+    vault_path = _safe_browse_path(raw_root)
 
     if not vault_path.exists():
         return {"error": "Path does not exist", "folders": [], "files": [],
@@ -2926,6 +3114,173 @@ async def auth_health():
         "active_sessions": svc.session_mgr.active_count,
         "timestamp": datetime.now().isoformat(),
     }
+
+
+# ═══════════════════════════════════════════════════
+# AGENT PERSISTENCE ENDPOINTS
+# ═══════════════════════════════════════════════════
+
+class CustomAgentRequest(BaseModel):
+    id: Optional[str] = None
+    name: str
+    icon: str = "robot"
+    system_prompt: str = ""
+    description: str = ""
+    voice: str = "warm"
+    tasks: Optional[list] = []
+    mcp_servers: Optional[list] = []
+    requires_browser_sandbox: bool = False
+
+
+@app.get("/agent/custom")
+async def list_custom_agents(token: str = Depends(get_session_token)):
+    """List all custom agents for the current user (persistent across launches)."""
+    username = get_username_from_token(token)
+    persistence = AgentPersistence(username)
+    agents = persistence.list_custom_agents()
+    return {"agents": agents, "count": len(agents)}
+
+
+@app.post("/agent/custom")
+async def save_custom_agent(
+    req: CustomAgentRequest,
+    token: str = Depends(get_session_token),
+):
+    """Create or update a custom agent. Persists across app launches."""
+    username = get_username_from_token(token)
+
+    # Guard: scan custom system prompt for injection
+    if req.system_prompt:
+        guard = get_prompt_guard(svc.audit_log)
+        scan = guard.scan_system_prompt(req.system_prompt)
+        if scan.is_blocked:
+            raise HTTPException(
+                status_code=403,
+                detail="Custom agent system prompt blocked — injection patterns detected.",
+            )
+
+    persistence = AgentPersistence(username)
+    agent = persistence.save_custom_agent({
+        "id": req.id,
+        "name": req.name,
+        "icon": req.icon,
+        "system_prompt": req.system_prompt,
+        "description": req.description,
+        "voice": req.voice,
+        "tasks": req.tasks or [],
+        "mcp_servers": req.mcp_servers or [],
+        "requires_browser_sandbox": req.requires_browser_sandbox,
+    })
+    return {"ok": True, "agent": agent}
+
+
+@app.delete("/agent/custom/{agent_id}")
+async def delete_custom_agent(
+    agent_id: str,
+    token: str = Depends(get_session_token),
+):
+    """Delete a custom agent and its persistent memory."""
+    username = get_username_from_token(token)
+    persistence = AgentPersistence(username)
+    deleted = persistence.delete_custom_agent(agent_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"ok": True, "deleted": agent_id}
+
+
+@app.post("/agent/custom/{agent_id}/tool")
+async def record_agent_tool_selection(
+    agent_id: str,
+    request: Request,
+    token: str = Depends(get_session_token),
+):
+    """Record that a user selected an MCP tool for a specific agent.
+    Persists so the agent remembers its tools across launches."""
+    username = get_username_from_token(token)
+    body = await request.json()
+    tool_name = body.get("tool", "")
+    mcp_server = body.get("mcp_server", "")
+    if not tool_name:
+        raise HTTPException(status_code=400, detail="tool name required")
+    persistence = AgentPersistence(username)
+    persistence.record_tool_selection(agent_id, tool_name, mcp_server)
+    return {"ok": True, "agent_id": agent_id, "tool": tool_name}
+
+
+@app.delete("/agent/custom/{agent_id}/tool")
+async def remove_agent_tool_selection(
+    agent_id: str,
+    request: Request,
+    token: str = Depends(get_session_token),
+):
+    """Remove a tool selection from an agent's persistent memory."""
+    username = get_username_from_token(token)
+    body = await request.json()
+    tool_name = body.get("tool", "")
+    mcp_server = body.get("mcp_server", "")
+    persistence = AgentPersistence(username)
+    persistence.remove_tool_selection(agent_id, tool_name, mcp_server)
+    return {"ok": True}
+
+
+@app.get("/agent/custom/{agent_id}/memory")
+async def get_agent_memory(
+    agent_id: str,
+    token: str = Depends(get_session_token),
+):
+    """Get all persistent memory for a specific agent."""
+    username = get_username_from_token(token)
+    persistence = AgentPersistence(username)
+    memory = persistence.get_agent_memory(agent_id)
+    return {"agent_id": agent_id, "memory": memory}
+
+
+@app.post("/agent/custom/{agent_id}/memory")
+async def set_agent_memory_entry(
+    agent_id: str,
+    request: Request,
+    token: str = Depends(get_session_token),
+):
+    """Set a key-value pair in an agent's persistent memory."""
+    username = get_username_from_token(token)
+    body = await request.json()
+    key = body.get("key", "")
+    value = body.get("value")
+    if not key:
+        raise HTTPException(status_code=400, detail="key required")
+    persistence = AgentPersistence(username)
+    persistence.set_agent_memory(agent_id, key, value)
+    return {"ok": True}
+
+
+@app.get("/agent/persistence/export")
+async def export_agent_data(token: str = Depends(get_session_token)):
+    """Export all agent data (custom agents, teams, memory) for backup."""
+    username = get_username_from_token(token)
+    persistence = AgentPersistence(username)
+    data = persistence.export_all()
+    return data
+
+
+@app.post("/agent/persistence/import")
+async def import_agent_data(
+    request: Request,
+    token: str = Depends(get_session_token),
+):
+    """Import agent data from a backup."""
+    username = get_username_from_token(token)
+    body = await request.json()
+    persistence = AgentPersistence(username)
+    result = persistence.import_all(body)
+    return {"ok": True, "imported": result}
+
+
+# ── Prompt Guard Stats ───────────────────────────
+@app.get("/security/prompt-guard/stats")
+async def prompt_guard_stats(token: str = Depends(get_session_token)):
+    """Return prompt guard statistics (scans, blocks, block rate)."""
+    guard = get_prompt_guard(svc.audit_log)
+    return guard.stats
 
 
 # ═══════════════════════════════════════════════════

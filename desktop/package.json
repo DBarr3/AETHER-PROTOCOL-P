@@ -10,34 +10,35 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "dist": "electron-builder --win --publish never",
-    "dist:signed": "electron-builder --win --publish never",
-    "dist:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish never"
+    "build:win": "node build/check-signing.js && electron-builder --win",
+    "dist": "node build/check-signing.js && electron-builder --win --publish never",
+    "dist:signed": "node build/check-signing.js && electron-builder --win --publish never",
+    "dist:unsigned": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false AETHER_ALLOW_UNSIGNED=1 electron-builder --win --publish never"
   },
   "dependencies": {
+    "dompurify": "^3.4.0",
     "electron-store": "^8.2.0",
     "node-machine-id": "^1.1.12"
   },
   "devDependencies": {
-    "electron": "^30.0.0",
-    "electron-builder": "^24.13.3"
+    "@electron/fuses": "^2.1.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.2.1",
+    "electron-builder": "^26.8.1"
   },
   "build": {
     "appId": "com.aethersystems.aethercloud",
     "productName": "AetherCloud-L",
     "copyright": "Copyright 2026 Aether Systems LLC",
-
     "asar": true,
     "asarUnpack": [
       "node_modules/node-machine-id/**"
     ],
-
+    "afterPack": "./build/fuses.js",
     "directories": {
       "output": "release",
       "buildResources": "assets"
     },
-
     "files": [
       "main.js",
       "preload.js",
@@ -55,21 +56,24 @@
       "!**/.git/**",
       "!**/node_modules/.cache/**"
     ],
-
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
       "publisherName": "Aether Systems LLC",
       "artifactName": "AetherCloud-L-Setup-${version}.exe",
-      "signAndEditExecutable": false,
-      "sign": null
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "rfc3161TimeStampServer": "http://timestamp.digicert.com",
+      "verifyUpdateCodeSignature": true
     },
-
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -85,11 +89,12 @@
       "menuCategory": "Aether Systems LLC",
       "license": "assets/license.txt",
       "runAfterFinish": true,
-      "perMachine": false,
-      "installerLanguages": ["en_US"],
+      "perMachine": true,
+      "installerLanguages": [
+        "en_US"
+      ],
       "warningsAsErrors": false
     },
-
     "mac": {
       "target": "dmg",
       "icon": "assets/icon.icns",
@@ -97,7 +102,6 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false
     },
-
     "linux": {
       "target": "AppImage",
       "icon": "assets/icon.png",

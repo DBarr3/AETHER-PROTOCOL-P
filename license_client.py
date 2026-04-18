@@ -29,8 +29,11 @@ class CloudLicenseClient:
     Validates on startup. Falls back to cached response with 72h grace period.
     """
 
-    def __init__(self):
-        self.key = os.getenv("AETHERCLOUD_LICENSE_KEY", "").strip()
+    def __init__(self, license_key: str | None = None):
+        # Explicit key takes precedence; falls back to env. This makes it
+        # possible to validate a user-supplied key during /auth/login
+        # WITHOUT mutating process-wide state (security fix H8).
+        self.key = (license_key or os.getenv("AETHERCLOUD_LICENSE_KEY", "") or "").strip()
         self.server = os.getenv(
             "AETHER_LICENSE_SERVER",
             "https://aethersecurity.net/api/license",

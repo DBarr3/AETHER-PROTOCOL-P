@@ -3,7 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.aethersystems.net https://license.aethersystems.net https://aethersecurity.net; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';">
 <title>AetherCloud-L</title>
+<!-- DOMPurify — agent/server-authored HTML is routed through window.safeHTML()
+     before reaching innerHTML. Closes audit finding H3 (renderMarkdown /
+     agent-JSON interpolation XSS sinks). Must load before any inline script. -->
+<script src="vendor/dompurify.min.js"></script>
+<script>
+  // Strict sanitizer: removes <script>, <iframe>, event handlers (onload,
+  // onerror, onclick, ...), javascript: URLs, and data: attribute values
+  // that could be used to smuggle JS. Keeps the markdown-rendering set
+  // (em, strong, a, code, pre, ul/ol/li, h1-h6, blockquote, br).
+  window.safeHTML = function (html) {
+    if (typeof window.DOMPurify === 'undefined') return '';  // fail closed
+    return window.DOMPurify.sanitize(String(html == null ? '' : html), {
+      ALLOWED_TAGS: ['a','b','br','blockquote','code','em','h1','h2','h3','h4','h5','h6',
+                     'hr','i','li','ol','p','pre','s','span','strong','sub','sup','u','ul','div'],
+      ALLOWED_ATTR: ['href','title','class','target','rel'],
+      ALLOW_DATA_ATTR: false,
+      FORBID_TAGS: ['script','iframe','object','embed','style','link','meta','form','input','button','base'],
+      FORBID_ATTR: ['onerror','onload','onclick','onmouseover','onfocus','onblur','onsubmit','onchange','formaction'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https|mailto|tel|file):|#|\/|\?|\w)/i,
+    });
+  };
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -9007,14 +9030,16 @@ function displayAIResponse(text, isThinking) {
   const plan = typeof _parseActionPlan === 'function' ? _parseActionPlan(text) : null;
   if (plan && plan.actions && plan.actions.length) {
     _lastPendingPlan = plan;
-    responseText.innerHTML = renderMarkdown(
+    // safeHTML wraps DOMPurify — defense against agent- or tool-authored
+    // HTML smuggled through the markdown renderer (audit H3).
+    responseText.innerHTML = window.safeHTML(renderMarkdown(
       (typeof _stripActionPlan === 'function' ? _stripActionPlan(text) : '') || plan.summary || ''
-    );
+    ));
     _renderPlanCard(panel, plan);
   } else {
     // Strip any raw action-plan block so JSON never leaks into display
     const displayText = (typeof _stripActionPlan === 'function') ? _stripActionPlan(text) : text;
-    responseText.innerHTML = renderMarkdown(displayText || text);
+    responseText.innerHTML = window.safeHTML(renderMarkdown(displayText || text));
     // Fallback execute bar if action-plan text was detected but parse failed
     if (_lastRawPlanText && /action-plan/i.test(text)) {
       _renderFallbackExecuteBar(panel);
@@ -16959,8 +16984,14 @@ if (typeof checkInjection === 'undefined') {
   }
 
   function connectSSE() {
+    // Session token is held in the encrypted electron-store and read through
+    // the preload IPC bridge (window.aetherAPI.authGet). Reading from the
+    // renderer's localStorage is never correct — nothing writes it, and it
+    // would be directly readable by any XSS. The previous fallback was dead
+    // code that made auditors think two storage paths existed.
     const sessionToken = (typeof store !== 'undefined' && store.get)
-      ? store.get('sessionToken') : localStorage.getItem('aether_session');
+      ? store.get('sessionToken')
+      : null;
     const baseUrl = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:8741';
     const url = `${baseUrl}/agent/mcp-status`;
 

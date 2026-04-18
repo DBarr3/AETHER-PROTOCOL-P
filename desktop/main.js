@@ -26,6 +26,110 @@ const PAGES_DIR    = path.join(__dirname, 'pages');
 const API_BASE     = 'https://api.aethersystems.net/cloud';
 const DOWNLOAD_URL = 'https://aethersystems.io/download/latest';
 
+// ── Security: path-jail for every filesystem IPC ─────
+// Every filesystem-touching IPC handler routes user-supplied paths through
+// safeResolve() which enforces (1) no UNC/SMB, (2) no null bytes,
+// (3) symlink rejection at the leaf, (4) resolved path must lie inside an
+// allowed root. Allowed roots = AETHER_VAULT_ROOT (env) + ~/AetherVault +
+// any directory the user has explicitly picked from a folder-dialog this
+// session. Without this, any renderer XSS can rm -rf the home directory.
+const DANGEROUS_EXEC_EXTS = new Set([
+  '.exe','.bat','.cmd','.com','.ps1','.vbs','.vbe','.js','.jse',
+  '.ws','.wsf','.wsh','.msh','.hta','.scr','.msi','.msp','.lnk',
+  '.url','.reg','.dll','.chm','.cpl','.pif','.jar','.appx','.appxbundle',
+]);
+const sessionGrantedRoots = new Set();
+
+function _defaultVaultRoots() {
+  const roots = [];
+  if (process.env.AETHER_VAULT_ROOT) {
+    try { roots.push(path.resolve(process.env.AETHER_VAULT_ROOT)); } catch {}
+  }
+  try { roots.push(path.resolve(path.join(os.homedir(), 'AetherVault'))); } catch {}
+  return roots;
+}
+function getAllowedRoots() {
+  const base = _defaultVaultRoots();
+  for (const r of sessionGrantedRoots) base.push(r);
+  return base;
+}
+function grantRoot(dir) {
+  try {
+    if (!dir || typeof dir !== 'string') return null;
+    const resolved = path.resolve(dir);
+    sessionGrantedRoots.add(resolved);
+    return resolved;
+  } catch { return null; }
+}
+function isUncPath(p) {
+  if (typeof p !== 'string') return false;
+  if (process.platform !== 'win32') return false;
+  return p.startsWith('\\\\') || p.startsWith('//');
+}
+// Canonicalize a path; for non-existent leaves, realpath the deepest existing
+// ancestor and re-attach the suffix. Defeats symlink-hop escapes.
+function _canonicalize(candidate) {
+  const abs = path.resolve(candidate);
+  let cursor = abs;
+  const suffix = [];
+  for (let i = 0; i < 64; i++) {
+    try { fs.lstatSync(cursor); break; }
+    catch {
+      const parent = path.dirname(cursor);
+      if (parent === cursor) break;
+      suffix.unshift(path.basename(cursor));
+      cursor = parent;
+    }
+  }
+  let realAncestor;
+  try { realAncestor = fs.realpathSync.native(cursor); }
+  catch { realAncestor = cursor; }
+  return suffix.length ? path.join(realAncestor, ...suffix) : realAncestor;
+}
+// opts: { allowCreate, denyExec, allowedExt, allowSymlink }
+function safeResolve(candidate, opts = {}) {
+  if (typeof candidate !== 'string' || candidate.length === 0) {
+    throw new Error('Invalid path');
+  }
+  if (candidate.includes('\0')) throw new Error('Null byte in path');
+  if (isUncPath(candidate)) throw new Error('UNC / network paths are blocked');
+  const canonical = _canonicalize(candidate);
+  if (isUncPath(canonical)) throw new Error('UNC / network paths are blocked');
+
+  const roots = getAllowedRoots().map(r => _canonicalize(r));
+  const sep = path.sep;
+  const insideRoot = roots.some(root => {
+    const withSep = root.endsWith(sep) ? root : root + sep;
+    return canonical === root || canonical.startsWith(withSep);
+  });
+  if (!insideRoot) {
+    throw new Error(`Path is outside the allowed vault root (${candidate})`);
+  }
+
+  const ext = path.extname(canonical).toLowerCase();
+  if (opts.denyExec && DANGEROUS_EXEC_EXTS.has(ext)) {
+    throw new Error(`Refusing to operate on executable type: ${ext}`);
+  }
+  if (opts.allowedExt) {
+    const allowed = new Set(
+      (Array.isArray(opts.allowedExt) ? opts.allowedExt : [...opts.allowedExt])
+        .map(e => e.toLowerCase())
+    );
+    if (!allowed.has(ext)) throw new Error(`File type not allowed: ${ext}`);
+  }
+
+  try {
+    const lst = fs.lstatSync(canonical);
+    if (!opts.allowSymlink && lst.isSymbolicLink()) {
+      throw new Error('Symbolic links are not allowed');
+    }
+  } catch (e) {
+    if (e.message && e.message.includes('Symbolic')) throw e;
+    if (!opts.allowCreate) throw new Error(`Path does not exist: ${candidate}`);
+  }
+  return canonical;
+}
+
 // ── Update tracking (shared between boot check + IPC) ──
 let _updateInfo = { currentVersion: null, latestVersion: null, updateAvailable: false, downloadUrl: DOWNLOAD_URL };
 
@@ -60,12 +164,31 @@ function createWindow(page) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       devTools: !app.isPackaged,  // DevTools disabled in production builds
     },
   });
 
   mainWindow = win;
+
+  // Navigation guards — audit M4. Without these:
+  //   - window.open / target=_blank creates a NEW BrowserWindow that inherits
+  //     our preload (including every window.aether.* IPC bridge).
+  //   - will-navigate on an attacker-controlled URL redirects the renderer
+  //     to an external page but keeps the preload active.
+  // Both fail any XSS + link attack into instant preload hijack.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) shell.openExternal(url);
+    else console.warn('[AetherCloud] Blocked window.open to non-allowlist URL:', url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, navUrl) => {
+    // Only allow file:// (internal page navigation) and hash fragments.
+    if (!navUrl.startsWith('file://')) {
+      console.warn('[AetherCloud] Blocked in-place navigation to:', navUrl);
+      event.preventDefault();
+    }
+  });
 
   win.loadFile(path.join(PAGES_DIR, `${page}.html`));
   win.once('ready-to-show', () => {
@@ -224,7 +347,42 @@ async function checkForUpdates(serverVersion) {
 }
 
 // ── App lifecycle ────────────────────────────────────
+// Strict CSP injected as a response header for every response the default
+// session handles. Defense-in-depth: the meta tag in each HTML page is the
+// primary enforcement (file:// loads never hit this hook), but any https://
+// sub-resource load gets the header applied regardless.
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self' https://api.aethersystems.net https://license.aethersystems.net https://aethersecurity.net",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'none'",
+].join('; ');
+
+function installCspHeader() {
+  const { session } = require('electron');
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    // Strip any existing CSP/X-Frame headers so ours is authoritative
+    for (const k of Object.keys(headers)) {
+      const lk = k.toLowerCase();
+      if (lk === 'content-security-policy' || lk === 'content-security-policy-report-only' || lk === 'x-frame-options') {
+        delete headers[k];
+      }
+    }
+    headers['Content-Security-Policy'] = [CSP_POLICY];
+    headers['X-Frame-Options'] = ['DENY'];
+    callback({ responseHeaders: headers });
+  });
+}
+
 app.whenReady().then(async () => {
+  installCspHeader();
   keyManager.hydrate();
 
   // Test backend connectivity before showing login
@@ -282,7 +440,9 @@ ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
   });
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled) return null;
+  grantRoot(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 ipcMain.handle('browse-folder', async () => {
@@ -290,7 +450,9 @@ ipcMain.handle('browse-folder', async () => {
     properties: ['openDirectory'],
     title: 'Select folder to connect',
   });
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled) return null;
+  grantRoot(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 // ── IPC: Shell ───────────────────────────────────────
@@ -316,12 +478,20 @@ ipcMain.on('shell:openExternal', (_e, url) => {
   }
 });
 ipcMain.handle('open-file', async (_e, filePath) => {
-  try { await shell.openPath(filePath); return { success: true }; }
-  catch (err) { return { success: false, error: err.message }; }
+  try {
+    const safe = safeResolve(filePath, { denyExec: true });
+    const result = await shell.openPath(safe);
+    // openPath returns an error-string on failure, empty string on success.
+    if (result) return { success: false, error: result };
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
 });
 ipcMain.handle('show-in-explorer', async (_e, filePath) => {
-  shell.showItemInFolder(filePath);
-  return { success: true };
+  try {
+    const safe = safeResolve(filePath, { denyExec: true });
+    shell.showItemInFolder(safe);
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
 });
 
 // ── IPC: Key management ──────────────────────────────
@@ -340,27 +510,34 @@ ipcMain.handle('fs:execPlan', async (_e, actions) => {
   for (const action of actions) {
     try {
       if (action.type === 'mkdir') {
-        fs.mkdirSync(action.path, { recursive: true });
+        const dst = safeResolve(action.path, { allowCreate: true });
+        fs.mkdirSync(dst, { recursive: true });
         results.push({ action, success: true });
 
       } else if (action.type === 'move') {
-        if (!fs.existsSync(action.from)) {
-          results.push({ action, success: false, error: 'Source not found: ' + action.from });
-          continue;
-        }
-        const destDir = path.dirname(action.to);
+        const src = safeResolve(action.from);
+        const dst = safeResolve(action.to, { allowCreate: true, denyExec: true });
+        const destDir = path.dirname(dst);
+        // destDir must also be inside the jail
+        safeResolve(destDir, { allowCreate: true });
         fs.mkdirSync(destDir, { recursive: true });
-        fs.renameSync(action.from, action.to);
+        fs.renameSync(src, dst);
         results.push({ action, success: true });
 
       } else if (action.type === 'rename') {
-        if (!fs.existsSync(action.path)) {
-          results.push({ action, success: false, error: 'File not found: ' + action.path });
+        if (!action.new_name || typeof action.new_name !== 'string') {
+          results.push({ action, success: false, error: 'Invalid new_name' });
           continue;
         }
-        const dir  = path.dirname(action.path);
-        const dest = path.join(dir, action.new_name);
-        fs.renameSync(action.path, dest);
+        if (action.new_name.includes('/') || action.new_name.includes('\\') ||
+            action.new_name.includes('..') || action.new_name.includes('\0')) {
+          results.push({ action, success: false, error: 'new_name must be a bare filename' });
+          continue;
+        }
+        const src = safeResolve(action.path);
+        const dir = path.dirname(src);
+        const dest = safeResolve(path.join(dir, action.new_name), { allowCreate: true, denyExec: true });
+        fs.renameSync(src, dest);
         results.push({ action, success: true });
 
       } else {
@@ -377,12 +554,19 @@ ipcMain.handle('fs:execPlan', async (_e, actions) => {
 ipcMain.handle('fs:previewPlan', async (_e, actions) => {
   if (!Array.isArray(actions)) return [];
   return actions.map(action => {
-    let exists = true;
+    let exists = false;
+    let denied = false;
     if (action.type === 'move' || action.type === 'rename') {
       const src = action.from || action.path;
-      exists = src ? fs.existsSync(src) : false;
+      try {
+        if (src) { safeResolve(src); exists = true; }
+      } catch { denied = true; exists = false; }
+    } else if (action.type === 'mkdir') {
+      try {
+        if (action.path) { safeResolve(action.path, { allowCreate: true }); exists = true; }
+      } catch { denied = true; exists = false; }
     }
-    return { action, exists };
+    return { action, exists, denied };
   });
 });
 
@@ -542,10 +726,19 @@ ipcMain.handle('terminal:open', async (_e, config) => {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       devTools: !app.isPackaged,
     },
     show: false,
+  });
+
+  // Navigation guards — same rationale as the main window (audit M4).
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, navUrl) => {
+    if (!navUrl.startsWith('file://')) event.preventDefault();
   });
 
   win.loadFile(path.join(PAGES_DIR, 'terminal.html'));
@@ -589,7 +782,9 @@ ipcMain.handle('vault:requestAccess', async () => {
     properties: ['openDirectory'],
     title: 'Select Vault Root',
   });
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled) return null;
+  grantRoot(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 ipcMain.handle('request-fs-permission', async () => {
@@ -597,7 +792,9 @@ ipcMain.handle('request-fs-permission', async () => {
     properties: ['openDirectory'],
     title: 'Grant filesystem access',
   });
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled) return null;
+  grantRoot(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 // ── IPC: Local directory scanner ─────────────────────
@@ -605,23 +802,27 @@ ipcMain.handle('request-fs-permission', async () => {
 // Returns { folders: [...], files: [...], path, name }
 ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
   try {
-    if (!dirPath || !fs.existsSync(dirPath)) {
-      return { error: true, message: 'Path does not exist: ' + dirPath };
-    }
-    const stat = fs.statSync(dirPath);
+    let rootDir;
+    try { rootDir = safeResolve(dirPath); }
+    catch (err) { return { error: true, message: err.message }; }
+
+    const stat = fs.lstatSync(rootDir);
     if (!stat.isDirectory()) {
       return { error: true, message: 'Not a directory: ' + dirPath };
     }
 
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    const entries = fs.readdirSync(rootDir, { withFileTypes: true });
     const folders = [];
     const files = [];
 
     for (const entry of entries) {
       // Skip hidden files/dirs and node_modules
       if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      // Skip symlinks — an imported vault with a symlink to /etc or
+      // C:\Windows would otherwise leak through the jail.
+      if (entry.isSymbolicLink()) continue;
 
-      const fullPath = path.join(dirPath, entry.name);
+      const fullPath = path.join(rootDir, entry.name);
       try {
         if (entry.isDirectory()) {
           let childCount = 0;
@@ -642,13 +843,14 @@ ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
               const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
               for (const sub of subEntries) {
                 if (sub.name.startsWith('.') || sub.name === 'node_modules') continue;
+                if (sub.isSymbolicLink()) continue;
                 const subPath = path.join(fullPath, sub.name);
                 try {
                   if (sub.isDirectory()) {
                     const sc = fs.readdirSync(subPath).filter(c => !c.startsWith('.')).length;
                     folders.push({ name: entry.name + '/' + sub.name, path: subPath, children: sc, isDirectory: true });
                   } else {
-                    const ss = fs.statSync(subPath);
+                    const ss = fs.lstatSync(subPath);
                     files.push({ name: sub.name, path: subPath, size: ss.size, modified: ss.mtimeMs, parent: entry.name });
                   }
                 } catch { /* skip */ }
@@ -656,7 +858,7 @@ ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
             } catch { /* skip */ }
           }
         } else if (entry.isFile()) {
-          const st = fs.statSync(fullPath);
+          const st = fs.lstatSync(fullPath);
           files.push({
             name: entry.name,
             path: fullPath,
@@ -669,8 +871,8 @@ ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
     }
 
     return {
-      path: dirPath,
-      name: path.basename(dirPath),
+      path: rootDir,
+      name: path.basename(rootDir),
       folders,
       files,
     };
@@ -682,8 +884,11 @@ ipcMain.handle('scan-directory', async (_e, dirPath, maxDepth = 1) => {
 // Read first N lines of a text file for preview
 ipcMain.handle('read-file-preview', async (_e, filePath, maxLines = 80) => {
   try {
-    if (!filePath || !fs.existsSync(filePath)) return { error: true, message: 'File not found' };
-    const stat = fs.statSync(filePath);
+    let safe;
+    try { safe = safeResolve(filePath); }
+    catch (err) { return { error: true, message: err.message }; }
+    filePath = safe;
+    const stat = fs.lstatSync(filePath);
 
     // Guard: directories cannot be read as files
     if (stat.isDirectory()) {
@@ -739,8 +944,11 @@ const MAX_FILES_READ = 20;
 // Options: maxFiles (number), treeOnly (bool), specificFiles (string[] of relPaths)
 ipcMain.handle('read-directory-context', async (_e, dirPath, optionsOrMax = MAX_FILES_READ) => {
   try {
-    if (!dirPath || !fs.existsSync(dirPath)) return { error: true, message: 'Path not found' };
-    const stat = fs.statSync(dirPath);
+    let safe;
+    try { safe = safeResolve(dirPath); }
+    catch (err) { return { error: true, message: err.message }; }
+    dirPath = safe;
+    const stat = fs.lstatSync(dirPath);
     if (!stat.isDirectory()) return { error: true, message: 'Not a directory' };
 
     // Support both old (number) and new (object) signatures
@@ -761,13 +969,15 @@ ipcMain.handle('read-directory-context', async (_e, dirPath, optionsOrMax = MAX_
       try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
       for (const e of entries) {
         if (e.name.startsWith('.') && e.name !== '.env.example') continue;
+        // Skip symlinks — prevents jail escape via symlink-to-/etc or C:\Windows.
+        if (e.isSymbolicLink()) continue;
         const full = path.join(dir, e.name);
         const relPath = rel ? rel + '/' + e.name : e.name;
         if (e.isDirectory()) {
           if (!SKIP_DIRS.has(e.name)) walkDir(full, relPath);
         } else if (e.isFile()) {
           try {
-            const s = fs.statSync(full);
+            const s = fs.lstatSync(full);
             const ext = path.extname(e.name).toLowerCase();
             allFiles.push({ path: full, relPath, size: s.size, ext });
           } catch { /* skip */ }
@@ -862,6 +1072,21 @@ ipcMain.handle('auth:get', () => {
     lastLogin: store.get('lastLogin') || null,
     serverUrl: store.get('serverUrl') || null,
     licenseKey: store.get('licenseKey') || null,
+    plan: store.get('plan') || null,
+  };
+});
+
+// Scoped status — returns ONLY non-secret fields. Renderer code that only
+// needs to know "is the user logged in" or display the user's email should
+// use this instead of auth:get so an XSS can't lift the token/license key.
+ipcMain.handle('auth:status', () => {
+  const store = getAuthStore();
+  return {
+    loggedIn: !!store.get('sessionToken'),
+    userId: store.get('userId') || null,
+    email: store.get('email') || null,
+    rememberMe: store.get('rememberMe', true),
+    lastLogin: store.get('lastLogin') || null,
     plan: store.get('plan') || null,
   };
 });
@@ -990,37 +1215,110 @@ async function adminFetch(endpoint, options = {}) {
   }
 }
 
+// ═════════════════════════════════════════════════════════════
+// Per-call re-auth on destructive admin IPCs
+// ═════════════════════════════════════════════════════════════
+// Prior to this hook, any renderer XSS (on an admin's logged-in machine)
+// could iterate the scrambler list and revoke every license without the
+// admin's knowledge. A stored session token + AETHER_ADMIN_KEY was the
+// only gate, and neither is a user-gesture signal.
+//
+// Every destructive admin op now pops a NATIVE OS dialog. XSS cannot
+// fake, drive, or suppress `dialog.showMessageBox` — only the user's
+// mouse/keyboard can advance it. Non-destructive ops (overview, list)
+// still go through without a prompt.
+const DESTRUCTIVE_ADMIN_OPS = new Set([
+  'admin:scrambler:issue',
+  'admin:scrambler:revoke',
+  'admin:scrambler:extend',
+  'admin:cloud:issue',
+  'admin:cloud:revoke',
+  'admin:apikey:issue',
+  'admin:apikey:revoke',
+]);
+
+async function confirmDestructiveAdmin(opName, dataPreview) {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const detail = dataPreview ? `Target:\n${dataPreview}` : 'No target data attached.';
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'warning',
+    title: 'Confirm Admin Operation',
+    message: `This will perform: ${opName}`,
+    detail: `${detail}\n\nThis is a DESTRUCTIVE license-server operation. Proceed only if you initiated it.`,
+    buttons: ['Cancel', 'Proceed'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  return response === 1;
+}
+
+function summarizeAdminPayload(data) {
+  if (!data) return '';
+  try {
+    const keys = Object.keys(data).slice(0, 5);
+    return keys.map(k => `  ${k}: ${String(data[k]).slice(0, 80)}`).join('\n');
+  } catch { return '(unreadable payload)'; }
+}
+
+// Wrapper: gate every admin IPC through the confirmation prompt when it's
+// in the destructive set. Non-destructive handlers call adminFetch directly.
+function guardedAdminHandler(opName, fn) {
+  return async (_e, ...args) => {
+    if (DESTRUCTIVE_ADMIN_OPS.has(opName)) {
+      const payload = args && args[0];
+      const ok = await confirmDestructiveAdmin(opName, summarizeAdminPayload(payload));
+      if (!ok) return { error: true, message: 'Operation cancelled by user', cancelled: true };
+    }
+    return fn(...args);
+  };
+}
+
 ipcMain.handle('admin:overview', () => adminFetch('/admin/overview'));
 ipcMain.handle('admin:scrambler:list', (_e, params) => {
   const qs = new URLSearchParams(params || {}).toString();
   return adminFetch(`/license/scrambler/list?${qs}`);
 });
-ipcMain.handle('admin:scrambler:issue', (_e, data) =>
-  adminFetch('/license/scrambler/issue', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:scrambler:issue',
+  guardedAdminHandler('admin:scrambler:issue', (data) =>
+    adminFetch('/license/scrambler/issue', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
-ipcMain.handle('admin:scrambler:revoke', (_e, data) =>
-  adminFetch('/license/scrambler/revoke', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:scrambler:revoke',
+  guardedAdminHandler('admin:scrambler:revoke', (data) =>
+    adminFetch('/license/scrambler/revoke', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
-ipcMain.handle('admin:scrambler:extend', (_e, data) =>
-  adminFetch('/license/scrambler/extend', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:scrambler:extend',
+  guardedAdminHandler('admin:scrambler:extend', (data) =>
+    adminFetch('/license/scrambler/extend', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
 ipcMain.handle('admin:cloud:list', (_e, params) => {
   const qs = new URLSearchParams(params || {}).toString();
   return adminFetch(`/license/cloud/list?${qs}`);
 });
-ipcMain.handle('admin:cloud:issue', (_e, data) =>
-  adminFetch('/license/cloud/issue', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:cloud:issue',
+  guardedAdminHandler('admin:cloud:issue', (data) =>
+    adminFetch('/license/cloud/issue', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
-ipcMain.handle('admin:cloud:revoke', (_e, data) =>
-  adminFetch('/license/cloud/revoke', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:cloud:revoke',
+  guardedAdminHandler('admin:cloud:revoke', (data) =>
+    adminFetch('/license/cloud/revoke', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
 ipcMain.handle('admin:apikey:list', (_e, params) => {
   const qs = new URLSearchParams(params || {}).toString();
   return adminFetch(`/license/api/list?${qs}`);
 });
-ipcMain.handle('admin:apikey:issue', (_e, data) =>
-  adminFetch('/license/api/issue', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:apikey:issue',
+  guardedAdminHandler('admin:apikey:issue', (data) =>
+    adminFetch('/license/api/issue', { method: 'POST', body: JSON.stringify(data) })
+  )
 );
-ipcMain.handle('admin:apikey:revoke', (_e, data) =>
-  adminFetch('/license/api/revoke', { method: 'POST', body: JSON.stringify(data) })
+ipcMain.handle('admin:apikey:revoke',
+  guardedAdminHandler('admin:apikey:revoke', (data) =>
+    adminFetch('/license/api/revoke', { method: 'POST', body: JSON.stringify(data) })
+  )
 );

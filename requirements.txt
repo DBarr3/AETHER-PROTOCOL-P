@@ -3,6 +3,11 @@
 # Quantum-Secured AI File Intelligence System
 # Aether Systems LLC — Patent Pending
 # ═══════════════════════════════════════════════════
+#
+# Floors are set to the lowest version KNOWN FREE of published CVEs as of
+# the 2026-04 security sweep. Do not weaken these without re-running
+# `pip-audit` / npm-audit-style CVE checks. Ideally generate a full
+# requirements.lock from this file for reproducible deploys.
 
 # ─── Protocol-L Dependencies ─────────────────────
 qiskit>=2.0.0
@@ -16,9 +21,13 @@ watchdog>=3.0.0
 rich>=13.0.0
 anthropic>=0.25.0
 textual>=0.50.0
-cryptography>=41.0.0
+# cryptography: CVE-2023-50782 (Bleichenbacher) fixed in 42.0.0,
+# CVE-2024-26130 (NULL-deref) fixed in 42.0.4. Floor bumped to 44 per
+# audit M8.
+cryptography>=44.0.0
 python-dotenv>=1.0.0
-requests>=2.31.0
+# requests: CVE-2024-47081 (.netrc cred leak) fixed in 2.32.4.
+requests>=2.32.4
 
 # ─── DO Spaces (vault cloud storage) ──────────────
 boto3>=1.34.0
@@ -27,7 +36,8 @@ boto3>=1.34.0
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.0.0
-python-multipart>=0.0.6
+# python-multipart: CVE-2024-53981 (multipart DoS) fixed in 0.0.18. Audit M7.
+python-multipart>=0.0.18
 slowapi>=0.1.9
 
 # ─── Development / Testing ───────────────────────
