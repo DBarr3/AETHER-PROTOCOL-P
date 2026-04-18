@@ -1,13 +1,14 @@
 // AetherCloud billing webhook.
-// Receives Stripe events, writes to public.users, emails a license key via Resend.
-//
-// Deploy:  supabase functions deploy stripe-webhook --no-verify-jwt
-// Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY,
-//          SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, APP_URL, FROM_EMAIL,
-//          PRICE_SOLO, PRICE_TEAM, PRICE_PRO
+// Verifies Stripe signature, writes to public.users, sends welcome email,
+// emits PostHog server-side events for revenue tracking.
 
 import Stripe from "https://esm.sh/stripe@14?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  generateLicenseKey,
+  sendWelcomeEmail,
+  captureServerEvent,
+} from "../_shared/license.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
   apiVersion: "2024-06-20",
@@ -18,6 +19,8 @@ const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
 const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
 const appUrl = Deno.env.get("APP_URL") ?? "https://aethersystems.net";
 const fromEmail = Deno.env.get("FROM_EMAIL") ?? "no-reply@aethersystems.net";
+const posthogKey = Deno.env.get("POSTHOG_KEY") ?? "";
+const posthogHost = Deno.env.get("POSTHOG_HOST") ?? "https://us.i.posthog.com";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
@@ -25,56 +28,16 @@ const supabase = createClient(
   { auth: { persistSession: false } },
 );
 
-const PRICE_TO_TIER: Record<string, "solo" | "team" | "pro"> = {
+// Free tier is handled by the free-signup function, never by this webhook.
+const PRICE_TO_TIER: Record<string, "solo" | "pro" | "team"> = {
   [Deno.env.get("PRICE_SOLO") ?? ""]: "solo",
-  [Deno.env.get("PRICE_TEAM") ?? ""]: "team",
   [Deno.env.get("PRICE_PRO") ?? ""]: "pro",
+  [Deno.env.get("PRICE_TEAM") ?? ""]: "team",
 };
 
-function tierForPrice(priceId: string | null | undefined): "solo" | "team" | "pro" | null {
+function tierForPrice(priceId: string | null | undefined): "solo" | "pro" | "team" | null {
   if (!priceId) return null;
   return PRICE_TO_TIER[priceId] ?? null;
-}
-
-// AETH-CLD-XXXX-XXXX-XXXX — matches license_client.py:23
-function generateLicenseKey(): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const bytes = new Uint8Array(12);
-  crypto.getRandomValues(bytes);
-  const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]);
-  const g1 = chars.slice(0, 4).join("");
-  const g2 = chars.slice(4, 8).join("");
-  const g3 = chars.slice(8, 12).join("");
-  return `AETH-CLD-${g1}-${g2}-${g3}`;
-}
-
-async function sendWelcomeEmail(to: string, licenseKey: string, tier: string) {
-  if (!resendKey) {
-    console.warn("RESEND_API_KEY not set, skipping email");
-    return;
-  }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to,
-      subject: "Welcome to AetherCloud — your license key",
-      html: `
-        <p>Thanks for subscribing to AetherCloud (<strong>${tier}</strong> tier).</p>
-        <p>Your license key:</p>
-        <p style="font-family:monospace;font-size:16px;padding:12px;background:#f4f4f4;border-radius:4px">${licenseKey}</p>
-        <p>Paste this into the AetherCloud desktop app to activate, or visit <a href="${appUrl}">${appUrl}</a>.</p>
-        <p>— Aether Systems</p>
-      `,
-    }),
-  });
-  if (!res.ok) {
-    console.error("Resend failed:", res.status, await res.text());
-  }
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -92,6 +55,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscriptionId = typeof full.subscription === "string"
     ? full.subscription
     : full.subscription?.id ?? null;
+  const mrr = (full.amount_total ?? 0) / 100;
 
   const licenseKey = generateLicenseKey();
 
@@ -111,7 +75,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
-  await sendWelcomeEmail(email, licenseKey, tier);
+  await sendWelcomeEmail(email, licenseKey, tier, { fromEmail, resendKey, appUrl });
+  await captureServerEvent({
+    posthogKey,
+    posthogHost,
+    distinctId: email,
+    event: "checkout_completed",
+    properties: { tier, price_id: priceId ?? "unknown", mrr },
+  });
 }
 
 async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
@@ -134,15 +105,34 @@ async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
     .update(update)
     .eq("stripe_customer_id", customerId);
   if (error) console.error("subscription.updated failed:", error);
+  // No PostHog event for tier changes in v1.
 }
 
 async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+
+  // Fetch the email so we can use it as distinctId in PostHog.
+  const { data: existing } = await supabase
+    .from("users")
+    .select("email")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("users")
     .update({ subscription_status: "canceled" })
     .eq("stripe_customer_id", customerId);
   if (error) console.error("subscription.deleted failed:", error);
+
+  if (existing?.email) {
+    await captureServerEvent({
+      posthogKey,
+      posthogHost,
+      distinctId: existing.email,
+      event: "subscription_canceled",
+      properties: { stripe_customer_id: customerId },
+    });
+  }
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
@@ -150,11 +140,31 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     ? invoice.customer
     : invoice.customer?.id;
   if (!customerId) return;
+
+  const { data: existing } = await supabase
+    .from("users")
+    .select("email")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("users")
     .update({ subscription_status: "past_due" })
     .eq("stripe_customer_id", customerId);
   if (error) console.error("invoice.payment_failed failed:", error);
+
+  if (existing?.email) {
+    await captureServerEvent({
+      posthogKey,
+      posthogHost,
+      distinctId: existing.email,
+      event: "payment_failed",
+      properties: {
+        stripe_customer_id: customerId,
+        attempt_count: invoice.attempt_count ?? null,
+      },
+    });
+  }
 }
 
 Deno.serve(async (req) => {
