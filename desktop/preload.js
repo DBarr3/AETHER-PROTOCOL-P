@@ -265,3 +265,18 @@ contextBridge.exposeInMainWorld('aetherAPI', {
   authClear:  () => ipcRenderer.invoke('auth:clear'),
   authClearAll: () => ipcRenderer.invoke('auth:clearAll'),
 });
+
+// ═══════════════════════════════════════════════════
+// INSTALLER BRIDGE — window.installerAPI
+// Contract consumed by desktop/pages/installer/installer.js:
+//   onProgress(cb), onState(cb), cancelInstall(), launchApp()
+// Deliberately separate namespace from window.aether so the installer
+// renderer has a minimal, auditable surface area. Nothing else in the
+// app uses this bridge.
+// ═══════════════════════════════════════════════════
+contextBridge.exposeInMainWorld('installerAPI', {
+  onProgress:    (cb) => ipcRenderer.on('installer:progress', (_e, payload) => cb(payload)),
+  onState:       (cb) => ipcRenderer.on('installer:state', (_e, payload) => cb(payload)),
+  cancelInstall: ()   => ipcRenderer.send('installer:cancel'),
+  launchApp:     ()   => ipcRenderer.send('installer:launch'),
+});

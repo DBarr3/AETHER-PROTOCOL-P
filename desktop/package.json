@@ -1,6 +1,6 @@
 {
   "name": "aethercloud-l",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "Quantum-secured AI file intelligence",
   "main": "main.js",
   "author": "Aether Systems LLC",
@@ -75,9 +75,8 @@
       "verifyUpdateCodeSignature": true
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "allowElevation": true,
+      "oneClick": true,
+      "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AetherCloud-L",
@@ -87,9 +86,7 @@
       "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false,
       "menuCategory": "Aether Systems LLC",
-      "license": "assets/license.txt",
       "runAfterFinish": true,
-      "perMachine": true,
       "installerLanguages": [
         "en_US"
       ],

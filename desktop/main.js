@@ -139,9 +139,26 @@ const terminalWindows = new Map(); // key: 'agent-{id}' or 'team-{name}'
 
 // ── Window configs per page ──────────────────────────
 const WINDOW_CONFIGS = {
+  installer: { width: 920, height: 560, resizable: false, bgColor: '#060912', transparent: true },
   login:     { width: 480, height: 620, resizable: false },
   dashboard: { width: 1280, height: 820, resizable: true, minWidth: 900, minHeight: 600 },
 };
+
+// ── First-run installer gate ─────────────────────────
+// Separate lightweight electron-store from auth-store. auth-store has a
+// strict schema that rejects arbitrary keys; the installer gate needs a
+// free-form key ('installerComplete').
+const Store = require('electron-store');
+const _appState = new Store({ name: 'aether-app-state' });
+
+function isFirstRun() {
+  try { return !_appState.get('installerComplete'); }
+  catch { return true; }  // fail-open: show installer if store is broken
+}
+function markInstallerComplete() {
+  try { _appState.set('installerComplete', true); }
+  catch { /* non-fatal */ }
+}
 
 // ── Create window ────────────────────────────────────
 function createWindow(page) {
@@ -157,8 +174,8 @@ function createWindow(page) {
     minHeight: cfg.minHeight || cfg.height,
     resizable: cfg.resizable ?? false,
     frame: false,
-    transparent: false,
-    backgroundColor: '#0a0a0a',
+    transparent: cfg.transparent || false,
+    backgroundColor: cfg.transparent ? undefined : (cfg.bgColor || '#0a0a0a'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -190,7 +207,12 @@ function createWindow(page) {
     }
   });
 
-  win.loadFile(path.join(PAGES_DIR, `${page}.html`));
+  // Installer lives in its own subdirectory with CSS/JS/agents assets.
+  // All other pages live at the pages/ root (dashboard.html, login.html, etc.).
+  const htmlPath = page === 'installer'
+    ? path.join(PAGES_DIR, 'installer', 'installer.html')
+    : path.join(PAGES_DIR, `${page}.html`);
+  win.loadFile(htmlPath);
   win.once('ready-to-show', () => {
     if (mainWindow === win) win.show();
     // Destroy old window AFTER new one is visible
@@ -376,16 +398,21 @@ app.whenReady().then(async () => {
   installCspHeader();
   keyManager.hydrate();
 
-  // Test backend connectivity before showing login
+  // First-run: show the branded installer IMMEDIATELY. Do NOT block on
+  // backend probing — the installer UX is fully offline-capable, and a
+  // 30-second silent wait during install was the root cause of the
+  // "crashes after install" bug in v0.9.6. Backend probe happens at the
+  // installer→login handoff (see installer:launch handler below).
+  if (isFirstRun()) {
+    createWindow('installer');
+    return;
+  }
+
+  // Returning user: probe backend, check updates, then show login.
   const status = await waitForBackend();
   if (!status.ready) return;
-
-  // Check for updates using server version as source of truth
   await checkForUpdates(status.version);
-
-  // Verify routing path
   await verifyRouting();
-
   createWindow('login');
 });
 
@@ -397,6 +424,34 @@ app.on('activate', () => { if (!mainWindow) createWindow('login'); });
 ipcMain.on('navigate', (_e, page) => {
   const allowed = ['login', 'dashboard'];
   if (allowed.includes(page)) createWindow(page);
+});
+
+// ── IPC: Installer → Main ────────────────────────────
+// The branded installer (desktop/pages/installer/installer.js) sends these
+// events via the installerAPI bridge in preload.js.
+ipcMain.on('installer:launch', async () => {
+  markInstallerComplete();
+  // Backend probe is deferred to here (was previously at app.whenReady,
+  // which blocked first-run users from ever seeing the installer if the
+  // backend was slow or down). We still probe before login so that users
+  // get the "VPS unreachable" dialog early if routing is broken.
+  const status = await waitForBackend();
+  if (!status.ready) {
+    // waitForBackend already showed the error dialog; exit cleanly.
+    app.quit();
+    return;
+  }
+  try {
+    await checkForUpdates(status.version);
+    await verifyRouting();
+  } catch (e) {
+    console.warn('[AetherCloud] post-installer backend checks failed:', e);
+    // Non-fatal — proceed to login anyway.
+  }
+  createWindow('login');
+});
+ipcMain.on('installer:cancel', () => {
+  app.quit();
 });
 
 // ── IPC: Window controls ─────────────────────────────
