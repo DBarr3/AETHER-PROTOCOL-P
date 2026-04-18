@@ -1,37 +1,40 @@
 # Vercel environment variables
 
-Paste these into your Vercel project (**Settings → Environment Variables**) so the Subscribe buttons and Checkout Session creation work. Scope every row to **Production + Preview + Development** unless otherwise noted.
+Paste these into your Vercel project (**Settings → Environment Variables**) so the Subscribe buttons and Checkout Session creation work. Scope every row to **Production + Preview + Development**.
 
-| Name | Value | Where to get it |
+## Required
+
+| Name | Scope | Value |
 |---|---|---|
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_...` | Stripe dashboard → **Developers → API keys** → *Publishable key* |
-| `STRIPE_SECRET_KEY` | `sk_live_...` | Stripe dashboard → **Developers → API keys** → *Secret key*. Used by your serverless function that creates Checkout Sessions. |
-| `NEXT_PUBLIC_PRICE_SOLO` | `price_...` | Stripe dashboard → **Products** → Solo product → copy price ID |
-| `NEXT_PUBLIC_PRICE_TEAM` | `price_...` | Stripe dashboard → **Products** → Team product → copy price ID |
-| `NEXT_PUBLIC_PRICE_PRO` | `price_...` | Stripe dashboard → **Products** → Pro product → copy price ID |
-| `APP_URL` | `https://aethersystems.net` | Your production domain — used for Checkout success/cancel URLs |
+| `STRIPE_SECRET_KEY` | Server | `sk_live_...` |
+| `STRIPE_PRICE_SOLO` | Server | `price_1TNKCm3TqWOqdd87AngxY9ks` ($19/mo) |
+| `STRIPE_PRICE_PRO` | Server | `price_1TNKCm3TqWOqdd87vSXEHnVW` ($49/mo) |
+| `STRIPE_PRICE_TEAM` | Server | `price_1TNKCm3TqWOqdd87FJIdQFI1` ($89/mo) |
+| `NEXT_PUBLIC_APP_URL` | Client | `https://<your-vercel-url>.vercel.app` → later `https://aethersystems.net` |
+| `NEXT_PUBLIC_SUPABASE_FREE_SIGNUP_URL` | Client | `https://<PROJECT_REF>.supabase.co/functions/v1/free-signup` |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Client | `phc_yBVAN9NdLngv5A34awLWQqgg9eyVGELsn9hdWFzqNwhR` |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Client | `https://us.i.posthog.com` |
+| `POSTHOG_KEY` | Server | `phc_yBVAN9NdLngv5A34awLWQqgg9eyVGELsn9hdWFzqNwhR` |
+| `POSTHOG_HOST` | Server | `https://us.i.posthog.com` |
+
+## Where to get each value
+
+- **`STRIPE_SECRET_KEY`** → Stripe dashboard → **Developers → API keys** → *Secret key*. Live mode only.
+- **`STRIPE_PRICE_*`** → Already listed above. Don't re-create — they exist in Live mode.
+- **`NEXT_PUBLIC_APP_URL`** → Blank on first deploy; Vercel gives you a `.vercel.app` URL. Paste it back as `NEXT_PUBLIC_APP_URL` and redeploy. Later swap for `https://aethersystems.net` after adding the custom domain.
+- **`NEXT_PUBLIC_SUPABASE_FREE_SIGNUP_URL`** → After running `aethercloud/deploy.sh`, the script prints this URL.
+- **`POSTHOG_*`** → Already listed above. Project 386803 (US cloud).
+
+## Security notes
+
+- `NEXT_PUBLIC_*` variables are bundled into client JavaScript — safe to expose. The PostHog project key, publishable Stripe price IDs, and public Supabase function URL are all designed for browser exposure.
+- `STRIPE_SECRET_KEY` must stay server-only. Never prefix it with `NEXT_PUBLIC_`.
+- `POSTHOG_KEY` is the same value on client and server; PostHog uses the project API key for both. The `NEXT_PUBLIC_` distinction only controls which runtime reads it.
 
 ## Checklist
 
-- [ ] All six rows added
+- [ ] All 10 rows added
 - [ ] Every row scoped to Production, Preview, and Development
-- [ ] Stripe account toggle was set to **Live** when copying keys (not Test)
+- [ ] Stripe account toggle was set to **Live** when copying the secret key
 - [ ] Project redeployed after saving (env changes don't take effect until redeploy)
-
-## Via CLI
-
-```bash
-vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production
-vercel env add STRIPE_SECRET_KEY production
-vercel env add NEXT_PUBLIC_PRICE_SOLO production
-vercel env add NEXT_PUBLIC_PRICE_TEAM production
-vercel env add NEXT_PUBLIC_PRICE_PRO production
-vercel env add APP_URL production
-# repeat for `preview` and `development` environments, or use `--environment all`
-```
-
-## Notes
-
-- `NEXT_PUBLIC_*` vars are bundled into the client JavaScript — safe to expose (publishable keys and price IDs are public by design).
-- `STRIPE_SECRET_KEY` is **not** `NEXT_PUBLIC_*` — it must only be read by server-side code (API routes / serverless functions). Never prefix it with `NEXT_PUBLIC_`.
-- `APP_URL` is used by your Checkout Session creator as `success_url` and `cancel_url`. Keep it in sync with the `APP_URL` secret on Supabase (they should match).
+- [ ] After first deploy, ran `supabase secrets set ALLOWED_ORIGIN_VERCEL=https://<your-vercel-url>.vercel.app` so CORS on `free-signup` allows the site

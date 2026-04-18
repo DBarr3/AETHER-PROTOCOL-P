@@ -1,6 +1,6 @@
 # AetherCloud billing — deploy walkthrough (plain English)
 
-You're wiring together three systems so a customer hitting "Subscribe" on your site ends up with a license key in their inbox:
+You're wiring together four tiers so a customer hitting "Subscribe" on your site ends up with a license key in their inbox:
 
 ```
 [Vercel site / checkout button]
@@ -53,12 +53,15 @@ supabase secrets set \
   STRIPE_SECRET_KEY=sk_live_REPLACE_ME \
   RESEND_API_KEY=re_REPLACE_ME \
   SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co \
-  SUPABASE_SERVICE_ROLE_KEY=eyJ...REPLACE_ME \
+  SUPABASE_SERVICE_ROLE_KEY=sb_secret_REPLACE_ME \
   APP_URL=https://aethersystems.net \
   FROM_EMAIL=no-reply@aethersystems.net \
-  PRICE_SOLO=price_REPLACE_ME \
-  PRICE_TEAM=price_REPLACE_ME \
-  PRICE_PRO=price_REPLACE_ME
+  PRICE_SOLO=price_1TNKCm3TqWOqdd87AngxY9ks \
+  PRICE_PRO=price_1TNKCm3TqWOqdd87vSXEHnVW \
+  PRICE_TEAM=price_1TNKCm3TqWOqdd87FJIdQFI1 \
+  POSTHOG_KEY=phc_yBVAN9NdLngv5A34awLWQqgg9eyVGELsn9hdWFzqNwhR \
+  POSTHOG_HOST=https://us.i.posthog.com \
+  ALLOWED_ORIGIN_VERCEL=https://your-vercel-url.vercel.app
 ```
 
 **Where to grab each one:**
@@ -83,6 +86,7 @@ supabase secrets set \
 ```bash
 cd /path/to/aethercloud
 supabase functions deploy stripe-webhook --no-verify-jwt
+supabase functions deploy free-signup --no-verify-jwt
 ```
 
 Output ends with the function URL. Copy it — you need it in the next step.
