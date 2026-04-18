@@ -19,13 +19,12 @@ export function PricingCard({ tier }: { tier: Tier }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier: tier.key }),
       });
+      const body = await res.json().catch(() => ({} as { url?: string; error?: string }));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `checkout failed (${res.status})`);
       }
-      const { url } = await res.json();
-      if (!url) throw new Error("missing checkout url");
-      window.location.href = url;
+      if (!body.url) throw new Error("missing checkout url");
+      window.location.href = body.url;
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
