@@ -30,6 +30,6 @@ export function posthogServer() {
  */
 export async function flushPostHog() {
   if (!client) return;
-  await client.shutdownAsync();
+  await client.shutdown();
   client = null;
 }
