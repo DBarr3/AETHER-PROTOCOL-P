@@ -36,7 +36,7 @@ class CloudLicenseClient:
         self.key = (license_key or os.getenv("AETHERCLOUD_LICENSE_KEY", "") or "").strip()
         self.server = os.getenv(
             "AETHER_LICENSE_SERVER",
-            "https://aethersecurity.net/api/license",
+            "https://license.aethersystems.net/api/license",
         ).rstrip("/")
         self.cache_path = os.getenv(
             "AETHERCLOUD_LICENSE_CACHE",
