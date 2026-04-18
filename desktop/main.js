@@ -315,7 +315,12 @@ function compareVersions(a, b) {
 }
 
 // ── Update check ─────────────────────────────────────
-// Called after waitForBackend() — server version is the source of truth.
+// Records version info for the app:updateInfo IPC handler.
+// No longer shows a native dialog — the dashboard HTML banner
+// handles version mismatch display (directional: only when backend > installed).
+// The old native dialog was problematic: it fired before the app loaded,
+// pointed to a download URL that might serve stale installers, and
+// confused users by telling them to "download" when they already had the latest.
 async function checkForUpdates(serverVersion) {
   const localVersion = app.getVersion();
   _updateInfo.currentVersion = localVersion;
@@ -323,27 +328,13 @@ async function checkForUpdates(serverVersion) {
 
   if (!serverVersion || compareVersions(serverVersion, localVersion) <= 0) {
     _updateInfo.updateAvailable = false;
-    return; // up to date or server didn't report a version
+    console.log(`[AetherCloud] Version check: installed v${localVersion}, backend v${serverVersion || 'unknown'} — up to date`);
+    return;
   }
 
   _updateInfo.updateAvailable = true;
-  console.log(`[AetherCloud] Update available: ${localVersion} → ${serverVersion}`);
-
-  const { response } = await dialog.showMessageBox({
-    type: 'info',
-    title: 'AetherCloud Update Available',
-    message: `A new version is available`,
-    detail: `You are running v${localVersion}.\nThe latest version is v${serverVersion}.\n\nDownload the update to access new features and security improvements.`,
-    buttons: ['Download Update', 'Continue Anyway'],
-    defaultId: 0,
-    cancelId: 1,
-  });
-
-  if (response === 0) {
-    shell.openExternal(DOWNLOAD_URL);
-    // Give the browser a moment to open, then continue launching
-    await new Promise(r => setTimeout(r, 1500));
-  }
+  console.log(`[AetherCloud] Version check: installed v${localVersion}, backend v${serverVersion} — update available (dashboard will show banner)`);
+  // Dashboard banner handles the UI notification — no native dialog needed.
 }
 
 // ── App lifecycle ────────────────────────────────────
@@ -572,7 +563,9 @@ ipcMain.handle('fs:previewPlan', async (_e, actions) => {
 
 // ── IPC: Agent Profile System ───────────────────────
 ipcMain.handle('agent:loadIcons', async () => {
-  const iconsPath = path.join(__dirname, '..', 'agent', 'agents');
+  // Icons are packaged inside desktop/assets/agents/ so they're available
+  // in both development (electron .) and installed builds (inside asar).
+  const iconsPath = path.join(__dirname, 'assets', 'agents');
   try {
     const files = fs.readdirSync(iconsPath).filter(f => f.endsWith('.svg'));
     return files.map(file => ({
@@ -586,7 +579,9 @@ ipcMain.handle('agent:loadIcons', async () => {
 });
 
 ipcMain.handle('agent:loadAnimations', async () => {
-  const animPath = path.join(__dirname, '..', 'agent', 'agents', 'animations');
+  // Animation JSON data is packaged inside desktop/assets/agents/animations/
+  // so it's available in both development and installed builds.
+  const animPath = path.join(__dirname, 'assets', 'agents', 'animations');
   try {
     if (!fs.existsSync(animPath)) return {};
     const files = fs.readdirSync(animPath).filter(f => f.endsWith('.json'));
