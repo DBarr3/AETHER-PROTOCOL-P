@@ -120,9 +120,12 @@ Deno.serve(async (req) => {
   let effectiveTier: string;
 
   if (existing && existing.tier !== "free" && existing.license_key) {
-    // Paid user signing up for "free" — return their existing license without changing tier.
+    // Paid user signing up for "free" — return their existing license without
+    // changing tier, without re-emailing, and without firing a misleading
+    // signup_completed event. Log for visibility.
     licenseKey = existing.license_key;
     effectiveTier = existing.tier;
+    console.info("existing paid user pinged free-signup; skipping email + event:", email);
   } else {
     licenseKey = existing?.license_key ?? generateLicenseKey();
     effectiveTier = "free";
@@ -139,16 +142,16 @@ Deno.serve(async (req) => {
       console.error("users upsert failed:", upsertErr);
       return json(500, { error: "internal error" }, allowedOrigin);
     }
-  }
 
-  await sendWelcomeEmail(email, licenseKey, effectiveTier, { fromEmail, resendKey, appUrl });
-  await captureServerEvent({
-    posthogKey,
-    posthogHost,
-    distinctId: email,
-    event: "signup_completed",
-    properties: { tier: effectiveTier, method: "email" },
-  });
+    await sendWelcomeEmail(email, licenseKey, effectiveTier, { fromEmail, resendKey, appUrl });
+    await captureServerEvent({
+      posthogKey,
+      posthogHost,
+      distinctId: email,
+      event: "signup_completed",
+      properties: { tier: effectiveTier, method: "email" },
+    });
+  }
 
   return json(200, { ok: true }, allowedOrigin);
 });
