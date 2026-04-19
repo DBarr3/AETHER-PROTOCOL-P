@@ -19,7 +19,9 @@
       try { cb(event.payload); }
       catch (err) { console.error('[tauri-bridge] progress listener threw', err); }
     }
-  }).then((unlisten) => { unlistenFn = unlisten; });
+  })
+    .then((unlisten) => { unlistenFn = unlisten; })
+    .catch((err) => { console.error('[tauri-bridge] listen(installer://progress) failed', err); });
 
   window.installerAPI = {
     startInstall: () => invoke('start_install'),

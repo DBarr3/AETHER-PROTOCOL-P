@@ -210,10 +210,16 @@ function nextPage() {
   } else if (page === 'setup' && consentCheckbox.checked) {
     setPage('download');
     // Kick off real install. Progress events will drive the UI from here.
-    window.installerAPI.startInstall().catch((err) => {
-      console.error('[installer] startInstall rejected', err);
-      renderProgress(0, 'Installation failed', String(err), 'See error details');
-    });
+    const started = window.installerAPI?.startInstall?.();
+    if (started && typeof started.catch === 'function') {
+      started.catch((err) => {
+        console.error('[installer] startInstall rejected', err);
+        renderProgress(0, 'Installation failed', String(err), 'See error details');
+      });
+    } else {
+      console.error('[installer] installerAPI.startInstall unavailable — Tauri bridge not loaded');
+      renderProgress(0, 'Installation unavailable', 'Tauri bridge not loaded', 'Please reinstall');
+    }
   } else if (page === 'final' && window.installerAPI?.launchApp) {
     window.installerAPI.launchApp();
   }
