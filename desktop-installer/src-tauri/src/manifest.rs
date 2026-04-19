@@ -1,4 +1,5 @@
 use crate::errors::{InstallerError, Result};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,8 +47,6 @@ impl Manifest {
     }
 }
 
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-
 /// Verify that `manifest_bytes` matches `signature_bytes` under `public_key_bytes`.
 /// Verifies BEFORE parsing the JSON — never trust a manifest you haven't authenticated.
 pub fn verify_signature(
@@ -60,7 +59,7 @@ pub fn verify_signature(
     if signature_bytes.len() != 64 {
         return Err(InstallerError::SignatureMismatch);
     }
-    let sig_arr: [u8; 64] = signature_bytes.try_into().unwrap();
+    let sig_arr: [u8; 64] = signature_bytes.try_into().expect("length checked above");
     let sig = Signature::from_bytes(&sig_arr);
     vk.verify(manifest_bytes, &sig).map_err(|_| InstallerError::SignatureMismatch)?;
     Ok(())
