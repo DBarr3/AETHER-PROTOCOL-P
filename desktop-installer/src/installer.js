@@ -250,6 +250,14 @@ if (typeof window.installerAPI.onProgress === 'function') {
     // State names must match the Rust backend (installer.rs ProgressEvent.state).
     // Known states: fetching_manifest, verifying_manifest, downloading_payload,
     // verifying_payload, installing, done, error, cancelled.
+    if (payload.state === 'cancelled') {
+      renderProgress(0, payload.label || 'Installation cancelled', payload.detail || 'You can close this window', payload.speed || '')
+      return
+    }
+    if (payload.state === 'error') {
+      renderProgress(0, payload.label || 'Installation failed', payload.error || payload.detail || 'See error details', payload.speed || '')
+      return
+    }
     if (payload.state === 'downloading_payload' && page !== 'download') setPage('download')
     if (payload.percent !== undefined && page === 'download') {
       renderProgress(Number(payload.percent), payload.label || 'Downloading AetherCloud', payload.detail || 'Page 3 of 4', payload.speed || 'Processing install tasks')
