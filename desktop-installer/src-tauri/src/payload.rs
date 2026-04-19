@@ -21,6 +21,10 @@ pub async fn sha256_stream<R: AsyncRead + Unpin>(mut reader: R) -> Result<String
 
 pub struct DownloadProgress {
     pub bytes_written: u64,
+    /// Total bytes expected for this download. Sourced from HTTP Content-Length
+    /// when present; falls back to `max_bytes` when the server omits the header.
+    /// Progress UI consumers that display "X of Y" MAY appear stuck at the
+    /// size-cap value until the real end-of-stream is reached in that fallback case.
     pub total_bytes: u64,
 }
 
@@ -138,9 +142,13 @@ mod download_tests {
     }
 
     #[tokio::test]
-    async fn downloads_small_body_computes_hash() {
-        // wiremock defaults to HTTP, which our download_with_progress rejects.
-        // This confirms the HTTPS-enforcement is always active — even against a mock.
+    async fn http_mock_url_still_rejected() {
+        // wiremock only serves HTTP (no self-signed TLS). Our download_with_progress
+        // rejects HTTP before the client is constructed. This test proves the
+        // scheme check fires against a URL built at runtime, not just a literal
+        // string constant (which rejects_http_url covers). No bytes are actually
+        // downloaded and no hash is computed here — full-pipeline HTTPS
+        // verification happens in the Task 12 integration test.
         let server = MockServer::start().await;
         Mock::given(method("GET")).and(path("/x"))
             .respond_with(ResponseTemplate::new(200).set_body_bytes(b"abc".to_vec()))
