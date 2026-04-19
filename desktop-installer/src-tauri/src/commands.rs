@@ -1,3 +1,4 @@
+use crate::errors::InstallerError;
 use crate::installer::{self, InstallerState, ProgressEvent};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -14,10 +15,19 @@ pub async fn start_install(app: AppHandle, state: State<'_, Arc<InstallerState>>
     match result {
         Ok(_) => Ok(()),
         Err(err) => {
+            // A user-initiated cancel is not a failure — emit a distinct
+            // "cancelled" progress event so the frontend can route it to
+            // its own UI affordance (close wizard quietly) rather than
+            // showing an error banner. Other error kinds still emit the
+            // generic error state.
             let ev = ProgressEvent {
-                state: "error",
+                state: if matches!(err, InstallerError::Cancelled) { "cancelled" } else { "error" },
                 percent: 0,
-                label: "Installation failed".into(),
+                label: if matches!(err, InstallerError::Cancelled) {
+                    "Installation cancelled".into()
+                } else {
+                    "Installation failed".into()
+                },
                 detail: err.state_label().into(),
                 speed: "".into(),
                 error: Some(err.user_message()),
@@ -38,7 +48,7 @@ pub async fn cancel_install(state: State<'_, Arc<InstallerState>>) -> Result<(),
 pub async fn launch_app(app: AppHandle) -> Result<(), String> {
     let path = installer::installed_app_path();
     if !path.exists() {
-        return Err(format!("Installed app not found at {:?}", path));
+        return Err(format!("Installed app not found at {}", path.display()));
     }
     std::process::Command::new(&path)
         .spawn()
