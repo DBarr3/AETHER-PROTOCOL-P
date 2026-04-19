@@ -130,9 +130,59 @@ Rebuild the wizard — the pub key is compile-time-embedded.
      "released_at": "2026-04-18T23:00:00Z"
    }
    ```
-4. Sign the manifest bytes with your private key (short Rust program or any
-   Ed25519 signer that produces a raw 64-byte signature over the JSON bytes).
-   Output: `manifest-latest.sig` (64 bytes, binary).
+4. Sign the manifest bytes with your private key. The signature must cover
+   the EXACT bytes you'll upload — do NOT let any tool reformat the JSON
+   between signing and upload, or the wizard's byte-for-byte signature
+   verification will fail.
+
+   Use this standalone Rust binary (copy into a throwaway `sign_manifest/`
+   directory, `cargo run --release`):
+
+   **`sign_manifest/Cargo.toml`**
+   ```toml
+   [package]
+   name = "sign_manifest"
+   version = "0.1.0"
+   edition = "2021"
+
+   [dependencies]
+   ed25519-dalek = "2"
+   ```
+
+   **`sign_manifest/src/main.rs`**
+   ```rust
+   use ed25519_dalek::{Signer, SigningKey};
+   use std::{env, fs};
+
+   fn main() {
+       let args: Vec<String> = env::args().collect();
+       if args.len() != 4 {
+           eprintln!("usage: sign_manifest <priv-key.bin> <manifest.json> <out.sig>");
+           std::process::exit(2);
+       }
+       let priv_bytes = fs::read(&args[1]).expect("read private key");
+       let priv_arr: [u8; 32] = priv_bytes.as_slice().try_into()
+           .expect("private key must be 32 bytes");
+       let sk = SigningKey::from_bytes(&priv_arr);
+
+       let manifest = fs::read(&args[2]).expect("read manifest");
+       let sig = sk.sign(&manifest);
+
+       fs::write(&args[3], sig.to_bytes()).expect("write signature");
+       println!("signed {} ({} bytes) -> {} (64 bytes)",
+                args[2], manifest.len(), args[3]);
+   }
+   ```
+
+   Run it:
+   ```bash
+   cargo run --release -- \
+     /secure/location/manifest-signing.priv.bin \
+     manifest-latest.json \
+     manifest-latest.sig
+   ```
+
+   Output: `manifest-latest.sig` (exactly 64 bytes, binary Ed25519 signature).
 5. Upload to vps1 via scp/rsync:
    ```bash
    scp manifest-latest.json aether-vps1:/var/www/aethercloud-downloads/

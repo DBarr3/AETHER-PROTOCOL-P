@@ -24,7 +24,9 @@
     .catch((err) => { console.error('[tauri-bridge] listen(installer://progress) failed', err); });
 
   window.installerAPI = {
-    startInstall: () => invoke('start_install'),
+    // Pass explicit consent bool so the Rust backend can re-verify it
+    // (defense-in-depth against a compromised WebView / crafted IPC).
+    startInstall: (consent) => invoke('start_install', { consent: !!consent }),
     cancelInstall: () => invoke('cancel_install'),
     launchApp: () => invoke('launch_app'),
     detectExisting: () => invoke('detect_existing'),

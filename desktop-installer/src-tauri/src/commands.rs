@@ -4,7 +4,28 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 #[tauri::command]
-pub async fn start_install(app: AppHandle, state: State<'_, Arc<InstallerState>>) -> Result<(), String> {
+pub async fn start_install(
+    app: AppHandle,
+    state: State<'_, Arc<InstallerState>>,
+    consent: bool,
+) -> Result<(), String> {
+    // Spec §9 / §13: backend must re-verify consent before any network
+    // request. Don't trust the frontend alone — a crafted IPC call (or a
+    // compromised WebView) could otherwise bypass the checkbox.
+    if !consent {
+        let err = InstallerError::NoConsent;
+        let ev = ProgressEvent {
+            state: "error",
+            percent: 0,
+            label: "Installation blocked".into(),
+            detail: err.state_label().into(),
+            speed: "".into(),
+            error: Some(err.user_message()),
+        };
+        let _ = app.emit("installer://progress", ev);
+        return Err(err.user_message());
+    }
+
     let state_inner = state.inner().clone();
     *state_inner.cancelled.lock().await = false;
     let app_for_emit = app.clone();

@@ -210,7 +210,8 @@ function nextPage() {
   } else if (page === 'setup' && consentCheckbox.checked) {
     setPage('download');
     // Kick off real install. Progress events will drive the UI from here.
-    const started = window.installerAPI?.startInstall?.();
+    // Pass consent bool explicitly — backend will re-verify (defense in depth).
+    const started = window.installerAPI?.startInstall?.(consentCheckbox.checked);
     if (started && typeof started.catch === 'function') {
       started.catch((err) => {
         console.error('[installer] startInstall rejected', err);
@@ -246,11 +247,14 @@ window.installerAPI = window.installerAPI || {}
 if (typeof window.installerAPI.onProgress === 'function') {
   window.installerAPI.onProgress((payload) => {
     lastExternalProgressAt = Date.now()
-    if (payload.state === 'download' && page !== 'download') setPage('download')
+    // State names must match the Rust backend (installer.rs ProgressEvent.state).
+    // Known states: fetching_manifest, verifying_manifest, downloading_payload,
+    // verifying_payload, installing, done, error, cancelled.
+    if (payload.state === 'downloading_payload' && page !== 'download') setPage('download')
     if (payload.percent !== undefined && page === 'download') {
       renderProgress(Number(payload.percent), payload.label || 'Downloading AetherCloud', payload.detail || 'Page 3 of 4', payload.speed || 'Processing install tasks')
     }
-    if (payload.percent >= 100 || payload.state === 'final') {
+    if (payload.state === 'done' || payload.percent >= 100) {
       setPage('final')
     }
   })
