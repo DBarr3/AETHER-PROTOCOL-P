@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-const MANIFEST_URL: &str = "https://aethersystems.io/downloads/manifest-latest.json";
-const MANIFEST_SIG_URL: &str = "https://aethersystems.io/downloads/manifest-latest.sig";
+const MANIFEST_URL: &str = "https://api.aethersystems.net/downloads/manifest-latest.json";
+const MANIFEST_SIG_URL: &str = "https://api.aethersystems.net/downloads/manifest-latest.sig";
 const MAX_PAYLOAD_BYTES: u64 = 500 * 1024 * 1024; // 500 MB ceiling — sanity check
 const WIZARD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
