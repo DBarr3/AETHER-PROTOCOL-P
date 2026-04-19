@@ -1,12 +1,116 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page="welcome" data-loop="0">
 <head>
   <meta charset="UTF-8" />
-  <title>AetherCloud Setup</title>
-  <style>body{background:#0a0a0a;color:#eee;font-family:system-ui;margin:0;padding:2rem;}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AetherCloud Installer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./installer.css" />
 </head>
 <body>
-  <h1>AetherCloud Setup — scaffold OK</h1>
-  <p>Replaced in Task 3.</p>
+  <main class="window-shell">
+    <section class="installer-shell" aria-live="polite">
+      <header class="topbar">
+        <div class="brandline">
+          <span class="brand-dot"></span>
+          <span>AETHERCLOUD INSTALLER</span>
+        </div>
+        <div class="window-actions" aria-hidden="true">
+          <span></span><span></span>
+        </div>
+      </header>
+
+      <section class="content-shell">
+        <section class="left-pane">
+          <div class="step-meta">
+            <span class="step-kicker" data-kicker>Welcome</span>
+            <span class="step-count" data-step-count>Page 1 of 4</span>
+          </div>
+
+          <div class="copy-shell">
+            <h1 data-title>Your agents. Your vaults. Your proof.</h1>
+            <p class="lede" data-body>AetherCloud brings agents, vaults, automation, and cryptographic proof into one desktop control surface.</p>
+
+            <div class="page-card-stack" data-page-cards>
+              <article class="info-card is-visible" data-card="0">
+                <h2>Your agents</h2>
+                <p>Bring agent teams into one workspace.</p>
+              </article>
+              <article class="info-card" data-card="1">
+                <h2>Your vaults</h2>
+                <p>Move files with ownership and control.</p>
+              </article>
+              <article class="info-card" data-card="2">
+                <h2>Your proof</h2>
+                <p>Make SHA-256 trust visible.</p>
+              </article>
+            </div>
+
+            <section class="telemetry-card">
+              <p class="telemetry-line" data-telemetry>welcome // trust // control // start install</p>
+              <div class="telemetry-grid">
+                <div class="telemetry-item"><span>Status</span><strong data-status>Ready</strong></div>
+                <div class="telemetry-item"><span>Focus</span><strong data-focus>Trust first</strong></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="right-pane">
+          <div class="scene-badge" data-scene-badge>Trusted setup</div>
+          <div class="scene-shell welcome-scene setup-scene download-scene final-scene">
+            <div class="ring ring-1"></div>
+            <div class="ring ring-2"></div>
+            <div class="agent a-cloud"><img src="./agents/skyblue_cloud_agent.svg" alt="Cloud agent" /></div>
+            <div class="agent a-bolt"><img src="./agents/electric_bolt_agent.svg" alt="Bolt agent" /></div>
+            <div class="agent a-coral"><img src="./agents/coral_diamond_agent.svg" alt="Diamond agent" /></div>
+            <div class="agent a-shield"><img src="./agents/lime_shield_agent.svg" alt="Shield agent" /></div>
+            <div class="agent a-red"><img src="./agents/red_agent.svg" alt="Red agent" /></div>
+
+            <article class="core-panel">
+              <header class="core-top">
+                <strong><span class="brand-dot small"></span>AetherCloud Core</strong>
+                <span data-core-tag>secure session</span>
+              </header>
+              <div class="core-body">
+                <h3 data-core-title>Your desktop control surface</h3>
+                <p data-core-body>Simple installer flow. Premium product feel. One clear reason to keep going.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <footer class="bottom-shell">
+        <label class="consent-row" data-consent-row hidden>
+          <input type="checkbox" id="consentCheckbox" />
+          <span>I agree to the license and launch AetherCloud when installation completes.</span>
+        </label>
+
+        <section class="progress-shell">
+          <div class="progress-top">
+            <span data-progress-label>Ready to begin</span>
+            <span data-progress-value>0%</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" data-progress-fill></div></div>
+          <div class="progress-foot">
+            <span data-progress-detail>Page 1 of 4</span>
+            <span data-progress-speed>Waiting for next step</span>
+          </div>
+        </section>
+
+        <div class="button-row">
+          <button class="btn btn-secondary" id="backButton" hidden>Back</button>
+          <button class="btn btn-secondary" id="cancelButton">Cancel</button>
+          <button class="btn btn-primary" id="primaryButton">Next</button>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script src="./tauri-bridge.js"></script>
+  <script src="./installer.js"></script>
 </body>
 </html>
