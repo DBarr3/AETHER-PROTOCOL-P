@@ -12,8 +12,12 @@ const MAX_PAYLOAD_BYTES: u64 = 500 * 1024 * 1024; // 500 MB ceiling — sanity c
 const WIZARD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Compile-time pinned public key for manifest signature verification.
-/// Replaced with real production key before first user release.
-const PINNED_PUBKEY: &[u8; 32] = include_bytes!("../keys/manifest-signing-test.pub.bin");
+/// Production key generated 2026-04-19. Pub fingerprint:
+///   b9f4d6d5460ad525b362c5886747fde43f567e63aa8b9060b88d6d4e82a97301
+/// The matching private key is stored offline outside the repo. Rotating
+/// requires regenerating the key + rebuilding the wizard (which invalidates
+/// all older wizards' trust — intentional).
+const PINNED_PUBKEY: &[u8; 32] = include_bytes!("../keys/manifest-signing.pub.bin");
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ProgressEvent {
