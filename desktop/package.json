@@ -67,7 +67,7 @@
       ],
       "icon": "assets/icon.ico",
       "publisherName": "Aether Systems LLC",
-      "artifactName": "AetherCloud-L-Setup-${version}.exe",
+      "artifactName": "AetherCloud-L-Payload-${version}.exe",
       "signingHashAlgorithms": [
         "sha256"
       ],
