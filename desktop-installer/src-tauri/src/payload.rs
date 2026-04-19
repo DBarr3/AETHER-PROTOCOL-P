@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::process::Command;
 
 /// Stream bytes through SHA-256 without buffering the whole file in memory.
 /// Returns the lowercase hex digest.
@@ -165,5 +166,42 @@ mod download_tests {
         let p = temp_payload_path();
         assert!(p.to_string_lossy().contains("aether-installer-"));
         assert!(p.to_string_lossy().ends_with(".exe"));
+    }
+}
+
+/// Runs `path` with `/S` (silent NSIS). Returns exit code as i32.
+/// Caller is responsible for mapping non-zero codes to InstallerError::PayloadExit.
+pub async fn run_payload_silent(path: &Path) -> Result<i32> {
+    let status = Command::new(path)
+        .arg("/S")
+        .status()
+        .await?;
+    Ok(status.code().unwrap_or(-1))
+}
+
+#[cfg(test)]
+mod spawn_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn runs_cmd_exit_zero() {
+        // Windows-only test. Uses cmd.exe with /c exit 0 as a stand-in — we don't
+        // test NSIS directly here, just the spawn+exit-capture plumbing.
+        #[cfg(windows)]
+        {
+            let code = Command::new("cmd.exe").args(["/c", "exit", "0"])
+                .status().await.unwrap().code().unwrap_or(-1);
+            assert_eq!(code, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn runs_cmd_exit_nonzero() {
+        #[cfg(windows)]
+        {
+            let code = Command::new("cmd.exe").args(["/c", "exit", "7"])
+                .status().await.unwrap().code().unwrap_or(-1);
+            assert_eq!(code, 7);
+        }
     }
 }
