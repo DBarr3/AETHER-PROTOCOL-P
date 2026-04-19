@@ -14,7 +14,10 @@ pub struct Manifest {
 
 impl Manifest {
     pub fn parse(bytes: &[u8]) -> Result<Manifest> {
-        let m: Manifest = serde_json::from_slice(bytes)?;
+        let mut m: Manifest = serde_json::from_slice(bytes)?;
+        // Normalize so downstream hash comparison is case-insensitive regardless
+        // of how the manifest serialized the digest.
+        m.payload_sha256 = m.payload_sha256.to_ascii_lowercase();
         m.validate()?;
         Ok(m)
     }
@@ -80,6 +83,16 @@ mod tests {
     fn rejects_unknown_field() {
         let bad = VALID_JSON.replace("\"version\"", "\"extra_field\": \"bad\", \"version\"");
         assert!(Manifest::parse(bad.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn normalizes_uppercase_sha256() {
+        let upper = VALID_JSON.replace(
+            "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
+            "3A7BD3E2360A3D29EEA436FCFB7E44C735D117C42D1C1835420B6B9942DD4F1B",
+        );
+        let m = Manifest::parse(upper.as_bytes()).unwrap();
+        assert_eq!(m.payload_sha256, "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b");
     }
 
     #[test]
