@@ -2,6 +2,7 @@
 
 mod errors;
 mod manifest;
+mod payload;
 
 fn main() {
     tauri::Builder::default()
