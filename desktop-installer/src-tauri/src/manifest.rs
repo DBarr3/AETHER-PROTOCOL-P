@@ -46,6 +46,26 @@ impl Manifest {
     }
 }
 
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+/// Verify that `manifest_bytes` matches `signature_bytes` under `public_key_bytes`.
+/// Verifies BEFORE parsing the JSON — never trust a manifest you haven't authenticated.
+pub fn verify_signature(
+    manifest_bytes: &[u8],
+    signature_bytes: &[u8],
+    public_key_bytes: &[u8; 32],
+) -> Result<()> {
+    let vk = VerifyingKey::from_bytes(public_key_bytes)
+        .map_err(|_| InstallerError::Internal("embedded public key is invalid".into()))?;
+    if signature_bytes.len() != 64 {
+        return Err(InstallerError::SignatureMismatch);
+    }
+    let sig_arr: [u8; 64] = signature_bytes.try_into().unwrap();
+    let sig = Signature::from_bytes(&sig_arr);
+    vk.verify(manifest_bytes, &sig).map_err(|_| InstallerError::SignatureMismatch)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +128,51 @@ mod tests {
     fn rejects_zero_size() {
         let bad = VALID_JSON.replace("94371840", "0");
         assert!(Manifest::parse(bad.as_bytes()).is_err());
+    }
+
+    const TEST_PUBKEY: &[u8] = include_bytes!("../keys/manifest-signing-test.pub.bin");
+    const TEST_MANIFEST: &[u8] = include_bytes!("../tests/fixtures/test-signed-manifest.json");
+    const TEST_SIG: &[u8] = include_bytes!("../tests/fixtures/test-signed-manifest.sig");
+
+    fn pubkey_arr() -> [u8; 32] {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(TEST_PUBKEY);
+        arr
+    }
+
+    #[test]
+    fn verifies_good_signature() {
+        verify_signature(TEST_MANIFEST, TEST_SIG, &pubkey_arr()).unwrap();
+    }
+
+    #[test]
+    fn rejects_tampered_manifest() {
+        let mut tampered = TEST_MANIFEST.to_vec();
+        tampered[20] ^= 0x01;
+        assert!(matches!(
+            verify_signature(&tampered, TEST_SIG, &pubkey_arr()),
+            Err(InstallerError::SignatureMismatch)
+        ));
+    }
+
+    #[test]
+    fn rejects_wrong_signature_length() {
+        let short = &TEST_SIG[..30];
+        assert!(matches!(
+            verify_signature(TEST_MANIFEST, short, &pubkey_arr()),
+            Err(InstallerError::SignatureMismatch)
+        ));
+    }
+
+    #[test]
+    fn rejects_with_different_key() {
+        let mut wrong_key = pubkey_arr();
+        wrong_key[0] ^= 0xFF;
+        // A mutated 32-byte value may or may not be a valid key. If valid, it's just a different key and verify fails.
+        match verify_signature(TEST_MANIFEST, TEST_SIG, &wrong_key) {
+            Err(InstallerError::SignatureMismatch) | Err(InstallerError::Internal(_)) => (),
+            Ok(_) => panic!("expected verify to fail with wrong key"),
+            Err(other) => panic!("unexpected error: {:?}", other),
+        }
     }
 }
