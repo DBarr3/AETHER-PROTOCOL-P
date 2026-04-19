@@ -1,13 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod errors;
-mod manifest;
-mod payload;
-mod installer;
 mod commands;
 
+use aethercloud_installer::installer::InstallerState;
 use std::sync::Arc;
-use installer::InstallerState;
 
 fn main() {
     tracing_subscriber::fmt()

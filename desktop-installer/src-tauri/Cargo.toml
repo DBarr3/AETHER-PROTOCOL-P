@@ -6,6 +6,14 @@ description = "AetherCloud branded installer wizard"
 authors = ["Aether Systems LLC"]
 license = "UNLICENSED"
 
+[lib]
+name = "aethercloud_installer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aethercloud-installer"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

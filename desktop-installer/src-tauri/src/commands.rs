@@ -1,5 +1,5 @@
-use crate::errors::InstallerError;
-use crate::installer::{self, InstallerState, ProgressEvent};
+use aethercloud_installer::errors::InstallerError;
+use aethercloud_installer::installer::{self, InstallerState, ProgressEvent};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
