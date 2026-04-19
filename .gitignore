@@ -94,3 +94,7 @@ desktop/node_modules/
 
 # electron-store encrypted data files
 *.json.locked
+
+# Ed25519 manifest signing private keys — NEVER commit.
+*.priv.bin
+!**/*-test.pub.bin
