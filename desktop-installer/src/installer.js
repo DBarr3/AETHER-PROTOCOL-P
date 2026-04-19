@@ -1,260 +1,162 @@
-const root = document.documentElement
+// AetherCloud Installer — minimal controller
+// Trust-first order: audit + IP claims lead. Technical users install on
+// trust; marketing capability closes after trust is established.
+const TAGLINES = [
+  'Every view is logged and audited.',
+  'AetherBrowser automates any task on the web — your IP never reaches the endpoint.',
+  'Stash a file in the vault. Work on it later.',
+  'Create your agents. Customize them. They learn from you.',
+  'Orchestrate agent teams. Do your business.',
+  'New MCPs and agent tools, shipped every day.'
+];
 
-const kicker = document.querySelector('[data-kicker]')
-const stepCount = document.querySelector('[data-step-count]')
-const title = document.querySelector('[data-title]')
-const body = document.querySelector('[data-body]')
-const sceneBadge = document.querySelector('[data-scene-badge]')
-const coreTag = document.querySelector('[data-core-tag]')
-const coreTitle = document.querySelector('[data-core-title]')
-const coreBody = document.querySelector('[data-core-body]')
-const consentRow = document.querySelector('[data-consent-row]')
-const consentCheckbox = document.getElementById('consentCheckbox')
-const progressLabel = document.querySelector('[data-progress-label]')
-const progressValue = document.querySelector('[data-progress-value]')
-const progressFill = document.querySelector('[data-progress-fill]')
-const progressDetail = document.querySelector('[data-progress-detail]')
-const progressSpeed = document.querySelector('[data-progress-speed]')
-const primaryButton = document.getElementById('primaryButton')
-const backButton = document.getElementById('backButton')
-const cancelButton = document.getElementById('cancelButton')
-const cards = [...document.querySelectorAll('.info-card')]
+const taglineEl = document.getElementById('tagline');
+const dotsEl = document.getElementById('taglineDots');
+const consentCheckbox = document.getElementById('consentCheckbox');
+const installButton = document.getElementById('installButton');
+const cancelButton = document.getElementById('cancelButton');
+const progressShell = document.getElementById('progressShell');
+const progressFill = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const progressValue = document.getElementById('progressValue');
 
-let page = 'welcome'
-let loop = 0
-let progress = 0
-let floatLoop = null
-let progressLoop = null
-let lastExternalProgressAt = 0
+let taglineIndex = 0;
+let taglineTimer = null;
+let installing = false;
 
-const pages = {
-  welcome: {
-    kicker: 'Welcome',
-    count: 'Page 1 of 4',
-    title: 'Your agents. Your vaults. Your proof.',
-    body: 'AetherCloud brings agents, vaults, automation, and cryptographic proof into one desktop control surface.',
-    status: 'Ready',
-    focus: 'Trust first',
-    badge: 'Trusted setup',
-    coreTag: 'secure session',
-    coreTitle: 'One command center. Agents, vaults, proof.',
-    coreBody: 'Every file gets an ownership path, every agent shows its work, and every transfer can surface a cryptographic receipt.',
-    cards: [
-      { title: 'Your agents', body: 'Bring agent teams into one workspace.' }
-    ],
-    progressLabel: 'Ready to begin',
-    progressDetail: 'Page 1 of 4',
-    progressSpeed: 'Waiting for next step',
-    progress: 0,
-    primary: 'Next',
-    showConsent: false,
-    showBack: false,
-    disablePrimary: false
-  },
-  setup: {
-    kicker: 'Install',
-    count: 'Page 2 of 4',
-    title: 'One checkbox. One clear install.',
-    body: 'Accept the license, choose whether to launch on finish, and we handle the rest — no extra screens, no scrolling to find the action.',
-    status: 'Awaiting consent',
-    focus: 'Low friction',
-    badge: 'Install ready',
-    coreTag: 'guided setup',
-    coreTitle: 'Sleek, professional, retro-future.',
-    coreBody: 'A short setup page so the product experience starts the moment the download begins, not three screens in.',
-    cards: [
-      { title: 'Your vaults', body: 'Move files with ownership and control.' }
-    ],
-    progressLabel: 'Setup',
-    progressDetail: 'Page 2 of 4',
-    progressSpeed: 'Consent required',
-    progress: 18,
-    primary: 'Download & install',
-    showConsent: true,
-    showBack: true,
-    disablePrimary: true
-  },
-  download: {
-    kicker: 'Downloading',
-    count: 'Page 3 of 4',
-    title: 'MCP agents that coordinate real work.',
-    body: 'Staging AetherForge, AetherBrowser, the MCP tool registry, and cryptographic modules. One step ahead of you, quietly verifying every byte.',
-    status: 'Downloading',
-    focus: 'Visible progress',
-    badge: 'Orchestration active',
-    coreTag: 'live install',
-    coreTitle: 'AetherForge · AetherBrowser · MCP tools',
-    coreBody: 'Agent teams, browser automation, and vault sync — staging together, ready to launch in sync.',
-    cards: [
-      { title: 'AetherForge', body: 'Build and automate from one surface.' },
-      { title: 'AetherBrowser', body: 'Browse and route work into your system.' }
-    ],
-    progressLabel: 'Downloading AetherCloud',
-    progressDetail: 'Page 3 of 4',
-    progressSpeed: 'Connecting to package stream',
-    progress: 34,
-    primary: 'Installing…',
-    showConsent: false,
-    showBack: false,
-    disablePrimary: true
-  },
-  final: {
-    kicker: 'Ready',
-    count: 'Page 4 of 4',
-    title: 'SHA-256 verified. Ready to launch.',
-    body: 'Every module was hash-checked, every agent module is staged, and the secure session is primed. One click and you are inside.',
-    status: 'Ready to launch',
-    focus: 'Confident finish',
-    badge: 'Proof locked in',
-    coreTag: 'verified session',
-    coreTitle: 'Integrity first. Control always.',
-    coreBody: 'Launch into a system where files stay attributable, agents stay visible, and automation feels premium.',
-    cards: [
-      { title: 'Your proof', body: 'SHA-256 trust, shown clearly.' },
-      { title: 'Launch ready', body: 'Open AetherCloud immediately.' }
-    ],
-    progressLabel: 'AetherCloud is ready',
-    progressDetail: 'Page 4 of 4',
-    progressSpeed: 'Verification complete',
-    progress: 100,
-    primary: 'Launch AetherCloud',
-    showConsent: false,
-    showBack: false,
-    disablePrimary: false
-  }
+// Build dots
+TAGLINES.forEach((_, i) => {
+  const dot = document.createElement('span');
+  if (i === 0) dot.classList.add('is-active');
+  dotsEl.appendChild(dot);
+});
+const dotNodes = [...dotsEl.children];
+
+function showTagline(i) {
+  taglineEl.classList.add('is-fading');
+  setTimeout(() => {
+    taglineEl.textContent = TAGLINES[i];
+    dotNodes.forEach((d, idx) => d.classList.toggle('is-active', idx === i));
+    taglineEl.classList.remove('is-fading');
+  }, 340);
 }
 
-function renderCards(items) {
-  cards.forEach((card, i) => {
-    const item = items[i]
-    if (!item) {
-      card.classList.remove('is-visible')
-      return
-    }
-    card.classList.add('is-visible')
-    card.querySelector('h2').textContent = item.title
-    card.querySelector('p').textContent = item.body
-  })
+function startTaglineLoop() {
+  stopTaglineLoop();
+  taglineTimer = setInterval(() => {
+    taglineIndex = (taglineIndex + 1) % TAGLINES.length;
+    showTagline(taglineIndex);
+  }, 4800);
 }
 
-function renderProgress(value, label, detail, speed) {
-  progress = value
-  progressFill.style.width = `${value}%`
-  progressValue.textContent = `${Math.round(value)}%`
-  progressLabel.textContent = label
-  progressDetail.textContent = detail
-  progressSpeed.textContent = speed
+function stopTaglineLoop() {
+  if (taglineTimer) { clearInterval(taglineTimer); taglineTimer = null; }
 }
 
-function setPage(nextPage) {
-  page = nextPage
-  root.dataset.page = nextPage
-  const cfg = pages[nextPage]
-  kicker.textContent = cfg.kicker
-  stepCount.textContent = cfg.count
-  title.textContent = cfg.title
-  body.textContent = cfg.body
-  sceneBadge.textContent = cfg.badge
-  coreTag.textContent = cfg.coreTag
-  coreTitle.textContent = cfg.coreTitle
-  coreBody.textContent = cfg.coreBody
-  renderCards(cfg.cards)
-  renderProgress(cfg.progress, cfg.progressLabel, cfg.progressDetail, cfg.progressSpeed)
-  primaryButton.textContent = cfg.primary
-  consentRow.hidden = !cfg.showConsent
-  backButton.hidden = !cfg.showBack
-  cancelButton.textContent = nextPage === 'download' ? 'Run in background' : 'Cancel'
-  primaryButton.disabled = cfg.disablePrimary
-
-  if (nextPage === 'welcome' || nextPage === 'final') startFloatLoop()
-  else stopFloatLoop()
-
-  if (nextPage === 'download') startProgressLoop()
-  else stopProgressLoop()
-}
-
-function startFloatLoop() {
-  stopFloatLoop()
-  floatLoop = setInterval(() => {
-    loop = loop === 0 ? 1 : 0
-    root.dataset.loop = String(loop)
-  }, 2400)
-}
-
-function stopFloatLoop() {
-  clearInterval(floatLoop)
-  root.dataset.loop = '0'
-}
-
-function startProgressLoop() {
-  // No fake progress — real progress drives UI via installerAPI.onProgress.
-}
-
-function stopProgressLoop() {
-  clearInterval(progressLoop)
-}
-
-function nextPage() {
-  if (page === 'welcome') {
-    setPage('setup')
-  } else if (page === 'setup' && consentCheckbox.checked) {
-    setPage('download')
-    // Pass consent bool explicitly — backend re-verifies (defense in depth).
-    const started = window.installerAPI?.startInstall?.(consentCheckbox.checked)
-    if (started && typeof started.catch === 'function') {
-      started.catch((err) => {
-        console.error('[installer] startInstall rejected', err)
-        renderProgress(0, 'Installation failed', String(err), 'See error details')
-      })
-    } else {
-      console.error('[installer] installerAPI.startInstall unavailable — Tauri bridge not loaded')
-      renderProgress(0, 'Installation unavailable', 'Tauri bridge not loaded', 'Please reinstall')
-    }
-  } else if (page === 'final' && window.installerAPI?.launchApp) {
-    window.installerAPI.launchApp()
-  }
-}
-
-function prevPage() {
-  if (page === 'setup') setPage('welcome')
-}
-
-primaryButton.addEventListener('click', nextPage)
-backButton.addEventListener('click', prevPage)
-cancelButton.addEventListener('click', () => {
-  if (window.installerAPI?.cancelInstall) window.installerAPI.cancelInstall()
-})
-
+// Consent gate
 consentCheckbox.addEventListener('change', () => {
-  if (page === 'setup') {
-    primaryButton.disabled = !consentCheckbox.checked
-    progressSpeed.textContent = consentCheckbox.checked ? 'Ready to install' : 'Consent required'
-  }
-})
+  installButton.disabled = !consentCheckbox.checked;
+});
 
-window.installerAPI = window.installerAPI || {}
+// Install
+installButton.addEventListener('click', () => {
+  if (!consentCheckbox.checked || installing) return;
+  installing = true;
+  installButton.disabled = true;
+  installButton.textContent = 'Installing…';
+  consentCheckbox.disabled = true;
+  progressShell.hidden = false;
+  // Freeze the rotating tagline during install — three simultaneous
+  // motions (tagline / progress bar / orbit) is visual noise at the
+  // moment the user wants calm. Resume on error or cancel.
+  stopTaglineLoop();
+  renderProgress(0, 'Starting install…');
+
+  if (window.installerAPI?.startInstall) {
+    window.installerAPI.startInstall(consentCheckbox.checked);
+  } else {
+    // Fallback demo progress for standalone preview
+    demoProgress();
+  }
+});
+
+cancelButton.addEventListener('click', () => {
+  if (window.installerAPI?.cancelInstall) {
+    window.installerAPI.cancelInstall();
+  } else {
+    window.close();
+  }
+});
+
+// Progress rendering
+function renderProgress(pct, label) {
+  const v = Math.max(0, Math.min(100, pct));
+  const rounded = Math.round(v);
+  progressFill.style.width = v + '%';
+  progressValue.textContent = rounded + '%';
+  if (label) progressLabel.textContent = label;
+  // ARIA so screen readers announce progress updates
+  progressShell.setAttribute('role', 'progressbar');
+  progressShell.setAttribute('aria-valuenow', String(rounded));
+  progressShell.setAttribute('aria-valuemin', '0');
+  progressShell.setAttribute('aria-valuemax', '100');
+  progressShell.setAttribute('aria-valuetext', label ? `${label} ${rounded}%` : `${rounded}%`);
+}
+
+// Backend bridge
+window.installerAPI = window.installerAPI || {};
 if (typeof window.installerAPI.onProgress === 'function') {
   window.installerAPI.onProgress((payload) => {
-    lastExternalProgressAt = Date.now()
-    // Backend state names (installer.rs ProgressEvent.state):
-    // fetching_manifest, verifying_manifest, downloading_payload,
-    // verifying_payload, installing, done, error, cancelled.
-    if (payload.state === 'cancelled') {
-      renderProgress(0, payload.label || 'Installation cancelled', payload.detail || 'You can close this window', payload.speed || '')
-      return
-    }
-    if (payload.state === 'error') {
-      renderProgress(0, payload.label || 'Installation failed', payload.error || payload.detail || 'See error details', payload.speed || '')
-      return
-    }
-    if (payload.state === 'downloading_payload' && page !== 'download') setPage('download')
-    if (payload.percent !== undefined && page === 'download') {
-      renderProgress(Number(payload.percent), payload.label || 'Downloading AetherCloud', payload.detail || 'Page 3 of 4', payload.speed || 'Processing install tasks')
+    if (!payload) return;
+    if (payload.percent !== undefined) {
+      renderProgress(Number(payload.percent), payload.label);
     }
     if (payload.state === 'done' || payload.percent >= 100) {
-      setPage('final')
+      renderProgress(100, 'Install complete. Launching…');
+      installButton.textContent = 'Launching…';
+      // Give the user ~800ms to see "Launching…" before the wizard closes.
+      setTimeout(() => {
+        if (window.installerAPI?.launchApp) window.installerAPI.launchApp();
+      }, 800);
     }
-  })
+    if (payload.state === 'cancelled') {
+      renderProgress(0, payload.label || 'Install cancelled');
+      installButton.textContent = 'Install AetherCloud';
+      consentCheckbox.disabled = false;
+      installButton.disabled = !consentCheckbox.checked;
+      installing = false;
+      progressShell.hidden = true;
+      startTaglineLoop();
+    }
+    if (payload.state === 'error') {
+      renderProgress(progressFill.style.width ? parseFloat(progressFill.style.width) : 0, payload.label || 'Install failed');
+      installButton.textContent = 'Retry';
+      installButton.disabled = false;
+      installing = false;
+      startTaglineLoop();
+    }
+  });
 }
 
-setPage('welcome')
+// Standalone demo mode (when no backend bridge)
+function demoProgress() {
+  let p = 0;
+  const phases = [
+    { at: 20, label: 'Downloading payload…' },
+    { at: 55, label: 'Verifying signature…' },
+    { at: 80, label: 'Unpacking tools…' },
+    { at: 100, label: 'Install complete.' }
+  ];
+  const tick = setInterval(() => {
+    p = Math.min(p + Math.random() * 6 + 2, 100);
+    const phase = phases.find(x => p < x.at) || phases[phases.length - 1];
+    renderProgress(p, phase.label);
+    if (p >= 100) {
+      clearInterval(tick);
+      installButton.textContent = 'Launched';
+    }
+  }, 420);
+}
+
+// Boot
+startTaglineLoop();

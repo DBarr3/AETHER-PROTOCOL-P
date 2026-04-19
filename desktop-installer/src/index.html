@@ -1,111 +1,88 @@
 <!doctype html>
-<html lang="en" data-page="welcome" data-loop="0">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AetherCloud Installer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./dot-background.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./installer.css" />
 </head>
 <body>
-  <!-- Interactive dot background — glows on mouse hover. Sits behind all content. -->
   <div class="dot-background" id="dotBackground" aria-hidden="true">
     <canvas id="dotCanvas"></canvas>
   </div>
 
-  <main class="window-shell">
-    <section class="installer-shell" aria-live="polite">
-      <header class="topbar">
-        <div class="brandline">
-          <span class="brand-dot"></span>
-          <span>AETHERCLOUD INSTALLER</span>
-        </div>
-        <div class="window-actions" aria-hidden="true">
-          <span></span><span></span>
-        </div>
-      </header>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brandline">
+        <span class="brand-mark"><img src="./agents/aether-ai-mark.svg" alt="AetherAI" /></span>
+        <span class="brand-text">AetherAI</span>
+        <span class="brand-sep" aria-hidden="true"></span>
+        <span class="brand-product">AetherCloud <span class="brand-version">v0.9.7</span></span>
+      </div>
+    </header>
 
-      <section class="content-shell">
-        <section class="left-pane">
-          <div class="step-meta">
-            <span class="step-kicker" data-kicker>Welcome</span>
-            <span class="step-count" data-step-count>Page 1 of 4</span>
-          </div>
+    <section class="stage" aria-hidden="true">
+      <div class="orbit orbit-1"></div>
+      <div class="orbit orbit-2"></div>
 
-          <div class="copy-shell">
-            <h1 data-title>Your agents. Your vaults. Your proof.</h1>
-            <p class="lede" data-body>AetherCloud brings agents, vaults, automation, and cryptographic proof into one desktop control surface.</p>
+      <div class="agent a-cloud"><img src="./agents/skyblue_cloud_agent.svg" alt="" /></div>
+      <div class="agent a-bolt"><img src="./agents/electric_bolt_agent.svg" alt="" /></div>
+      <div class="agent a-coral"><img src="./agents/coral_diamond_agent.svg" alt="" /></div>
+      <div class="agent a-shield"><img src="./agents/lime_shield_agent.svg" alt="" /></div>
+      <div class="agent a-red"><img src="./agents/red_agent.svg" alt="" /></div>
 
-            <div class="page-card-stack" data-page-cards>
-              <article class="info-card is-visible" data-card="0">
-                <h2>Your agents</h2>
-                <p>Bring agent teams into one workspace.</p>
-              </article>
-              <article class="info-card" data-card="1">
-                <h2>Your vaults</h2>
-                <p>Move files with ownership and control.</p>
-              </article>
-              <article class="info-card" data-card="2">
-                <h2>Your proof</h2>
-                <p>Make SHA-256 trust visible.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="right-pane">
-          <div class="scene-badge" data-scene-badge>Trusted setup</div>
-          <div class="scene-shell welcome-scene setup-scene download-scene final-scene">
-            <div class="ring ring-1"></div>
-            <div class="ring ring-2"></div>
-            <div class="agent a-cloud"><img src="./agents/skyblue_cloud_agent.svg" alt="Cloud agent" /></div>
-            <div class="agent a-bolt"><img src="./agents/electric_bolt_agent.svg" alt="Bolt agent" /></div>
-            <div class="agent a-coral"><img src="./agents/coral_diamond_agent.svg" alt="Diamond agent" /></div>
-            <div class="agent a-shield"><img src="./agents/lime_shield_agent.svg" alt="Shield agent" /></div>
-            <div class="agent a-red"><img src="./agents/red_agent.svg" alt="Red agent" /></div>
-
-            <article class="core-panel">
-              <header class="core-top">
-                <strong><span class="brand-dot small"></span>AetherCloud Core</strong>
-                <span data-core-tag>secure session</span>
-              </header>
-              <div class="core-body">
-                <h3 data-core-title>One command center. Agents, vaults, proof.</h3>
-                <p data-core-body>Every file gets an ownership path, every agent shows its work, and every transfer can surface a cryptographic receipt.</p>
-              </div>
-            </article>
-          </div>
-        </section>
-      </section>
-
-      <footer class="bottom-shell">
-        <label class="consent-row" data-consent-row hidden>
-          <input type="checkbox" id="consentCheckbox" />
-          <span>I agree to the license and launch AetherCloud when installation completes.</span>
-        </label>
-
-        <section class="progress-shell">
-          <div class="progress-top">
-            <span data-progress-label>Ready to begin</span>
-            <span data-progress-value>0%</span>
-          </div>
-          <div class="progress-track"><div class="progress-fill" data-progress-fill></div></div>
-          <div class="progress-foot">
-            <span data-progress-detail>Page 1 of 4</span>
-            <span data-progress-speed>Waiting for next step</span>
-          </div>
-        </section>
-
-        <div class="button-row">
-          <button class="btn btn-secondary" id="backButton" hidden>Back</button>
-          <button class="btn btn-secondary" id="cancelButton">Cancel</button>
-          <button class="btn btn-primary" id="primaryButton">Next</button>
-        </div>
-      </footer>
+      <div class="core">
+        <span class="core-ring"></span>
+        <span class="core-glow"></span>
+        <img class="core-vault" src="./agents/aether-vault.svg" alt="" />
+      </div>
     </section>
+
+    <section class="tagline-shell">
+      <h1 class="tagline" id="tagline">Every view is logged and audited.</h1>
+      <div class="tagline-dots" id="taglineDots" aria-hidden="true"></div>
+    </section>
+
+    <footer class="footer">
+      <label class="consent">
+        <input type="checkbox" id="consentCheckbox" />
+        <span>I agree to the license.</span>
+      </label>
+
+      <p class="disclosure-note">
+        Anonymous usage events help us improve AetherCloud. Opt-out in Settings after install.
+      </p>
+
+      <details class="included-details">
+        <summary>What gets installed</summary>
+        <div class="included-body">
+          <p>
+            AetherCloud-L desktop app — agent workspace, vault, and browser automation — plus the MCP tool runtime and cryptographic verification libraries.
+          </p>
+          <ul class="included-facts">
+            <li><span>Size</span><strong>~260 MB on disk</strong></li>
+            <li><span>Location</span><strong><code>%LOCALAPPDATA%\aethercloud-l</code></strong></li>
+            <li><span>Uninstall</span><strong>Add/Remove Programs</strong></li>
+          </ul>
+        </div>
+      </details>
+
+      <div class="progress-shell" id="progressShell" hidden>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-meta">
+          <span id="progressLabel">Preparing install…</span>
+          <span id="progressValue">0%</span>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-ghost" id="cancelButton" aria-label="Cancel install">Cancel</button>
+        <button class="btn btn-primary" id="installButton" disabled>Install AetherCloud</button>
+      </div>
+    </footer>
   </main>
 
   <script src="./dot-background.js"></script>
