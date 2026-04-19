@@ -38,25 +38,31 @@ fn sha256_hex(bytes: &[u8]) -> String {
 async fn integration_spawn_captures_exit_code() {
     // Plumbing test: write a real Windows PE to a temp location,
     // call run_payload_silent, assert we capture its exit code.
-    // Uses cmd.exe bytes as the stand-in. cmd.exe /S is not a valid flag
-    // (cmd doesn't recognize /S for silent) but cmd.exe happily ignores
-    // unknown switches and exits promptly — which is what we want here:
-    // verify spawn() → wait() → exit code propagation works end-to-end.
+    // Uses cmd.exe bytes as the stand-in. run_payload_silent internally
+    // spawns with /S — cmd.exe recognizes /S as the "strip surrounding
+    // quotes" flag. With no /C or /K command string following, cmd exits
+    // immediately with code 0 because there's nothing to execute. This
+    // is enough to verify spawn() → wait() → exit-code propagation
+    // without running an actual NSIS installer in the test.
     let payload_bytes = small_payload_bytes();
     let expected_hash = sha256_hex(&payload_bytes);
-    let size = payload_bytes.len() as u64;
 
     let tmp = temp_payload_path();
     tokio::fs::write(&tmp, &payload_bytes).await.expect("write temp payload");
 
+    // Verify the temp file on disk matches what we intended to write —
+    // proves the download-style "write bytes to disk, hash later" path
+    // is sound before we exercise the spawn step.
+    let on_disk = tokio::fs::read(&tmp).await.expect("read temp payload back");
+    assert_eq!(sha256_hex(&on_disk), expected_hash, "bytes on disk diverged from source");
+
     let code = run_payload_silent(&tmp).await.expect("spawn payload");
-    // cmd.exe with an unknown /S flag exits with code 0 quickly on Windows 10+.
-    // Accept any deterministic exit — the key assertion is that we CAPTURED a code.
+    // cmd.exe /S with no command exits with 0 quickly on Windows 10+.
+    // Accept 0 or 1 — the key assertion is that we captured a deterministic code.
     assert!(code == 0 || code == 1, "unexpected cmd.exe exit code: {}", code);
 
+    // best-effort cleanup
     let _ = tokio::fs::remove_file(&tmp).await;
-    assert!(size > 0);
-    assert_eq!(expected_hash.len(), 64);
 }
 
 #[tokio::test]
