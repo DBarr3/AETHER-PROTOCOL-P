@@ -149,6 +149,11 @@ where
         error: None,
     });
 
+    // Hand the payload to NSIS — past this point a cancel() must NOT delete
+    // the file out from under the running process. Clearing in_flight_temp
+    // keeps cancel()'s cleanup branch from racing run_payload_silent.
+    *state.in_flight_temp.lock().await = None;
+
     let code = payload::run_payload_silent(&temp_path).await?;
     let _ = tokio::fs::remove_file(&temp_path).await;
 
@@ -178,10 +183,15 @@ fn check_min_wizard_version(required: &str) -> Result<()> {
     Ok(())
 }
 
-/// Minimal semver-ish comparison. "1.0.0" vs "1.0.1". Returns Ordering.
+/// Minimal semver-ish comparison. Zero-pads unequal lengths so "1.0" == "1.0.0".
+/// Non-numeric pre-release tags (e.g. "-beta") are silently dropped — the wizard
+/// and manifest are expected to use plain numeric versions only.
 fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let pa: Vec<u32> = a.split('.').filter_map(|s| s.parse().ok()).collect();
-    let pb: Vec<u32> = b.split('.').filter_map(|s| s.parse().ok()).collect();
+    let mut pa: Vec<u32> = a.split('.').filter_map(|s| s.parse().ok()).collect();
+    let mut pb: Vec<u32> = b.split('.').filter_map(|s| s.parse().ok()).collect();
+    let len = pa.len().max(pb.len());
+    pa.resize(len, 0);
+    pb.resize(len, 0);
     pa.cmp(&pb)
 }
 
@@ -208,6 +218,17 @@ mod tests {
         assert_eq!(version_cmp("1.0.0", "1.0.0"), std::cmp::Ordering::Equal);
         assert_eq!(version_cmp("1.0.0", "1.0.1"), std::cmp::Ordering::Less);
         assert_eq!(version_cmp("2.0.0", "1.9.9"), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn version_cmp_handles_unequal_length() {
+        // Regression: "1.0" must compare equal to "1.0.0" — zero-padding,
+        // not lexicographic Vec ordering. Otherwise a manifest with
+        // min_wizard_version "1.0" incorrectly blocks a wizard at "1.0.0".
+        assert_eq!(version_cmp("1.0", "1.0.0"), std::cmp::Ordering::Equal);
+        assert_eq!(version_cmp("1.0.0", "1.0"), std::cmp::Ordering::Equal);
+        assert_eq!(version_cmp("1.0", "1.0.1"), std::cmp::Ordering::Less);
+        assert_eq!(version_cmp("1.1", "1.0.9"), std::cmp::Ordering::Greater);
     }
 
     #[test]
