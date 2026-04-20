@@ -107,8 +107,26 @@ installButton.addEventListener('click', () => {
       surfaceError('Installation failed to start', String(syncErr) + '\n\nSee ' + LOG_HINT);
       return;
     }
-    if (started && typeof started.catch === 'function') {
-      started.catch((err) => {
+    if (started && typeof started.then === 'function') {
+      // IPC resolve = backend ran run_install → Ok(path). Authoritative signal
+      // that the install succeeded, even if progress events never flowed
+      // (e.g. missing capability grant, event-bus routing issue, any future
+      // Tauri regression). Without this the UI could sit at 0% forever while
+      // the app was already installed — the exact bug the first v4 build hit.
+      started.then(() => {
+        console.info('[installer] startInstall IPC resolved — backend completed');
+        if (backendWatchdog) { clearTimeout(backendWatchdog); backendWatchdog = null; }
+        // If the 'done' progress event already flipped us to the launching
+        // state, don't clobber it. Otherwise drive the UI to completion here.
+        if (installing) {
+          renderProgress(100, 'Install complete. Launching…');
+          installButton.textContent = 'Launching…';
+          installing = false;
+          setTimeout(() => {
+            if (window.installerAPI?.launchApp) window.installerAPI.launchApp();
+          }, 800);
+        }
+      }).catch((err) => {
         console.error('[installer] startInstall IPC rejected', err);
         // If an onProgress error event already fired, don't double-render.
         // Errors from the Err(...) match arm in commands.rs always emit first.

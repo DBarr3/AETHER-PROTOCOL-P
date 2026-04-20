@@ -25,7 +25,9 @@ pub async fn start_install(
             speed: "".into(),
             error: Some(err.user_message()),
         };
-        let _ = app.emit("installer://progress", ev);
+        if let Err(emit_err) = app.emit("installer://progress", ev) {
+            tracing::warn!(error = ?emit_err, "cmd: emit() failed on NoConsent path");
+        }
         return Err(err.user_message());
     }
 
@@ -34,7 +36,9 @@ pub async fn start_install(
     let app_for_emit = app.clone();
     let result = installer::run_install(state_inner.clone(), move |ev: ProgressEvent| {
         tracing::debug!(state = ev.state, percent = ev.percent, "cmd: emitting progress");
-        let _ = app_for_emit.emit("installer://progress", ev);
+        if let Err(emit_err) = app_for_emit.emit("installer://progress", ev) {
+            tracing::warn!(error = ?emit_err, "cmd: emit() failed — capability missing?");
+        }
     })
     .await;
 
@@ -68,7 +72,9 @@ pub async fn start_install(
                 speed: "".into(),
                 error: Some(err.user_message()),
             };
-            let _ = app.emit("installer://progress", ev);
+            if let Err(emit_err) = app.emit("installer://progress", ev) {
+                tracing::warn!(error = ?emit_err, "cmd: emit() failed on error path");
+            }
             Err(err.user_message())
         }
     }

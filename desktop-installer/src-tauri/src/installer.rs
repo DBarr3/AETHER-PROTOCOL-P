@@ -312,13 +312,36 @@ fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     pa.cmp(&pb)
 }
 
+/// Locate the installed AetherCloud-L.exe after NSIS finishes.
+///
+/// electron-builder with `perMachine: false, oneClick: true` installs into
+/// `%LOCALAPPDATA%\Programs\<productName>\` by default (verified on this
+/// build: both "AetherCloud-L" and "aethercloud-l" subdirs exist because
+/// NSIS creates the dir from `artifactName` first-time then reuses it on
+/// upgrades). A prior version of this function used
+/// `%LOCALAPPDATA%\aethercloud-l\...` — wrong, missed the `Programs\`
+/// subdirectory — so launch_app reported `installed app binary missing`
+/// even though NSIS had in fact written the binary. Now we probe all four
+/// plausible layouts and return the first that exists.
 pub fn installed_app_path() -> PathBuf {
-    // %LOCALAPPDATA%\aethercloud-l\AetherCloud-L.exe (matches existing NSIS oneClick default).
-    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-        PathBuf::from(local).join("aethercloud-l").join("AetherCloud-L.exe")
-    } else {
-        PathBuf::from("AetherCloud-L.exe")
+    let Some(local) = std::env::var_os("LOCALAPPDATA") else {
+        return PathBuf::from("AetherCloud-L.exe");
+    };
+    let local = PathBuf::from(local);
+    let candidates = [
+        local.join("Programs").join("AetherCloud-L").join("AetherCloud-L.exe"),
+        local.join("Programs").join("aethercloud-l").join("AetherCloud-L.exe"),
+        local.join("AetherCloud-L").join("AetherCloud-L.exe"),
+        local.join("aethercloud-l").join("AetherCloud-L.exe"),
+    ];
+    for c in candidates.iter() {
+        if c.exists() {
+            return c.clone();
+        }
     }
+    // Nothing on disk — return the canonical default so error messages show
+    // a useful path rather than an empty/relative one.
+    candidates[0].clone()
 }
 
 pub fn detect_existing_install() -> (bool, Option<String>) {
