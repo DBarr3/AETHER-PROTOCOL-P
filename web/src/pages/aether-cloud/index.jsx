@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { DOWNLOAD_URL, UPGRADE_URL, TIER_KEYS } from "../../lib/config.js";
-import { startCheckout } from "../../lib/checkoutApi.js";
+import { DOWNLOAD_URL, UPGRADE_URL, TIER_CHECKOUT_LINKS } from "../../lib/config.js";
 import "./aethercloud.css";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -612,31 +611,20 @@ function AudienceAndPillars() {
 }
 
 /* ═══════════════════════════════════════════════════
-   PRICING CARD — free tier is a direct <a> to DOWNLOAD_URL (the installer
-   on our CDN); paid tiers call startCheckout(tierKey) which POSTs to the
-   Next.js checkout API and redirects to Stripe. See lib/checkoutApi.js.
+   PRICING CARD
+   Free tier downloads the installer directly.
+   Paid tiers link to app.aethersystems.net (the /site/ Next.js app that
+   owns the Subscribe → Stripe flow). The deep-link #tier-<slug> lets
+   that page auto-scroll + highlight the matching tier card.
    ═══════════════════════════════════════════════════ */
 function PricingCard({ tier }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  const tierKey = TIER_KEYS[tier.name] || "free";
-  const isFree  = tierKey === "free";
-  const btnClass = tier.featured ? "ac-btn-primary" : "ac-btn-ghost";
-  const btnStyle = { textAlign: "center", justifyContent: "center", marginBottom: 0 };
-
-  async function onPaidClick(e) {
-    e.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await startCheckout(tierKey);
-      // startCheckout redirects on success; control won't return here.
-    } catch (err) {
-      setError(err.message || "checkout failed");
-      setLoading(false);
-    }
-  }
+  const checkoutHref = TIER_CHECKOUT_LINKS[tier.name];
+  const isFree       = !checkoutHref;
+  const btnClass     = tier.featured ? "ac-btn-primary" : "ac-btn-ghost";
+  const btnStyle     = { textAlign: "center", justifyContent: "center", marginBottom: 0 };
+  // Free tier: in-site link to DOWNLOAD_URL. Paid: cross-origin link to
+  // the checkout app; open in same tab so the user doesn't lose context.
+  const href = isFree ? tier.href : checkoutHref;
 
   return (
     <div className={`ac-pricing-card ${tier.featured ? "ac-featured" : ""}`}>
@@ -645,26 +633,9 @@ function PricingCard({ tier }) {
       <div className="ac-pricing-divider" />
       <div className="ac-pricing-price">{tier.price}</div>
       <p className="ac-pricing-period">{tier.period}</p>
-      {isFree ? (
-        <a href={tier.href} className={btnClass} style={btnStyle}>
-          {tier.cta}
-        </a>
-      ) : (
-        <button
-          type="button"
-          onClick={onPaidClick}
-          disabled={loading}
-          className={btnClass}
-          style={{ ...btnStyle, opacity: loading ? 0.6 : 1, cursor: loading ? "wait" : "pointer" }}
-        >
-          {loading ? "Redirecting…" : tier.cta}
-        </button>
-      )}
-      {error && (
-        <p style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, textAlign: "center" }}>
-          {error}
-        </p>
-      )}
+      <a href={href} className={btnClass} style={btnStyle}>
+        {tier.cta}
+      </a>
       <div className="ac-pricing-divider" />
       <div className="ac-pricing-features">
         {tier.features.map((f) => (
@@ -686,13 +657,13 @@ function HowAndPricing() {
 
   const monthly = [
     { name: "Free",         desc: "Try it on real work", price: "$0",  period: "/ forever · Limited tokens", featured: false, cta: "Download free",       href: DOWNLOAD_URL, features: ["2GB encrypted vault", "Signed audit chain", "Capped monthly tokens"] },
-    { name: "Solo",         desc: "For individuals",     price: "$19", period: "/ month",                    featured: false, cta: "Start solo",          href: UPGRADE_URL,  features: ["10GB encrypted vault", "Signed audit chain", "Injection protection"] },
+    { name: "Solo",         desc: "For individuals",     price: "$19.99", period: "/ month",                 featured: false, cta: "Start solo",          href: UPGRADE_URL,  features: ["10GB encrypted vault", "Signed audit chain", "Injection protection"] },
     { name: "Professional", desc: "For consultants",     price: "$49", period: "/ month",                    featured: true,  cta: "Start professional",  href: UPGRADE_URL,  features: ["50GB encrypted vault", "MCP tool integration", "Priority routing", "One teammate seat"] },
     { name: "Team",         desc: "For small teams",     price: "$89", period: "/ month",                    featured: false, cta: "Start team",          href: UPGRADE_URL,  features: ["200GB encrypted vault", "Five team seats", "Compliance exports", "Dedicated support", "Custom integrations"] },
   ];
   const yearly = [
     { name: "Free",         desc: "Try it on real work", price: "$0",   period: "/ forever · Limited tokens", featured: false, cta: "Download free",      href: DOWNLOAD_URL, features: ["2GB encrypted vault", "Signed audit chain", "Capped monthly tokens"] },
-    { name: "Solo",         desc: "For individuals",     price: "$180", period: "/ year · Save 22%",          featured: false, cta: "Start solo",         href: UPGRADE_URL,  features: ["10GB encrypted vault", "Signed audit chain", "Injection protection"] },
+    { name: "Solo",         desc: "For individuals",     price: "$189", period: "/ year · Save 21%",          featured: false, cta: "Start solo",         href: UPGRADE_URL,  features: ["10GB encrypted vault", "Signed audit chain", "Injection protection"] },
     { name: "Professional", desc: "For consultants",     price: "$588", period: "/ year · Save 20%",          featured: true,  cta: "Start professional", href: UPGRADE_URL,  features: ["50GB encrypted vault", "MCP tool integration", "Priority routing", "One teammate seat"] },
     { name: "Team",         desc: "For small teams",     price: "$960", period: "/ year · Save 20%",          featured: false, cta: "Start team",         href: UPGRADE_URL,  features: ["200GB encrypted vault", "Five team seats", "Compliance exports", "Dedicated support", "Custom integrations"] },
   ];
