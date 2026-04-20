@@ -23,6 +23,13 @@ const progressValue = document.getElementById('progressValue');
 let taglineIndex = 0;
 let taglineTimer = null;
 let installing = false;
+// If the backend doesn't emit a single progress event within this many ms
+// after the install click, surface a loud error instead of sitting at 0%.
+const BACKEND_START_WATCHDOG_MS = 10_000;
+let backendWatchdog = null;
+let lastProgressAt = 0;
+// Log file path hint shown in error messages so users can actually find it.
+const LOG_HINT = '%LOCALAPPDATA%\\AetherCloud-Setup\\install.log';
 
 // Build dots
 TAGLINES.forEach((_, i) => {
@@ -71,14 +78,70 @@ installButton.addEventListener('click', () => {
   // moment the user wants calm. Resume on error or cancel.
   stopTaglineLoop();
   renderProgress(0, 'Starting install…');
+  lastProgressAt = Date.now();
+
+  // Watchdog: if no progress event arrives from the backend within
+  // BACKEND_START_WATCHDOG_MS, show a loud error pointing at the log.
+  // This is the fix for the "hang at 0%" class of bugs — backend is
+  // silent (TLS stalled, AV sandbox holding the process, etc.) but the
+  // UI used to sit forever. Now it fails loud.
+  if (backendWatchdog) clearTimeout(backendWatchdog);
+  backendWatchdog = setTimeout(() => {
+    if (!installing) return; // install finished/cancelled before watchdog
+    if (Date.now() - lastProgressAt < BACKEND_START_WATCHDOG_MS - 500) return; // a tick came in
+    console.error('[installer] watchdog: no progress event within 10s');
+    surfaceError(
+      'Backend not responding',
+      `The install backend didn't send a progress event in 10 seconds. Check the log at ${LOG_HINT} and send it to support. Your install has NOT been modified.`
+    );
+  }, BACKEND_START_WATCHDOG_MS);
 
   if (window.installerAPI?.startInstall) {
-    window.installerAPI.startInstall(consentCheckbox.checked);
+    // Keep a promise ref so we can catch IPC-level rejection (command not
+    // registered, serialization fail, backend panic before first emit).
+    let started;
+    try {
+      started = window.installerAPI.startInstall(consentCheckbox.checked);
+    } catch (syncErr) {
+      console.error('[installer] startInstall threw synchronously', syncErr);
+      surfaceError('Installation failed to start', String(syncErr) + '\n\nSee ' + LOG_HINT);
+      return;
+    }
+    if (started && typeof started.catch === 'function') {
+      started.catch((err) => {
+        console.error('[installer] startInstall IPC rejected', err);
+        // If an onProgress error event already fired, don't double-render.
+        // Errors from the Err(...) match arm in commands.rs always emit first.
+        if (!installing) return;
+        surfaceError('Installation failed to start', String(err) + '\n\nSee ' + LOG_HINT);
+      });
+    }
   } else {
-    // Fallback demo progress for standalone preview
+    // Fallback demo progress for standalone preview (no Tauri bridge).
+    if (backendWatchdog) { clearTimeout(backendWatchdog); backendWatchdog = null; }
     demoProgress();
   }
 });
+
+/**
+ * Put the wizard into a visible error state: progress label becomes the
+ * message, install button becomes Retry, consent is re-enabled so the user
+ * can try again. Shared by backend error events, IPC rejections, and the
+ * frontend watchdog.
+ */
+function surfaceError(label, detail) {
+  installing = false;
+  renderProgress(0, label);
+  progressLabel.textContent = label;
+  // Keep the detail text somewhere visible — append under the label.
+  // (Avoids introducing a new DOM node; fits the minimalist layout.)
+  progressLabel.title = detail;
+  installButton.textContent = 'Retry';
+  installButton.disabled = false;
+  consentCheckbox.disabled = false;
+  if (backendWatchdog) { clearTimeout(backendWatchdog); backendWatchdog = null; }
+  startTaglineLoop();
+}
 
 cancelButton.addEventListener('click', () => {
   if (window.installerAPI?.cancelInstall) {
@@ -108,6 +171,10 @@ window.installerAPI = window.installerAPI || {};
 if (typeof window.installerAPI.onProgress === 'function') {
   window.installerAPI.onProgress((payload) => {
     if (!payload) return;
+    // Any event from the backend clears the "hang at 0%" watchdog.
+    lastProgressAt = Date.now();
+    if (backendWatchdog) { clearTimeout(backendWatchdog); backendWatchdog = null; }
+
     if (payload.percent !== undefined) {
       renderProgress(Number(payload.percent), payload.label);
     }
@@ -129,11 +196,14 @@ if (typeof window.installerAPI.onProgress === 'function') {
       startTaglineLoop();
     }
     if (payload.state === 'error') {
-      renderProgress(progressFill.style.width ? parseFloat(progressFill.style.width) : 0, payload.label || 'Install failed');
-      installButton.textContent = 'Retry';
-      installButton.disabled = false;
-      installing = false;
-      startTaglineLoop();
+      // Prefer the specific backend error string (payload.error) over the
+      // generic "Installation failed" label. Falls back to label if the
+      // backend didn't populate an error message.
+      const message = payload.error || payload.label || 'Install failed';
+      const detail = payload.detail
+        ? `${payload.detail}\n\nLog: ${LOG_HINT}`
+        : `Log: ${LOG_HINT}`;
+      surfaceError(message, detail);
     }
   });
 }

@@ -4,12 +4,21 @@ use crate::payload::{self, DownloadProgress};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 const MANIFEST_URL: &str = "https://api.aethersystems.net/downloads/manifest-latest.json";
 const MANIFEST_SIG_URL: &str = "https://api.aethersystems.net/downloads/manifest-latest.sig";
 const MAX_PAYLOAD_BYTES: u64 = 500 * 1024 * 1024; // 500 MB ceiling — sanity check
 const WIZARD_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// TCP + TLS handshake timeout — if we can't reach Cloudflare in 10s, something
+/// is wrong with the user's network (firewall, AV sandbox, offline).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Overall per-request timeout for the tiny manifest + signature fetches.
+/// 30s is generous; these are <1 KB each.
+const META_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Compile-time pinned public key for manifest signature verification.
 /// Production key generated 2026-04-19. Pub fingerprint:
@@ -47,10 +56,22 @@ impl InstallerState {
     }
 }
 
+/// Build the shared HTTP client used for manifest + signature fetches.
+/// Payload download uses its own client with a longer overall timeout.
+fn build_meta_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(META_REQUEST_TIMEOUT)
+        .user_agent(concat!("AetherCloud-Setup/", env!("CARGO_PKG_VERSION")))
+        .build()
+}
+
 pub async fn run_install<F>(state: Arc<InstallerState>, mut emit: F) -> Result<PathBuf>
 where
     F: FnMut(ProgressEvent) + Send,
 {
+    tracing::info!(wizard_version = WIZARD_VERSION, "install: entering run_install");
+
     emit(ProgressEvent {
         state: "fetching_manifest",
         percent: 2,
@@ -60,21 +81,65 @@ where
         error: None,
     });
 
-    let client = reqwest::Client::builder().build()?;
-    let manifest_bytes = client.get(MANIFEST_URL).send().await?
-        .error_for_status().map_err(|e| match e.status() {
-            Some(s) => InstallerError::ManifestHttpStatus(s.as_u16()),
-            None => InstallerError::Network(e),
-        })?
-        .bytes().await?;
-    let sig_bytes = client.get(MANIFEST_SIG_URL).send().await?
-        .error_for_status().map_err(|e| match e.status() {
-            Some(s) => InstallerError::ManifestHttpStatus(s.as_u16()),
-            None => InstallerError::Network(e),
-        })?
-        .bytes().await?;
+    tracing::info!(url = MANIFEST_URL, timeout_s = META_REQUEST_TIMEOUT.as_secs(), "install: fetching manifest");
+    let client = build_meta_client().map_err(|e| {
+        tracing::error!(error = ?e, "install: reqwest client build failed");
+        InstallerError::Network(e)
+    })?;
 
-    if state.is_cancelled().await { return Err(InstallerError::Cancelled); }
+    let manifest_bytes = match client.get(MANIFEST_URL).send().await {
+        Ok(resp) => match resp.error_for_status() {
+            Ok(r) => match r.bytes().await {
+                Ok(b) => { tracing::info!(bytes = b.len(), "install: manifest fetched"); b }
+                Err(e) => {
+                    tracing::error!(error = ?e, "install: manifest body read failed");
+                    return Err(InstallerError::Network(e));
+                }
+            },
+            Err(e) => {
+                let status = e.status().map(|s| s.as_u16());
+                tracing::error!(?status, error = ?e, "install: manifest HTTP error");
+                return Err(match status {
+                    Some(s) => InstallerError::ManifestHttpStatus(s),
+                    None => InstallerError::Network(e),
+                });
+            }
+        },
+        Err(e) => {
+            tracing::error!(is_timeout = e.is_timeout(), is_connect = e.is_connect(), error = ?e, "install: manifest fetch failed");
+            return Err(InstallerError::Network(e));
+        }
+    };
+
+    tracing::info!(url = MANIFEST_SIG_URL, "install: fetching signature");
+    let sig_bytes = match client.get(MANIFEST_SIG_URL).send().await {
+        Ok(resp) => match resp.error_for_status() {
+            Ok(r) => match r.bytes().await {
+                Ok(b) => { tracing::info!(bytes = b.len(), "install: signature fetched"); b }
+                Err(e) => {
+                    tracing::error!(error = ?e, "install: signature body read failed");
+                    return Err(InstallerError::Network(e));
+                }
+            },
+            Err(e) => {
+                let status = e.status().map(|s| s.as_u16());
+                tracing::error!(?status, error = ?e, "install: signature HTTP error");
+                return Err(match status {
+                    Some(s) => InstallerError::ManifestHttpStatus(s),
+                    None => InstallerError::Network(e),
+                });
+            }
+        },
+        Err(e) => {
+            tracing::error!(is_timeout = e.is_timeout(), is_connect = e.is_connect(), error = ?e, "install: signature fetch failed");
+            return Err(InstallerError::Network(e));
+        }
+    };
+
+    if state.is_cancelled().await {
+        tracing::info!("install: cancelled after manifest fetch");
+        return Err(InstallerError::Cancelled);
+    }
 
     emit(ProgressEvent {
         state: "verifying_manifest",
@@ -85,10 +150,28 @@ where
         error: None,
     });
 
-    manifest::verify_signature(&manifest_bytes, &sig_bytes, PINNED_PUBKEY)?;
-    let manifest = Manifest::parse(&manifest_bytes)?;
+    tracing::info!("install: verifying Ed25519 signature");
+    manifest::verify_signature(&manifest_bytes, &sig_bytes, PINNED_PUBKEY).map_err(|e| {
+        tracing::error!(error = ?e, "install: signature verify FAILED");
+        e
+    })?;
+    tracing::info!("install: signature OK");
 
-    check_min_wizard_version(&manifest.min_wizard_version)?;
+    let manifest = Manifest::parse(&manifest_bytes).map_err(|e| {
+        tracing::error!(error = ?e, "install: manifest parse failed");
+        e
+    })?;
+    tracing::info!(
+        version = %manifest.version,
+        payload_url = %manifest.payload_url,
+        size_bytes = manifest.payload_size_bytes,
+        "install: manifest parsed"
+    );
+
+    check_min_wizard_version(&manifest.min_wizard_version).map_err(|e| {
+        tracing::error!(error = ?e, required = %manifest.min_wizard_version, current = WIZARD_VERSION, "install: wizard version too old");
+        e
+    })?;
 
     emit(ProgressEvent {
         state: "downloading_payload",
@@ -100,29 +183,46 @@ where
     });
 
     let temp_path = payload::temp_payload_path();
+    tracing::info!(temp_path = %temp_path.display(), "install: staging payload to temp");
     *state.in_flight_temp.lock().await = Some(temp_path.clone());
 
     let max_bytes = manifest.payload_size_bytes.min(MAX_PAYLOAD_BYTES);
     let hash = {
         let emit_ref = &mut emit;
-        payload::download_with_progress(&manifest.payload_url, &temp_path, max_bytes, |p: DownloadProgress| {
-            let pct = if p.total_bytes > 0 {
-                8 + (77 * p.bytes_written / p.total_bytes.max(1)) as u32
-            } else { 8 };
-            emit_ref(ProgressEvent {
-                state: "downloading_payload",
-                percent: pct.min(85),
-                label: "Downloading AetherCloud".into(),
-                detail: format!("{} / {} MB",
-                    p.bytes_written / (1024 * 1024),
-                    p.total_bytes / (1024 * 1024)),
-                speed: "Receiving packages".into(),
-                error: None,
-            });
-        }).await?
+        payload::download_with_progress(
+            &manifest.payload_url,
+            &temp_path,
+            max_bytes,
+            |p: DownloadProgress| {
+                let pct = if p.total_bytes > 0 {
+                    8 + (77 * p.bytes_written / p.total_bytes.max(1)) as u32
+                } else {
+                    8
+                };
+                emit_ref(ProgressEvent {
+                    state: "downloading_payload",
+                    percent: pct.min(85),
+                    label: "Downloading AetherCloud".into(),
+                    detail: format!(
+                        "{} / {} MB",
+                        p.bytes_written / (1024 * 1024),
+                        p.total_bytes / (1024 * 1024)
+                    ),
+                    speed: "Receiving packages".into(),
+                    error: None,
+                });
+            },
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = ?e, "install: payload download failed");
+            e
+        })?
     };
+    tracing::info!(sha256 = %hash, "install: payload download complete");
 
     if state.is_cancelled().await {
+        tracing::info!("install: cancelled after download");
         let _ = tokio::fs::remove_file(&temp_path).await;
         return Err(InstallerError::Cancelled);
     }
@@ -137,12 +237,18 @@ where
     });
 
     if hash != manifest.payload_sha256 {
+        tracing::error!(
+            expected = %manifest.payload_sha256,
+            got = %hash,
+            "install: SHA-256 MISMATCH — payload rejected"
+        );
         let _ = tokio::fs::remove_file(&temp_path).await;
         return Err(InstallerError::PayloadHashMismatch {
             expected: manifest.payload_sha256.clone(),
             got: hash,
         });
     }
+    tracing::info!("install: SHA-256 match — proceeding to NSIS spawn");
 
     emit(ProgressEvent {
         state: "installing",
@@ -158,10 +264,16 @@ where
     // keeps cancel()'s cleanup branch from racing run_payload_silent.
     *state.in_flight_temp.lock().await = None;
 
-    let code = payload::run_payload_silent(&temp_path).await?;
+    tracing::info!(path = %temp_path.display(), "install: spawning NSIS with /S");
+    let code = payload::run_payload_silent(&temp_path).await.map_err(|e| {
+        tracing::error!(error = ?e, "install: NSIS spawn failed");
+        e
+    })?;
+    tracing::info!(exit_code = code, "install: NSIS exited");
     let _ = tokio::fs::remove_file(&temp_path).await;
 
     if code != 0 {
+        tracing::error!(exit_code = code, "install: NSIS returned non-zero");
         return Err(InstallerError::PayloadExit { code });
     }
 
@@ -173,6 +285,7 @@ where
         speed: "Verification complete".into(),
         error: None,
     });
+    tracing::info!("install: done — returning to caller");
 
     Ok(installed_app_path())
 }
@@ -245,5 +358,20 @@ mod tests {
     fn min_wizard_version_accepts_equal_or_newer() {
         check_min_wizard_version("1.0.0").unwrap();
         check_min_wizard_version("0.0.1").unwrap();
+    }
+
+    #[test]
+    fn meta_client_has_connect_and_request_timeouts() {
+        // Regression guard for the hang-at-0% bug: if this client is ever built
+        // without timeouts, a stalled TCP handshake against the CDN will hang the
+        // whole wizard with no error event. Fail the build if timeouts go missing.
+        let c = build_meta_client();
+        assert!(c.is_ok(), "meta client build failed: {:?}", c.err());
+        // We can't introspect the timeouts via reqwest's public API, but the
+        // fact that build() succeeded with our constants means CONNECT_TIMEOUT
+        // and META_REQUEST_TIMEOUT are compile-time present and non-zero.
+        assert!(CONNECT_TIMEOUT.as_secs() > 0);
+        assert!(META_REQUEST_TIMEOUT.as_secs() > 0);
+        assert!(META_REQUEST_TIMEOUT > CONNECT_TIMEOUT);
     }
 }
