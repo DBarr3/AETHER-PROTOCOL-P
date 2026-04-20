@@ -14540,7 +14540,7 @@ function _showUpdateBanner(installed, latest) {
   ].join(';');
   bar.innerHTML =
     `\u2B06 Update available \u2014 backend v${latest} is newer than installed v${installed}. ` +
-    `Download and install AetherCloud-L-Setup-${latest}.exe. ` +
+    `Download and install AetherCloud-Setup.exe. ` +
     `<span style="opacity:.6;font-weight:400;">(click to dismiss)</span>`;
   bar.onclick = () => bar.remove();
   document.body.appendChild(bar);

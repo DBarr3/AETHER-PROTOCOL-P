@@ -66,12 +66,14 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "publisherName": "Aether Systems LLC",
-      "artifactName": "AetherCloud-L-Setup-${version}.exe",
-      "signingHashAlgorithms": [
-        "sha256"
-      ],
-      "rfc3161TimeStampServer": "http://timestamp.digicert.com",
+      "artifactName": "AetherCloud-L-Payload-${version}.exe",
+      "signtoolOptions": {
+        "publisherName": "Aether Systems LLC",
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      },
       "verifyUpdateCodeSignature": true
     },
     "nsis": {

@@ -1,0 +1,8 @@
+{
+  "version": "0.9.7",
+  "payload_url": "https://aethersystems.io/downloads/x.exe",
+  "payload_sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
+  "payload_size_bytes": 94371840,
+  "min_wizard_version": "1.0.0",
+  "released_at": "2026-04-18T23:00:00Z"
+}

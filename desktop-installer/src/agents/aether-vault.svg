@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="120" height="120" shape-rendering="crispEdges">
+  <!-- AetherVault — pixel-art vault door with lock dial, matching agent style -->
+  <defs>
+    <linearGradient id="vaultBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="vaultDial" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#89dcff"/>
+      <stop offset="100%" stop-color="#8b90ff"/>
+    </linearGradient>
+  </defs>
+  <!-- vault door outer frame (rounded square) -->
+  <rect x="2" y="1" width="8" height="1" fill="url(#vaultBody)"/>
+  <rect x="1" y="2" width="1" height="1" fill="url(#vaultBody)"/>
+  <rect x="10" y="2" width="1" height="1" fill="url(#vaultBody)"/>
+  <rect x="1" y="3" width="1" height="7" fill="url(#vaultBody)"/>
+  <rect x="10" y="3" width="1" height="7" fill="url(#vaultBody)"/>
+  <rect x="1" y="10" width="1" height="1" fill="url(#vaultBody)"/>
+  <rect x="10" y="10" width="1" height="1" fill="url(#vaultBody)"/>
+  <rect x="2" y="11" width="8" height="1" fill="url(#vaultBody)"/>
+  <!-- inner hollow -->
+  <rect x="2" y="2" width="8" height="9" fill="#0a0a1a"/>
+  <!-- dial ring (outer) -->
+  <rect x="4" y="3" width="4" height="1" fill="url(#vaultDial)"/>
+  <rect x="3" y="4" width="1" height="1" fill="url(#vaultDial)"/>
+  <rect x="8" y="4" width="1" height="1" fill="url(#vaultDial)"/>
+  <rect x="3" y="5" width="1" height="3" fill="url(#vaultDial)"/>
+  <rect x="8" y="5" width="1" height="3" fill="url(#vaultDial)"/>
+  <rect x="3" y="8" width="1" height="1" fill="url(#vaultDial)"/>
+  <rect x="8" y="8" width="1" height="1" fill="url(#vaultDial)"/>
+  <rect x="4" y="9" width="4" height="1" fill="url(#vaultDial)"/>
+  <!-- dial center (glowing core) -->
+  <rect x="5" y="5" width="2" height="2" fill="#89dcff"/>
+  <rect x="5" y="7" width="2" height="1" fill="#8b90ff"/>
+  <!-- hinge marks (right side) -->
+  <rect x="9" y="5" width="1" height="1" fill="#a855f7"/>
+  <rect x="9" y="7" width="1" height="1" fill="#a855f7"/>
+</svg>

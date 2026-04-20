@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="100" height="100" shape-rendering="crispEdges">
+  <!-- AetherAI — pixel-art "A∴" mark, violet gradient -->
+  <defs>
+    <linearGradient id="aiGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+  </defs>
+  <!-- outer A triangle (pixel letter) -->
+  <rect x="4" y="1" width="2" height="1" fill="url(#aiGrad)"/>
+  <rect x="3" y="2" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="6" y="2" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="2" y="3" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="7" y="3" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="2" y="4" width="6" height="1" fill="url(#aiGrad)"/>
+  <rect x="1" y="5" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="8" y="5" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="1" y="6" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="8" y="6" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="1" y="7" width="1" height="1" fill="url(#aiGrad)"/>
+  <rect x="8" y="7" width="1" height="1" fill="url(#aiGrad)"/>
+  <!-- three dots (∴ intelligence cluster) inside the A opening -->
+  <rect x="4" y="6" width="1" height="1" fill="#e9d5ff"/>
+  <rect x="5" y="6" width="1" height="1" fill="#e9d5ff"/>
+  <rect x="4" y="7" width="2" height="1" fill="#c4b5fd"/>
+</svg>

@@ -1,0 +1,7 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/keys/*.priv.bin
+src-tauri/WixTools/
+*.log
+release/
