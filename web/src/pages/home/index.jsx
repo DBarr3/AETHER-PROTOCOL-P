@@ -738,7 +738,7 @@ export default function Page() {
           </p>
           <p className="mt-3 font-mono text-[10px] text-aether-dim">
             First Fortress client: 3 months at $500/mo with case study agreement &middot;{" "}
-            <Link to={contactLink({ intent: 'general', product: 'aether_security', cta: 'home_footer_email' })} className="text-aether-cyan hover:underline">contact@aethersecurity.io</Link>
+            <Link to={contactLink({ intent: 'general', product: 'aether_security', cta: 'home_footer_email' })} className="text-aether-cyan hover:underline">contact@aethersystems.net</Link>
           </p>
         </div>
       </section>

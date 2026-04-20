@@ -2,17 +2,19 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { DOWNLOAD_URL, UPGRADE_URL, TIER_KEYS } from "../../lib/config.js";
+import { startCheckout } from "../../lib/checkoutApi.js";
 import "./aethercloud.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
 /* ═══════════════════════════════════════════════════
-   CONFIG — single source of truth for CTAs.
-   Swap DOWNLOAD_URL to the real installer link when ready.
-   Swap UPGRADE_URL once Stripe checkout is live.
+   CONFIG — CTA destinations are imported from lib/config.js so deploys
+   can override via VITE_CHECKOUT_API_URL / VITE_DOWNLOAD_URL env vars
+   without a code change. `UPGRADE_URL` is the internal hash anchor for
+   "See pricing →"; the paid tier buttons below call startCheckout()
+   directly and bypass that URL.
    ═══════════════════════════════════════════════════ */
-const DOWNLOAD_URL = "/downloads/aethercloud-latest";   // ← point to real installer
-const UPGRADE_URL  = "/pricing#aethercloud";            // ← Stripe checkout later
 const DOCS_URL     = "/documentation";
 const PROTOCOL_URL = "/protocol-family";
 
@@ -610,6 +612,73 @@ function AudienceAndPillars() {
 }
 
 /* ═══════════════════════════════════════════════════
+   PRICING CARD — free tier is a direct <a> to DOWNLOAD_URL (the installer
+   on our CDN); paid tiers call startCheckout(tierKey) which POSTs to the
+   Next.js checkout API and redirects to Stripe. See lib/checkoutApi.js.
+   ═══════════════════════════════════════════════════ */
+function PricingCard({ tier }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
+  const tierKey = TIER_KEYS[tier.name] || "free";
+  const isFree  = tierKey === "free";
+  const btnClass = tier.featured ? "ac-btn-primary" : "ac-btn-ghost";
+  const btnStyle = { textAlign: "center", justifyContent: "center", marginBottom: 0 };
+
+  async function onPaidClick(e) {
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await startCheckout(tierKey);
+      // startCheckout redirects on success; control won't return here.
+    } catch (err) {
+      setError(err.message || "checkout failed");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className={`ac-pricing-card ${tier.featured ? "ac-featured" : ""}`}>
+      <p className="ac-pricing-name">{tier.name}</p>
+      <p className="ac-pricing-desc">{tier.desc}</p>
+      <div className="ac-pricing-divider" />
+      <div className="ac-pricing-price">{tier.price}</div>
+      <p className="ac-pricing-period">{tier.period}</p>
+      {isFree ? (
+        <a href={tier.href} className={btnClass} style={btnStyle}>
+          {tier.cta}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={onPaidClick}
+          disabled={loading}
+          className={btnClass}
+          style={{ ...btnStyle, opacity: loading ? 0.6 : 1, cursor: loading ? "wait" : "pointer" }}
+        >
+          {loading ? "Redirecting…" : tier.cta}
+        </button>
+      )}
+      {error && (
+        <p style={{ fontSize: 11, color: "#ff6b6b", marginTop: 6, textAlign: "center" }}>
+          {error}
+        </p>
+      )}
+      <div className="ac-pricing-divider" />
+      <div className="ac-pricing-features">
+        {tier.features.map((f) => (
+          <div key={f} className="ac-pricing-feature">
+            <svg viewBox="0 0 16 16"><path d="M3 8l3.5 3.5 6.5-7" strokeLinecap="round" /></svg>
+            {f}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    HOW IT WORKS + PRICING
    ═══════════════════════════════════════════════════ */
 function HowAndPricing() {
@@ -670,29 +739,7 @@ function HowAndPricing() {
         </div>
         <div className="ac-pricing-grid ac-pricing-grid-4">
           {tiers.map((tier) => (
-            <div key={tier.name + tab} className={`ac-pricing-card ${tier.featured ? "ac-featured" : ""}`}>
-              <p className="ac-pricing-name">{tier.name}</p>
-              <p className="ac-pricing-desc">{tier.desc}</p>
-              <div className="ac-pricing-divider" />
-              <div className="ac-pricing-price">{tier.price}</div>
-              <p className="ac-pricing-period">{tier.period}</p>
-              <a
-                href={tier.href}
-                className={tier.featured ? "ac-btn-primary" : "ac-btn-ghost"}
-                style={{ textAlign: "center", justifyContent: "center", marginBottom: 0 }}
-              >
-                {tier.cta}
-              </a>
-              <div className="ac-pricing-divider" />
-              <div className="ac-pricing-features">
-                {tier.features.map((f) => (
-                  <div key={f} className="ac-pricing-feature">
-                    <svg viewBox="0 0 16 16"><path d="M3 8l3.5 3.5 6.5-7" strokeLinecap="round" /></svg>
-                    {f}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PricingCard key={tier.name + tab} tier={tier} />
           ))}
         </div>
       </div>

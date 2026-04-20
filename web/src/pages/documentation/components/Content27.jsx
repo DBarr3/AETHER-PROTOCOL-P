@@ -118,7 +118,7 @@ export function Content27() {
                 </p>
                 <pre>
                   <code>{`# Install aetherctl
-curl -fsSL https://get.aethersecurity.io | sh
+curl -fsSL https://get.aethersystems.net | sh
 
 # Authenticate and bootstrap node identity
 aetherctl init --org <YOUR_ORG_ID> --token <API_TOKEN>
@@ -420,7 +420,7 @@ aetherctl ledger compliance --framework nist-800-53 --output report.pdf`}</code>
                 <p>
                   <strong>REST API.</strong> The Aether REST API exposes all
                   rotation, attestation, and ledger operations over HTTPS. Base
-                  URL: <code>https://api.aethersecurity.io/v2</code>.
+                  URL: <code>https://api.aethersystems.net/v2</code>.
                   Authentication uses short-lived JWT tokens obtained via OAuth
                   2.0 client credentials flow. Rate limits: 1,000 requests/min
                   for rotation operations, 100 requests/min for ledger queries.
@@ -442,7 +442,7 @@ aetherctl ledger compliance --framework nist-800-53 --output report.pdf`}</code>
                   Custom Resources. Install via Helm:
                 </p>
                 <pre>
-                  <code>{`helm repo add aether https://charts.aethersecurity.io
+                  <code>{`helm repo add aether https://charts.aethersystems.net
 helm install aether-operator aether/aether-operator \\
   --namespace aether-system --create-namespace \\
   --set auth.token=<API_TOKEN>

@@ -130,7 +130,7 @@ export default function ContactPage() {
               <p className="font-mono text-sm text-yellow-400 mb-2">Too many submissions</p>
               <p className="font-sans text-sm text-aether-dim">
                 You've sent several already today. Email us directly at{" "}
-                <span className="text-aether-cyan">contact@aethersecurity.io</span>
+                <span className="text-aether-cyan">contact@aethersystems.net</span>
               </p>
             </motion.div>
           ) : (
@@ -175,7 +175,7 @@ export default function ContactPage() {
               {intent === "security" && (
                 <div className="border border-aether-cyan/20 bg-aether-cyan/5 px-4 py-3 text-xs font-sans text-aether-dim">
                   For responsible disclosure with PGP, email{" "}
-                  <span className="text-aether-cyan">security@aethersecurity.io</span>
+                  <span className="text-aether-cyan">security@aethersystems.net</span>
                 </div>
               )}
 
@@ -282,7 +282,7 @@ export default function ContactPage() {
               {status === "error" && (
                 <p className="text-xs text-red-400">
                   Something went wrong. Email us at{" "}
-                  <span className="text-aether-cyan">contact@aethersecurity.io</span>
+                  <span className="text-aether-cyan">contact@aethersystems.net</span>
                 </p>
               )}
             </motion.form>

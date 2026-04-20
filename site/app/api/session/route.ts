@@ -1,0 +1,88 @@
+import { NextResponse } from "next/server";
+import { requireStripe } from "@/lib/stripe";
+
+export const runtime = "nodejs";
+
+/**
+ * GET /api/session?id=cs_test_...
+ *
+ * Returns a redacted summary of a Stripe Checkout session so the
+ * marketing site's /success page can render a personalized welcome
+ * ("Welcome to Solo, {email}") without ever exposing the raw Stripe
+ * session object to the client.
+ *
+ * This is a *read-only* passthrough. Fields returned:
+ *   - status:   "complete" | "open" | "expired"
+ *   - tier:     derived from the subscription's price nickname/metadata
+ *   - email:    customer email if already collected
+ *
+ * Anything Stripe returns beyond these fields is intentionally dropped.
+ */
+
+const ALLOWED_ORIGINS = new Set([
+  "https://aethersystems.net",
+  "https://www.aethersystems.net",
+  "https://aethersystems-web.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:5173",
+]);
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") || "";
+  const allow = ALLOWED_ORIGINS.has(origin) ? origin : "https://aethersystems.net";
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+  };
+}
+
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
+}
+
+export async function GET(req: Request) {
+  const headers = corsHeaders(req);
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "missing id" }, { status: 400, headers });
+  }
+  // Defensive: Stripe session IDs start with "cs_". Reject anything else
+  // to avoid accidentally exposing a lookup API for arbitrary resource ids.
+  if (!id.startsWith("cs_")) {
+    return NextResponse.json({ error: "invalid id" }, { status: 400, headers });
+  }
+
+  try {
+    const stripe = requireStripe();
+    const session = await stripe.checkout.sessions.retrieve(id, {
+      expand: ["line_items.data.price"],
+    });
+
+    // Pull the tier label from the expanded line item, falling back to metadata.
+    const firstItem = session.line_items?.data?.[0];
+    const price = firstItem?.price;
+    const tier =
+      price?.nickname ||
+      price?.lookup_key ||
+      (session.metadata?.tier as string | undefined) ||
+      null;
+
+    return NextResponse.json(
+      {
+        status: session.status,
+        tier,
+        email: session.customer_details?.email ?? null,
+      },
+      { headers }
+    );
+  } catch (e: unknown) {
+    console.error("session retrieve failed:", e);
+    // Don't leak Stripe error internals to the client.
+    return NextResponse.json({ error: "session lookup failed" }, { status: 404, headers });
+  }
+}
