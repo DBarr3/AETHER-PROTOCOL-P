@@ -1,7 +1,20 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://d22po4pjz3o32e.cloudfront.net; media-src 'self'; connect-src 'self' https://cjjcdwrnpzwlvradbros.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://d22po4pjz3o32e.cloudfront.net; media-src 'self'; connect-src 'self' https://cjjcdwrnpzwlvradbros.supabase.co https://app.aethersystems.net; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+# Vite emits content-hashed asset filenames (e.g. index-DDHCoejT.css).
+# Safe to cache forever — a new build produces a new filename, so the
+# browser will fetch the new one without invalidating this entry.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML always revalidates: a stale index.html references old chunk
+# hashes, so caching it would break clients after a deploy.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
