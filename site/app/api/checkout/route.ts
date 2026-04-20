@@ -57,9 +57,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `price ID for ${tier} not configured` }, { status: 500, headers });
   }
 
-  // The marketing site (aethersystems.net) owns the post-checkout UX;
-  // this Next.js app only issues the session and hands Stripe a return URL.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://aethersystems.net";
+  // Stripe redirects back into THIS Next.js app's /success and /canceled
+  // routes (they live in site/app/success and site/app/canceled). The
+  // canonical deployment is app.aethersystems.net, so default there.
+  // Override via NEXT_PUBLIC_APP_URL when running locally or on a preview.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.aethersystems.net";
   const stripe = requireStripe();
 
   try {
