@@ -29,8 +29,8 @@ export const TIERS: Tier[] = [
   {
     key: "solo",
     name: "Solo",
-    price: "$19/mo",
-    priceNumeric: 19,
+    price: "$19.99/mo",
+    priceNumeric: 19.99,
     tagline: "For individuals running daily agent workflows.",
     features: [
       "500,000 tokens/month",
@@ -73,12 +73,27 @@ export const TIERS: Tier[] = [
   },
 ];
 
-// Server-side only — reads STRIPE_PRICE_* env vars.
+// Server-side only — reads STRIPE_PRICE_AETHER_CLOUD_* env vars.
 // Never call from a client component.
+//
+// Unified naming across the stack (2026-04-20): the Supabase edge functions
+// (stripe-webhook, create-checkout-session) and this Next.js app all read
+// the same env var name per tier. Set once on each platform (Supabase
+// secrets + Vercel env), same Stripe price ID value. See docs/superpowers/
+// specs/2026-04-20-aethersystems-net-checkout-wiring-design.md.
+//
+// Legacy fallback: if STRIPE_PRICE_AETHER_CLOUD_{TIER} is unset we fall
+// back to the older STRIPE_PRICE_{TIER} name so an existing deploy keeps
+// working until the operator renames env vars.
 export function priceIdForTier(key: Exclude<TierKey, "free">): string {
-  switch (key) {
-    case "solo": return process.env.STRIPE_PRICE_SOLO ?? "";
-    case "pro":  return process.env.STRIPE_PRICE_PRO  ?? "";
-    case "team": return process.env.STRIPE_PRICE_TEAM ?? "";
+  const envByTier = {
+    solo: ["STRIPE_PRICE_AETHER_CLOUD_SOLO", "STRIPE_PRICE_SOLO"],
+    pro:  ["STRIPE_PRICE_AETHER_CLOUD_PRO",  "STRIPE_PRICE_PRO"],
+    team: ["STRIPE_PRICE_AETHER_CLOUD_TEAM", "STRIPE_PRICE_TEAM"],
+  } as const;
+  for (const name of envByTier[key]) {
+    const v = process.env[name];
+    if (v) return v;
   }
+  return "";
 }
