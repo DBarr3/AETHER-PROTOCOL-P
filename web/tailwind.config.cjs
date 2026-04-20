@@ -1,0 +1,66 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./index.html",
+    "./node_modules/@relume_io/relume-ui/dist/**/*.{js,ts,jsx,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  presets: [require("@relume_io/relume-tailwind")],
+  theme: {
+    extend: {
+      colors: {
+        aether: {
+          bg: "#040507",
+          surface: "#0a0c10",
+          raised: "#111418",
+          border: "#1a1f2e",
+          text: "#e8e6e0",
+          dim: "#9ca3af",
+          muted: "#6b7280",
+          cyan: "#00d4ff",
+          "cyan-soft": "#06b6d4",
+          gold: "#d4a017",
+          red: "#e84040",
+          green: "#00ff88",
+        },
+        "background-primary": "#040507",
+        "background-secondary": "#0a0c10",
+        "background-tertiary": "#111418",
+        "background-alternative": "#0a0c10",
+        "neutral-white": "#e8e6e0",
+        "neutral-lightest": "#e8e6e0",
+        "neutral-lighter": "#c9c7c0",
+        "neutral-light": "#9ca3af",
+        "neutral-darker": "#1a1f2e",
+        "neutral-darkest": "#040507",
+        "neutral-black": "#040507",
+        "text-primary": "#e8e6e0",
+        "text-secondary": "#9ca3af",
+        "text-tertiary": "#6b7280",
+        "text-alternate": "#040507",
+        "text-alternative": "#e8e6e0",
+        "border-primary": "#1a1f2e",
+        "border-secondary": "#111418",
+        "border-alternate": "rgba(0,212,255,0.28)",
+        "scheme-background": "#040507",
+        "scheme-border": "#1a1f2e",
+        "scheme-text": "#e8e6e0",
+        "scheme-accent": "#00d4ff",
+      },
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+        display: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+      },
+      letterSpacing: {
+        brand: "0.08em",
+      },
+      boxShadow: {
+        "glow-cyan":
+          "0 0 24px rgba(0,212,255,0.35), 0 0 1px rgba(0,212,255,0.6) inset",
+        "glow-soft": "0 0 60px rgba(0,212,255,0.18)",
+      },
+    },
+  },
+};

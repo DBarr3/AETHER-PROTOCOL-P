@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --aether-bg: #040507;
+  --aether-surface: #0a0c10;
+  --aether-raised: #111418;
+  --aether-border: #1a1f2e;
+  --aether-text: #e8e6e0;
+  --aether-dim: #9ca3af;
+  --aether-muted: #6b7280;
+  --aether-cyan: #00d4ff;
+  --aether-cyan-soft: #06b6d4;
+  --aether-gold: #d4a017;
+  --aether-red: #e84040;
+  --aether-green: #00ff88;
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--aether-bg);
+  color: var(--aether-text);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+body {
+  min-height: 100vh;
+  position: relative;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--aether-text);
+}
+
+.font-display,
+.display {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  color: var(--aether-cyan);
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(0, 212, 255, 0.35);
+  color: #ffffff;
+}
+
+/* Relume preset overrides — Relume ships a light theme; push it dark.
+   Using body-prefixed selectors for specificity instead of !important. */
+body [class*="bg-background-primary"],
+body .bg-background-primary {
+  background-color: var(--aether-bg);
+}
+body [class*="bg-background-secondary"],
+body .bg-background-secondary {
+  background-color: var(--aether-surface);
+}
+body [class*="bg-background-tertiary"],
+body .bg-background-tertiary {
+  background-color: var(--aether-raised);
+}
+body [class*="bg-background-alternative"],
+body .bg-background-alternative {
+  background-color: var(--aether-surface);
+}
+body [class*="bg-neutral-white"],
+body .bg-neutral-white {
+  background-color: var(--aether-surface);
+}
+body [class*="bg-neutral-lightest"],
+body .bg-neutral-lightest {
+  background-color: var(--aether-raised);
+}
+body [class*="text-text-primary"],
+body .text-text-primary {
+  color: var(--aether-text);
+}
+body [class*="text-text-secondary"],
+body .text-text-secondary {
+  color: var(--aether-dim);
+}
+body [class*="text-text-alternate"],
+body .text-text-alternate {
+  color: var(--aether-bg);
+}
+body [class*="border-border-primary"],
+body .border-border-primary {
+  border-color: var(--aether-border);
+}
+body [class*="border-border-secondary"],
+body .border-border-secondary {
+  border-color: var(--aether-raised);
+}
+body [class*="border-border-alternate"],
+body .border-border-alternate {
+  border-color: rgba(0, 212, 255, 0.28);
+}
+
+/* Force black-on-hover buttons to read correctly on dark */
+button,
+.button {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: 0.04em;
+}
+
+/* Make Relume's default svg icon color use text primary */
+svg {
+  color: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--aether-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--aether-border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.35);
+}
+
+/* Atmosphere glow spheres keyframes */
+@keyframes aether-drift-1 {
+  0%, 100% { transform: translate(-10%, -8%) scale(1); }
+  50% { transform: translate(12%, 6%) scale(1.1); }
+}
+@keyframes aether-drift-2 {
+  0%, 100% { transform: translate(15%, 20%) scale(1.05); }
+  50% { transform: translate(-8%, -4%) scale(0.95); }
+}
+@keyframes aether-drift-3 {
+  0%, 100% { transform: translate(0%, 30%) scale(1); }
+  50% { transform: translate(-12%, 2%) scale(1.08); }
+}
+
+@keyframes aether-scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Terminal block */
+.aether-terminal {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  background: #05070a;
+  border: 1px solid var(--aether-border);
+  box-shadow: 0 0 60px rgba(0, 212, 255, 0.08),
+    0 0 1px rgba(0, 212, 255, 0.4) inset;
+  color: var(--aether-text);
+}

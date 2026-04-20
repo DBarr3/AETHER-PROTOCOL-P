@@ -1,0 +1,3 @@
+# SPA fallback — every non-asset path resolves to index.html so react-router
+# can handle it client-side (prevents 404 on hard-refresh of /pricing, /demo, etc.).
+/*    /index.html    200
