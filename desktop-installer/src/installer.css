@@ -289,14 +289,6 @@ body:has(#progressShell:not([hidden])) .stage { width: min(360px, 38vh); }
   flex-shrink: 0;
 }
 
-.disclosure-note {
-  margin: -2px 0 0 27px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--faint);
-  letter-spacing: 0.005em;
-}
-
 .included-details {
   margin: 0 0 0 27px;
   font-size: 12px;
