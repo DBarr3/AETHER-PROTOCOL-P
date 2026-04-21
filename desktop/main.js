@@ -14,8 +14,6 @@ const http  = require('http');
 const fs    = require('fs');
 const os    = require('os');
 
-const keyManager = require('./key-manager');
-
 // Cloudflare provides valid SSL — reject all cert errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   callback(false);
@@ -396,7 +394,6 @@ function installCspHeader() {
 
 app.whenReady().then(async () => {
   installCspHeader();
-  keyManager.hydrate();
 
   // First-run: show the branded installer IMMEDIATELY. Do NOT block on
   // backend probing — the installer UX is fully offline-capable, and a
@@ -538,12 +535,6 @@ ipcMain.handle('show-in-explorer', async (_e, filePath) => {
     return { success: true };
   } catch (err) { return { success: false, error: err.message }; }
 });
-
-// ── IPC: Key management ──────────────────────────────
-ipcMain.handle('keys:set', (_e, name, value) => keyManager.setKey(name, value));
-ipcMain.handle('keys:has', (_e, name) => keyManager.hasKey(name));
-ipcMain.handle('keys:delete', (_e, name) => keyManager.deleteKey(name));
-ipcMain.handle('keys:validate', () => keyManager.validate());
 
 // ── IPC: Local File Plan Execution ───────────────────
 // Executes an action-plan produced by the agent.

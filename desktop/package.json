@@ -42,7 +42,6 @@
     "files": [
       "main.js",
       "preload.js",
-      "key-manager.js",
       "auth-store.js",
       "analysis-cache.js",
       "pages/**/*",

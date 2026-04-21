@@ -199,8 +199,12 @@ class ProjectOrchestrator:
                         return
 
     async def _execute_task(self, task, user_id: str, api_key: str, context_injection: str) -> str:
-        """Call Anthropic with the task prompt and optional MCP server."""
-        import httpx
+        """Call Anthropic via TokenAccountant with the task prompt and optional MCP server.
+
+        api_key is retained in the signature for back-compat with callers but is
+        unused — TokenAccountant reads ANTHROPIC_API_KEY from env directly.
+        """
+        from lib import token_accountant
 
         agent = self.router.get_agent(user_id, task.agent_id) if task.agent_id else None
 
@@ -229,72 +233,44 @@ class ProjectOrchestrator:
             if url and transport in ("http", "sse"):
                 mcp_servers.append({"type": "url", "url": url, "name": agent.get("server", "")})
 
-        payload: dict = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 3000,
-            "system": system,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        if mcp_servers:
-            payload["mcp_servers"] = mcp_servers
-            headers["anthropic-beta"] = "mcp-client-2025-04-04"
-
-        async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        return "".join(
-            b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
-        ).strip()
+        resp = await token_accountant.call(
+            model="sonnet",
+            messages=[{"role": "user", "content": prompt}],
+            user_id=None,
+            task_id=task.task_id,
+            system=system,
+            mcp_servers=mcp_servers or None,
+            max_tokens=3000,
+        )
+        return resp.text
 
     async def _validate_output(self, output: str, task, api_key: str) -> tuple:
-        """QOPC validation via claude-haiku. Returns (score 0-1, feedback)."""
-        import httpx
+        """QOPC validation via Haiku. Returns (score 0-1, feedback).
+
+        api_key retained for signature compat; TokenAccountant reads env directly.
+        """
+        from lib import token_accountant
 
         if not output.strip():
             return 0.0, "Empty output"
 
         criteria = "\n".join(f"- {c}" for c in task.acceptance_criteria) or "- Task completed"
         prompt = (
-            f"You are a strict quality validator. Score this task output 0.0–1.0.\n\n"
+            f"You are a strict quality validator. Score this task output 0.0-1.0.\n\n"
             f"Task: {task.title}\nCriteria:\n{criteria}\n\n"
             f"Output:\n{output[:2000]}\n\n"
             'Respond ONLY with valid JSON: {"score": 0.85, "feedback": "brief reason"}'
         )
 
-        payload = {
-            "model": "claude-haiku-4-20250514",
-            "max_tokens": 150,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers=headers,
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-            text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
-            m = re.search(r'\{[^}]+\}', text)
+            resp = await token_accountant.call(
+                model="haiku",
+                messages=[{"role": "user", "content": prompt}],
+                user_id=None,
+                task_id=task.task_id,
+                max_tokens=150,
+            )
+            m = re.search(r'\{[^}]+\}', resp.text)
             if m:
                 result = json.loads(m.group())
                 return float(result.get("score", 0.8)), result.get("feedback", "")

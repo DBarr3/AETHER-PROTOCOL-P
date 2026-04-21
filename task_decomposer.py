@@ -187,33 +187,23 @@ Rules:
                 dfs(t.task_id)
 
     async def _call_anthropic(self, goal: str, api_key: str) -> list:
-        """Call Anthropic and return the parsed task list."""
-        import httpx
+        """Call Anthropic via TokenAccountant and return the parsed task list.
 
-        payload = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 2000,
-            "system": self.DECOMPOSE_SYSTEM,
-            "messages": [{"role": "user", "content": f"Goal: {goal}"}],
-        }
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
+        api_key retained for signature compat; TokenAccountant reads env directly.
+        Decomposer uses Sonnet today; will escalate to Opus for heavy QOPC loads
+        in Stage D (Router).
+        """
+        from lib import token_accountant
 
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        resp = await token_accountant.call(
+            model="sonnet",
+            messages=[{"role": "user", "content": f"Goal: {goal}"}],
+            user_id=None,
+            system=self.DECOMPOSE_SYSTEM,
+            max_tokens=2000,
+        )
 
-        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
-
-        match = re.search(r'\{[\s\S]*\}', text)
+        match = re.search(r'\{[\s\S]*\}', resp.text)
         if not match:
             log.warning("No JSON in decomposer response — using fallback tasks")
             return self._default_tasks(goal)

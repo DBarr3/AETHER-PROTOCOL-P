@@ -5,6 +5,73 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.aethersystems.net https://license.aethersystems.net https://aethersecurity.net; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';">
 <title>AetherCloud-L</title>
+
+<!-- UVT Meter v3 (Stage G) — droplet trigger + 152px popover tile between
+     Plan/Bypass toggles and the input. Reads GET /account/usage and
+     observes POST /agent/run round-trips via window.UvtMeter.ingest*. -->
+<link rel="stylesheet" href="uvt-meter/uvt-meter.css">
+<script src="uvt-meter/uvt-meter.js" defer></script>
+<script>
+  // UVT meter mount — runs once on DOM ready. Self-contained so the
+  // legacy dashboard init doesn't need to know about it.
+  //
+  // Stage J gate: before mounting the meter we hit /healthz/flags on the
+  // same apiBase to check AETHER_UVT_ENABLED. When the backend says UVT
+  // is OFF, we leave #uvt-host empty and the chatbar renders without the
+  // droplet. /account/usage would 404 in that state anyway — this just
+  // avoids showing an empty meter that spams 404s in the console during
+  // the staged rollout.
+  (function () {
+    async function mount() {
+      const host = document.getElementById('uvt-host');
+      if (!host || !window.UvtMeter) return;
+      const apiBase = (window.aether && window.aether.apiBase)
+                   || 'https://api.aethersystems.net/cloud';
+
+      // Flag probe — no auth required, sub-100ms in normal conditions.
+      // Failures fall through to "don't mount" — safer default than
+      // rendering a broken meter.
+      try {
+        const resp = await fetch(`${apiBase}/healthz/flags`, { method: 'GET' });
+        if (!resp.ok) {
+          console.info('[uvt-meter] flag probe failed — skipping mount');
+          return;
+        }
+        const flags = await resp.json();
+        // Global-off + no rollout AND no overrides = nobody gets UVT.
+        // Per-user overrides + partial rollout mean the backend's
+        // /agent/run will decide per-call anyway, so we mount whenever
+        // ANY path to UVT is open (rollout>0, overrides>0, or global on).
+        const globalOn = String(flags.AETHER_UVT_ENABLED).toLowerCase() === 'true';
+        const rolloutOn = Number(flags.AETHER_UVT_ROLLOUT_PCT || 0) > 0;
+        const hasOverrides = Number(flags.override_count || 0) > 0;
+        if (!(globalOn || rolloutOn || hasOverrides)) {
+          console.info('[uvt-meter] UVT disabled for all users — not mounting');
+          return;
+        }
+      } catch (e) {
+        console.info('[uvt-meter] flag probe threw — skipping mount:', e);
+        return;
+      }
+
+      // Flag says some users get UVT; proceed with mount.
+      const getToken = async () => {
+        try {
+          const a = await window.aetherAPI?.authGet?.();
+          return a && a.sessionToken ? a.sessionToken : null;
+        } catch (_) { return null; }
+      };
+      try { window.UvtMeter.mount(host, { apiBase, getToken }); }
+      catch (e) { console.warn('[uvt-meter] mount failed:', e); }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', mount);
+    } else {
+      mount();
+    }
+  })();
+</script>
+
 <!-- DOMPurify — agent/server-authored HTML is routed through window.safeHTML()
      before reaching innerHTML. Closes audit finding H3 (renderMarkdown /
      agent-JSON interpolation XSS sinks). Must load before any inline script. -->
@@ -5586,6 +5653,10 @@
         </div>
         <span id="mcp-agent-count" style="display:none"></span>
       </div>
+      <!-- UVT Meter v3 droplet mount point. Sits between the toggles/mcp-bar
+           and the input. .input-bar already has position: relative so the
+           popover anchors correctly (see .input-bar rule above). -->
+      <span id="uvt-host" class="uvt-host"></span>
       <input type="text" id="chat-input" placeholder="Ask AetherCloud anything..."
              onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendMessage()">
       <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>

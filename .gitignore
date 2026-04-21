@@ -98,3 +98,14 @@ desktop/node_modules/
 # Ed25519 manifest signing private keys — NEVER commit.
 *.priv.bin
 !**/*-test.pub.bin
+
+# Stage I harness — transient runs are noisy; only the committed samples
+# (sample-*.md) and the .gitkeep belong in git.
+reports/*
+!reports/.gitkeep
+!reports/sample-*.md
+
+# Stage J — production env + deploy artifacts never belong in git.
+# deploy/env.example IS committed (template, no secrets); everything
+# else with a .env prefix/suffix is gitignored by the rules above.
+.last-deployed-sha
