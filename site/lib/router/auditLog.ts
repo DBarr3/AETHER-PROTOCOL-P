@@ -44,6 +44,13 @@ export function resetAuditWriter(): void {
   _writer = noopWriter;
 }
 
+// Exposes whether the active writer is still the default (noop) writer.
+// Used by startupAssertions.assertRouterWired() to fail-closed in
+// production when boot.ts could not install the Supabase-backed writer.
+export function isAuditWriterDefault(): boolean {
+  return _writer === noopWriter;
+}
+
 export function setAuditErrorHandler(h: (err: unknown) => void): void {
   _errorHandler = h;
 }

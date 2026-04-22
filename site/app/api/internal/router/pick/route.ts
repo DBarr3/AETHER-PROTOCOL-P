@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { pick } from "@/lib/router/deterministic";
 import { RouterGateError } from "@/lib/router/errors";
+import "@/lib/router/boot";
+import { assertRouterWired } from "@/lib/router/startupAssertions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,8 @@ function isValidServiceToken(header: string | null): boolean {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  assertRouterWired();
+
   if (!isValidServiceToken(req.headers.get("x-aether-internal"))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
