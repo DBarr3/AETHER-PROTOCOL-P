@@ -333,3 +333,116 @@ def _append_to_dlq(event: dict[str, Any]) -> None:
             f.write(json.dumps(event) + "\n")
     except Exception as exc:  # noqa: BLE001 — nothing actionable if DLQ write fails
         log.error("TokenAccountant: DLQ append failed (%s). Usage event LOST: %s", exc, event)
+        return
+
+    # ─── DLQ size gauge + threshold alert (Red Team #2 H3) ────────────────
+    # Emit a gauge on every enqueue + a CRITICAL line tagged DLQ_OVER_THRESHOLD
+    # once the queue crosses AETHER_DLQ_ALERT_THRESHOLD (default 50). Ops can
+    # grep journalctl for the tag; Prometheus scrapes log_messages_total
+    # filtered by the tag. Stage K will replace this with a proper replay
+    # cron (see deploy/replay_dlq.py for the manual path that exists today).
+    try:
+        line_count = 0
+        with path.open("r", encoding="utf-8") as f:
+            for _ in f:
+                line_count += 1
+        log.info("dlq.size_gauge", extra={
+            "event": "dlq.size_gauge",
+            "dlq_line_count": line_count,
+            "dlq_path": str(path),
+        })
+        threshold = int(os.environ.get("AETHER_DLQ_ALERT_THRESHOLD", "50"))
+        if line_count >= threshold:
+            log.critical(
+                "DLQ_OVER_THRESHOLD: usage_dlq has %d entries (>= %d). "
+                "Billing ledger is drifting. Run deploy/replay_dlq.py to "
+                "re-fire rpc_record_usage against these rows before any "
+                "reach the monthly boundary.",
+                line_count, threshold,
+            )
+    except Exception as exc:  # noqa: BLE001 — gauge is best-effort; never fail the write
+        log.warning("TokenAccountant: DLQ size-gauge read failed (%s)", exc)
+
+
+# ─── Public helpers for non-router call sites ───────────────────────────
+#
+# Red Team #2 Critical C1: the three legacy call sites
+#     agent/claude_agent.py
+#     agent/hardened_claude_agent.py
+#     mcp_worker/agent_executor.py
+# used to call Anthropic directly, bypassing every invariant this module
+# enforces. They're now required to route through `call()` (async) or
+# `call_sync()` (the sync bridge below). Do NOT add a fourth helper that
+# hits Anthropic — extend this module instead.
+
+
+def resolve_model_key(raw: str) -> model_registry.ModelKey:
+    """Map a raw model identifier (env-config string, Anthropic snapshot,
+    logical name) to the ModelRegistry short key.
+
+    Used by call sites that carry a legacy `CLAUDE_MODEL`-style env string
+    and need to feed it into `call()`. If the mapping is ambiguous we
+    default to 'sonnet' — safer than raising in a hot path.
+    """
+    if not raw:
+        return "sonnet"
+    r = str(raw).lower()
+    if "haiku" in r:
+        return "haiku"
+    if "opus" in r:
+        return "opus"
+    if "sonnet" in r:
+        return "sonnet"
+    if "gpt" in r:
+        return "gpt5"
+    if "gemma" in r:
+        return "gemma"
+    return "sonnet"
+
+
+def call_sync(
+    *,
+    model: model_registry.ModelKey,
+    messages: list[dict],
+    user_id: Optional[str] = None,
+    task_id: Optional[str] = None,
+    system: Optional[str] = None,
+    tools: Optional[list[dict]] = None,
+    mcp_servers: Optional[list[dict]] = None,
+    max_tokens: int = 2048,
+    qopc_load: Optional[QopcLoad] = None,
+    supabase_client: Optional[Any] = None,
+) -> AnthropicResponse:
+    """Synchronous bridge around `call()` for legacy sync call sites.
+
+    Behavior:
+    - If no asyncio loop is running in the current thread: uses
+      asyncio.run() (creates a new loop, runs, closes).
+    - If a loop IS already running (e.g. this is called from within an
+      async handler): runs the coroutine on a dedicated thread via a
+      short-lived executor. This avoids the "cannot be called from a
+      running event loop" error while keeping the caller synchronous.
+
+    Never returns a fallback response — all errors propagate exactly as
+    the async version, including httpx.HTTPStatusError and RuntimeError.
+    """
+    coro_factory = lambda: call(
+        model=model, messages=messages, user_id=user_id, task_id=task_id,
+        system=system, tools=tools, mcp_servers=mcp_servers,
+        max_tokens=max_tokens, qopc_load=qopc_load,
+        supabase_client=supabase_client,
+    )
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop → safe to asyncio.run()
+        return asyncio.run(coro_factory())
+
+    # Running loop present → execute on a worker thread with its own loop.
+    import concurrent.futures as _cf
+
+    def _runner() -> AnthropicResponse:
+        return asyncio.run(coro_factory())
+
+    with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(_runner).result()

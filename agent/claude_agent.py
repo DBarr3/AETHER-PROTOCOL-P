@@ -8,10 +8,9 @@ Aether Systems LLC — Patent Pending
 
 import json
 import logging
+import sys
 from datetime import datetime
 from typing import Optional
-
-from anthropic import Anthropic
 
 from config.settings import (
     CLAUDE_API_KEY,
@@ -20,6 +19,18 @@ from config.settings import (
     AGENT_SYSTEM_PROMPT,
 )
 from config.agent_prompt import TASK_SUFFIXES, DAILY_PLAN_SUFFIX
+from lib import token_accountant
+
+# Red Team #2 C1: TokenAccountant is the SOLE Anthropic caller. This file
+# used to import `anthropic` directly; that bypassed UVT accounting, DLQ,
+# and usage_events. The assertion below catches any future regression at
+# import time — if someone adds `import anthropic` to this module, Python
+# will have loaded it into sys.modules before we run.
+assert "anthropic" not in sys.modules, (
+    "agent/claude_agent.py imported the `anthropic` package directly. "
+    "Route all Anthropic calls through lib.token_accountant.call / call_sync "
+    "— see Red Team #2 C1 in tests/security/redteam_modelrouter_report.md."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +65,41 @@ class AetherClaudeAgent:
                 "ANTHROPIC_API_KEY not set. Add to your .env file."
             )
 
-        self.client = Anthropic(api_key=self._api_key)
+        # No direct Anthropic client — TokenAccountant owns the HTTP hop,
+        # prompt caching, UVT accounting, and DLQ on failure. This module
+        # is now a thin adapter that builds prompts and calls call_sync().
         self.model = model or CLAUDE_MODEL
+        self._model_key = token_accountant.resolve_model_key(self.model)
         self.max_tokens = max_tokens or CLAUDE_MAX_TOKENS
         self.conversation_history: list[dict] = []
         self.system_prompt = AGENT_SYSTEM_PROMPT
-        logger.info("Claude agent initialized (model=%s)", self.model)
+        logger.info(
+            "Claude agent initialized (model=%s → key=%s, via TokenAccountant)",
+            self.model, self._model_key,
+        )
+
+    def _claude_call(
+        self,
+        *,
+        messages: list[dict],
+        system: Optional[str],
+        max_tokens: Optional[int] = None,
+    ):
+        """Route one Anthropic call through TokenAccountant.
+
+        Desktop-local agent — no Supabase user_id context, so usage is
+        unattributed (ledger write is skipped server-side). The Anthropic
+        HTTP call itself, prompt caching, and DLQ-on-error all still apply
+        via token_accountant.call_sync. See Red Team #2 C1 fix notes.
+        """
+        return token_accountant.call_sync(
+            model=self._model_key,
+            messages=messages,
+            system=system,
+            max_tokens=max_tokens or self.max_tokens,
+            user_id=None,
+            task_id=None,
+        )
 
     def analyze_file(
         self,
@@ -103,13 +143,12 @@ class AetherClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
 
@@ -154,13 +193,12 @@ class AetherClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=4096,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             results = json.loads(raw)
 
@@ -241,14 +279,14 @@ class AetherClaudeAgent:
             logger.debug("Planning intent detected — injecting DAILY_PLAN_SUFFIX")
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=active_system,
+            response = self._claude_call(
                 messages=self.conversation_history,
+                system=active_system,
+                max_tokens=self.max_tokens,
+
             )
 
-            reply = response.content[0].text.strip()
+            reply = response.text.strip()
             self.conversation_history.append({"role": "assistant", "content": reply})
 
             # Keep history bounded (last 20 turns)
@@ -304,8 +342,7 @@ Rules:
         """
         try:
             today = datetime.now().strftime("%Y-%m-%d")
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=2048,
                 system=self._PLANNER_SYSTEM,
                 messages=[
@@ -318,7 +355,7 @@ Rules:
                     }
                 ],
             )
-            return response.content[0].text.strip()
+            return response.text.strip()
         except Exception as e:
             logger.error("plan_day failed: %s", e)
             return f"Planner unavailable: {str(e)}"
@@ -363,13 +400,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=512,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
 
@@ -406,13 +442,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
         except Exception as e:
@@ -449,13 +484,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
         except Exception as e:
@@ -494,13 +528,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=4096,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
         except Exception as e:
@@ -534,13 +567,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
         except Exception as e:
@@ -577,13 +609,12 @@ Rules:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self.system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             return json.loads(raw)
         except Exception as e:
