@@ -134,3 +134,74 @@ async def test_policy_bypass_counter_increments_on_tripwire(adversarial_heavy):
     with pytest.raises(PlanExcludesOpusError):
         await r.route(user_id="u-1", tier="free", prompt="x")
     assert router.policy_bypass_by_gate["plan_excludes_opus"] == before + 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Red Team #2 H2 — the medium/free blind spot.
+#
+# The five HEAVY × tier tests above cover the "never escalate to Opus" half
+# of the invariant. They miss the other half: the architecture doc promises
+# "Free user tries a task → runs on Haiku (explicit tier baseline, not a
+# downgrade)" — which _pick_orchestrator violated by returning Sonnet on
+# medium classification for every tier, free included. The three tests
+# below fill that blind spot with explicit assertions on the baseline.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def classifier_returns(monkeypatch):
+    """Parameterized classifier for non-heavy invariant tests."""
+    from lib import qopc_bridge, token_accountant
+
+    def _set(load: str, confidence: float = 0.9):
+        classify = AsyncMock(return_value=QopcSignal(load=load, confidence=confidence, reason="TEST"))
+        monkeypatch.setattr(qopc_bridge, "classify", classify)
+        # Make token_accountant.call a no-op so the router's return value
+        # reflects the orchestrator_model choice without doing a real call.
+        call = AsyncMock(return_value=MagicMock(text="ok", uvt_consumed=0))
+        monkeypatch.setattr(token_accountant, "call", call)
+        return classify, call
+
+    return _set
+
+
+@pytest.mark.asyncio
+async def test_invariant_medium_free_returns_haiku(classifier_returns):
+    """Red Team #2 H2 core: free + medium MUST route to Haiku.
+
+    The architecture doc explicitly promises Haiku as the free-tier
+    baseline. Sonnet on medium for free users is a ~5× COGS margin
+    attack — this test freezes the post-fix behavior."""
+    classifier_returns("medium", 0.9)
+    r = Router(_supabase())
+    result = await r.route(user_id="u-free-1", tier="free", prompt="moderate task")
+    assert result.orchestrator_model == "haiku", (
+        "Free-tier baseline violation. See diagrams/docs_router_architecture.md "
+        "§'Philosophy — honest limits' and redteam_modelrouter_report.md H2."
+    )
+
+
+@pytest.mark.asyncio
+async def test_invariant_medium_solo_returns_sonnet(classifier_returns):
+    """Solo (and up) still get Sonnet on medium. The H2 fix is scoped
+    narrowly to free; this test guards against over-correction that
+    would break paid tiers."""
+    classifier_returns("medium", 0.9)
+    r = Router(_supabase())
+    result = await r.route(user_id="u-solo-1", tier="solo", prompt="moderate task")
+    assert result.orchestrator_model == "sonnet", (
+        "Paid tier regression — solo users should still get Sonnet on "
+        "medium-load tasks."
+    )
+
+
+@pytest.mark.asyncio
+async def test_invariant_light_free_returns_haiku(classifier_returns):
+    """Regression guard for the light case. This was already correct
+    before the H2 fix (light always → haiku) but wasn't covered by any
+    adversarial-invariant test. Making it explicit so any future
+    refactor can't break it silently."""
+    classifier_returns("light", 0.95)
+    r = Router(_supabase())
+    result = await r.route(user_id="u-free-2", tier="free", prompt="list files")
+    assert result.orchestrator_model == "haiku"
