@@ -33,13 +33,11 @@ describe("audit_writer.production_default — Supabase writer wiring at boot", (
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     const originalNodeEnv = process.env.NODE_ENV;
-    // vitest defaults to NODE_ENV='test'; flip to production for this one
-    // assertion using Object.defineProperty because NODE_ENV is read-only
-    // when Next.js globals are present.
-    Object.defineProperty(process.env, "NODE_ENV", {
-      value: "production",
-      configurable: true,
-    });
+    // vitest defaults NODE_ENV='test'; flip to 'production' via direct
+    // assignment (Object.defineProperty is rejected by the process.env
+    // proxy — "only accepts a configurable, writable, and enumerable
+    // data descriptor").
+    process.env.NODE_ENV = "production";
 
     try {
       const { assertRouterWired, RouterBootFailedError } = await import(
@@ -47,10 +45,7 @@ describe("audit_writer.production_default — Supabase writer wiring at boot", (
       );
       expect(() => assertRouterWired()).toThrow(RouterBootFailedError);
     } finally {
-      Object.defineProperty(process.env, "NODE_ENV", {
-        value: originalNodeEnv,
-        configurable: true,
-      });
+      process.env.NODE_ENV = originalNodeEnv;
     }
   });
 
