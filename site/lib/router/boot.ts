@@ -18,8 +18,9 @@ import {
   makeSupabaseAuditWriter,
   setAuditWriter,
 } from "./auditLog";
-import { setOpusPctMtdResolver } from "./gateInputs";
+import { setOpusPctMtdResolver, setUvtBalanceResolver } from "./gateInputs";
 import { getOpusPctMtd } from "./helpers/getOpusPctMtd";
+import { getUvtBalance } from "@/lib/getUvtBalance";
 
 let _attempted = false;
 let _succeeded = false;
@@ -44,6 +45,7 @@ export function ensureRouterBooted(): void {
     });
     setAuditWriter(makeSupabaseAuditWriter(supabase));
     setOpusPctMtdResolver((userId) => getOpusPctMtd(userId, { supabase }));
+    setUvtBalanceResolver((userId) => getUvtBalance(userId, { supabase }));
     _succeeded = true;
   } catch (err) {
     const name = err instanceof Error ? err.name : "unknown";

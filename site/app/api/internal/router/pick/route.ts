@@ -3,7 +3,10 @@ import { pick } from "@/lib/router/deterministic";
 import { RouterGateError } from "@/lib/router/errors";
 import "@/lib/router/boot";
 import { assertRouterWired } from "@/lib/router/startupAssertions";
-import { resolveOpusPctMtd } from "@/lib/router/gateInputs";
+import {
+  resolveOpusPctMtd,
+  resolveUvtBalance,
+} from "@/lib/router/gateInputs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +16,10 @@ export const dynamic = "force-dynamic";
 // In-flight callers may still send them; the route strips them before
 // Zod validation so `.strict()` does not reject. The values are then
 // ignored — resolvers are the only source of truth.
-const LEGACY_STRIPPED_BODY_KEYS: readonly string[] = ["opusPctMtd"];
+const LEGACY_STRIPPED_BODY_KEYS: readonly string[] = [
+  "opusPctMtd",
+  "uvtBalance",
+];
 
 function stripLegacyKeys(obj: unknown): unknown {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
@@ -41,7 +47,6 @@ const RoutingContextSchema = z
     estimatedInputTokens: z.number().int().nonnegative().finite(),
     estimatedOutputTokens: z.number().int().nonnegative().finite(),
     activeConcurrentTasks: z.number().int().nonnegative().finite(),
-    uvtBalance: z.number().int().nonnegative().finite(),
     requestId: z.string().min(1).max(256),
     traceId: z.string().min(1).max(256),
   })
@@ -86,10 +91,13 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const opusPctMtd = await resolveOpusPctMtd(parse.data.userId);
+  const [opusPctMtd, uvtBalance] = await Promise.all([
+    resolveOpusPctMtd(parse.data.userId),
+    resolveUvtBalance(parse.data.userId),
+  ]);
 
   try {
-    const decision = pick({ ...parse.data, opusPctMtd });
+    const decision = pick({ ...parse.data, opusPctMtd, uvtBalance });
     return Response.json(decision, { status: 200 });
   } catch (e) {
     if (e instanceof RouterGateError) {

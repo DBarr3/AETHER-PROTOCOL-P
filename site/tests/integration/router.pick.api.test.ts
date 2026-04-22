@@ -8,6 +8,7 @@ import {
 import {
   resetGateInputsForTests,
   setOpusPctMtdResolver,
+  setUvtBalanceResolver,
 } from "@/lib/router/gateInputs";
 
 const GOOD = "test-service-token-xyz";
@@ -24,9 +25,9 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
-// opusPctMtd is intentionally absent — C1 made it server-resolved. Tests
-// that need a non-zero MTD value install a resolver stub via
-// setOpusPctMtdResolver(async () => 0.15).
+// opusPctMtd (C1) and uvtBalance (C2) are intentionally absent — both
+// are server-resolved. Tests that need specific gate trips install
+// resolver stubs via setOpusPctMtdResolver / setUvtBalanceResolver.
 const validCtx = {
   userId: "00000000-0000-0000-0000-000000000001",
   tier: "pro",
@@ -34,7 +35,6 @@ const validCtx = {
   estimatedInputTokens: 100,
   estimatedOutputTokens: 100,
   activeConcurrentTasks: 0,
-  uvtBalance: 1_000_000,
   requestId: "req_integ_1",
   traceId: "trace_integ_1",
 };
@@ -131,12 +131,14 @@ describe("POST /api/internal/router/pick", () => {
   });
 
   it("402 on insufficient UVT balance", async () => {
+    // uvtBalance is server-resolved (C2). Stub the resolver low so the
+    // gate fires; the body value (if any) is stripped pre-Zod.
+    setUvtBalanceResolver(async () => 10);
     const res = await POST(
       req({
         ...validCtx,
         estimatedInputTokens: 5000,
         estimatedOutputTokens: 5000,
-        uvtBalance: 10,
       }),
     );
     expect(res.status).toBe(402);
