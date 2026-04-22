@@ -217,35 +217,16 @@ class PipelineExecutor:
             "Complete the task autonomously and respond concisely."
         )
 
-        payload: dict = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1500,
-            "system": system,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        if mcp_servers:
-            payload["mcp_servers"] = mcp_servers
-            headers["anthropic-beta"] = "mcp-client-2025-04-04"
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        text = ""
-        for block in data.get("content", []):
-            if block.get("type") == "text":
-                text += block.get("text", "")
-        return text.strip()
+        from lib import token_accountant
+        resp = await token_accountant.call(
+            model="sonnet",
+            messages=[{"role": "user", "content": prompt}],
+            user_id=None,
+            system=system,
+            mcp_servers=mcp_servers or None,
+            max_tokens=1500,
+        )
+        return resp.text
 
 
 async def _load_agent_key_for_pipeline(user_id: str, agent_id: str) -> Optional[str]:

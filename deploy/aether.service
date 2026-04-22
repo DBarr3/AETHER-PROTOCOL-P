@@ -1,0 +1,52 @@
+[Unit]
+Description=AetherCloud API (FastAPI on VPS2)
+Documentation=https://github.com/DBarr3/AETHER-CLOUD/blob/main/deploy/vps2-runbook.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aether
+Group=aether
+WorkingDirectory=/opt/aether
+EnvironmentFile=/opt/aether/.env
+
+# Uvicorn, 2 workers behind nginx on 127.0.0.1. Bind loopback only —
+# TLS termination + rate limiting happen in nginx. --proxy-headers
+# tells FastAPI to trust X-Forwarded-* from nginx so get_session_token
+# sees real client IPs for slowapi.
+ExecStart=/opt/aether/.venv/bin/uvicorn api_server:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --proxy-headers \
+    --forwarded-allow-ips=127.0.0.1
+
+# Graceful shutdown: SIGTERM first, SIGKILL after 20s if workers hang.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Restart on crash, but cap the rate so a boot loop doesn't burn the
+# disk with journal entries.
+Restart=on-failure
+RestartSec=3
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Send stdout/stderr to journald. `journalctl -u aether -f` tails live.
+StandardOutput=journal
+StandardError=journal
+
+# Hardening — prevent the service from writing outside its expected roots.
+# Keeps /opt/aether writable for deploy.sh's `git reset --hard`; writes
+# anywhere else get EROFS. Comment these out if you need to debug a
+# PermissionError that's actually a config issue.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/aether /var/lib/aethercloud
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

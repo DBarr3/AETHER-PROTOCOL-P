@@ -3,7 +3,7 @@
  * Aether Systems LLC · Patent Pending
  *
  * Two bridges:
- *   window.aether    — Electron IPC (navigation, window controls, keys)
+ *   window.aether    — Electron IPC (navigation, window controls, vault, cache)
  *   window.aetherAPI — VPS HTTP client (routes through VPS1 Ghost Proxy)
  */
 
@@ -32,12 +32,6 @@ contextBridge.exposeInMainWorld('aether', {
   scanDirectory:  (dirPath, depth) => ipcRenderer.invoke('scan-directory', dirPath, depth || 2),
   readFilePreview: (filePath, maxLines) => ipcRenderer.invoke('read-file-preview', filePath, maxLines || 80),
   readDirectoryContext: (dirPath, maxFiles) => ipcRenderer.invoke('read-directory-context', dirPath, maxFiles || 20),
-  keys: {
-    set:      (name, value) => ipcRenderer.invoke('keys:set', name, value),
-    has:      (name)        => ipcRenderer.invoke('keys:has', name),
-    delete:   (name)        => ipcRenderer.invoke('keys:delete', name),
-    validate: ()            => ipcRenderer.invoke('keys:validate'),
-  },
   vault: {
     hasAccess:     () => ipcRenderer.invoke('vault:hasAccess'),
     getPath:       () => ipcRenderer.invoke('vault:getPath'),

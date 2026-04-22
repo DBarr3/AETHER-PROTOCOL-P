@@ -361,6 +361,25 @@ async def lifespan(application: FastAPI):
     _proj_routes.ctx_manager  = _ctx_manager
     _proj_routes.orchestrator = _orchestrator
 
+    # ── UVT stack wiring (Stage F) ──────────────────────────────
+    # PricingGuard + Router + /agent/run + /account/usage + /account/overage.
+    # All billing flows read from public.plans / uvt_balances / usage_events
+    # via the service-role supabase client (RLS bypass). If either env var is
+    # unset we leave the routes disabled rather than crash boot — lets local
+    # dev run without Supabase provisioned.
+    try:
+        from lib import uvt_routes as _uvt_routes
+        from lib import health_routes as _health_routes
+        from lib.router import Router as _Router
+        from lib.license_validation import get_supabase_client
+        _sb = get_supabase_client()
+        _uvt_routes.supabase_client = _sb
+        _uvt_routes.router_instance = _Router(_sb)
+        _health_routes.supabase_client = _sb   # Stage J deep healthcheck
+        log.info("UVT stack initialized (PricingGuard + Router + /agent/run)")
+    except Exception as _uvt_exc:  # noqa: BLE001 — any failure here should NOT block boot
+        log.warning("UVT stack init failed — /agent/run will return 503: %s", _uvt_exc)
+
     yield
 
 # Introspection endpoints (/docs, /redoc, /openapi.json) are a route map
@@ -428,6 +447,14 @@ app.add_middleware(
 
 # Project execution router
 app.include_router(project_router)
+
+# UVT billable entrypoint + account endpoints (Stage F)
+from lib.uvt_routes import uvt_router  # noqa: E402 — must come after app init
+app.include_router(uvt_router)
+
+# Health endpoints (Stage J) — liveness, deep, flag-snapshot
+from lib.health_routes import health_router  # noqa: E402
+app.include_router(health_router)
 
 
 # ═══════════════════════════════════════════════════
@@ -1706,10 +1733,11 @@ BROWSER_TOOL_NAMES = {"browser_navigate", "browser_interact", "browser_snapshot"
 
 async def _process_browser_tool_loop(
     data: dict,
-    payload: dict,
-    headers: dict,
-    api_key: str,
-    browser_tools: list,
+    messages: list,
+    system: str | None,
+    tools: list | None,
+    mcp_servers: list | None,
+    max_tokens: int,
     browser_session_id: str | None,
     credential_token: str | None,
     response_text_parts: list,
@@ -1722,9 +1750,12 @@ async def _process_browser_tool_loop(
     aetherbrowser_client and feed the results back in a tool-use loop.
     Returns the final API response (which may be the original if no
     browser tools were used).
+
+    Every continuation call in the loop routes through TokenAccountant so
+    prompt caching + usage accounting apply uniformly.
     """
-    import httpx as _httpx
     from agent import aetherbrowser_client as _browser
+    from lib import token_accountant
 
     max_iterations = 25  # safety cap on tool-use loops
 
@@ -1804,22 +1835,22 @@ async def _process_browser_tool_loop(
             })
 
         # Feed tool results back to Claude for the next turn
-        messages = list(payload.get("messages", []))
-        messages.append({"role": "assistant", "content": data["content"]})
-        messages.append({"role": "user", "content": tool_results})
-
-        loop_payload = dict(payload)
-        loop_payload["messages"] = messages
+        loop_messages = list(messages)
+        loop_messages.append({"role": "assistant", "content": data["content"]})
+        loop_messages.append({"role": "user", "content": tool_results})
 
         try:
-            async with _httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers=headers,
-                    json=loop_payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            ta_resp = await token_accountant.call(
+                model="sonnet",
+                messages=loop_messages,
+                user_id=None,
+                system=system,
+                tools=tools,
+                mcp_servers=mcp_servers,
+                max_tokens=max_tokens,
+            )
+            data = ta_resp.raw
+            messages = loop_messages  # carry forward for next iteration
         except Exception as e:
             log.warning("Browser tool loop API call failed: %s", e)
             return data
@@ -1942,34 +1973,25 @@ async def agent_mcp_chat(
             if vps5_result and vps5_result.get("error"):
                 log.warning("VPS5 error — falling back to direct: %s", vps5_result["error"])
 
-            api_key = get_anthropic_key()
+            # UVT routing: every Anthropic call flows through TokenAccountant.
+            # Stage B: user_id=None (unattributed); PricingGuard in Stage E
+            # will thread the real UUID. Model key resolves to Sonnet by default
+            # until the QOPC router lands in Stage D.
+            from lib import token_accountant
             messages = _build_messages(req.conversation_history, req.query)
-            payload: dict = {
-                "model": os.environ.get("AETHER_AGENT_MODEL", "claude-sonnet-4-20250514"),
-                "max_tokens": req.max_tokens,
-                "system": system,
-                "messages": messages,
-            }
-            headers = {
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            }
-            if mcp_servers:
-                payload["mcp_servers"] = mcp_servers
-                headers["anthropic-beta"] = "mcp-client-2025-04-04"
-            if browser_tools:
-                payload.setdefault("tools", []).extend(browser_tools)
+            combined_tools = list(browser_tools) if browser_tools else None
 
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers=headers,
-                        json=payload,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
+                ta_resp = await token_accountant.call(
+                    model="sonnet",
+                    messages=messages,
+                    user_id=None,
+                    system=system,
+                    tools=combined_tools,
+                    mcp_servers=mcp_servers or None,
+                    max_tokens=req.max_tokens,
+                )
+                data = ta_resp.raw
             except Exception as e:
                 log.warning("MCP agent direct call failed: %s", e)
                 raise HTTPException(status_code=502, detail="Agent worker unavailable")
@@ -1979,7 +2001,8 @@ async def agent_mcp_chat(
             browser_credential_token = None  # set externally if auth needed
             try:
                 data = await _process_browser_tool_loop(
-                    data, payload, headers, api_key, browser_tools,
+                    data, messages, system, combined_tools, mcp_servers or None,
+                    req.max_tokens,
                     browser_session_id, browser_credential_token,
                     response_text_parts := [],
                     tools_used,
@@ -2781,7 +2804,7 @@ async def run_task(task_id: str, token: str = Depends(get_session_token)):
     if prompt_injection:
         task["_qopc_injection"] = prompt_injection
 
-    result = execute_task(task)
+    result = await execute_task(task)
 
     # Update store
     task["last_run"] = result["ran_at"]

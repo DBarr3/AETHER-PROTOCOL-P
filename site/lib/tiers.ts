@@ -11,6 +11,10 @@ export interface Tier {
   isFree: boolean;
 }
 
+// Display values below MUST match the seeded rows in public.plans in Supabase.
+// Source of truth at runtime is the plans table — this file is the static copy
+// the marketing page bundles. Migration: 20260421_uvt_accounting.sql.
+// Tier keys stay `free/solo/pro/team` in DB; `solo` displays as "Starter".
 export const TIERS: Tier[] = [
   {
     key: "free",
@@ -19,8 +23,9 @@ export const TIERS: Tier[] = [
     priceNumeric: 0,
     tagline: "Try AetherCloud — no card, no commitment.",
     features: [
-      "15,000 tokens/month",
+      "15,000 UVT/month",
       "1 connected MCP",
+      "Haiku orchestrator",
       "Community support",
     ],
     cta: "Get started free",
@@ -28,12 +33,13 @@ export const TIERS: Tier[] = [
   },
   {
     key: "solo",
-    name: "Solo",
+    name: "Starter",
     price: "$19.99/mo",
     priceNumeric: 19.99,
     tagline: "For individuals running daily agent workflows.",
     features: [
-      "500,000 tokens/month",
+      "400,000 UVT/month",
+      "Haiku → Sonnet escalation (QOPC)",
       "Unlimited MCPs",
       "Voice-match on Gmail",
       "Email support",
@@ -44,12 +50,13 @@ export const TIERS: Tier[] = [
   {
     key: "pro",
     name: "Pro",
-    price: "$49/mo",
-    priceNumeric: 49,
+    price: "$49.99/mo",
+    priceNumeric: 49.99,
     tagline: "For power users and small teams.",
     features: [
-      "2,000,000 tokens/month",
-      "Everything in Solo",
+      "1,500,000 UVT/month",
+      "Haiku → Sonnet → Opus (10% cap)",
+      "3 concurrent tasks",
       "Agent pipelines",
       "Priority support",
     ],
@@ -59,12 +66,13 @@ export const TIERS: Tier[] = [
   {
     key: "team",
     name: "Team",
-    price: "$89/mo",
-    priceNumeric: 89,
+    price: "$89.99/mo",
+    priceNumeric: 89.99,
     tagline: "For teams running shared automations.",
     features: [
-      "5,000,000 tokens/month",
-      "Everything in Pro",
+      "3,000,000 UVT/month",
+      "Opus up to 25% of quota",
+      "10 concurrent tasks",
       "Shared agent library",
       "Dedicated support",
     ],

@@ -141,7 +141,7 @@ def parse_schedule(natural_language: str) -> tuple[str, str]:
 # TASK EXECUTION
 # ================================================================
 
-def execute_task(task: dict, username: str = None) -> dict:
+async def execute_task(task: dict, username: str = None) -> dict:
     """
     Execute a scheduled task by calling the Claude API.
 
@@ -164,7 +164,7 @@ def execute_task(task: dict, username: str = None) -> dict:
                 "duration_ms": int((time.time() - start) * 1000),
             }
 
-        import httpx
+        from lib import token_accountant
 
         # Build prompt from natural_language + agent context + QOPC injection
         nl = task.get("natural_language", task.get("name", ""))
@@ -183,8 +183,6 @@ def execute_task(task: dict, username: str = None) -> dict:
             prompt_parts.append(f"Context: {user_context}")
         full_prompt = "\n\n".join(prompt_parts)
 
-        messages = [{"role": "user", "content": full_prompt}]
-
         # Build MCP servers list
         mcp_servers = task.get("mcp_servers", [])
         if agent_type == "email" and not any(s.get("name") == "gmail-mcp" for s in mcp_servers):
@@ -194,33 +192,16 @@ def execute_task(task: dict, username: str = None) -> dict:
                 "name": "gmail-mcp",
             })
 
-        payload = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1000,
-            "system": system_prompt,
-            "messages": messages,
-        }
-
-        headers = {
-            "x-api-key": CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(
-                "https://api.anthropic.com/v1/messages",
-                json=payload,
-                headers=headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        # Extract text from response content blocks
-        output_text = ""
-        for block in data.get("content", []):
-            if block.get("type") == "text":
-                output_text += block.get("text", "")
+        ta_resp = await token_accountant.call(
+            model="sonnet",
+            messages=[{"role": "user", "content": full_prompt}],
+            user_id=None,
+            task_id=task_id,
+            system=system_prompt,
+            mcp_servers=mcp_servers or None,
+            max_tokens=1000,
+        )
+        output_text = ta_resp.text
 
         preview = output_text[:500] if output_text else "(no output)"
         duration = int((time.time() - start) * 1000)
@@ -444,13 +425,18 @@ class TaskScheduler:
         return None
 
     def _run_task_job(self, task: dict):
-        """Job callback: execute the task and update the store."""
+        """Job callback: execute the task and update the store.
+        APScheduler calls us synchronously from a worker thread with no event
+        loop. execute_task is async (routes through TokenAccountant), so we
+        spin up a fresh loop here — safe because the thread has no existing loop.
+        """
+        import asyncio
         task_id = task.get("task_id")
         logger.info("Scheduler firing task: %s", task.get("name", task_id))
 
         from agent.task_scheduler import execute_task, load_task_store, save_task_store
 
-        result = execute_task(task)
+        result = asyncio.run(execute_task(task))
 
         # Update the persisted store
         store = load_task_store()

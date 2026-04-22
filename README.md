@@ -309,7 +309,6 @@ AETHER-CLOUD/
 |-- desktop/                   Electron app
 |   |-- main.js                Main process + backend health check
 |   |-- preload.js             IPC bridge (aether + aetherAPI)
-|   |-- key-manager.js         AES-encrypted key storage
 |   +-- pages/
 |       |-- login.html         Auth screen with protocol indicators
 |       +-- dashboard.html     Main UI (~6,400 lines)
