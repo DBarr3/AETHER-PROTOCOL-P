@@ -58,40 +58,62 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 
 
-def test_no_replay_function_in_lib() -> None:
-    """Grep lib/ for any function or module that could replay the DLQ."""
-    hits: list[tuple[Path, int, str]] = []
-    pat = re.compile(r"\b(replay|reprocess)_(dlq|usage|events?)\b", re.IGNORECASE)
-    for path in (REPO / "lib").rglob("*.py"):
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for m in pat.finditer(text):
-            line_no = text[: m.start()].count("\n") + 1
-            hits.append((path, line_no, m.group(0)))
-    assert not hits, (
-        "Unexpected: replay hooks found in lib/. If Stage K landed, great — "
-        f"update this PoC. Hits: {hits}"
+def test_manual_replay_script_exists() -> None:
+    """Red Team #2 H3 post-fix: a manual replay path exists at
+    deploy/replay_dlq.py. A scheduled cron is still Stage K."""
+    script = REPO / "deploy" / "replay_dlq.py"
+    assert script.exists(), (
+        "deploy/replay_dlq.py is missing. The Red Team #2 H3 fix shipped "
+        "a manual replay entry point here — if you've relocated it, update "
+        "this assertion."
+    )
+    text = script.read_text(encoding="utf-8")
+    # Core interface: dry-run flag + service-role env + rpc_record_usage call.
+    assert "--dry-run" in text
+    assert "rpc_record_usage" in text
+
+
+def test_dlq_threshold_alert_wired_in_token_accountant() -> None:
+    """Red Team #2 H3 post-fix: the DLQ writer emits a CRITICAL tag
+    `DLQ_OVER_THRESHOLD` once the queue crosses
+    AETHER_DLQ_ALERT_THRESHOLD. This is the loud-alarm half of the
+    'durable billing' fix until Stage K automates replay."""
+    text = (REPO / "lib" / "token_accountant.py").read_text(encoding="utf-8")
+    assert "DLQ_OVER_THRESHOLD" in text, (
+        "Threshold alert tag has been removed from token_accountant. "
+        "The H3 fix requires a grep-friendly tag so ops can alert."
+    )
+    assert "AETHER_DLQ_ALERT_THRESHOLD" in text, (
+        "Threshold env var is no longer referenced."
+    )
+    assert "dlq.size_gauge" in text, (
+        "DLQ size-gauge log record is no longer emitted on every enqueue."
     )
 
 
-def test_release_notes_confirm_no_replay() -> None:
+def test_release_notes_document_the_fix() -> None:
+    """Post-fix RELEASE_NOTES reflects manual replay + threshold alert."""
     rn = (REPO / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-    assert "No DLQ replay" in rn, (
-        "RELEASE_NOTES.md no longer carries the 'No DLQ replay' caveat. "
-        "If replay landed, remove this PoC."
-    )
+    assert "DLQ replay is manual" in rn or "manual replay" in rn.lower()
+    assert "replay_dlq.py" in rn
+    assert "DLQ_OVER_THRESHOLD" in rn
 
 
 def test_deploy_script_documents_manual_replay_gap() -> None:
+    """deploy/commit-uvt-stack.sh still references the manual-replay state.
+    When Stage K's cron lands, that reference will be updated and this
+    test may need refreshing."""
     script = (REPO / "deploy" / "commit-uvt-stack.sh").read_text(encoding="utf-8")
     assert "DLQ replay cron (currently manual" in script, (
         "deploy/commit-uvt-stack.sh no longer documents the manual-replay "
-        "gap. Assert the replay job now exists and update this PoC."
+        "gap. Assert the replay cron now exists and update this PoC."
     )
 
 
 if __name__ == "__main__":
-    test_no_replay_function_in_lib()
-    test_release_notes_confirm_no_replay()
+    test_manual_replay_script_exists()
+    test_dlq_threshold_alert_wired_in_token_accountant()
+    test_release_notes_document_the_fix()
     test_deploy_script_documents_manual_replay_gap()
-    print("Confirmed: DLQ replay is manual-only. Un-metered inference on "
-          "any rpc_record_usage failure persists indefinitely.")
+    print("Confirmed: H3 fix in place — manual replay script + threshold "
+          "alert + gauge. Stage K cron still pending.")
