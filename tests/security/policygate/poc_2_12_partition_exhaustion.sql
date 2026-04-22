@@ -1,0 +1,44 @@
+-- ─────────────────────────────────────────────────────────────────
+-- §2.12 Migration/DDL PoC — partition exhaustion in month 13.
+--
+-- 20260422_routing_decisions.sql seeds partitions for 2026-04 .. 2027-03
+-- (12 months). From 2027-04-01 00:00:00+00 onward, INSERTs into
+-- routing_decisions with default created_at=now() will fail:
+--   "ERROR: no partition of relation "routing_decisions" found for row"
+-- Because recordDecisionAsync() is fire-and-forget, the main POST
+-- still returns 200. The audit log silently goes dark.
+--
+-- This is the canonical "shadow table" attack: any adversary that
+-- pushes the calendar past the partition window (or who runs at
+-- the flip-over minute) gets un-audited calls for free.
+--
+-- This file is a DRY-RUN proof — do NOT execute against the production
+-- project. To verify manually on a disposable dev DB:
+--
+--   -- 1. apply 20260422_routing_decisions.sql
+--   -- 2. attempt an insert dated 2027-04-01:
+--   INSERT INTO public.routing_decisions
+--     (created_at, user_id, request_id, trace_id, task_kind, tier,
+--      reason_code, estimated_input_tokens, estimated_output_tokens,
+--      opus_pct_mtd_snapshot, active_concurrent_tasks,
+--      uvt_balance_snapshot, decision_schema_version,
+--      uvt_weight_version, latency_ms)
+--   VALUES
+--     ('2027-04-01 00:00:00+00',
+--      '00000000-0000-0000-0000-0000000000aa',
+--      'req-partition-poc', 'trace-partition-poc', 'chat', 'pro',
+--      'default_by_tier_and_task', 100, 100, 0.0, 0, 1000, 1, 1, 0);
+--   -- ERROR:  no partition of relation "routing_decisions" found for row
+--
+-- Fix:
+--   (a) pg_cron job that runs monthly and creates next-year partition
+--       (recommended; listed in PR 1 deferrals but not shipped).
+--   (b) OR a default partition:
+--       CREATE TABLE routing_decisions_default PARTITION OF
+--         routing_decisions DEFAULT;
+--       NOTE: default partitions slow down partition pruning; a pg_cron
+--       roll-forward is preferred.
+-- ─────────────────────────────────────────────────────────────────
+
+-- No executable statements — documentation only.
+SELECT 'partition-exhaustion PoC — see comments above' AS note;
