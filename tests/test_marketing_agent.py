@@ -10,11 +10,9 @@ from unittest.mock import patch, MagicMock
 
 
 def _make_mock_response(text: str) -> MagicMock:
-    """Create a mock Claude API response."""
+    """Create a mock TokenAccountant AnthropicResponse."""
     mock_resp = MagicMock()
-    mock_content = MagicMock()
-    mock_content.text = text
-    mock_resp.content = [mock_content]
+    mock_resp.text = text
     return mock_resp
 
 
@@ -25,9 +23,8 @@ def _make_mock_response(text: str) -> MagicMock:
 class TestCreateCompetitiveCard:
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
+        with patch("agent.claude_agent.token_accountant.call_sync") as mock_cls:
+            mock_client = mock_cls  # call_sync is invoked directly; alias keeps downstream mock_client.X compat
             yield mock_client
 
     @pytest.fixture
@@ -36,7 +33,7 @@ class TestCreateCompetitiveCard:
         return AetherClaudeAgent(api_key="test-key-123")
 
     def test_returns_valid_structure(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "product": "AetherCloud-L",
                 "competitors": ["Dropbox", "Box"],
@@ -53,7 +50,7 @@ class TestCreateCompetitiveCard:
         assert result["confidence"] == 0.9
 
     def test_with_features_filter(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "product": "AetherCloud-L",
                 "competitors": ["Box"],
@@ -68,13 +65,13 @@ class TestCreateCompetitiveCard:
         assert result["confidence"] == 0.85
 
     def test_api_failure_returns_fallback(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("API error")
+        mock_anthropic.side_effect = Exception("API error")
         result = agent.create_competitive_card("AetherCloud-L", ["Dropbox"])
         assert result["confidence"] == 0.0
         assert "unavailable" in result["summary"].lower() or "error" in result["summary"].lower()
 
     def test_empty_competitors_list(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "product": "AetherCloud-L",
                 "competitors": [],
@@ -87,7 +84,7 @@ class TestCreateCompetitiveCard:
         assert result["competitors"] == []
 
     def test_markdown_fences_stripped(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             '```json\n{"product": "X", "competitors": [], "differentiators": [], '
             '"summary": "test", "confidence": 0.7}\n```'
         )
@@ -95,7 +92,7 @@ class TestCreateCompetitiveCard:
         assert result["product"] == "X"
 
     def test_verdict_values(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "product": "AetherCloud-L",
                 "competitors": ["Rival"],
@@ -120,9 +117,8 @@ class TestCreateCompetitiveCard:
 class TestDraftContent:
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
+        with patch("agent.claude_agent.token_accountant.call_sync") as mock_cls:
+            mock_client = mock_cls  # call_sync is invoked directly; alias keeps downstream mock_client.X compat
             yield mock_client
 
     @pytest.fixture
@@ -131,7 +127,7 @@ class TestDraftContent:
         return AetherClaudeAgent(api_key="test-key-123")
 
     def test_blog_draft(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "content_type": "blog",
                 "title": "Why Quantum Security Matters",
@@ -148,7 +144,7 @@ class TestDraftContent:
         assert result["word_count"] == 800
 
     def test_linkedin_post(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "content_type": "linkedin",
                 "title": "Post title",
@@ -164,7 +160,7 @@ class TestDraftContent:
         assert result["content_type"] == "linkedin"
 
     def test_with_tone_parameter(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "content_type": "press_release",
                 "title": "PR",
@@ -180,13 +176,13 @@ class TestDraftContent:
         assert result["tone"] == "formal"
 
     def test_api_failure_returns_fallback(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("Timeout")
+        mock_anthropic.side_effect = Exception("Timeout")
         result = agent.draft_content("blog", "Test Topic")
         assert result["confidence"] == 0.0
         assert result["word_count"] == 0
 
     def test_seo_keywords_present(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "content_type": "blog",
                 "title": "Test",
@@ -209,9 +205,8 @@ class TestDraftContent:
 class TestDraftEmailSequence:
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
+        with patch("agent.claude_agent.token_accountant.call_sync") as mock_cls:
+            mock_client = mock_cls  # call_sync is invoked directly; alias keeps downstream mock_client.X compat
             yield mock_client
 
     @pytest.fixture
@@ -220,7 +215,7 @@ class TestDraftEmailSequence:
         return AetherClaudeAgent(api_key="test-key-123")
 
     def test_welcome_sequence(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "sequence_name": "welcome",
                 "emails": [
@@ -241,7 +236,7 @@ class TestDraftEmailSequence:
     def test_custom_email_count(self, agent, mock_anthropic):
         emails = [{"day": i, "subject": f"Email {i}", "preview_text": "",
                     "body": "", "cta": ""} for i in range(3)]
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "sequence_name": "launch",
                 "emails": emails,
@@ -253,14 +248,14 @@ class TestDraftEmailSequence:
         assert result["total_emails"] == 3
 
     def test_api_failure_returns_empty(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("Error")
+        mock_anthropic.side_effect = Exception("Error")
         result = agent.draft_email_sequence("welcome", "Product")
         assert result["emails"] == []
         assert result["total_emails"] == 0
         assert result["confidence"] == 0.0
 
     def test_with_audience(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "sequence_name": "enterprise",
                 "emails": [{"day": 0, "subject": "For CISOs", "preview_text": "",
@@ -275,7 +270,7 @@ class TestDraftEmailSequence:
         assert result["sequence_name"] == "enterprise"
 
     def test_email_has_required_fields(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "sequence_name": "test",
                 "emails": [{"day": 1, "subject": "Sub", "preview_text": "Pre",
@@ -300,9 +295,8 @@ class TestDraftEmailSequence:
 class TestReviewContent:
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
+        with patch("agent.claude_agent.token_accountant.call_sync") as mock_cls:
+            mock_client = mock_cls  # call_sync is invoked directly; alias keeps downstream mock_client.X compat
             yield mock_client
 
     @pytest.fixture
@@ -311,7 +305,7 @@ class TestReviewContent:
         return AetherClaudeAgent(api_key="test-key-123")
 
     def test_review_returns_grade(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "readability_score": 72.5,
                 "accuracy_issues": [],
@@ -327,7 +321,7 @@ class TestReviewContent:
         assert result["readability_score"] == 72.5
 
     def test_review_flags_unsupported_claims(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "readability_score": 65.0,
                 "accuracy_issues": ["Claim about 100% uptime is unverified"],
@@ -343,7 +337,7 @@ class TestReviewContent:
         assert result["overall_grade"] == "C"
 
     def test_review_with_audience(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "readability_score": 80.0,
                 "accuracy_issues": [],
@@ -358,13 +352,13 @@ class TestReviewContent:
         assert result["overall_grade"] == "A"
 
     def test_review_api_failure(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("API down")
+        mock_anthropic.side_effect = Exception("API down")
         result = agent.review_content("Some text")
         assert result["overall_grade"] == "F"
         assert result["confidence"] == 0.0
 
     def test_review_preserves_original_on_failure(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("Error")
+        mock_anthropic.side_effect = Exception("Error")
         original = "Original marketing text"
         result = agent.review_content(original)
         assert result["revised_content"] == original
@@ -377,9 +371,8 @@ class TestReviewContent:
 class TestDevelopPositioning:
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
+        with patch("agent.claude_agent.token_accountant.call_sync") as mock_cls:
+            mock_client = mock_cls  # call_sync is invoked directly; alias keeps downstream mock_client.X compat
             yield mock_client
 
     @pytest.fixture
@@ -388,7 +381,7 @@ class TestDevelopPositioning:
         return AetherClaudeAgent(api_key="test-key-123")
 
     def test_positioning_returns_framework(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "category": "Quantum-Secured File Intelligence",
                 "value_proposition": "Dispute-proof chain of custody",
@@ -408,7 +401,7 @@ class TestDevelopPositioning:
         assert len(result["competitive_moat"]) == 2
 
     def test_with_competitors(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "category": "File Security",
                 "value_proposition": "Test",
@@ -424,13 +417,13 @@ class TestDevelopPositioning:
         assert result["confidence"] == 0.85
 
     def test_api_failure_returns_fallback(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("Error")
+        mock_anthropic.side_effect = Exception("Error")
         result = agent.develop_positioning("AetherCloud-L", "security")
         assert result["confidence"] == 0.0
         assert result["category"] == "security"
 
     def test_icp_structure(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "category": "SaaS",
                 "value_proposition": "VP",
@@ -449,7 +442,7 @@ class TestDevelopPositioning:
         assert len(icp["pain_points"]) == 2
 
     def test_messaging_hierarchy(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "category": "Security",
                 "value_proposition": "VP",

@@ -278,7 +278,7 @@ class TestQOPCLoopContext:
 class TestAgentContextInjection:
     """Test that user context is injected into the agent's system prompt."""
 
-    @patch("agent.hardened_claude_agent.Anthropic")
+    @patch("agent.hardened_claude_agent.token_accountant.call_sync")
     @patch("agent.hardened_claude_agent.AuditLog")
     @patch("agent.hardened_claude_agent.get_quantum_seed", return_value=(42, "OS_URANDOM"))
     def test_set_user_context_injects_into_prompt(self, mock_seed, mock_audit, mock_anthropic):
@@ -288,7 +288,7 @@ class TestAgentContextInjection:
         assert "never delete, always ask" in agent._active_system_prompt
         assert "USER PREFERENCES" in agent._active_system_prompt
 
-    @patch("agent.hardened_claude_agent.Anthropic")
+    @patch("agent.hardened_claude_agent.token_accountant.call_sync")
     @patch("agent.hardened_claude_agent.AuditLog")
     @patch("agent.hardened_claude_agent.get_quantum_seed", return_value=(42, "OS_URANDOM"))
     def test_clear_context_restores_base_prompt(self, mock_seed, mock_audit, mock_anthropic):
@@ -301,7 +301,7 @@ class TestAgentContextInjection:
         assert "USER PREFERENCES" not in agent._active_system_prompt
         assert agent._active_system_prompt == agent.system_prompt
 
-    @patch("agent.hardened_claude_agent.Anthropic")
+    @patch("agent.hardened_claude_agent.token_accountant.call_sync")
     @patch("agent.hardened_claude_agent.AuditLog")
     @patch("agent.hardened_claude_agent.get_quantum_seed", return_value=(42, "OS_URANDOM"))
     def test_qopc_stats_include_context_info(self, mock_seed, mock_audit, mock_anthropic):
@@ -313,7 +313,7 @@ class TestAgentContextInjection:
         assert "context_scoring" in stats
         assert stats["context_scoring"]["has_context"] is True
 
-    @patch("agent.hardened_claude_agent.Anthropic")
+    @patch("agent.hardened_claude_agent.token_accountant.call_sync")
     @patch("agent.hardened_claude_agent.AuditLog")
     @patch("agent.hardened_claude_agent.get_quantum_seed", return_value=(42, "OS_URANDOM"))
     def test_context_scorer_on_agent(self, mock_seed, mock_audit, mock_anthropic):
