@@ -29,7 +29,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
-from lib import feature_flags, pricing_guard, router as router_module
+import os
+import uuid as _uuid
+
+from lib import feature_flags, pricing_guard, router as router_module, router_client
 from lib.router import PlanConfig, Router
 
 log = logging.getLogger("aethercloud.uvt_routes")
@@ -208,6 +211,29 @@ async def agent_run(
 
     if router_instance is None:
         raise HTTPException(status_code=503, detail="Router not configured")
+
+    # router-shadow-log: PR 1 v5 shadow dispatch to PolicyGate (TS edge).
+    # See diagrams/docs_router_architecture.md § "Migration from Stage E to
+    # PolicyGate". chosen_model is NOT used for substitution in PR 1; Stage D
+    # picks below. Telemetry-only pass; PR 2 flips ROUTER_CONFIG.shadow_mode
+    # false and starts enforcing PolicyGate's decisions for canary users.
+    if os.environ.get("AETHER_ROUTER_URL") and os.environ.get("AETHER_INTERNAL_SERVICE_TOKEN"):
+        try:
+            shadow = await router_client.pick({
+                "userId": str(user_id) if user_id else "00000000-0000-0000-0000-000000000000",
+                "tier": tier,
+                "taskKind": "agent_execute",
+                "estimatedInputTokens": estimated,
+                "estimatedOutputTokens": plan_cfg.output_cap,
+                "opusPctMtd": 0.0,
+                "activeConcurrentTasks": 0,
+                "uvtBalance": 1_000_000_000,
+                "requestId": str(_uuid.uuid4()),
+                "traceId": str(_uuid.uuid4()),
+            })
+            log.info("router_would_pick: %s", shadow.chosen_model)
+        except Exception:
+            log.debug("shadow dispatch failed", exc_info=True)
 
     try:
         result = await router_instance.route(

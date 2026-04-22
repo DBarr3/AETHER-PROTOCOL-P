@@ -5,16 +5,18 @@ ModelRouter — MODEL SELECTION ONLY. NOT A POLICY ENFORCER.
   ⚠  DO NOT build features that assume this layer enforces plan limits,
       quotas, concurrency caps, or budget gates. It does NOT.
 
-  ⚠  The silent-downgrade branches in `_pick_orchestrator` and
-     `_opus_budget_remaining` (heavy→sonnet, opus-exhausted→sonnet,
-     budget-lookup-fail→sonnet) are DEFENSIVE-ONLY DEAD CODE.
+  ⚠  The historical silent-downgrade branches (heavy→sonnet,
+     opus-exhausted→sonnet, budget-lookup-fail→sonnet) HAVE BEEN REPLACED
+     with typed tripwire exceptions (PlanExcludesOpusError,
+     OpusBudgetExhaustedError). They raise loudly — no path returns a
+     weaker model silently for budget/tier reasons.
 
-  ⚠  In production those cases are caught upstream by Stage E
-     (lib/pricing_guard.py PricingGuard.preflight) which throws 402 / 429
-     BEFORE this code runs. After PR 1 v5 ships, the same enforcement
-     moves to the TypeScript edge (PolicyGate at /api/internal/router/pick),
-     and these defensive branches get replaced with typed Python exceptions
-     (OpusBudgetExhaustedError, PlanExcludesOpusError).
+  ⚠  In production those exception paths should never fire because
+     PolicyGate (TS edge, /api/internal/router/pick) throws 402 / 413 / 429
+     BEFORE this code runs. Stage E (lib/pricing_guard.py) is the belt-
+     and-suspenders enforcer during PR 1 v5 shadow mode; PR 2 flips
+     PolicyGate from shadow to primary for canary users, and PR 3 cuts
+     Stage E out entirely.
 
   ⚠  See diagrams/docs_router_architecture.md § "Division of Responsibility"
      for the hard line. RouterResponse.downgrade_reason was removed in PR 1
@@ -403,11 +405,12 @@ class Router:
             opus_used = int(rows[0]["opus_uvt"]) if rows else 0
         except Exception as exc:
             # Supabase hiccup: fail-closed on Opus (cheaper error than
-            # billing surprise). Router silently downgrades to Sonnet.
-            # NOTE: same defensive-only caveat as _pick_orchestrator's
-            # downgrade branches — PR 1's HTTP gate ahead of this code
-            # would normally surface this as a 5xx instead. See
-            # docs/router.md § "Philosophy".
+            # billing surprise). Returns 0; _pick_orchestrator then raises
+            # OpusBudgetExhaustedError if load is heavy, which surfaces as
+            # an honest 402 via uvt_routes.py — no silent downgrade path.
+            # Production PolicyGate blocks this case upstream before we get
+            # here; if the DB hiccup reaches Stage D, something bypassed
+            # the gate. See diagrams/docs_router_architecture.md.
             log.warning("Router: opus_uvt lookup failed (%s) — assuming exhausted", exc)
             return 0
 
