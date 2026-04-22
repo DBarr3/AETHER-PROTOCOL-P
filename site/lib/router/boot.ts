@@ -18,9 +18,14 @@ import {
   makeSupabaseAuditWriter,
   setAuditWriter,
 } from "./auditLog";
-import { setOpusPctMtdResolver, setUvtBalanceResolver } from "./gateInputs";
+import {
+  setActiveConcurrentTasksResolver,
+  setOpusPctMtdResolver,
+  setUvtBalanceResolver,
+} from "./gateInputs";
 import { getOpusPctMtd } from "./helpers/getOpusPctMtd";
 import { getUvtBalance } from "@/lib/getUvtBalance";
+import { getActiveConcurrentTasks } from "@/lib/getActiveConcurrentTasks";
 
 let _attempted = false;
 let _succeeded = false;
@@ -46,6 +51,9 @@ export function ensureRouterBooted(): void {
     setAuditWriter(makeSupabaseAuditWriter(supabase));
     setOpusPctMtdResolver((userId) => getOpusPctMtd(userId, { supabase }));
     setUvtBalanceResolver((userId) => getUvtBalance(userId, { supabase }));
+    setActiveConcurrentTasksResolver((userId) =>
+      getActiveConcurrentTasks(userId, { supabase }),
+    );
     _succeeded = true;
   } catch (err) {
     const name = err instanceof Error ? err.name : "unknown";

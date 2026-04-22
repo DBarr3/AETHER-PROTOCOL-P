@@ -7,6 +7,7 @@ import {
 } from "@/lib/router/auditLog";
 import {
   resetGateInputsForTests,
+  setActiveConcurrentTasksResolver,
   setOpusPctMtdResolver,
   setUvtBalanceResolver,
 } from "@/lib/router/gateInputs";
@@ -25,16 +26,17 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
-// opusPctMtd (C1) and uvtBalance (C2) are intentionally absent — both
-// are server-resolved. Tests that need specific gate trips install
-// resolver stubs via setOpusPctMtdResolver / setUvtBalanceResolver.
+// opusPctMtd (C1), uvtBalance (C2), and activeConcurrentTasks (C3) are
+// intentionally absent — all three are server-resolved. Tests that
+// need specific gate trips install resolver stubs via
+// setOpusPctMtdResolver / setUvtBalanceResolver /
+// setActiveConcurrentTasksResolver.
 const validCtx = {
   userId: "00000000-0000-0000-0000-000000000001",
   tier: "pro",
   taskKind: "chat",
   estimatedInputTokens: 100,
   estimatedOutputTokens: 100,
-  activeConcurrentTasks: 0,
   requestId: "req_integ_1",
   traceId: "trace_integ_1",
 };
@@ -122,9 +124,11 @@ describe("POST /api/internal/router/pick", () => {
   });
 
   it("429 on concurrency cap", async () => {
-    const res = await POST(
-      req({ ...validCtx, taskKind: "code_review", activeConcurrentTasks: 3 }),
-    );
+    // activeConcurrentTasks is server-resolved (C3). Stub the resolver
+    // at the pro-tier cap (3) so the gate fires; body value is
+    // stripped pre-Zod.
+    setActiveConcurrentTasksResolver(async () => 3);
+    const res = await POST(req({ ...validCtx, taskKind: "code_review" }));
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.gate_type).toBe("concurrency_cap_exceeded");

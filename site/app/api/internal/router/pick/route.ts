@@ -4,6 +4,7 @@ import { RouterGateError } from "@/lib/router/errors";
 import "@/lib/router/boot";
 import { assertRouterWired } from "@/lib/router/startupAssertions";
 import {
+  resolveActiveConcurrentTasks,
   resolveOpusPctMtd,
   resolveUvtBalance,
 } from "@/lib/router/gateInputs";
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 const LEGACY_STRIPPED_BODY_KEYS: readonly string[] = [
   "opusPctMtd",
   "uvtBalance",
+  "activeConcurrentTasks",
 ];
 
 function stripLegacyKeys(obj: unknown): unknown {
@@ -46,7 +48,6 @@ const RoutingContextSchema = z
     ]),
     estimatedInputTokens: z.number().int().nonnegative().finite(),
     estimatedOutputTokens: z.number().int().nonnegative().finite(),
-    activeConcurrentTasks: z.number().int().nonnegative().finite(),
     requestId: z.string().min(1).max(256),
     traceId: z.string().min(1).max(256),
   })
@@ -91,13 +92,19 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const [opusPctMtd, uvtBalance] = await Promise.all([
+  const [opusPctMtd, uvtBalance, activeConcurrentTasks] = await Promise.all([
     resolveOpusPctMtd(parse.data.userId),
     resolveUvtBalance(parse.data.userId),
+    resolveActiveConcurrentTasks(parse.data.userId),
   ]);
 
   try {
-    const decision = pick({ ...parse.data, opusPctMtd, uvtBalance });
+    const decision = pick({
+      ...parse.data,
+      opusPctMtd,
+      uvtBalance,
+      activeConcurrentTasks,
+    });
     return Response.json(decision, { status: 200 });
   } catch (e) {
     if (e instanceof RouterGateError) {
