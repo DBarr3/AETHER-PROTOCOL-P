@@ -1,35 +1,44 @@
 """
-Router — single-turn orchestration from user prompt to model response.
+═════════════════════════════════════════════════════════════════════════════
+ModelRouter — MODEL SELECTION ONLY. NOT A POLICY ENFORCER.
 
-Pipeline:
-    classify → pick orchestrator model → call via TokenAccountant → return
+  ⚠  DO NOT build features that assume this layer enforces plan limits,
+      quotas, concurrency caps, or budget gates. It does NOT.
 
-Decision rules (locked in the spec, not heuristics):
-- qopc_load='light'  → Haiku   (regardless of tier)
-- qopc_load='medium' → Sonnet  (regardless of tier)
-- qopc_load='heavy'  → Opus IF plans.opus_pct_cap > 0 AND opus_sub_budget > 0
-                       ELSE Sonnet (silent downgrade with reason)
+  ⚠  The silent-downgrade branches in `_pick_orchestrator` and
+     `_opus_budget_remaining` (heavy→sonnet, opus-exhausted→sonnet,
+     budget-lookup-fail→sonnet) are DEFENSIVE-ONLY DEAD CODE.
 
-Confidence gate: qopc_load='heavy' AND confidence < 0.6 triggers a SECOND
-Haiku classify call. If the second pass disagrees (returns light/medium),
-we use that signal instead. This prevents low-confidence heavy flags from
-burning Opus budget on ambiguous requests. Classifier is cheap enough
-(<300 tokens of Haiku) that the guard is worth it.
+  ⚠  In production those cases are caught upstream by Stage E
+     (lib/pricing_guard.py PricingGuard.preflight) which throws 402 / 429
+     BEFORE this code runs. After PR 1 v5 ships, the same enforcement
+     moves to the TypeScript edge (PolicyGate at /api/internal/router/pick),
+     and these defensive branches get replaced with typed Python exceptions
+     (OpusBudgetExhaustedError, PlanExcludesOpusError).
 
-Opus sub-budget: per-user, per-period, computed on the fly:
-    opus_budget     = plans.uvt_monthly * plans.opus_pct_cap
-    opus_remaining  = opus_budget - uvt_balances.opus_uvt
-When opus_remaining <= 0, router silently downgrades to Sonnet and sets
-RouterResponse.downgrade_reason so the UI banner can show.
+  ⚠  See diagrams/docs_router_architecture.md § "Division of Responsibility"
+     for the hard line. Any code that reads `RouterResponse.downgrade_reason`
+     and shows it to a user is a philosophy violation — fix the caller, not
+     this file.
 
-Not yet in Stage D (deferred scope):
-- Sub-agent dispatch (plan→execute→aggregate) — Stage D.5
-- Pre-flight UVT quota check — Stage E (PricingGuard)
-- Concurrency cap semaphore — Stage E (Redis/advisory-lock)
-- Right-sizing plans that exceed sub_agent_cap — Stage D.5 (single-turn
-  doesn't produce sub-agent plans)
+ModelRouter's actual job:
+    1. Compress hydrated context to plan.context_budget_tokens
+    2. Classify load via QOPC bridge (light / medium / heavy)
+    3. Pick a model APPROPRIATE FOR THE WORK (not for the user's eligibility)
+    4. Confidence gate — low-confidence heavy → reclassify
+    5. Call model via TokenAccountant (sole Anthropic path)
+    6. Return RouterResponse with breakdown
+
+Tripwire: every Router.route() call increments the module-level counter
+`policy_bypass_detected` and emits one ROUTER_POLICY_BYPASS log line per
+process. After PR 1 v5 lands, the route entry point will receive a
+`policy_decision_id` from PolicyGate; the tripwire then only fires on
+calls that lack that ID — which should be zero in production. Any non-zero
+count post-PR-1 means something is bypassing the gate. SRE: alert on
+ROUTER_POLICY_BYPASS log lines once PR 1 v5 is fully cut over.
 
 Aether Systems LLC — Patent Pending
+═════════════════════════════════════════════════════════════════════════════
 """
 
 from __future__ import annotations
@@ -43,6 +52,15 @@ from lib import context_compressor, qopc_bridge, token_accountant
 from lib.model_registry import ModelKey
 
 log = logging.getLogger("aethercloud.router")
+
+# ─── SCARECROW: PolicyGate-bypass tripwire counter ──────────────────────
+# Increments on every Router.route() invocation. Today fires on every call
+# (PR 1 v5 / TypeScript PolicyGate hasn't shipped yet). Post-PR-1, this only
+# increments when the upstream gate didn't run — which should be zero in
+# prod. SRE: page on a non-zero rate after PR 1 v5 cuts over.
+# See diagrams/docs_router_architecture.md § "Dead-code safety net".
+policy_bypass_detected: int = 0
+_warned_once: bool = False
 
 Tier = Literal["free", "solo", "pro", "team"]
 
@@ -124,6 +142,27 @@ class Router:
         are skipped but the call still happens. PricingGuard in Stage E will
         require a real user_id.
         """
+        # ── SCARECROW: PolicyGate-bypass tripwire ──────────────────────
+        # Bumps the module counter on every call. Today this fires on every
+        # invocation because PR 1 v5 (the TypeScript PolicyGate at
+        # /api/internal/router/pick) hasn't shipped yet — the gate is
+        # currently Stage E (Python pricing_guard.preflight). Post-PR-1,
+        # the route entry will receive a policy_decision_id from PolicyGate
+        # and skip this branch when present; remaining hits become the SRE
+        # alert signal. See diagrams/docs_router_architecture.md §
+        # "Dead-code safety net".
+        global policy_bypass_detected, _warned_once
+        policy_bypass_detected += 1
+        if not _warned_once:
+            log.warning(
+                "ROUTER_POLICY_BYPASS: ModelRouter.route() invoked without "
+                "an upstream PolicyGate decision_id. This is EXPECTED until "
+                "PR 1 v5 ships. After cutover, any occurrence of this log "
+                "indicates something bypassed PolicyGate — page SRE. "
+                "See diagrams/docs_router_architecture.md."
+            )
+            _warned_once = True
+
         plan_cfg = self._get_plan_config(tier)
 
         # 1. Compress context to tier budget so re-injected history doesn't
@@ -221,7 +260,16 @@ class Router:
             return "haiku", None
         if signal.load == "medium":
             return "sonnet", None
+
         # heavy
+        # NOTE: downgrade paths below are defensive-only. Production HTTP entry
+        # point is PR 1's /api/internal/router/pick which enforces hard 402
+        # gates (OpusBudgetExceededError / InsufficientUvtBalanceError) BEFORE
+        # this code runs. These branches execute only if Stage D is called
+        # directly (e.g. internal tooling, the harness, or a test). See
+        # docs/router.md § "Philosophy". Follow-up: after PR 1 ships, replace
+        # these silent downgrades with typed Python exceptions so callers
+        # can't accidentally get a weaker model without knowing.
         if plan_cfg.opus_pct_cap <= 0:
             return "sonnet", "tier does not include Opus"
         if opus_remaining <= 0:
@@ -317,6 +365,10 @@ class Router:
         except Exception as exc:
             # Supabase hiccup: fail-closed on Opus (cheaper error than
             # billing surprise). Router silently downgrades to Sonnet.
+            # NOTE: same defensive-only caveat as _pick_orchestrator's
+            # downgrade branches — PR 1's HTTP gate ahead of this code
+            # would normally surface this as a 5xx instead. See
+            # docs/router.md § "Philosophy".
             log.warning("Router: opus_uvt lookup failed (%s) — assuming exhausted", exc)
             return 0
 
