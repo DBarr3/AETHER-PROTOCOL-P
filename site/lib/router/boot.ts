@@ -18,6 +18,8 @@ import {
   makeSupabaseAuditWriter,
   setAuditWriter,
 } from "./auditLog";
+import { setOpusPctMtdResolver } from "./gateInputs";
+import { getOpusPctMtd } from "./helpers/getOpusPctMtd";
 
 let _attempted = false;
 let _succeeded = false;
@@ -41,6 +43,7 @@ export function ensureRouterBooted(): void {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     setAuditWriter(makeSupabaseAuditWriter(supabase));
+    setOpusPctMtdResolver((userId) => getOpusPctMtd(userId, { supabase }));
     _succeeded = true;
   } catch (err) {
     const name = err instanceof Error ? err.name : "unknown";

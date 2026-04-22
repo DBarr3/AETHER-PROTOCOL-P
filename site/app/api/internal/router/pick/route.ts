@@ -3,9 +3,26 @@ import { pick } from "@/lib/router/deterministic";
 import { RouterGateError } from "@/lib/router/errors";
 import "@/lib/router/boot";
 import { assertRouterWired } from "@/lib/router/startupAssertions";
+import { resolveOpusPctMtd } from "@/lib/router/gateInputs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Keys the route USED to read from the body but that are now server-
+// resolved (C1/C2/C3 in tests/security/redteam_policygate_report.md).
+// In-flight callers may still send them; the route strips them before
+// Zod validation so `.strict()` does not reject. The values are then
+// ignored — resolvers are the only source of truth.
+const LEGACY_STRIPPED_BODY_KEYS: readonly string[] = ["opusPctMtd"];
+
+function stripLegacyKeys(obj: unknown): unknown {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (!LEGACY_STRIPPED_BODY_KEYS.includes(k)) out[k] = v;
+  }
+  return out;
+}
 
 const RoutingContextSchema = z
   .object({
@@ -23,7 +40,6 @@ const RoutingContextSchema = z
     ]),
     estimatedInputTokens: z.number().int().nonnegative().finite(),
     estimatedOutputTokens: z.number().int().nonnegative().finite(),
-    opusPctMtd: z.number().min(0).max(1).finite(),
     activeConcurrentTasks: z.number().int().nonnegative().finite(),
     uvtBalance: z.number().int().nonnegative().finite(),
     requestId: z.string().min(1).max(256),
@@ -62,7 +78,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const parse = RoutingContextSchema.safeParse(body);
+  const parse = RoutingContextSchema.safeParse(stripLegacyKeys(body));
   if (!parse.success) {
     return Response.json(
       { error: "validation_failed", details: parse.error.issues },
@@ -70,8 +86,10 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  const opusPctMtd = await resolveOpusPctMtd(parse.data.userId);
+
   try {
-    const decision = pick(parse.data);
+    const decision = pick({ ...parse.data, opusPctMtd });
     return Response.json(decision, { status: 200 });
   } catch (e) {
     if (e instanceof RouterGateError) {

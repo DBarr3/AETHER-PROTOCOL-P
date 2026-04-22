@@ -5,6 +5,10 @@ import {
   resetAuditWriter,
   type RoutingDecisionRow,
 } from "@/lib/router/auditLog";
+import {
+  resetGateInputsForTests,
+  setOpusPctMtdResolver,
+} from "@/lib/router/gateInputs";
 
 const GOOD = "test-service-token-xyz";
 
@@ -20,13 +24,15 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
+// opusPctMtd is intentionally absent — C1 made it server-resolved. Tests
+// that need a non-zero MTD value install a resolver stub via
+// setOpusPctMtdResolver(async () => 0.15).
 const validCtx = {
   userId: "00000000-0000-0000-0000-000000000001",
   tier: "pro",
   taskKind: "chat",
   estimatedInputTokens: 100,
   estimatedOutputTokens: 100,
-  opusPctMtd: 0,
   activeConcurrentTasks: 0,
   uvtBalance: 1_000_000,
   requestId: "req_integ_1",
@@ -37,12 +43,14 @@ beforeEach(() => {
   process.env.AETHER_INTERNAL_SERVICE_TOKEN = GOOD;
   process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV = "";
   resetAuditWriter();
+  resetGateInputsForTests();
 });
 
 afterAll(() => {
   delete process.env.AETHER_INTERNAL_SERVICE_TOKEN;
   delete process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV;
   resetAuditWriter();
+  resetGateInputsForTests();
 });
 
 describe("POST /api/internal/router/pick", () => {
@@ -90,9 +98,11 @@ describe("POST /api/internal/router/pick", () => {
   });
 
   it("402 with router_gate body shape on OpusBudgetExceeded", async () => {
-    const res = await POST(
-      req({ ...validCtx, taskKind: "agent_plan", opusPctMtd: 0.15 }),
-    );
+    // Server-resolved opusPctMtd (C1). Stub the resolver so the gate
+    // sees 15% MTD usage; sending opusPctMtd: 0.15 in the body would
+    // be ignored (stripped pre-Zod) per the C1 patch.
+    setOpusPctMtdResolver(async () => 0.15);
+    const res = await POST(req({ ...validCtx, taskKind: "agent_plan" }));
     expect(res.status).toBe(402);
     const body = await res.json();
     expect(body.error).toBe("router_gate");
