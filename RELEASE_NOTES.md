@@ -4,6 +4,66 @@
 
 ---
 
+## v0.9.8 — UVT Stack + UVT Meter v3 + BYOK Removal (2026-04-21)
+
+The release that pairs with backend Stages A-J. Desktop app no longer manages its own Anthropic key, ships the new UVT meter in the chatbar, and is forward-compatible with the metered-billing pipeline that's now live (and dormant) on VPS2.
+
+### Removed — BYOK (Bring Your Own Key)
+- **`desktop/key-manager.js` deleted entirely.** Previously, every install carried an AES-encrypted `electron-store` named `aethercloud-keys` that stored a per-user `ANTHROPIC_API_KEY` in `%APPDATA%/AetherCloud-L/`. It was wired but never used by any UI surface (no form ever asked for it) — pure attack surface for no benefit.
+- Removed 4 IPC handlers (`keys:set`, `keys:has`, `keys:delete`, `keys:validate`) from `desktop/main.js`.
+- Removed `keyManager.hydrate()` call from `app.whenReady()`.
+- Removed `window.aether.keys.{set,has,delete,validate}` bridge from `desktop/preload.js`.
+- Removed `key-manager.js` from `desktop/package.json` files manifest — it won't ship in any future binary.
+- **Net:** -150 lines, smaller binary, single source of truth (Anthropic key lives only on VPS2 in `/etc/aethercloud/.env`).
+
+### Added — UVT Meter v3 (chatbar droplet + 152px popover tile)
+- **`desktop/pages/uvt-meter/{uvt-meter.css, uvt-meter.js, uvt-meter-tap.js}`** installed per spec — the v3 droplet trigger between Plan/Bypass toggles and the input, expanding into a 152px tile with tube fill, three mini bars (Monthly / Daily / Concurrent), and an action button (Upgrade tier OR Manage overage).
+- Reads `/account/usage` every 30s, ingests `/agent/run` round-trips for the "last call" detail row.
+- Status colors: green (healthy), amber (≥70%), red (≥90%).
+- Storage keys: `uvtmeter.snapshot.v1`, `uvtmeter.lastcall.v1` (versioned, future-safe).
+
+### Added — Stage J flag-aware mount
+- **`desktop/pages/dashboard.html`**: added `<span id="uvt-host" class="uvt-host"></span>` between the chatbar toggles and the input field.
+- New mount IIFE in the `<head>` that, on `DOMContentLoaded`, hits `/healthz/flags` BEFORE rendering the meter. When `AETHER_UVT_ENABLED=false` AND `AETHER_UVT_ROLLOUT_PCT=0` AND `override_count=0`, the meter does NOT mount — keeps the chatbar clean for users not yet in the rollout, prevents 404 spam in the console.
+- Mount uses `window.aether.apiBase` (the VPS1 ghost proxy) and reads the session token via the `aetherAPI.authGet()` bridge.
+
+### Verification
+- `node --check desktop/main.js` ✅
+- `node --check desktop/preload.js` ✅
+- `JSON.parse(desktop/package.json)` ✅
+- `grep -rn "keyManager\|key-manager.js\|aethercloud-keys\|aether.keys"` returns **zero matches** repo-wide.
+- `grep -rn "api.anthropic.com" desktop/` returns **zero matches** (everything routes through the VPS now).
+
+### Backend dependency (Stage A-J already deployed)
+This v0.9.8 desktop binary is forward-compatible with the metered-billing pipeline. With `AETHER_UVT_ENABLED=false` on VPS2 (current production state), the desktop app's behavior is **identical to v0.9.7** from the user's perspective:
+- Chat hits `/agent/chat` (legacy) and works normally.
+- The UVT meter detects flag-off via `/healthz/flags` and stays hidden.
+
+When the operator flips `AETHER_UVT_ENABLED=true` (or `AETHER_UVT_ROLLOUT_PCT>0`), the meter automatically appears for users in the rollout bucket. **Same binary, no re-install needed.**
+
+### Files Modified / Removed
+| File | Change |
+|------|--------|
+| `desktop/key-manager.js` | **Deleted** (-142 lines) |
+| `desktop/main.js` | Removed `require('./key-manager')`, `keyManager.hydrate()`, 4 `keys:*` IPC handlers (-9 lines) |
+| `desktop/preload.js` | Removed `keys:` bridge (-8 lines, +1 line comment update) |
+| `desktop/package.json` | Removed `key-manager.js` from `files`; version bump 0.9.7 → 0.9.8 |
+| `desktop/pages/dashboard.html` | Added meter link/script + flag-aware mount IIFE + `#uvt-host` span (+71 lines) |
+| `desktop/pages/uvt-meter/` | **3 new files** (css, js, tap.js) — v3 spec install |
+| `README.md` | architecture tree updated — `key-manager.js` line removed |
+
+### Test counts
+- Backend: **186 UVT-stack tests** added today (Stages A-J), plus existing suite (~640 tests, 2 pre-existing failures unrelated to this release).
+- Desktop: no new automated tests — UI behavior verified by spec compliance + acceptance checklist.
+
+### Known caveats
+- **SmartScreen warning still expected.** Installer is not yet Authenticode-signed (Azure Trusted Signing setup is the next backlog item, ~$10/mo).
+- **No DLQ replay.** If `rpc_record_usage` ever fails, events land in `/var/lib/aethercloud/usage_dlq.jsonl` on VPS2; manual replay until Stage K cron lands.
+- **Stripe metered billing (Stage H) not yet wired.** Overage USD is stubbed to 0 in `/account/usage` — UI handles the 0 cleanly.
+- **Stage B.5 deferred.** `agent/claude_agent.py` + `hardened_claude_agent.py` (file-agent SDK paths) still use the Anthropic SDK directly. Not in the UVT-metered hot path.
+
+---
+
 ## v0.9.5 — AetherBrowser Integration + Project Orchestrator Wiring Fix (2026-04-15)
 
 First shipped release after v0.9.4. Rolls two separate bodies of work into one version: the AetherBrowser / AetherForge infrastructure work (originally drafted as "v1.0.0" but never released) and the project orchestrator wiring fix.

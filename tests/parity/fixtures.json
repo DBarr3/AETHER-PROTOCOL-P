@@ -1,0 +1,1302 @@
+[
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 1
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 1
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 4
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 1
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 20
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 5
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 2
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 1
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 5
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 2
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 0,
+    "expected_weighted": 0
+  },
+  {
+    "input": {
+      "input_tokens": 0,
+      "output_tokens": 1,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 2
+  },
+  {
+    "input": {
+      "input_tokens": 1,
+      "output_tokens": 0,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 1,
+    "expected_weighted": 1
+  },
+  {
+    "input": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 1500,
+    "expected_weighted": 3000
+  },
+  {
+    "input": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 0,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 1500,
+    "expected_weighted": 15000
+  },
+  {
+    "input": {
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "thinking_tokens": 0,
+      "cached_input_tokens": 500,
+      "sub_agent_count": 0,
+      "tool_calls": 0,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 50,
+    "expected_weighted": 350
+  },
+  {
+    "input": {
+      "input_tokens": 20000,
+      "output_tokens": 4000,
+      "thinking_tokens": 2000,
+      "cached_input_tokens": 15000,
+      "sub_agent_count": 5,
+      "tool_calls": 20,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 9000,
+    "expected_weighted": 248750
+  },
+  {
+    "input": {
+      "input_tokens": 3648,
+      "output_tokens": 204,
+      "thinking_tokens": 1126,
+      "cached_input_tokens": 4012,
+      "sub_agent_count": 3,
+      "tool_calls": 8,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 204,
+    "expected_weighted": 4659
+  },
+  {
+    "input": {
+      "input_tokens": 3358,
+      "output_tokens": 5543,
+      "thinking_tokens": 2233,
+      "cached_input_tokens": 1424,
+      "sub_agent_count": 9,
+      "tool_calls": 27,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 7477,
+    "expected_weighted": 10110
+  },
+  {
+    "input": {
+      "input_tokens": 976,
+      "output_tokens": 767,
+      "thinking_tokens": 895,
+      "cached_input_tokens": 3811,
+      "sub_agent_count": 8,
+      "tool_calls": 38,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 767,
+    "expected_weighted": 3201
+  },
+  {
+    "input": {
+      "input_tokens": 18390,
+      "output_tokens": 1628,
+      "thinking_tokens": 2932,
+      "cached_input_tokens": 8928,
+      "sub_agent_count": 6,
+      "tool_calls": 14,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 11090,
+    "expected_weighted": 12797
+  },
+  {
+    "input": {
+      "input_tokens": 19309,
+      "output_tokens": 2278,
+      "thinking_tokens": 26,
+      "cached_input_tokens": 2615,
+      "sub_agent_count": 6,
+      "tool_calls": 21,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 18972,
+    "expected_weighted": 156813
+  },
+  {
+    "input": {
+      "input_tokens": 5094,
+      "output_tokens": 1763,
+      "thinking_tokens": 1378,
+      "cached_input_tokens": 1674,
+      "sub_agent_count": 1,
+      "tool_calls": 24,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 5183,
+    "expected_weighted": 5164
+  },
+  {
+    "input": {
+      "input_tokens": 11763,
+      "output_tokens": 6942,
+      "thinking_tokens": 1408,
+      "cached_input_tokens": 9891,
+      "sub_agent_count": 4,
+      "tool_calls": 2,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 8814,
+    "expected_weighted": 19465
+  },
+  {
+    "input": {
+      "input_tokens": 15054,
+      "output_tokens": 4392,
+      "thinking_tokens": 511,
+      "cached_input_tokens": 6201,
+      "sub_agent_count": 1,
+      "tool_calls": 35,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 13245,
+    "expected_weighted": 188986
+  },
+  {
+    "input": {
+      "input_tokens": 11850,
+      "output_tokens": 4729,
+      "thinking_tokens": 787,
+      "cached_input_tokens": 1139,
+      "sub_agent_count": 0,
+      "tool_calls": 42,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 15440,
+    "expected_weighted": 36915
+  },
+  {
+    "input": {
+      "input_tokens": 9482,
+      "output_tokens": 653,
+      "thinking_tokens": 953,
+      "cached_input_tokens": 1654,
+      "sub_agent_count": 6,
+      "tool_calls": 17,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 8481,
+    "expected_weighted": 5813
+  },
+  {
+    "input": {
+      "input_tokens": 11954,
+      "output_tokens": 1332,
+      "thinking_tokens": 1516,
+      "cached_input_tokens": 5820,
+      "sub_agent_count": 3,
+      "tool_calls": 42,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 7466,
+    "expected_weighted": 141470
+  },
+  {
+    "input": {
+      "input_tokens": 2339,
+      "output_tokens": 4990,
+      "thinking_tokens": 2600,
+      "cached_input_tokens": 2803,
+      "sub_agent_count": 8,
+      "tool_calls": 46,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 4990,
+    "expected_weighted": 39880
+  },
+  {
+    "input": {
+      "input_tokens": 5354,
+      "output_tokens": 3786,
+      "thinking_tokens": 1554,
+      "cached_input_tokens": 4422,
+      "sub_agent_count": 10,
+      "tool_calls": 44,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 4718,
+    "expected_weighted": 40093
+  },
+  {
+    "input": {
+      "input_tokens": 7196,
+      "output_tokens": 5608,
+      "thinking_tokens": 1328,
+      "cached_input_tokens": 916,
+      "sub_agent_count": 3,
+      "tool_calls": 2,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 11888,
+    "expected_weighted": 186048
+  },
+  {
+    "input": {
+      "input_tokens": 13145,
+      "output_tokens": 2193,
+      "thinking_tokens": 271,
+      "cached_input_tokens": 3456,
+      "sub_agent_count": 9,
+      "tool_calls": 45,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 11882,
+    "expected_weighted": 140588
+  },
+  {
+    "input": {
+      "input_tokens": 6967,
+      "output_tokens": 5369,
+      "thinking_tokens": 2044,
+      "cached_input_tokens": 6482,
+      "sub_agent_count": 10,
+      "tool_calls": 29,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 5854,
+    "expected_weighted": 43262
+  },
+  {
+    "input": {
+      "input_tokens": 8679,
+      "output_tokens": 1143,
+      "thinking_tokens": 1010,
+      "cached_input_tokens": 9197,
+      "sub_agent_count": 8,
+      "tool_calls": 16,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 1143,
+    "expected_weighted": 8809
+  },
+  {
+    "input": {
+      "input_tokens": 19155,
+      "output_tokens": 3509,
+      "thinking_tokens": 2390,
+      "cached_input_tokens": 6543,
+      "sub_agent_count": 5,
+      "tool_calls": 14,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 16121,
+    "expected_weighted": 47746
+  },
+  {
+    "input": {
+      "input_tokens": 16696,
+      "output_tokens": 4042,
+      "thinking_tokens": 372,
+      "cached_input_tokens": 771,
+      "sub_agent_count": 1,
+      "tool_calls": 9,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 19967,
+    "expected_weighted": 14201
+  },
+  {
+    "input": {
+      "input_tokens": 5242,
+      "output_tokens": 6488,
+      "thinking_tokens": 2787,
+      "cached_input_tokens": 6916,
+      "sub_agent_count": 9,
+      "tool_calls": 4,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 6488,
+    "expected_weighted": 14482
+  },
+  {
+    "input": {
+      "input_tokens": 12504,
+      "output_tokens": 4881,
+      "thinking_tokens": 1917,
+      "cached_input_tokens": 8669,
+      "sub_agent_count": 4,
+      "tool_calls": 35,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 8716,
+    "expected_weighted": 11308
+  },
+  {
+    "input": {
+      "input_tokens": 3753,
+      "output_tokens": 5584,
+      "thinking_tokens": 2199,
+      "cached_input_tokens": 4371,
+      "sub_agent_count": 10,
+      "tool_calls": 21,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 5584,
+    "expected_weighted": 10268
+  },
+  {
+    "input": {
+      "input_tokens": 9617,
+      "output_tokens": 3561,
+      "thinking_tokens": 647,
+      "cached_input_tokens": 7433,
+      "sub_agent_count": 0,
+      "tool_calls": 46,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 5745,
+    "expected_weighted": 12056
+  },
+  {
+    "input": {
+      "input_tokens": 8630,
+      "output_tokens": 7961,
+      "thinking_tokens": 2050,
+      "cached_input_tokens": 2927,
+      "sub_agent_count": 8,
+      "tool_calls": 6,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 13664,
+    "expected_weighted": 21327
+  },
+  {
+    "input": {
+      "input_tokens": 9779,
+      "output_tokens": 6894,
+      "thinking_tokens": 2617,
+      "cached_input_tokens": 8317,
+      "sub_agent_count": 9,
+      "tool_calls": 12,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 8356,
+    "expected_weighted": 54122
+  },
+  {
+    "input": {
+      "input_tokens": 12252,
+      "output_tokens": 6246,
+      "thinking_tokens": 661,
+      "cached_input_tokens": 8837,
+      "sub_agent_count": 8,
+      "tool_calls": 0,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 9661,
+    "expected_weighted": 52110
+  },
+  {
+    "input": {
+      "input_tokens": 10621,
+      "output_tokens": 4002,
+      "thinking_tokens": 79,
+      "cached_input_tokens": 1832,
+      "sub_agent_count": 5,
+      "tool_calls": 19,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 12791,
+    "expected_weighted": 29408
+  },
+  {
+    "input": {
+      "input_tokens": 1898,
+      "output_tokens": 1973,
+      "thinking_tokens": 2323,
+      "cached_input_tokens": 1290,
+      "sub_agent_count": 1,
+      "tool_calls": 46,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 2581,
+    "expected_weighted": 7226
+  },
+  {
+    "input": {
+      "input_tokens": 2267,
+      "output_tokens": 6230,
+      "thinking_tokens": 2181,
+      "cached_input_tokens": 2060,
+      "sub_agent_count": 2,
+      "tool_calls": 42,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 6437,
+    "expected_weighted": 12270
+  },
+  {
+    "input": {
+      "input_tokens": 18015,
+      "output_tokens": 1352,
+      "thinking_tokens": 1085,
+      "cached_input_tokens": 8645,
+      "sub_agent_count": 9,
+      "tool_calls": 27,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 10722,
+    "expected_weighted": 33313
+  },
+  {
+    "input": {
+      "input_tokens": 17671,
+      "output_tokens": 6187,
+      "thinking_tokens": 2989,
+      "cached_input_tokens": 3295,
+      "sub_agent_count": 4,
+      "tool_calls": 25,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 20563,
+    "expected_weighted": 23978
+  },
+  {
+    "input": {
+      "input_tokens": 12236,
+      "output_tokens": 3588,
+      "thinking_tokens": 2119,
+      "cached_input_tokens": 7397,
+      "sub_agent_count": 1,
+      "tool_calls": 15,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 8427,
+    "expected_weighted": 38923
+  },
+  {
+    "input": {
+      "input_tokens": 2098,
+      "output_tokens": 2769,
+      "thinking_tokens": 86,
+      "cached_input_tokens": 9638,
+      "sub_agent_count": 8,
+      "tool_calls": 14,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 2769,
+    "expected_weighted": 20722
+  },
+  {
+    "input": {
+      "input_tokens": 7216,
+      "output_tokens": 58,
+      "thinking_tokens": 290,
+      "cached_input_tokens": 964,
+      "sub_agent_count": 3,
+      "tool_calls": 4,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 6310,
+    "expected_weighted": 2487
+  },
+  {
+    "input": {
+      "input_tokens": 10827,
+      "output_tokens": 580,
+      "thinking_tokens": 2105,
+      "cached_input_tokens": 3899,
+      "sub_agent_count": 4,
+      "tool_calls": 42,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 7508,
+    "expected_weighted": 8149
+  },
+  {
+    "input": {
+      "input_tokens": 7020,
+      "output_tokens": 4417,
+      "thinking_tokens": 541,
+      "cached_input_tokens": 9355,
+      "sub_agent_count": 9,
+      "tool_calls": 30,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 4417,
+    "expected_weighted": 32079
+  },
+  {
+    "input": {
+      "input_tokens": 15498,
+      "output_tokens": 6615,
+      "thinking_tokens": 1667,
+      "cached_input_tokens": 3119,
+      "sub_agent_count": 1,
+      "tool_calls": 6,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 18994,
+    "expected_weighted": 20462
+  },
+  {
+    "input": {
+      "input_tokens": 14124,
+      "output_tokens": 2902,
+      "thinking_tokens": 1734,
+      "cached_input_tokens": 6735,
+      "sub_agent_count": 7,
+      "tool_calls": 46,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 10291,
+    "expected_weighted": 9782
+  },
+  {
+    "input": {
+      "input_tokens": 3224,
+      "output_tokens": 496,
+      "thinking_tokens": 1649,
+      "cached_input_tokens": 5559,
+      "sub_agent_count": 1,
+      "tool_calls": 15,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 496,
+    "expected_weighted": 15009
+  },
+  {
+    "input": {
+      "input_tokens": 6232,
+      "output_tokens": 4393,
+      "thinking_tokens": 1837,
+      "cached_input_tokens": 2296,
+      "sub_agent_count": 6,
+      "tool_calls": 11,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 8329,
+    "expected_weighted": 176343
+  },
+  {
+    "input": {
+      "input_tokens": 15159,
+      "output_tokens": 2046,
+      "thinking_tokens": 308,
+      "cached_input_tokens": 7260,
+      "sub_agent_count": 8,
+      "tool_calls": 6,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 9945,
+    "expected_weighted": 6978
+  },
+  {
+    "input": {
+      "input_tokens": 17713,
+      "output_tokens": 6848,
+      "thinking_tokens": 60,
+      "cached_input_tokens": 1528,
+      "sub_agent_count": 3,
+      "tool_calls": 10,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 23033,
+    "expected_weighted": 14043
+  },
+  {
+    "input": {
+      "input_tokens": 15913,
+      "output_tokens": 3943,
+      "thinking_tokens": 875,
+      "cached_input_tokens": 6570,
+      "sub_agent_count": 0,
+      "tool_calls": 10,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 13286,
+    "expected_weighted": 11166
+  },
+  {
+    "input": {
+      "input_tokens": 70,
+      "output_tokens": 3198,
+      "thinking_tokens": 1086,
+      "cached_input_tokens": 7454,
+      "sub_agent_count": 4,
+      "tool_calls": 27,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 3198,
+    "expected_weighted": 8555
+  },
+  {
+    "input": {
+      "input_tokens": 18211,
+      "output_tokens": 5422,
+      "thinking_tokens": 2942,
+      "cached_input_tokens": 7973,
+      "sub_agent_count": 2,
+      "tool_calls": 12,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 15660,
+    "expected_weighted": 282532
+  },
+  {
+    "input": {
+      "input_tokens": 7133,
+      "output_tokens": 7935,
+      "thinking_tokens": 239,
+      "cached_input_tokens": 9489,
+      "sub_agent_count": 8,
+      "tool_calls": 3,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 7935,
+    "expected_weighted": 17267
+  },
+  {
+    "input": {
+      "input_tokens": 10276,
+      "output_tokens": 468,
+      "thinking_tokens": 205,
+      "cached_input_tokens": 9571,
+      "sub_agent_count": 7,
+      "tool_calls": 32,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 1173,
+    "expected_weighted": 20977
+  },
+  {
+    "input": {
+      "input_tokens": 5158,
+      "output_tokens": 465,
+      "thinking_tokens": 2080,
+      "cached_input_tokens": 1312,
+      "sub_agent_count": 2,
+      "tool_calls": 4,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 4311,
+    "expected_weighted": 21900
+  },
+  {
+    "input": {
+      "input_tokens": 2226,
+      "output_tokens": 5531,
+      "thinking_tokens": 963,
+      "cached_input_tokens": 6615,
+      "sub_agent_count": 1,
+      "tool_calls": 36,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 5531,
+    "expected_weighted": 31877
+  },
+  {
+    "input": {
+      "input_tokens": 18970,
+      "output_tokens": 4870,
+      "thinking_tokens": 162,
+      "cached_input_tokens": 1343,
+      "sub_agent_count": 6,
+      "tool_calls": 42,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 22497,
+    "expected_weighted": 51594
+  },
+  {
+    "input": {
+      "input_tokens": 18521,
+      "output_tokens": 4282,
+      "thinking_tokens": 1295,
+      "cached_input_tokens": 4272,
+      "sub_agent_count": 3,
+      "tool_calls": 42,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 18531,
+    "expected_weighted": 18161
+  },
+  {
+    "input": {
+      "input_tokens": 10295,
+      "output_tokens": 1955,
+      "thinking_tokens": 1087,
+      "cached_input_tokens": 6484,
+      "sub_agent_count": 2,
+      "tool_calls": 42,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 5766,
+    "expected_weighted": 10720
+  },
+  {
+    "input": {
+      "input_tokens": 9830,
+      "output_tokens": 3745,
+      "thinking_tokens": 1295,
+      "cached_input_tokens": 1188,
+      "sub_agent_count": 0,
+      "tool_calls": 29,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 12387,
+    "expected_weighted": 39425
+  },
+  {
+    "input": {
+      "input_tokens": 18448,
+      "output_tokens": 819,
+      "thinking_tokens": 300,
+      "cached_input_tokens": 8808,
+      "sub_agent_count": 3,
+      "tool_calls": 32,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 10459,
+    "expected_weighted": 132274
+  },
+  {
+    "input": {
+      "input_tokens": 4340,
+      "output_tokens": 7645,
+      "thinking_tokens": 1429,
+      "cached_input_tokens": 1127,
+      "sub_agent_count": 3,
+      "tool_calls": 23,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 10858,
+    "expected_weighted": 220389
+  },
+  {
+    "input": {
+      "input_tokens": 5169,
+      "output_tokens": 3589,
+      "thinking_tokens": 2225,
+      "cached_input_tokens": 4956,
+      "sub_agent_count": 9,
+      "tool_calls": 41,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 3802,
+    "expected_weighted": 42535
+  },
+  {
+    "input": {
+      "input_tokens": 256,
+      "output_tokens": 5471,
+      "thinking_tokens": 2271,
+      "cached_input_tokens": 4905,
+      "sub_agent_count": 10,
+      "tool_calls": 6,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 5471,
+    "expected_weighted": 36786
+  },
+  {
+    "input": {
+      "input_tokens": 8666,
+      "output_tokens": 945,
+      "thinking_tokens": 438,
+      "cached_input_tokens": 9064,
+      "sub_agent_count": 2,
+      "tool_calls": 17,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 945,
+    "expected_weighted": 84462
+  },
+  {
+    "input": {
+      "input_tokens": 19819,
+      "output_tokens": 1725,
+      "thinking_tokens": 2939,
+      "cached_input_tokens": 5617,
+      "sub_agent_count": 3,
+      "tool_calls": 43,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 15927,
+    "expected_weighted": 17951
+  },
+  {
+    "input": {
+      "input_tokens": 8650,
+      "output_tokens": 4140,
+      "thinking_tokens": 2001,
+      "cached_input_tokens": 4114,
+      "sub_agent_count": 0,
+      "tool_calls": 5,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 8676,
+    "expected_weighted": 14351
+  },
+  {
+    "input": {
+      "input_tokens": 13879,
+      "output_tokens": 6794,
+      "thinking_tokens": 1133,
+      "cached_input_tokens": 722,
+      "sub_agent_count": 0,
+      "tool_calls": 21,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 19951,
+    "expected_weighted": 47843
+  },
+  {
+    "input": {
+      "input_tokens": 8583,
+      "output_tokens": 1323,
+      "thinking_tokens": 1809,
+      "cached_input_tokens": 9038,
+      "sub_agent_count": 6,
+      "tool_calls": 35,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 1323,
+    "expected_weighted": 6769
+  },
+  {
+    "input": {
+      "input_tokens": 3665,
+      "output_tokens": 616,
+      "thinking_tokens": 2830,
+      "cached_input_tokens": 2442,
+      "sub_agent_count": 8,
+      "tool_calls": 2,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 1839,
+    "expected_weighted": 113116
+  },
+  {
+    "input": {
+      "input_tokens": 19087,
+      "output_tokens": 4526,
+      "thinking_tokens": 606,
+      "cached_input_tokens": 7041,
+      "sub_agent_count": 2,
+      "tool_calls": 2,
+      "model_id": "claude-opus-4"
+    },
+    "expected_simple": 16572,
+    "expected_weighted": 207626
+  },
+  {
+    "input": {
+      "input_tokens": 11948,
+      "output_tokens": 7364,
+      "thinking_tokens": 163,
+      "cached_input_tokens": 5862,
+      "sub_agent_count": 3,
+      "tool_calls": 43,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 13450,
+    "expected_weighted": 45706
+  },
+  {
+    "input": {
+      "input_tokens": 3368,
+      "output_tokens": 2897,
+      "thinking_tokens": 2293,
+      "cached_input_tokens": 6658,
+      "sub_agent_count": 9,
+      "tool_calls": 47,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 2897,
+    "expected_weighted": 31687
+  },
+  {
+    "input": {
+      "input_tokens": 7757,
+      "output_tokens": 7082,
+      "thinking_tokens": 665,
+      "cached_input_tokens": 2900,
+      "sub_agent_count": 6,
+      "tool_calls": 1,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 11939,
+    "expected_weighted": 41250
+  },
+  {
+    "input": {
+      "input_tokens": 10885,
+      "output_tokens": 6409,
+      "thinking_tokens": 1686,
+      "cached_input_tokens": 4065,
+      "sub_agent_count": 4,
+      "tool_calls": 10,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 13229,
+    "expected_weighted": 18743
+  },
+  {
+    "input": {
+      "input_tokens": 3542,
+      "output_tokens": 3133,
+      "thinking_tokens": 158,
+      "cached_input_tokens": 7711,
+      "sub_agent_count": 3,
+      "tool_calls": 12,
+      "model_id": "gpt-5-mini"
+    },
+    "expected_simple": 3133,
+    "expected_weighted": 5696
+  },
+  {
+    "input": {
+      "input_tokens": 11457,
+      "output_tokens": 2500,
+      "thinking_tokens": 932,
+      "cached_input_tokens": 3652,
+      "sub_agent_count": 0,
+      "tool_calls": 42,
+      "model_id": "claude-sonnet-4"
+    },
+    "expected_simple": 10305,
+    "expected_weighted": 28583
+  },
+  {
+    "input": {
+      "input_tokens": 13056,
+      "output_tokens": 2689,
+      "thinking_tokens": 1141,
+      "cached_input_tokens": 1137,
+      "sub_agent_count": 4,
+      "tool_calls": 22,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 14608,
+    "expected_weighted": 12693
+  },
+  {
+    "input": {
+      "input_tokens": 16692,
+      "output_tokens": 3274,
+      "thinking_tokens": 2783,
+      "cached_input_tokens": 8785,
+      "sub_agent_count": 5,
+      "tool_calls": 1,
+      "model_id": "claude-haiku-4"
+    },
+    "expected_simple": 11181,
+    "expected_weighted": 11471
+  },
+  {
+    "input": {
+      "input_tokens": 8559,
+      "output_tokens": 1462,
+      "thinking_tokens": 2378,
+      "cached_input_tokens": 4349,
+      "sub_agent_count": 0,
+      "tool_calls": 6,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 5672,
+    "expected_weighted": 32439
+  },
+  {
+    "input": {
+      "input_tokens": 14239,
+      "output_tokens": 2831,
+      "thinking_tokens": 2984,
+      "cached_input_tokens": 5139,
+      "sub_agent_count": 6,
+      "tool_calls": 38,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 11931,
+    "expected_weighted": 53277
+  },
+  {
+    "input": {
+      "input_tokens": 3789,
+      "output_tokens": 3155,
+      "thinking_tokens": 2361,
+      "cached_input_tokens": 3114,
+      "sub_agent_count": 4,
+      "tool_calls": 2,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 3830,
+    "expected_weighted": 11851
+  },
+  {
+    "input": {
+      "input_tokens": 14288,
+      "output_tokens": 13,
+      "thinking_tokens": 2129,
+      "cached_input_tokens": 8821,
+      "sub_agent_count": 10,
+      "tool_calls": 46,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 5480,
+    "expected_weighted": 12267
+  },
+  {
+    "input": {
+      "input_tokens": 6456,
+      "output_tokens": 2983,
+      "thinking_tokens": 1766,
+      "cached_input_tokens": 1146,
+      "sub_agent_count": 10,
+      "tool_calls": 21,
+      "model_id": "gpt-5"
+    },
+    "expected_simple": 8293,
+    "expected_weighted": 37060
+  },
+  {
+    "input": {
+      "input_tokens": 10286,
+      "output_tokens": 5434,
+      "thinking_tokens": 510,
+      "cached_input_tokens": 4920,
+      "sub_agent_count": 8,
+      "tool_calls": 19,
+      "model_id": "perplexity-sonar"
+    },
+    "expected_simple": 10800,
+    "expected_weighted": 15206
+  }
+]
