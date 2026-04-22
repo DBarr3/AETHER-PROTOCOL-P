@@ -17,9 +17,10 @@ ModelRouter — MODEL SELECTION ONLY. NOT A POLICY ENFORCER.
      (OpusBudgetExhaustedError, PlanExcludesOpusError).
 
   ⚠  See diagrams/docs_router_architecture.md § "Division of Responsibility"
-     for the hard line. Any code that reads `RouterResponse.downgrade_reason`
-     and shows it to a user is a philosophy violation — fix the caller, not
-     this file.
+     for the hard line. RouterResponse.downgrade_reason was removed in PR 1
+     v5 cleanup; callers that used to read it now receive a typed exception
+     (PlanExcludesOpusError or OpusBudgetExhaustedError) that surfaces as
+     an honest HTTP 402 — no silent downgrade path exists anymore.
 
 ModelRouter's actual job:
     1. Compress hydrated context to plan.context_budget_tokens
@@ -60,7 +61,35 @@ log = logging.getLogger("aethercloud.router")
 # prod. SRE: page on a non-zero rate after PR 1 v5 cuts over.
 # See diagrams/docs_router_architecture.md § "Dead-code safety net".
 policy_bypass_detected: int = 0
+# Per-gate bypass counter — incremented when the typed-exception tripwires
+# fire (PlanExcludesOpusError, OpusBudgetExhaustedError). Production should
+# see these at 0; any non-zero value means a request reached Stage D with
+# a condition that PolicyGate would have refused. Emits alongside the
+# module counter for SRE alert correlation.
+policy_bypass_by_gate: dict[str, int] = {
+    "plan_excludes_opus": 0,
+    "opus_budget_exhausted": 0,
+}
 _warned_once: bool = False
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tripwire exceptions — replace the PR 1 v4 silent-downgrade branches.
+# In production PolicyGate blocks both upstream; if either raises, SRE pages.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class PlanExcludesOpusError(Exception):
+    """User's tier has opus_pct_cap=0 but heavy load was classified.
+    PolicyGate should have caught this as FreeTierModelBlockedError (PR 2+)
+    or mapped 'heavy' to Sonnet at the routing-table level. If this raises,
+    something bypassed PolicyGate."""
+
+
+class OpusBudgetExhaustedError(Exception):
+    """User's opus sub-budget hit 0 MTD but heavy load was classified.
+    PolicyGate should have caught this as OpusBudgetExceededError. If this
+    raises, something bypassed PolicyGate."""
 
 Tier = Literal["free", "solo", "pro", "team"]
 
@@ -93,7 +122,12 @@ class PlanConfig:
 @dataclass
 class RouterResponse:
     """What the /agent/run endpoint returns. Every field feeds the UX
-    breakdown panel or the billing ledger — nothing here is decorative."""
+    breakdown panel or the billing ledger — nothing here is decorative.
+
+    Note: `downgrade_reason` was removed in PR 1 v5 cleanup. Budget/tier
+    denials now raise typed exceptions (PlanExcludesOpusError,
+    OpusBudgetExhaustedError) that surface to the caller as honest 402s
+    via lib/uvt_routes.py. Silent downgrade is a philosophy violation."""
     text: str
     orchestrator_model: ModelKey
     qopc_load: str
@@ -101,7 +135,6 @@ class RouterResponse:
     reason: str                              # classifier's reason string
     total_uvt: int                           # UVT consumed by orchestrator call
     classifier_uvt: int                      # UVT consumed by classifier call(s)
-    downgrade_reason: Optional[str] = None   # set when Opus was wanted but denied
     reclassified: bool = False               # second-pass was invoked
 
 
@@ -187,9 +220,10 @@ class Router:
         classifier_uvt = _classifier_token_estimate(prompt, compressed_ctx)
         reclassified = False
 
-        # 3. Pick orchestrator model
+        # 3. Pick orchestrator model (raises PlanExcludesOpusError /
+        #    OpusBudgetExhaustedError on heavy-but-denied cases)
         opus_remaining = self._opus_budget_remaining(user_id, plan_cfg)
-        orchestrator_model, downgrade_reason = self._pick_orchestrator(
+        orchestrator_model = self._pick_orchestrator(
             signal, plan_cfg, opus_remaining,
         )
 
@@ -212,10 +246,11 @@ class Router:
             classifier_uvt += _classifier_token_estimate(prompt, compressed_ctx)
             reclassified = True
             if signal2.load != "heavy":
-                # Second pass disagrees — downgrade. Use the second signal's
-                # load as the ground truth.
+                # Second pass disagrees — use the second signal's load as
+                # ground truth (work-appropriate adjustment, not a budget
+                # downgrade).
                 signal = signal2
-                orchestrator_model, downgrade_reason = self._pick_orchestrator(
+                orchestrator_model = self._pick_orchestrator(
                     signal2, plan_cfg, opus_remaining,
                 )
 
@@ -241,7 +276,6 @@ class Router:
             reason=signal.reason,
             total_uvt=resp.uvt_consumed,
             classifier_uvt=classifier_uvt,
-            downgrade_reason=downgrade_reason,
             reclassified=reclassified,
         )
 
@@ -252,29 +286,34 @@ class Router:
         signal: qopc_bridge.QopcSignal,
         plan_cfg: PlanConfig,
         opus_remaining: int,
-    ) -> tuple[ModelKey, Optional[str]]:
+    ) -> ModelKey:
         """Map qopc_load × tier × opus-budget → orchestrator model.
-        Returns (model_key, downgrade_reason). downgrade_reason is non-None
-        only when Opus was the 'right' choice but we had to fall back."""
+
+        On heavy-but-denied cases, raises a typed tripwire exception.
+        Production PolicyGate (TS edge) blocks these cases upstream with
+        FreeTierModelBlockedError / OpusBudgetExceededError → HTTP 402. If
+        either tripwire raises in prod, SRE pages — it means PolicyGate
+        was bypassed.
+        """
         if signal.load == "light":
-            return "haiku", None
+            return "haiku"
         if signal.load == "medium":
-            return "sonnet", None
+            return "sonnet"
 
         # heavy
-        # NOTE: downgrade paths below are defensive-only. Production HTTP entry
-        # point is PR 1's /api/internal/router/pick which enforces hard 402
-        # gates (OpusBudgetExceededError / InsufficientUvtBalanceError) BEFORE
-        # this code runs. These branches execute only if Stage D is called
-        # directly (e.g. internal tooling, the harness, or a test). See
-        # docs/router.md § "Philosophy". Follow-up: after PR 1 ships, replace
-        # these silent downgrades with typed Python exceptions so callers
-        # can't accidentally get a weaker model without knowing.
         if plan_cfg.opus_pct_cap <= 0:
-            return "sonnet", "tier does not include Opus"
+            policy_bypass_by_gate["plan_excludes_opus"] += 1
+            raise PlanExcludesOpusError(
+                f"tier={plan_cfg.tier!r} has opus_pct_cap=0 — PolicyGate "
+                "should have mapped this task away from Opus upstream"
+            )
         if opus_remaining <= 0:
-            return "sonnet", "Opus sub-budget exhausted for this period"
-        return "opus", None
+            policy_bypass_by_gate["opus_budget_exhausted"] += 1
+            raise OpusBudgetExhaustedError(
+                f"tier={plan_cfg.tier!r} opus sub-budget is 0 MTD — "
+                "PolicyGate should have refused this call upstream"
+            )
+        return "opus"
 
     # ── Plan config lookup ──────────────────────────────────────────────
 

@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
-from lib import feature_flags, pricing_guard
+from lib import feature_flags, pricing_guard, router as router_module
 from lib.router import PlanConfig, Router
 
 log = logging.getLogger("aethercloud.uvt_routes")
@@ -63,7 +63,6 @@ class AgentRunResponse(BaseModel):
     reason: str
     total_uvt: int
     classifier_uvt: int
-    downgrade_reason: Optional[str] = None
     reclassified: bool = False
     overage_in_effect: bool = False
     task_id: Optional[str] = None
@@ -210,15 +209,31 @@ async def agent_run(
     if router_instance is None:
         raise HTTPException(status_code=503, detail="Router not configured")
 
-    result = await router_instance.route(
-        user_id=user_id,
-        tier=tier,  # type: ignore[arg-type]
-        prompt=req.prompt,
-        task_id=req.task_id,
-        hydrated_context=req.hydrated_context,
-        system=req.system,
-        mcp_servers=req.mcp_servers,
-    )
+    try:
+        result = await router_instance.route(
+            user_id=user_id,
+            tier=tier,  # type: ignore[arg-type]
+            prompt=req.prompt,
+            task_id=req.task_id,
+            hydrated_context=req.hydrated_context,
+            system=req.system,
+            mcp_servers=req.mcp_servers,
+        )
+    except router_module.PlanExcludesOpusError as e:
+        # Tripwire — PolicyGate should have refused upstream. Surface as 402.
+        raise HTTPException(status_code=402, detail={
+            "error": "router_gate",
+            "gate_type": "plan_excludes_opus",
+            "user_message_code": "upgrade_for_opus",
+            "message": str(e),
+        })
+    except router_module.OpusBudgetExhaustedError as e:
+        raise HTTPException(status_code=402, detail={
+            "error": "router_gate",
+            "gate_type": "opus_budget_exhausted",
+            "user_message_code": "opus_budget_exceeded",
+            "message": str(e),
+        })
 
     return AgentRunResponse(
         text=result.text,
@@ -228,7 +243,6 @@ async def agent_run(
         reason=result.reason,
         total_uvt=result.total_uvt,
         classifier_uvt=result.classifier_uvt,
-        downgrade_reason=result.downgrade_reason,
         reclassified=result.reclassified,
         overage_in_effect=decision.overage_in_effect,
         task_id=req.task_id,

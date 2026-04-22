@@ -8,8 +8,11 @@ We mock:
 
 The contract under test:
 - Decision rules: light→haiku, medium→sonnet, heavy→opus (when allowed)
-- Tier gating: free/solo always downgrade heavy to sonnet (opus_pct_cap=0)
-- Opus sub-budget: exhausted → silent downgrade + downgrade_reason set
+- Tier gating: free/solo raise PlanExcludesOpusError when heavy is classified
+  (post-PR 1 v5: these are tripwire exceptions; production PolicyGate at the
+  HTTP edge blocks these cases upstream so the exceptions should never fire
+  in live traffic — they're defense-in-depth)
+- Opus sub-budget: exhausted → raise OpusBudgetExhaustedError (same tripwire)
 - Confidence gate: heavy + conf<0.6 triggers second-pass classify
 - Plan config caching: one lookup per tier
 - output_cap applied as max_tokens
@@ -173,7 +176,6 @@ async def test_heavy_on_pro_picks_opus(patches):
     r = router.Router(_supabase_mock(opus_uvt_used=0))
     result = await r.route(user_id="u-1", tier="pro", prompt="Design my system")
     assert result.orchestrator_model == "opus"
-    assert result.downgrade_reason is None
 
 
 @pytest.mark.asyncio
@@ -191,23 +193,21 @@ async def test_heavy_on_team_picks_opus(patches):
 
 
 @pytest.mark.asyncio
-async def test_heavy_on_free_downgrades_to_sonnet(patches):
+async def test_heavy_on_free_raises_PlanExcludesOpusError(patches):
     classify_m, _ = patches
     classify_m.return_value = QopcSignal(load="heavy", confidence=0.95, reason="big")
     r = router.Router(_supabase_mock())
-    result = await r.route(user_id="u-1", tier="free", prompt="Design system")
-    assert result.orchestrator_model == "sonnet"
-    assert result.downgrade_reason == "tier does not include Opus"
+    with pytest.raises(router.PlanExcludesOpusError):
+        await r.route(user_id="u-1", tier="free", prompt="Design system")
 
 
 @pytest.mark.asyncio
-async def test_heavy_on_solo_downgrades_to_sonnet(patches):
+async def test_heavy_on_solo_raises_PlanExcludesOpusError(patches):
     classify_m, _ = patches
     classify_m.return_value = QopcSignal(load="heavy", confidence=0.95, reason="big")
     r = router.Router(_supabase_mock())
-    result = await r.route(user_id="u-1", tier="solo", prompt="Design system")
-    assert result.orchestrator_model == "sonnet"
-    assert "does not include Opus" in result.downgrade_reason
+    with pytest.raises(router.PlanExcludesOpusError):
+        await r.route(user_id="u-1", tier="solo", prompt="Design system")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -216,25 +216,23 @@ async def test_heavy_on_solo_downgrades_to_sonnet(patches):
 
 
 @pytest.mark.asyncio
-async def test_opus_exhausted_pro_downgrades(patches):
+async def test_opus_exhausted_pro_raises_OpusBudgetExhaustedError(patches):
     classify_m, _ = patches
     classify_m.return_value = QopcSignal(load="heavy", confidence=0.95, reason="big")
     # Pro budget = 1.5M * 0.10 = 150k. Simulate 150k already used.
     r = router.Router(_supabase_mock(opus_uvt_used=150_000))
-    result = await r.route(user_id="u-1", tier="pro", prompt="Complex thing")
-    assert result.orchestrator_model == "sonnet"
-    assert "exhausted" in result.downgrade_reason.lower()
+    with pytest.raises(router.OpusBudgetExhaustedError):
+        await r.route(user_id="u-1", tier="pro", prompt="Complex thing")
 
 
 @pytest.mark.asyncio
-async def test_opus_exhausted_team_downgrades(patches):
+async def test_opus_exhausted_team_raises_OpusBudgetExhaustedError(patches):
     classify_m, _ = patches
     classify_m.return_value = QopcSignal(load="heavy", confidence=0.95, reason="big")
     # Team budget = 3M * 0.25 = 750k. Simulate 800k already used (overshot).
     r = router.Router(_supabase_mock(opus_uvt_used=800_000))
-    result = await r.route(user_id="u-1", tier="team", prompt="Complex thing")
-    assert result.orchestrator_model == "sonnet"
-    assert "exhausted" in result.downgrade_reason.lower()
+    with pytest.raises(router.OpusBudgetExhaustedError):
+        await r.route(user_id="u-1", tier="team", prompt="Complex thing")
 
 
 @pytest.mark.asyncio
@@ -420,7 +418,6 @@ async def test_response_carries_all_breakdown_fields(patches):
     assert result.reason == "architecture"
     assert result.total_uvt == 5000
     assert result.classifier_uvt > 0
-    assert result.downgrade_reason is None
     assert result.reclassified is False
 
 

@@ -178,7 +178,6 @@ class _FakeRouterResp:
     reason: str = "simple"
     total_uvt: int = 100
     classifier_uvt: int = 50
-    downgrade_reason: Any = None
     reclassified: bool = False
 
 
