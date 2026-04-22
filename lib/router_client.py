@@ -112,7 +112,12 @@ async def pick(ctx: dict[str, Any]) -> RoutingDecision:
 
     ctx is the RoutingContext shape validated zod-side:
       userId, tier, taskKind, estimatedInputTokens, estimatedOutputTokens,
-      opusPctMtd, activeConcurrentTasks, uvtBalance, requestId, traceId.
+      requestId, traceId.
+    (opusPctMtd, activeConcurrentTasks, uvtBalance were removed from the
+    PolicyGate contract in C1/C2/C3 — see
+    tests/security/redteam_policygate_report.md. The TS route now
+    server-resolves them from Supabase. Callers may still include them
+    in the dict for now; the route strips legacy keys pre-Zod.)
     """
     url = os.environ.get("AETHER_ROUTER_URL")
     token = os.environ.get("AETHER_INTERNAL_SERVICE_TOKEN")
