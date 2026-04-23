@@ -90,11 +90,15 @@ export async function assertPlanParity(
       continue;
     }
     const expected = PLAN_CAPS[tier];
+    // Cast via unknown — PlanCaps has no index signature, so direct cast to
+    // Record<string, number> is a TS2352 error in strict mode. The values
+    // ARE all numbers; we assert that here.
+    const expectedRec = expected as unknown as Record<string, number>;
     for (const key of PARITY_FIELDS) {
-      const ev = Number((expected as Record<string, number>)[key]);
+      const ev = Number(expectedRec[key]);
       const dv = Number(row[key]);
       if (!Number.isFinite(ev) || !Number.isFinite(dv) || ev !== dv) {
-        issues.push(`${tier}.${key}: db=${row[key]} ts=${(expected as any)[key]}`);
+        issues.push(`${tier}.${key}: db=${row[key]} ts=${expectedRec[key]}`);
       }
     }
   }

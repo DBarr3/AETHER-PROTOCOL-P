@@ -52,11 +52,26 @@ export function ensureRouterBooted(): void {
     const supabase = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    setAuditWriter(makeSupabaseAuditWriter(supabase));
-    setOpusPctMtdResolver((userId) => getOpusPctMtd(userId, { supabase }));
-    setUvtBalanceResolver((userId) => getUvtBalance(userId, { supabase }));
+
+    // SupabaseClient's generic type depth causes TS2589 ("Type
+    // instantiation is excessively deep and possibly infinite") when
+    // unifying against the deeply-nested query-builder interfaces we
+    // use in the resolver deps (order?().limit().maybeSingle?() chain
+    // in GetUvtBalanceDeps, etc.). The runtime object supports every
+    // method we call; the cast here narrows to the structural shape
+    // each resolver expects without asking TS to do the heavy generic
+    // match. Each resolver's own interface still enforces its method
+    // contract at the call site inside the fn, which is what matters
+    // for test stubs and future refactors.
+    //
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    setAuditWriter(makeSupabaseAuditWriter(sb));
+    setOpusPctMtdResolver((userId) => getOpusPctMtd(userId, { supabase: sb }));
+    setUvtBalanceResolver((userId) => getUvtBalance(userId, { supabase: sb }));
     setActiveConcurrentTasksResolver((userId) =>
-      getActiveConcurrentTasks(userId, { supabase }),
+      getActiveConcurrentTasks(userId, { supabase: sb }),
     );
 
     // Red Team #1 M5 — fire-and-forget plan-parity check. Records the
@@ -66,7 +81,7 @@ export function ensureRouterBooted(): void {
     // which cannot be async. The first few requests may land before the
     // check completes and will pass through; once the check settles,
     // subsequent requests see the cached result.
-    void assertPlanParity(supabase as unknown as Parameters<typeof assertPlanParity>[0])
+    void assertPlanParity(sb as Parameters<typeof assertPlanParity>[0])
       .then(() => recordPlanParityResult(null))
       .catch((err: unknown) => {
         recordPlanParityResult(

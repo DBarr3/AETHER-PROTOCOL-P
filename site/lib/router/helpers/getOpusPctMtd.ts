@@ -32,11 +32,14 @@ const _lkg = new Map<string, number>();
 
 export interface OpusPctMtdDeps {
   supabase: {
-    rpc?: (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>;
+    // PromiseLike — the real @supabase/supabase-js client returns
+    // PostgrestFilterBuilder from rpc()/from()..., which is thenable but
+    // NOT a strict Promise<T>. `await` resolves both the same way.
+    rpc?: (fn: string, args: unknown) => PromiseLike<{ data: unknown; error: unknown }>;
     from: (t: string) => {
       select: (cols: string) => {
         eq: (col: string, val: string) => {
-          gte: (col: string, val: string) => Promise<{ data: unknown; error: unknown }>;
+          gte: (col: string, val: string) => PromiseLike<{ data: unknown; error: unknown }>;
         };
       };
     };

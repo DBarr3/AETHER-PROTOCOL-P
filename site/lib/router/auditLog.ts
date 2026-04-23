@@ -184,8 +184,18 @@ export function recordGateAsync(
 
 // Production wiring — called once at app boot from the API route.
 // Kept as a factory so tests don't accidentally hit Supabase.
+//
+// PromiseLike<...> (not strict Promise<...>) is deliberate: the real
+// @supabase/supabase-js `from().insert()` returns a PostgrestFilterBuilder
+// that is thenable but lacks .catch/.finally/[Symbol.toStringTag] which
+// strict Promise<T> requires. `await` only needs PromiseLike, and
+// destructuring the awaited value works the same way.
 export function makeSupabaseAuditWriter(
-  supabase: { from: (t: string) => { insert: (row: unknown) => Promise<{ error: unknown }> } },
+  supabase: {
+    from: (t: string) => {
+      insert: (row: unknown) => PromiseLike<{ error: unknown }>;
+    };
+  },
 ): AuditWriter {
   return async (row: RoutingDecisionRow) => {
     const { error } = await supabase.from("routing_decisions").insert(row);

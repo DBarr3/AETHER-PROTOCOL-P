@@ -16,6 +16,11 @@
 // so a DB failure surfaces as a 500 to the caller — explicitly NOT a
 // fail-open (which would mean "unlimited balance during DB outage").
 
+// PromiseLike — the real @supabase/supabase-js query builder is thenable
+// but NOT a strict Promise<T> (lacks .catch / .finally / Symbol.toStringTag).
+// Using Promise<T> here caused TS2589 "Type instantiation is excessively
+// deep" when SupabaseClient was passed as the arg; PromiseLike is the
+// documented escape hatch.
 export interface GetUvtBalanceDeps {
   supabase: {
     from: (table: string) => {
@@ -23,11 +28,11 @@ export interface GetUvtBalanceDeps {
         eq: (col: string, val: string) => {
           order?: (col: string, opts: { ascending: boolean }) => {
             limit: (n: number) => {
-              maybeSingle?: () => Promise<{ data: unknown; error: unknown }>;
+              maybeSingle?: () => PromiseLike<{ data: unknown; error: unknown }>;
             };
           };
-          single?: () => Promise<{ data: unknown; error: unknown }>;
-          maybeSingle?: () => Promise<{ data: unknown; error: unknown }>;
+          single?: () => PromiseLike<{ data: unknown; error: unknown }>;
+          maybeSingle?: () => PromiseLike<{ data: unknown; error: unknown }>;
         };
       };
     };

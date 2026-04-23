@@ -8,8 +8,16 @@
 // at the libcrypto level) and pads unequal-length inputs so the length
 // branch also takes the full compare's worth of time.
 
-import { timingSafeEqual } from "node:crypto";
 import { metrics } from "@opentelemetry/api";
+
+// Why not node:crypto.timingSafeEqual:
+//   site/middleware.ts consumes this module from the Vercel edge runtime,
+//   which does not expose node:-prefixed built-ins. `import "node:crypto"`
+//   was causing webpack UnhandledSchemeError at build time. The XOR-reduce
+//   below is runtime-agnostic (works on edge + nodejs) and gives the same
+//   constant-time property as timingSafeEqual provided we don't early-exit
+//   on length mismatch — which is exactly the M2 fix over the pre-M2 hand-
+//   rolled version.
 
 // Red Team #1 M3 — counter emitted every time the rotation-overlap token
 // (_PREV) is the one that matches. SRE alert: any traffic on this counter
@@ -33,33 +41,32 @@ function isPrevExpired(): boolean {
 }
 
 /**
- * Constant-time string compare. Uses node:crypto.timingSafeEqual under
- * the hood; pads unequal-length inputs before comparing so the length
- * check cannot be observed via timing.
+ * Constant-time string compare. No early return on length mismatch —
+ * always walks max(len_a, len_b) codepoints. Folds the length difference
+ * into the XOR accumulator so a length-oracle attacker cannot distinguish
+ * "wrong length" from "wrong content" via timing.
  *
- * Returns true only when both strings are the same length AND have
- * byte-identical utf8 representations.
+ * Edge-runtime safe (works without node:crypto). Equivalent timing
+ * property to node:crypto.timingSafeEqual as long as the loop is not
+ * short-circuited by a hostile JIT — the accumulator write on every
+ * iteration keeps the loop alive for the optimizer.
+ *
+ * Returns true only when both strings have the same length AND
+ * byte-identical UTF-16 codepoint sequences. (All callers use this on
+ * opaque service-token strings; no Unicode normalization edge cases
+ * apply because the comparison is codepoint-exact.)
  */
 export function serviceTokenEquals(provided: string, expected: string): boolean {
-  const ab = Buffer.from(provided, "utf8");
-  const bb = Buffer.from(expected, "utf8");
-
-  if (ab.length !== bb.length) {
-    // Pad both sides to the longer length. timingSafeEqual still runs a
-    // constant-time compare; we intentionally discard the result and
-    // return false because the original lengths were unequal. The pad
-    // step ensures the "unequal-length" branch and the "equal-length
-    // mismatch" branch take approximately the same time.
-    const n = Math.max(ab.length, bb.length, 1);
-    const pa = Buffer.concat([ab, Buffer.alloc(n - ab.length)], n);
-    const pb = Buffer.concat([bb, Buffer.alloc(n - bb.length)], n);
-    // Result intentionally consumed by the runtime but not used in the
-    // return value — this is the "keep-the-timing-cost" branch.
-    timingSafeEqual(pa, pb);
-    return false;
+  const la = provided.length;
+  const lb = expected.length;
+  const n = la > lb ? la : lb || 1;
+  let diff = la ^ lb;
+  for (let i = 0; i < n; i++) {
+    const ca = i < la ? provided.charCodeAt(i) : 0;
+    const cb = i < lb ? expected.charCodeAt(i) : 0;
+    diff |= ca ^ cb;
   }
-
-  return timingSafeEqual(ab, bb);
+  return diff === 0;
 }
 
 /**

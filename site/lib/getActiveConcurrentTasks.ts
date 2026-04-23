@@ -30,13 +30,15 @@
 
 const STALE_TASK_WINDOW_MINUTES = 10;
 
+// PromiseLike — see note in getUvtBalance.ts: Supabase query builders are
+// thenable but not strict Promise<T>.
 export interface GetActiveConcurrentTasksDeps {
   supabase: {
     from: (table: string) => {
       select: (cols: string, opts?: { count?: "exact" }) => {
         eq: (col: string, val: string) => {
           in: (col: string, vals: string[]) => {
-            gte: (col: string, val: string) => Promise<{
+            gte: (col: string, val: string) => PromiseLike<{
               data: unknown;
               error: unknown;
               count?: number | null;
