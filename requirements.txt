@@ -10,7 +10,7 @@
 # requirements.lock from this file for reproducible deploys.
 
 # ─── Protocol-L Dependencies ─────────────────────
-qiskit>=2.0.0
+qiskit>=2.4.0
 qiskit-ibm-runtime>=0.46.1
 qiskit-aer>=0.17.2
 pyasn1>=0.5.0
