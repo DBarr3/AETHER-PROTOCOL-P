@@ -5,6 +5,12 @@ import {
   resetAuditWriter,
   type RoutingDecisionRow,
 } from "@/lib/router/auditLog";
+import {
+  resetGateInputsForTests,
+  setActiveConcurrentTasksResolver,
+  setOpusPctMtdResolver,
+  setUvtBalanceResolver,
+} from "@/lib/router/gateInputs";
 
 const GOOD = "test-service-token-xyz";
 
@@ -20,15 +26,17 @@ function req(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
+// opusPctMtd (C1), uvtBalance (C2), and activeConcurrentTasks (C3) are
+// intentionally absent — all three are server-resolved. Tests that
+// need specific gate trips install resolver stubs via
+// setOpusPctMtdResolver / setUvtBalanceResolver /
+// setActiveConcurrentTasksResolver.
 const validCtx = {
   userId: "00000000-0000-0000-0000-000000000001",
   tier: "pro",
   taskKind: "chat",
   estimatedInputTokens: 100,
   estimatedOutputTokens: 100,
-  opusPctMtd: 0,
-  activeConcurrentTasks: 0,
-  uvtBalance: 1_000_000,
   requestId: "req_integ_1",
   traceId: "trace_integ_1",
 };
@@ -37,12 +45,14 @@ beforeEach(() => {
   process.env.AETHER_INTERNAL_SERVICE_TOKEN = GOOD;
   process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV = "";
   resetAuditWriter();
+  resetGateInputsForTests();
 });
 
 afterAll(() => {
   delete process.env.AETHER_INTERNAL_SERVICE_TOKEN;
   delete process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV;
   resetAuditWriter();
+  resetGateInputsForTests();
 });
 
 describe("POST /api/internal/router/pick", () => {
@@ -90,9 +100,11 @@ describe("POST /api/internal/router/pick", () => {
   });
 
   it("402 with router_gate body shape on OpusBudgetExceeded", async () => {
-    const res = await POST(
-      req({ ...validCtx, taskKind: "agent_plan", opusPctMtd: 0.15 }),
-    );
+    // Server-resolved opusPctMtd (C1). Stub the resolver so the gate
+    // sees 15% MTD usage; sending opusPctMtd: 0.15 in the body would
+    // be ignored (stripped pre-Zod) per the C1 patch.
+    setOpusPctMtdResolver(async () => 0.15);
+    const res = await POST(req({ ...validCtx, taskKind: "agent_plan" }));
     expect(res.status).toBe(402);
     const body = await res.json();
     expect(body.error).toBe("router_gate");
@@ -112,21 +124,25 @@ describe("POST /api/internal/router/pick", () => {
   });
 
   it("429 on concurrency cap", async () => {
-    const res = await POST(
-      req({ ...validCtx, taskKind: "code_review", activeConcurrentTasks: 3 }),
-    );
+    // activeConcurrentTasks is server-resolved (C3). Stub the resolver
+    // at the pro-tier cap (3) so the gate fires; body value is
+    // stripped pre-Zod.
+    setActiveConcurrentTasksResolver(async () => 3);
+    const res = await POST(req({ ...validCtx, taskKind: "code_review" }));
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.gate_type).toBe("concurrency_cap_exceeded");
   });
 
   it("402 on insufficient UVT balance", async () => {
+    // uvtBalance is server-resolved (C2). Stub the resolver low so the
+    // gate fires; the body value (if any) is stripped pre-Zod.
+    setUvtBalanceResolver(async () => 10);
     const res = await POST(
       req({
         ...validCtx,
         estimatedInputTokens: 5000,
         estimatedOutputTokens: 5000,
-        uvtBalance: 10,
       }),
     );
     expect(res.status).toBe(402);

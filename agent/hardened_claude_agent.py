@@ -15,11 +15,23 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import time
 from dataclasses import dataclass
 from typing import Optional
 
-from anthropic import Anthropic
+from lib import token_accountant
+
+# Red Team #2 C1: TokenAccountant is the SOLE Anthropic caller. This file
+# used to import `anthropic` directly; that bypassed UVT accounting, DLQ,
+# and usage_events — AND circumvented the crypto verification chain's
+# own audit log because the HTTP hop was invisible to the accountant.
+assert "anthropic" not in sys.modules, (
+    "agent/hardened_claude_agent.py imported the `anthropic` package "
+    "directly. Route all Anthropic calls through "
+    "lib.token_accountant.call / call_sync — see Red Team #2 C1 in "
+    "tests/security/redteam_modelrouter_report.md."
+)
 
 from aether_protocol.audit import AuditLog
 from aether_protocol.quantum_crypto import (
@@ -129,8 +141,11 @@ class HardenedClaudeAgent:
                 "ANTHROPIC_API_KEY not set. Add to your .env file."
             )
 
-        self.client = Anthropic(api_key=self._api_key)
+        # No direct Anthropic client — TokenAccountant owns the HTTP hop,
+        # prompt caching, UVT accounting, and DLQ on failure. The
+        # Protocol-L crypto chain now wraps a call that is also metered.
         self.model = model or CLAUDE_MODEL
+        self._model_key = token_accountant.resolve_model_key(self.model)
         self.max_tokens = max_tokens or CLAUDE_MAX_TOKENS
         self.system_prompt = AETHER_AGENT_SYSTEM_PROMPT
         self._active_system_prompt = self.system_prompt
@@ -206,6 +221,30 @@ class HardenedClaudeAgent:
             self._active_system_prompt = self.system_prompt + "\n\n" + "\n\n".join(additions)
         else:
             self._active_system_prompt = self.system_prompt
+
+    # ─── Metered Anthropic hop (Red Team #2 C1) ──────────────
+    def _claude_call(
+        self,
+        *,
+        messages: list[dict],
+        system: Optional[str],
+        max_tokens: Optional[int] = None,
+    ):
+        """Route one Anthropic call through TokenAccountant.
+
+        Desktop-local agent — no Supabase user_id context, so usage
+        is unattributed (ledger write is skipped server-side). The
+        HTTP call itself, prompt caching, and DLQ-on-error still
+        apply via token_accountant.call_sync. See Red Team #2 C1.
+        """
+        return token_accountant.call_sync(
+            model=self._model_key,
+            messages=messages,
+            system=system,
+            max_tokens=max_tokens or self.max_tokens,
+            user_id=None,
+            task_id=None,
+        )
 
     # ─── Core: Commit a Claude response ──────────────────────
 
@@ -419,13 +458,12 @@ class HardenedClaudeAgent:
         try:
             # Node 3: LLMRE — Call Claude
             system = variant.system_prompt if variant else self._active_system_prompt
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
 
             # Commit the response via Protocol-L
@@ -498,13 +536,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=4096,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
 
             # Commit and verify
@@ -562,14 +599,13 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self._active_system_prompt,
                 messages=self.conversation_history,
             )
 
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
 
             # Commit and verify
             hardened = self._commit_response(raw, full_query)
@@ -621,13 +657,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=512,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
 
             hardened = self._commit_response(raw, prompt)
@@ -671,13 +706,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             hardened = self._commit_response(raw, prompt)
             self._verify_response(hardened)
@@ -710,13 +744,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             hardened = self._commit_response(raw, prompt)
             self._verify_response(hardened)
@@ -748,13 +781,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=4096,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             hardened = self._commit_response(raw, prompt)
             self._verify_response(hardened)
@@ -783,13 +815,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             hardened = self._commit_response(raw, prompt)
             self._verify_response(hardened)
@@ -820,13 +851,12 @@ class HardenedClaudeAgent:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
+            response = self._claude_call(
                 max_tokens=self.max_tokens,
                 system=self._active_system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.text.strip()
             raw = self._strip_markdown_fences(raw)
             hardened = self._commit_response(raw, prompt)
             self._verify_response(hardened)

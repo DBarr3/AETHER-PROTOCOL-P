@@ -53,14 +53,17 @@ def _json_response(status: int, body: dict) -> MagicMock:
 
 
 VALID_CTX = {
+    # C1/C2/C3: opusPctMtd, activeConcurrentTasks, uvtBalance are
+    # server-resolved by the TS PolicyGate route and are NOT part of
+    # the Python-side request contract anymore. See
+    # tests/security/redteam_policygate_report.md and lib/uvt_routes.py
+    # (H1 fix removed the hardcoded bypass values from the shadow
+    # dispatch).
     "userId": "00000000-0000-0000-0000-000000000001",
     "tier": "pro",
     "taskKind": "chat",
     "estimatedInputTokens": 100,
     "estimatedOutputTokens": 100,
-    "opusPctMtd": 0.0,
-    "activeConcurrentTasks": 0,
-    "uvtBalance": 1_000_000,
     "requestId": "req_1",
     "traceId": "trace_1",
 }

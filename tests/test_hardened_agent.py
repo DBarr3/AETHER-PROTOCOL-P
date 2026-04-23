@@ -12,11 +12,9 @@ from unittest.mock import patch, MagicMock, PropertyMock
 
 
 def _make_mock_response(text: str) -> MagicMock:
-    """Create a mock Claude API response."""
+    """Create a mock TokenAccountant AnthropicResponse."""
     mock_resp = MagicMock()
-    mock_content = MagicMock()
-    mock_content.text = text
-    mock_resp.content = [mock_content]
+    mock_resp.text = text
     return mock_resp
 
 
@@ -25,10 +23,11 @@ class TestHardenedClaudeAgent:
 
     @pytest.fixture
     def mock_anthropic(self):
-        with patch("agent.hardened_claude_agent.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            yield mock_client
+        """Red Team #2 C1: agent now routes through token_accountant
+        instead of anthropic.Anthropic. Fixture patches the new path;
+        return_value on the mock is the AnthropicResponse-like object."""
+        with patch("agent.hardened_claude_agent.token_accountant.call_sync") as mock_call:
+            yield mock_call
 
     @pytest.fixture
     def mock_tsa(self):
@@ -230,7 +229,7 @@ class TestHardenedClaudeAgent:
     # ─── analyze_file tests ──────────────────────────────────
 
     def test_analyze_file_verified(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "suggested_name": "20260319_PATENT_test.pdf",
                 "category": "PATENT",
@@ -247,7 +246,7 @@ class TestHardenedClaudeAgent:
         assert agent._verified_responses == 1
 
     def test_analyze_file_with_markdown_fences(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             '```json\n{"suggested_name": "test.py", "category": "CODE", '
             '"suggested_directory": "code", "confidence": 0.9, '
             '"reasoning": "Python file", "security_flag": false, '
@@ -257,14 +256,14 @@ class TestHardenedClaudeAgent:
         assert result["category"] == "CODE"
 
     def test_analyze_file_api_failure_uses_fallback(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("API error")
+        mock_anthropic.side_effect = Exception("API error")
         result = agent.analyze_file("mycode", ".py", "projects")
         assert result["category"] == "CODE"
         assert result["confidence"] == 0.6
         assert "Rule-based" in result["reasoning"]
 
     def test_analyze_file_sends_correct_params(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "suggested_name": "test.py",
                 "category": "CODE",
@@ -276,14 +275,17 @@ class TestHardenedClaudeAgent:
             })
         )
         agent.analyze_file("script", ".py", "src")
-        call_kwargs = mock_anthropic.messages.create.call_args
-        assert call_kwargs.kwargs["model"] == agent.model
+        call_kwargs = mock_anthropic.call_args
+        # After Red Team #2 C1 fix, the agent passes the ModelRegistry
+        # short key (e.g. "opus") to token_accountant.call_sync, not the
+        # full model id.
+        assert call_kwargs.kwargs["model"] == agent._model_key
         assert call_kwargs.kwargs["system"] == agent.system_prompt
 
     # ─── batch_analyze tests ─────────────────────────────────
 
     def test_batch_analyze_verified(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps([
                 {
                     "index": 1,
@@ -308,7 +310,7 @@ class TestHardenedClaudeAgent:
         assert results == []
 
     def test_batch_analyze_fallback_on_error(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("API error")
+        mock_anthropic.side_effect = Exception("API error")
         files = [{"filename": "test", "extension": ".py", "directory": "src"}]
         results = agent.batch_analyze(files)
         assert len(results) == 1
@@ -317,7 +319,7 @@ class TestHardenedClaudeAgent:
     # ─── chat tests ──────────────────────────────────────────
 
     def test_chat_verified(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             "I found 3 Python files in your vault."
         )
         result = agent.chat("find my python files", {"file_count": 10})
@@ -325,24 +327,24 @@ class TestHardenedClaudeAgent:
         assert agent._verified_responses == 1
 
     def test_chat_maintains_history(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response("ok")
+        mock_anthropic.return_value = _make_mock_response("ok")
         agent.chat("hello", {})
         agent.chat("followup", {})
         assert len(agent.conversation_history) == 4
 
     def test_chat_history_bounded(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response("ok")
+        mock_anthropic.return_value = _make_mock_response("ok")
         for i in range(30):
             agent.chat(f"msg {i}", {})
         assert len(agent.conversation_history) <= 40
 
     def test_chat_api_error(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("Timeout")
+        mock_anthropic.side_effect = Exception("Timeout")
         result = agent.chat("test", {})
         assert "unavailable" in result.lower() or "Timeout" in result
 
     def test_chat_first_message_includes_context(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response("ok")
+        mock_anthropic.return_value = _make_mock_response("ok")
         agent.chat("hello", {"file_count": 42, "vault_stats": {"files": 42}})
         first_msg = agent.conversation_history[0]["content"]
         assert "42" in first_msg
@@ -350,7 +352,7 @@ class TestHardenedClaudeAgent:
     # ─── security analysis tests ─────────────────────────────
 
     def test_security_scan_verified(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "threat_level": "HIGH",
                 "findings": ["15 failed logins in 60s"],
@@ -368,7 +370,7 @@ class TestHardenedClaudeAgent:
         assert result["recommended_action"] == "No events to analyze"
 
     def test_security_scan_api_error(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.side_effect = Exception("API error")
+        mock_anthropic.side_effect = Exception("API error")
         events = [{"type": "test"}]
         result = agent.analyze_security_pattern(events)
         assert result["threat_level"] == "UNKNOWN"
@@ -376,7 +378,7 @@ class TestHardenedClaudeAgent:
     # ─── verification report tests ───────────────────────────
 
     def test_verification_report_clean(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "suggested_name": "t.py",
                 "category": "CODE",
@@ -434,7 +436,7 @@ class TestHardenedClaudeAgent:
     # ─── reset and utility tests ─────────────────────────────
 
     def test_reset_conversation(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response("ok")
+        mock_anthropic.return_value = _make_mock_response("ok")
         agent.chat("hello", {})
         assert len(agent.conversation_history) > 0
         agent.reset_conversation()
@@ -521,7 +523,7 @@ class TestHardenedClaudeAgent:
     # ─── Multiple verified responses ─────────────────────────
 
     def test_multiple_verified_responses(self, agent, mock_anthropic):
-        mock_anthropic.messages.create.return_value = _make_mock_response(
+        mock_anthropic.return_value = _make_mock_response(
             json.dumps({
                 "suggested_name": "test.py",
                 "category": "CODE",
@@ -560,7 +562,7 @@ class TestHardenedAgentInit:
         audit_dir = tmp_path / "audit"
         audit_dir.mkdir()
 
-        with patch("agent.hardened_claude_agent.Anthropic"), \
+        with patch("agent.hardened_claude_agent.token_accountant.call_sync"), \
              patch("agent.hardened_claude_agent.RFC3161TimestampAuthority"), \
              patch("agent.hardened_claude_agent.DEFAULT_AUDIT_DIR", audit_dir):
             from agent.hardened_claude_agent import HardenedClaudeAgent
@@ -573,7 +575,7 @@ class TestHardenedAgentInit:
         audit_dir = tmp_path / "audit"
         audit_dir.mkdir()
 
-        with patch("agent.hardened_claude_agent.Anthropic"), \
+        with patch("agent.hardened_claude_agent.token_accountant.call_sync"), \
              patch("agent.hardened_claude_agent.RFC3161TimestampAuthority"), \
              patch("agent.hardened_claude_agent.DEFAULT_AUDIT_DIR", audit_dir):
             from agent.hardened_claude_agent import HardenedClaudeAgent
@@ -584,7 +586,7 @@ class TestHardenedAgentInit:
         audit_dir = tmp_path / "audit"
         audit_dir.mkdir()
 
-        with patch("agent.hardened_claude_agent.Anthropic"), \
+        with patch("agent.hardened_claude_agent.token_accountant.call_sync"), \
              patch("agent.hardened_claude_agent.DEFAULT_AUDIT_DIR", audit_dir):
             from agent.hardened_claude_agent import HardenedClaudeAgent
             agent = HardenedClaudeAgent(
@@ -596,7 +598,7 @@ class TestHardenedAgentInit:
         audit_dir = tmp_path / "audit"
         audit_dir.mkdir()
 
-        with patch("agent.hardened_claude_agent.Anthropic"), \
+        with patch("agent.hardened_claude_agent.token_accountant.call_sync"), \
              patch("agent.hardened_claude_agent.RFC3161TimestampAuthority"), \
              patch("agent.hardened_claude_agent.DEFAULT_AUDIT_DIR", audit_dir):
             from agent.hardened_claude_agent import HardenedClaudeAgent

@@ -101,17 +101,20 @@ async def test_free_tier_medium_classification_receives_sonnet(monkeypatch):
     r = Router(_supabase_free_tier())
     result = await r.route(user_id="u-free-1", tier="free", prompt="Any medium task")
 
-    # The bug:
-    assert result.orchestrator_model == "sonnet", (
-        "Expected current (buggy) behavior: free tier routed to Sonnet on "
-        f"medium. Got {result.orchestrator_model!r}. If this assertion now "
-        "FAILS, the bug has been fixed — great; update the test expectation."
+    # H2 post-fix state (commit "fix(router): H2 free-tier medium returns
+    # Haiku"): the architecture doc's promise — "Free user tries a task →
+    # runs on Haiku (explicit tier baseline, not a downgrade)" — is now
+    # enforced in lib/router.py:_pick_orchestrator. This PoC flipped from
+    # evidence-of-bug to regression-guard.
+    assert result.orchestrator_model == "haiku", (
+        f"H2 regression: free tier should route to Haiku on medium "
+        f"classification. Got {result.orchestrator_model!r}. See "
+        "diagrams/docs_router_architecture.md § 'Philosophy — honest limits'."
     )
-    assert seen["model"] == "sonnet", "TokenAccountant was asked to call Sonnet for a free user"
-
-    # What the architecture doc PROMISED:
-    # result.orchestrator_model == "haiku"
-    # Sonnet is 5× Haiku COGS on identical UVT → margin bleed.
+    assert seen["model"] == "haiku", (
+        "TokenAccountant was asked to call the wrong model for a free user "
+        "— free baseline is Haiku on any non-heavy classification."
+    )
 
 
 if __name__ == "__main__":

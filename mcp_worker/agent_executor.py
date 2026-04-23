@@ -7,12 +7,26 @@ Aether Systems LLC — Patent Pending
 
 import logging
 import os
+import sys
 import time
 import threading
+import uuid
 from collections import defaultdict, deque
 from typing import Optional
 
+from lib import token_accountant
+
 logger = logging.getLogger("aether.mcp.executor")
+
+# Red Team #2 C1: TokenAccountant is the SOLE Anthropic caller. This file
+# used to POST the Anthropic /v1/messages endpoint directly via httpx;
+# that bypassed UVT accounting, usage_events, and DLQ. The assertion
+# catches any future regression at import time.
+assert "anthropic" not in sys.modules, (
+    "mcp_worker/agent_executor.py imported the `anthropic` package "
+    "directly. Route all Anthropic calls through lib.token_accountant. "
+    "See Red Team #2 C1 in tests/security/redteam_modelrouter_report.md."
+)
 
 import os as _os
 
@@ -66,7 +80,6 @@ class AgentExecutor:
         self._seen_task_ids = set()
 
     async def execute(self, task):
-        import httpx
         task_id = task.get("task_id", "")
         agent_type = task.get("agent_type", "mcp")
         prompt = task.get("prompt", "")
@@ -94,38 +107,41 @@ class AgentExecutor:
             if context:
                 system += f"\n\nUser context:\n{context}"
 
-            request_body = {
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "system": system,
-                "messages": [{"role": "user", "content": prompt}],
-            }
-            if mcp_servers:
-                request_body["mcp_servers"] = mcp_servers
+            # Red Team #2 C1: route through TokenAccountant instead of a
+            # direct POST to the Anthropic messages endpoint. When
+            # task["client_id"] is a valid UUID we treat it as a Supabase
+            # user_id (attributed usage); otherwise the call is
+            # unattributed (desktop MCP worker mode). Either way
+            # TokenAccountant owns prompt caching and DLQ on any
+            # rpc_record_usage failure.
+            raw_client_id = task.get("client_id", "")
+            attributed_user_id: Optional[str] = None
+            try:
+                attributed_user_id = str(uuid.UUID(str(raw_client_id)))
+            except (ValueError, TypeError):
+                attributed_user_id = None
 
-            headers = {
-                "x-api-key": self.api_key,
-                "content-type": "application/json",
-                "anthropic-version": "2023-06-01",
-                "anthropic-beta": "mcp-client-2025-04-04",
-            }
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=request_body)
+            model_key = token_accountant.resolve_model_key(self.model)
+            try:
+                resp = await token_accountant.call(
+                    model=model_key,
+                    messages=[{"role": "user", "content": prompt}],
+                    system=system,
+                    mcp_servers=mcp_servers or None,
+                    max_tokens=self.max_tokens,
+                    user_id=attributed_user_id,
+                    task_id=task_id or None,
+                )
+            except Exception as call_exc:  # noqa: BLE001 — preserve existing API shape
+                elapsed_ms = int((time.monotonic() - start) * 1000)
+                return {
+                    "result": "", "tools_used": [], "execution_ms": elapsed_ms,
+                    "error": f"Anthropic API error: {call_exc}",
+                }
 
             elapsed_ms = int((time.monotonic() - start) * 1000)
-
-            if resp.status_code != 200:
-                return {"result": "", "tools_used": [], "execution_ms": elapsed_ms, "error": f"Anthropic API error: {resp.status_code}"}
-
-            data = resp.json()
-            result_text = ""
-            tools_used = []
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    result_text += block.get("text", "")
-                elif block.get("type") == "tool_use":
-                    tools_used.append(block.get("name", "unknown"))
+            result_text = resp.text
+            tools_used = [tu.get("name", "unknown") for tu in resp.tool_uses]
 
             with self._lock:
                 self.total_executions += 1

@@ -300,6 +300,15 @@ class Router:
         if signal.load == "light":
             return "haiku"
         if signal.load == "medium":
+            # Red Team #2 H2: free-tier baseline is Haiku. The architecture
+            # doc ("Philosophy — honest limits", diagrams/docs_router_architecture.md)
+            # promises "Free user tries a task → runs on Haiku (explicit
+            # tier baseline, not a downgrade)." Returning Sonnet here
+            # violated that promise and imposed ~5× Haiku COGS on the
+            # highest-volume tier. Paid tiers (solo/pro/team) still get
+            # Sonnet on medium.
+            if plan_cfg.tier == "free":
+                return "haiku"
             return "sonnet"
 
         # heavy

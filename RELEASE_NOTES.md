@@ -58,9 +58,23 @@ When the operator flips `AETHER_UVT_ENABLED=true` (or `AETHER_UVT_ROLLOUT_PCT>0`
 
 ### Known caveats
 - **SmartScreen warning still expected.** Installer is not yet Authenticode-signed (Azure Trusted Signing setup is the next backlog item, ~$10/mo).
-- **No DLQ replay.** If `rpc_record_usage` ever fails, events land in `/var/lib/aethercloud/usage_dlq.jsonl` on VPS2; manual replay until Stage K cron lands.
+- **DLQ replay is manual, not automatic (Stage K deferred).** If `rpc_record_usage` ever fails, events land in `/var/lib/aethercloud/usage_dlq.jsonl` on VPS2. Red Team #2 H3 added three protections that ship with this release: (1) a size-gauge log line on every enqueue, (2) a `DLQ_OVER_THRESHOLD` CRITICAL log tag once the queue crosses `AETHER_DLQ_ALERT_THRESHOLD` (default 50) so ops can grep journalctl, and (3) a manual replay script at `deploy/replay_dlq.py` (see the **Operational** section below). A scheduled replay cron is still Stage K pending idempotency work on `rpc_record_usage`.
 - **Stripe metered billing (Stage H) not yet wired.** Overage USD is stubbed to 0 in `/account/usage` — UI handles the 0 cleanly.
-- **Stage B.5 deferred.** `agent/claude_agent.py` + `hardened_claude_agent.py` (file-agent SDK paths) still use the Anthropic SDK directly. Not in the UVT-metered hot path.
+- ~~**Stage B.5 deferred.** `agent/claude_agent.py` + `hardened_claude_agent.py` (file-agent SDK paths) still use the Anthropic SDK directly.~~ **Resolved in Red Team #2 C1 fix:** all three previously-direct call sites (`agent/claude_agent.py`, `agent/hardened_claude_agent.py`, `mcp_worker/agent_executor.py`) now route through `lib/token_accountant.call` / `call_sync`. An AST-based import-graph CI gate (`tests/security/test_anthropic_import_isolation.py`) enforces the sole-call-site invariant.
+
+### Operational
+
+**Manual DLQ replay.** When the `DLQ_OVER_THRESHOLD` alert fires, or after a planned Supabase outage, run:
+
+```bash
+# Dry-run first — parse the DLQ without re-firing.
+python deploy/replay_dlq.py --dry-run
+
+# Live replay (service-role env must be set).
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python deploy/replay_dlq.py -v
+```
+
+Events that succeed are removed from the DLQ atomically; events that still fail stay in place for the next run. Do NOT wire this into cron until Stage K lands per-row idempotency keys — see the script docstring for the double-bill risk during mid-RPC network failures.
 
 ---
 

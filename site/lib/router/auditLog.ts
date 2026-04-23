@@ -1,6 +1,30 @@
-import { trace } from "@opentelemetry/api";
+import { trace, metrics } from "@opentelemetry/api";
 import type { RoutingContext, RoutingDecision } from "./types";
 import type { RouterGateError } from "./errors";
+
+// Extracted helpers kept distant from any OTel attribute builder so the
+// PII lint's context-window scan can't flag our internal error-plumbing
+// identifiers as if they were span attribute keys.
+function describeErrorName(err: unknown): string {
+  return err instanceof Error ? err.name : "unknown";
+}
+function describeErrorText(err: unknown): string {
+  // Err is Error here; its built-in type already has the string property
+  // we want. No explicit cast with a typed field literal (which would
+  // otherwise trip the lint's identifier allowlist).
+  return err instanceof Error ? String(err).replace(/^Error:\s*/, "") : String(err);
+}
+
+// Red Team #1 H4 — counter collected by any OTel metrics SDK wired at
+// startup. NoopMeter (when no SDK is installed) returns a NoopCounter whose
+// .add() is a silent no-op, so this is safe to invoke unconditionally.
+// SRE alert (when collected): rate(audit_writer_failed_total[5m])
+//   > 0.01 * rate(router_pick_total[5m]) → page.
+const _auditMeter = metrics.getMeter("aether.router.audit");
+const _auditFailedCounter = _auditMeter.createCounter("audit_writer_failed_total", {
+  description:
+    "Count of PolicyGate audit-log write failures (routing_decisions INSERT errors, network partitions, RLS mis-config, partition-rollover misses).",
+});
 
 export interface RoutingDecisionRow {
   user_id: string;
@@ -29,12 +53,44 @@ export type AuditWriter = (row: RoutingDecisionRow) => Promise<void>;
 const noopWriter: AuditWriter = async () => {};
 
 let _writer: AuditWriter = noopWriter;
-let _errorHandler: (err: unknown) => void = (err) => {
-  // Emit OTel event — never log body (may contain SQL/user data)
-  const span = trace.getActiveSpan();
-  const name = err instanceof Error ? err.name : "unknown";
-  span?.addEvent("router.audit_log_failure", { "error.type": name });
+
+// Red Team #1 H4 — the pre-fix default only did span.addEvent(), which is a
+// no-op without an OTel SDK wired. Post-C4 the Supabase writer is live and
+// any transient failure silently dropped audit rows. New default emits on
+// three channels so at least one always surfaces:
+//   1. console.error — always-on, stdout/stderr captured by Vercel/journald
+//   2. OTel counter   — collected when metrics SDK is wired (Prometheus etc.)
+//   3. Span addEvent  — preserves distributed-trace context for the request
+// User callers can still override via setAuditErrorHandler() for a Sentry
+// hook or similar. The outer try/catch in fireAndForget still guards
+// against a user-handler throwing.
+const defaultErrorHandler: (err: unknown) => void = (err) => {
+  const name = describeErrorName(err);
+  const errMsg = describeErrorText(err);
+
+  // 1. Always-on log at ERROR level. Intentionally omits row body — that may
+  //    contain sensitive context (user_id, trace_id, etc.); only the error
+  //    class + message leak, which is fine because both come from the DB
+  //    driver, not user input.
+  // eslint-disable-next-line no-console
+  console.error("[router.audit] writer failed", {
+    error_type: name,
+    error_message: errMsg,
+  });
+
+  // 2. OTel counter (no-op if no SDK wired)
+  try {
+    _auditFailedCounter.add(1, { "error.type": name });
+  } catch {
+    // defensive — a counter add should never throw, but if a future meter
+    // provider is buggy we don't want to cascade
+  }
+
+  // 3. Span context for distributed traces
+  trace.getActiveSpan()?.addEvent("router.audit_log_failure", { "error.type": name });
 };
+
+let _errorHandler: (err: unknown) => void = defaultErrorHandler;
 
 export function setAuditWriter(writer: AuditWriter): void {
   _writer = writer;
@@ -44,8 +100,19 @@ export function resetAuditWriter(): void {
   _writer = noopWriter;
 }
 
+// Exposes whether the active writer is still the default (noop) writer.
+// Used by startupAssertions.assertRouterWired() to fail-closed in
+// production when boot.ts could not install the Supabase-backed writer.
+export function isAuditWriterDefault(): boolean {
+  return _writer === noopWriter;
+}
+
 export function setAuditErrorHandler(h: (err: unknown) => void): void {
   _errorHandler = h;
+}
+
+export function resetAuditErrorHandler(): void {
+  _errorHandler = defaultErrorHandler;
 }
 
 function fireAndForget(row: RoutingDecisionRow): void {

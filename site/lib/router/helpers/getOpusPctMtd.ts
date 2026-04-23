@@ -1,6 +1,15 @@
-// 30s TTL in-memory cache of (userId → opusPctMtd).
-// On DB error: return 0.0 (fail-open for opus cap) AND emit OTel counter
-// router.opus_cap_bypassed_fail_open so SRE can alert when it spikes.
+// 30s TTL in-memory cache of (userId → opusPctMtd) + unbounded last-known-good
+// cache keyed by userId for fail-closed recovery.
+//
+// Red Team #1 H5 fix: DB error no longer returns 0 (which was "fail-open" and
+// let a Supabase outage hand out unlimited Opus). New behavior:
+//   * rpc success           → cache and return the value
+//   * rpc error + LKG cache → return cached value (best effort) + emit
+//                              router.opus_pct_mtd_resolver_error
+//                              with fallback="last_known_good"
+//   * rpc error + no LKG    → return 1.0 (blocks Opus hard) + emit
+//                              fallback="fail_closed"
+//   * rpc absent entirely   → return 1.0 + emit fallback="fail_closed"
 //
 // Called by the API route BEFORE pick(). Router itself does not fetch —
 // opusPctMtd arrives via RoutingContext.
@@ -14,7 +23,12 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+// Short-TTL cache for hot-path hits
 const _cache = new Map<string, CacheEntry>();
+// Last-known-good cache: never expires until process restart; populated on
+// every successful rpc call. Enables best-effort recovery when rpc fails
+// transiently without punishing every user with a 1.0 gate during the outage.
+const _lkg = new Map<string, number>();
 
 export interface OpusPctMtdDeps {
   supabase: {
@@ -30,6 +44,26 @@ export interface OpusPctMtdDeps {
   now?: () => number;
 }
 
+function emitResolverError(
+  err: unknown,
+  fallback: "fail_closed" | "last_known_good",
+): void {
+  trace.getActiveSpan()?.addEvent("router.opus_pct_mtd_resolver_error", {
+    "error.type": err instanceof Error ? err.name : "unknown",
+    fallback,
+  });
+}
+
+function failFallback(userId: string, err: unknown): number {
+  const lkg = _lkg.get(userId);
+  if (lkg !== undefined) {
+    emitResolverError(err, "last_known_good");
+    return lkg;
+  }
+  emitResolverError(err, "fail_closed");
+  return 1.0;
+}
+
 export async function getOpusPctMtd(
   userId: string,
   deps: OpusPctMtdDeps,
@@ -40,31 +74,28 @@ export async function getOpusPctMtd(
     return cached.value;
   }
 
+  if (!deps.supabase.rpc) {
+    // No resolver wired. This is the "dev/test without rpc seed" path; in
+    // production this never fires because boot.ts wires the rpc-capable
+    // service-role client. Return 1.0 — do NOT fall back to 0.
+    return failFallback(userId, new Error("rpc_not_configured"));
+  }
+
   try {
-    // Uses an rpc if available (cleaner for the SUM/FILTER expression);
-    // callers wire the rpc in migration. If absent, we derive from a
-    // simpler scan path which the migration also provides a view for.
-    if (deps.supabase.rpc) {
-      const { data, error } = await deps.supabase.rpc("rpc_opus_pct_mtd", {
-        p_user_id: userId,
-      });
-      if (error) throw error;
-      const value = typeof data === "number" ? data : 0;
-      _cache.set(userId, { value, expiresAt: now + TTL_MS });
-      return value;
-    }
-    // Fall-through path: caller didn't wire rpc; fail-open.
-    return 0;
+    const { data, error } = await deps.supabase.rpc("rpc_opus_pct_mtd", {
+      p_user_id: userId,
+    });
+    if (error) throw error;
+    const value = typeof data === "number" ? data : 0;
+    _cache.set(userId, { value, expiresAt: now + TTL_MS });
+    _lkg.set(userId, value);
+    return value;
   } catch (err) {
-    trace
-      .getActiveSpan()
-      ?.addEvent("router.opus_cap_bypassed_fail_open", {
-        "error.type": err instanceof Error ? err.name : "unknown",
-      });
-    return 0;
+    return failFallback(userId, err);
   }
 }
 
 export function __clearOpusPctMtdCacheForTests(): void {
   _cache.clear();
+  _lkg.clear();
 }

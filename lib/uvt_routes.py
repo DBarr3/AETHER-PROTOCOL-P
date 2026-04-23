@@ -217,6 +217,13 @@ async def agent_run(
     # PolicyGate". chosen_model is NOT used for substitution in PR 1; Stage D
     # picks below. Telemetry-only pass; PR 2 flips ROUTER_CONFIG.shadow_mode
     # false and starts enforcing PolicyGate's decisions for canary users.
+    #
+    # H1 fix (tests/security/redteam_policygate_report.md): previously this
+    # payload hardcoded opusPctMtd=0, activeConcurrentTasks=0,
+    # uvtBalance=1_000_000_000 — a pre-stocked bypass for the PR 2 flip day.
+    # The TS route now server-resolves all three (C1/C2/C3) and strips the
+    # fields from the body pre-Zod, so the shadow dispatch OMITS them.
+    # On flip day, the gate sees the resolved truth, not a Python caller lie.
     if os.environ.get("AETHER_ROUTER_URL") and os.environ.get("AETHER_INTERNAL_SERVICE_TOKEN"):
         try:
             shadow = await router_client.pick({
@@ -225,9 +232,6 @@ async def agent_run(
                 "taskKind": "agent_execute",
                 "estimatedInputTokens": estimated,
                 "estimatedOutputTokens": plan_cfg.output_cap,
-                "opusPctMtd": 0.0,
-                "activeConcurrentTasks": 0,
-                "uvtBalance": 1_000_000_000,
                 "requestId": str(_uuid.uuid4()),
                 "traceId": str(_uuid.uuid4()),
             })

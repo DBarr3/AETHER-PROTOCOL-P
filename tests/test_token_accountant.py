@@ -408,3 +408,64 @@ async def test_correct_model_id_sent_to_anthropic(dlq_path):
     payload = _captured_payload(transport)
     # Must send the literal Anthropic model_id, not our registry key.
     assert payload["model"] == "claude-opus-4-7"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Red Team #2 H3 — DLQ size gauge + threshold alert
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_dlq_gauge_emits_size_on_every_enqueue(dlq_path, caplog):
+    """Every DLQ append should log a `dlq.size_gauge` record with the
+    current line count."""
+    import logging
+    caplog.set_level(logging.INFO, logger="aethercloud.token_accountant")
+    for i in range(3):
+        token_accountant._append_to_dlq({"user_id": f"u{i}", "model": "haiku"})
+
+    gauge_records = [
+        r for r in caplog.records
+        if getattr(r, "event", None) == "dlq.size_gauge"
+    ]
+    assert len(gauge_records) == 3
+    # Line count must increase monotonically across the 3 appends.
+    assert [getattr(r, "dlq_line_count", None) for r in gauge_records] == [1, 2, 3]
+
+
+def test_dlq_threshold_fires_critical_tag(dlq_path, caplog, monkeypatch):
+    """Red Team #2 H3: once DLQ crosses AETHER_DLQ_ALERT_THRESHOLD, the
+    accountant emits a CRITICAL log tagged DLQ_OVER_THRESHOLD so ops can
+    grep journalctl and Prometheus can alert on log_messages_total."""
+    import logging
+    monkeypatch.setenv("AETHER_DLQ_ALERT_THRESHOLD", "3")
+    caplog.set_level(logging.CRITICAL, logger="aethercloud.token_accountant")
+
+    # Two appends — under threshold, no CRITICAL.
+    for i in range(2):
+        token_accountant._append_to_dlq({"user_id": f"u{i}", "model": "haiku"})
+    criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert len(criticals) == 0
+
+    # Third append → crosses threshold, CRITICAL fires.
+    token_accountant._append_to_dlq({"user_id": "u2", "model": "haiku"})
+    criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert len(criticals) == 1
+    assert "DLQ_OVER_THRESHOLD" in criticals[0].getMessage()
+
+
+def test_dlq_threshold_defaults_to_fifty(dlq_path, caplog, monkeypatch):
+    """If AETHER_DLQ_ALERT_THRESHOLD isn't set, the default is 50."""
+    import logging
+    monkeypatch.delenv("AETHER_DLQ_ALERT_THRESHOLD", raising=False)
+    caplog.set_level(logging.CRITICAL, logger="aethercloud.token_accountant")
+
+    # Seed 49 rows — still under the 50 default.
+    for i in range(49):
+        token_accountant._append_to_dlq({"user_id": f"u{i}", "model": "haiku"})
+    criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert len(criticals) == 0
+
+    # 50th row crosses the default threshold.
+    token_accountant._append_to_dlq({"user_id": "u49", "model": "haiku"})
+    criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert len(criticals) >= 1
