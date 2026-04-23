@@ -60,8 +60,17 @@ const RoutingContextSchema = z
     // DB insert happens.
     estimatedInputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
     estimatedOutputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
-    requestId: z.string().min(1).max(256),
-    traceId: z.string().min(1).max(256),
+    // Red Team #1 M4 — restrict to [A-Za-z0-9._:-], 1..128 chars. Covers
+    // UUIDs, span IDs, Vercel trace formats; rejects newline/ANSI/control
+    // chars that would corrupt routing_decisions audit rows or log
+    // dashboards that split on \n. Length ceiling dropped from 256 to 128
+    // — no known caller sends longer IDs.
+    requestId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/, {
+      message: "requestId must be 1..128 chars of [A-Za-z0-9._:-]",
+    }),
+    traceId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/, {
+      message: "traceId must be 1..128 chars of [A-Za-z0-9._:-]",
+    }),
   })
   .strict();
 
