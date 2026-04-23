@@ -1,0 +1,24 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- HISTORY-ONLY — pin set_updated_at() search_path to empty
+-- Applied LIVE via Supabase MCP on 2026-04-23; committed here afterward for
+-- repo history. DO NOT re-apply.
+--
+-- Supabase advisor finding: function_search_path_mutable (WARN)
+--   Detail: public.set_updated_at() (the updated_at-maintenance trigger
+--   used by plans + other tables) had a role-mutable search_path. No
+--   known exploit path in the current tree, but the lint is a defense-
+--   in-depth signal: a future schema change that shadows pg_catalog
+--   names in a user schema could turn this into an escalation vector.
+--
+-- Fix:
+--   alter function public.set_updated_at() set search_path = '';
+--
+-- Behavior unchanged — set_updated_at only uses the OLD/NEW record refs
+-- and the now() builtin, both available without search_path lookup.
+--
+-- Post-fix verification:
+--   - Supabase security advisor: finding cleared
+--   - set_updated_at: search_path = ''
+-- ═══════════════════════════════════════════════════════════════════════════
+
+alter function public.set_updated_at() set search_path = '';
