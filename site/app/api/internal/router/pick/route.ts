@@ -8,6 +8,12 @@ import {
   resolveOpusPctMtd,
   resolveUvtBalance,
 } from "@/lib/router/gateInputs";
+import {
+  rateCheck,
+  RATE_WINDOW_MS,
+  USER_LIMIT_PER_MIN,
+} from "@/lib/router/rateLimit";
+import { isValidServiceTokenHeader } from "@/lib/router/serviceToken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,33 +60,52 @@ const RoutingContextSchema = z
     // DB insert happens.
     estimatedInputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
     estimatedOutputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
-    requestId: z.string().min(1).max(256),
-    traceId: z.string().min(1).max(256),
+    // Red Team #1 M4 — restrict to [A-Za-z0-9._:-], 1..128 chars. Covers
+    // UUIDs, span IDs, Vercel trace formats; rejects newline/ANSI/control
+    // chars that would corrupt routing_decisions audit rows or log
+    // dashboards that split on \n. Length ceiling dropped from 256 to 128
+    // — no known caller sends longer IDs.
+    requestId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/, {
+      message: "requestId must be 1..128 chars of [A-Za-z0-9._:-]",
+    }),
+    traceId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/, {
+      message: "traceId must be 1..128 chars of [A-Za-z0-9._:-]",
+    }),
   })
   .strict();
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
+// Red Team #1 M2 — constantTimeEqual + isValidServiceToken previously lived
+// here AND in middleware.ts. Both have been consolidated into
+// @/lib/router/serviceToken (node:crypto.timingSafeEqual under the hood,
+// with pad-to-longer on unequal-length inputs so the length branch can't
+// be observed via timing).
 
-function isValidServiceToken(header: string | null): boolean {
-  if (!header) return false;
-  const current = process.env.AETHER_INTERNAL_SERVICE_TOKEN ?? "";
-  const prev = process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV ?? "";
-  return (
-    (current !== "" && constantTimeEqual(header, current)) ||
-    (prev !== "" && constantTimeEqual(header, prev))
-  );
-}
+// Red Team #1 L3 — HTTP body size ceiling. Vercel's default bodyParser
+// (App Router) is 4.5 MB; the RoutingContext shape is a few hundred bytes.
+// 16 KB gives ample headroom for future fields without inviting any
+// realistic large-body DoS.
+const BODY_MAX_BYTES = 16_384;
 
 export async function POST(req: Request): Promise<Response> {
   assertRouterWired();
 
-  if (!isValidServiceToken(req.headers.get("x-aether-internal"))) {
+  if (!isValidServiceTokenHeader(req.headers.get("x-aether-internal"))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Red Team #1 L3 — reject oversize bodies BEFORE req.json() materializes
+  // them. Trusts the Content-Length header (chunked/missing → fall through
+  // to the JSON parser which has its own protections). Legit callers send
+  // tiny RoutingContexts; anything over 16 KB is a bug or an attack.
+  const cl = req.headers.get("content-length");
+  if (cl !== null) {
+    const clNum = Number(cl);
+    if (Number.isFinite(clNum) && clNum > BODY_MAX_BYTES) {
+      return Response.json(
+        { error: "payload_too_large", limit_bytes: BODY_MAX_BYTES },
+        { status: 413 },
+      );
+    }
   }
 
   let body: unknown;
@@ -95,6 +120,25 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json(
       { error: "validation_failed", details: parse.error.issues },
       { status: 400 },
+    );
+  }
+
+  // Red Team #1 H3 — per-user rate limit, 600 req/user/min. Runs AFTER Zod
+  // so we have a validated userId to key on; the IP bucket (in middleware)
+  // already rejected the caller if they tried to flood before validation.
+  const userRate = rateCheck(
+    `user:${parse.data.userId}`,
+    Date.now(),
+    RATE_WINDOW_MS,
+    USER_LIMIT_PER_MIN,
+  );
+  if (!userRate.allowed) {
+    return Response.json(
+      { error: "rate_limited", retry_after_seconds: userRate.retry_after_seconds },
+      {
+        status: 429,
+        headers: { "retry-after": String(userRate.retry_after_seconds ?? 60) },
+      },
     );
   }
 
