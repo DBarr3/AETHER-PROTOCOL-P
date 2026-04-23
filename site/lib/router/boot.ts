@@ -26,6 +26,10 @@ import {
 import { getOpusPctMtd } from "./helpers/getOpusPctMtd";
 import { getUvtBalance } from "@/lib/getUvtBalance";
 import { getActiveConcurrentTasks } from "@/lib/getActiveConcurrentTasks";
+import {
+  assertPlanParity,
+  recordPlanParityResult,
+} from "./startupAssertions";
 
 let _attempted = false;
 let _succeeded = false;
@@ -54,6 +58,25 @@ export function ensureRouterBooted(): void {
     setActiveConcurrentTasksResolver((userId) =>
       getActiveConcurrentTasks(userId, { supabase }),
     );
+
+    // Red Team #1 M5 — fire-and-forget plan-parity check. Records the
+    // outcome on the startupAssertions module; assertRouterWired()
+    // escalates to 500 in production if the cached result is an error.
+    // Intentionally NOT awaited here — boot.ts runs during module import
+    // which cannot be async. The first few requests may land before the
+    // check completes and will pass through; once the check settles,
+    // subsequent requests see the cached result.
+    void assertPlanParity(supabase as unknown as Parameters<typeof assertPlanParity>[0])
+      .then(() => recordPlanParityResult(null))
+      .catch((err: unknown) => {
+        recordPlanParityResult(
+          err instanceof Error ? err : new Error(String(err)),
+        );
+        console.warn(
+          `[router boot] plan parity check failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+
     _succeeded = true;
   } catch (err) {
     const name = err instanceof Error ? err.name : "unknown";
