@@ -19,7 +19,7 @@ pyasn1>=0.5.0
 bcrypt>=4.0.0
 watchdog>=3.0.0
 rich>=13.0.0
-anthropic>=0.25.0
+anthropic>=0.97.0
 textual>=0.50.0
 # cryptography: CVE-2023-50782 (Bleichenbacher) fixed in 42.0.0,
 # CVE-2024-26130 (NULL-deref) fixed in 42.0.4. Floor bumped to 44 per
