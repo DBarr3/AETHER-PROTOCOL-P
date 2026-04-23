@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
@@ -72,7 +73,15 @@ policy_bypass_by_gate: dict[str, int] = {
     "plan_excludes_opus": 0,
     "opus_budget_exhausted": 0,
 }
-_warned_once: bool = False
+
+# Red Team #2 M4 — serialize writes to the two module-level counters above
+# so threaded workers (uvicorn --workers N --threads M>1, Gunicorn gthread,
+# etc.) can't race the read-modify-write path and lose increments.
+# CPython's GIL makes `d[k] += 1` atomic only in the single-threaded case;
+# under threads the BINARY_ADD + STORE_SUBSCR bytecodes can be interleaved
+# by another thread's BINARY_ADD that reads the same pre-increment value.
+# A lost increment = an un-alerted bypass.
+_policy_bypass_lock = threading.Lock()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -186,17 +195,23 @@ class Router:
         # and skip this branch when present; remaining hits become the SRE
         # alert signal. See diagrams/docs_router_architecture.md §
         # "Dead-code safety net".
-        global policy_bypass_detected, _warned_once
-        policy_bypass_detected += 1
-        if not _warned_once:
-            log.warning(
-                "ROUTER_POLICY_BYPASS: ModelRouter.route() invoked without "
-                "an upstream PolicyGate decision_id. This is EXPECTED until "
-                "PR 1 v5 ships. After cutover, any occurrence of this log "
-                "indicates something bypassed PolicyGate — page SRE. "
-                "See diagrams/docs_router_architecture.md."
-            )
-            _warned_once = True
+        #
+        # Red Team #2 M4: log EVERY bypass at WARN (no _warned_once
+        # short-circuit). The pre-fix code suppressed every bypass after
+        # the first one per process, so `journalctl -u aethercloud |
+        # grep ROUTER_POLICY_BYPASS` workflows missed all but the first
+        # bypass per worker lifetime. Rate-limiting (if needed) is the
+        # log handler's / OTel sampler's job, not ours.
+        global policy_bypass_detected
+        with _policy_bypass_lock:
+            policy_bypass_detected += 1
+        log.warning(
+            "ROUTER_POLICY_BYPASS: ModelRouter.route() invoked without "
+            "an upstream PolicyGate decision_id. This is EXPECTED until "
+            "PR 1 v5 ships. After cutover, any occurrence of this log "
+            "indicates something bypassed PolicyGate — page SRE. "
+            "See diagrams/docs_router_architecture.md."
+        )
 
         plan_cfg = self._get_plan_config(tier)
 
@@ -313,13 +328,15 @@ class Router:
 
         # heavy
         if plan_cfg.opus_pct_cap <= 0:
-            policy_bypass_by_gate["plan_excludes_opus"] += 1
+            with _policy_bypass_lock:
+                policy_bypass_by_gate["plan_excludes_opus"] += 1
             raise PlanExcludesOpusError(
                 f"tier={plan_cfg.tier!r} has opus_pct_cap=0 — PolicyGate "
                 "should have mapped this task away from Opus upstream"
             )
         if opus_remaining <= 0:
-            policy_bypass_by_gate["opus_budget_exhausted"] += 1
+            with _policy_bypass_lock:
+                policy_bypass_by_gate["opus_budget_exhausted"] += 1
             raise OpusBudgetExhaustedError(
                 f"tier={plan_cfg.tier!r} opus sub-budget is 0 MTD — "
                 "PolicyGate should have refused this call upstream"

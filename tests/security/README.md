@@ -48,15 +48,15 @@ Future reports (Groups B, C, D) will be added here as they land.
 | [MR-H1](redteam_modelrouter_report.md#h1--classifier-prompt-injection-via-context_compressor-tail-trim) | High | Classifier prompt-injection via `context_compressor` tail-trim | 🔜 Deferred to Group C | — | Sweep #2 §H1 |
 | [MR-H2](redteam_modelrouter_report.md#h2--free-tier-silently-receives-sonnet-on-medium-classification-architecture-doc-drift) | High | Free-tier receives Sonnet on medium classification (arch doc says Haiku) | ✅ Fixed | `50e1b59` | Sweep #2 §H2 |
 | [MR-H3](redteam_modelrouter_report.md#h3--dlq-has-no-replay-mechanism-persistent-un-metered-inference) | High | DLQ has no replay mechanism; un-metered inference on Supabase hiccup | ✅ Fixed | `4fdfc2b` | Sweep #2 §H3 |
-| [MR-M1](redteam_modelrouter_report.md#m1--downgrade_reason-ghost-reference-cleanup-incomplete) | Medium | `downgrade_reason` ghost refs in harness + desktop UI still live | 🔜 Deferred to Group C | — | Sweep #2 §M1 |
+| [MR-M1](redteam_modelrouter_report.md#m1--downgrade_reason-ghost-reference-cleanup-incomplete) | Medium | `downgrade_reason` ghost refs in harness + desktop UI still live | ✅ Fixed | `c068161` | Sweep #2 §M1 |
 | [MR-M2](redteam_modelrouter_report.md#m2--aether_router_url-env-var-swap-low-today-critical-at-pr-2-cutover) | Medium | `AETHER_ROUTER_URL` not pinned; token exfil surface at PR 2 cutover | 🔜 Deferred to PR 2 | — | Sweep #2 §M2 |
 | [MR-M3](redteam_modelrouter_report.md#m3--concurrent-preflight-toctou--monthly-quota-overshoot) | Medium | Concurrent-preflight TOCTOU → monthly quota overshoot | 🔜 Deferred to PR 2 | — | Sweep #2 §M3 |
-| [MR-M4](redteam_modelrouter_report.md#m4--router_policy_bypass-warn-log-suppressed-after-first-hit) | Medium | `_warned_once` suppresses bypass WARN after first hit | 🔜 Deferred to Group C | — | Sweep #2 §M4 |
+| [MR-M4](redteam_modelrouter_report.md#m4--router_policy_bypass-warn-log-suppressed-after-first-hit) | Medium | `_warned_once` suppresses bypass WARN after first hit | ✅ Fixed | `4ea39b4` | Sweep #2 §M4 |
 | [MR-M5](redteam_modelrouter_report.md#m5--confidence-gate-reclassify-burns-a-second-classifier-call-no-bounded-retry) | Medium | Confidence-gate reclassify doubles classifier UVT burn per crafted call | 🔜 Deferred to PR 2 | — | Sweep #2 §M5 |
 | [MR-M6](redteam_modelrouter_report.md#m6--routers-_plans_cache-stale-window-on-tier-config-change) | Medium | `_plans_cache` stale on admin plan updates (no TTL / invalidation) | 🔜 Deferred to PR 2 | — | Sweep #2 §M6 |
-| [MR-L1](redteam_modelrouter_report.md#l1--chosen_model-logged-unsanitized-in-shadow-path) | Low | `chosen_model` unsanitized in shadow log → log injection | 🔜 Deferred to Group C | — | Sweep #2 §L1 |
+| [MR-L1](redteam_modelrouter_report.md#l1--chosen_model-logged-unsanitized-in-shadow-path) | Low | `chosen_model` unsanitized in shadow log → log injection | ✅ Fixed | `a7ab967` | Sweep #2 §L1 |
 
-**Total findings: 30** (19 Sweep #1 + 11 Sweep #2) · **Fixed: 14** · **Open/Deferred: 16**
+**Total findings: 30** (19 Sweep #1 + 11 Sweep #2) · **Fixed: 17** · **Open/Deferred: 13**
 
 ---
 
@@ -65,7 +65,7 @@ Future reports (Groups B, C, D) will be added here as they land.
 | | Critical | High | Medium | Low | Info |
 |---|---|---|---|---|---|
 | **Sweep #1 — PolicyGate** | 4 of 4 fixed | 4 of 5 fixed | 1 of 6 fixed | 0 of 2 fixed | 0 of 2 fixed |
-| **Sweep #2 — ModelRouter** | 1 of 1 fixed | 2 of 3 fixed | 0 of 6 fixed | 0 of 1 fixed | — |
+| **Sweep #2 — ModelRouter** | 1 of 1 fixed | 2 of 3 fixed | 2 of 6 fixed | 1 of 1 fixed | — |
 
 ---
 
@@ -81,12 +81,11 @@ Future reports (Groups B, C, D) will be added here as they land.
 - **PG-M6** No CI test asserts `ROUTER_CONFIG.shadow_mode === true` — a mis-merge can ship enforcement mode silently.
 - **PG-L3** No HTTP body-size cap on the route; Vercel 4.5 MB default is broader than needed.
 
-### Group C — Python Hardening
+### Group C — Python Hardening (partially closed)
 
-- **MR-H1** Classifier prompt-injection via `context_compressor` tail-trim + `_parse_signal` first-match: attacker controls QOPC verdict. Strip JSON-looking substrings from `hydrated_context` before classifier call or stop feeding context into the classifier entirely.
-- **MR-M1** `downgrade_reason` ghost refs survive in `aether/harness/simulate.py`, `aether/harness/report.py`, and `desktop/pages/uvt-meter/uvt-meter.js:90` (UI reads the dead field). Removing is lossless today but re-adding the field later would silently re-enable the buried-downgrade UX the arch doc forbids.
-- **MR-M4** `_warned_once` short-circuits bypass WARN after the first hit per process; OTel counter still increments but log-line-based detection goes blind. Remove flag; delegate rate-limit to log aggregator.
-- **MR-L1** `chosen_model` logged verbatim in `lib/uvt_routes.py:234`; attacker with env-write access injects newlines. One-line strip: `re.sub(r"[\x00-\x1f]", "?", shadow.chosen_model)`.
+- **MR-H1** Classifier prompt-injection via `context_compressor` tail-trim + `_parse_signal` first-match: attacker controls QOPC verdict. Strip JSON-looking substrings from `hydrated_context` before classifier call or stop feeding context into the classifier entirely. **Still open — bigger fix, not in the M1/M4/L1 scope.**
+
+**Closed in Group C:** MR-M1 (`c068161`), MR-M4 (`4ea39b4`), MR-L1 (`a7ab967`). See `group_c_patch_report.md`.
 
 ### PR 2 Prerequisites
 

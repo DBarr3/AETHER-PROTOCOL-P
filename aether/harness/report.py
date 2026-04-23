@@ -53,7 +53,6 @@ class CallRecord:
     underlying_cost_usd: float          # sum of token × ModelRegistry rates
     allowed: bool
     http_status: int
-    downgrade_reason: str               # '' if none
     reclassified: bool
     detail_code: str                    # only set on denied calls
 
@@ -68,7 +67,7 @@ _CSV_COLUMNS = [
     "orchestrator_model", "classifier_load", "confidence",
     "input_tokens", "output_tokens", "cached_input_tokens",
     "uvt_charged", "underlying_cost_usd",
-    "allowed", "http_status", "downgrade_reason", "reclassified", "detail_code",
+    "allowed", "http_status", "reclassified", "detail_code",
 ]
 
 
@@ -295,12 +294,9 @@ def _routing_breakdown(records: list[CallRecord], tier: str) -> list[str]:
 
     by_model: dict[str, list[CallRecord]] = {"haiku": [], "sonnet": [], "opus": []}
     denied: list[CallRecord] = []
-    downgraded: list[CallRecord] = []
     for r in tier_rows:
         if not r.allowed:
             denied.append(r); continue
-        if r.downgrade_reason:
-            downgraded.append(r)
         if r.orchestrator_model in by_model:
             by_model[r.orchestrator_model].append(r)
 
@@ -322,25 +318,8 @@ def _routing_breakdown(records: list[CallRecord], tier: str) -> list[str]:
         reason_str = ", ".join(f"{k}={v}" for k, v in sorted(reasons.items()))
         lines.append(f"  Denied   {denied_pct:5.1f}%  ({reason_str})")
 
-    if downgraded:
-        dpct = len(downgraded) / total * 100
-        dreasons: dict[str, int] = {}
-        for r in downgraded:
-            dreasons[r.downgrade_reason] = dreasons.get(r.downgrade_reason, 0) + 1
-        dr_str = ", ".join(f"{_normalize(k)}={v}" for k, v in sorted(dreasons.items()))
-        lines.append(f"  Downgraded {dpct:5.1f}%  ({dr_str})")
-
     lines.append("```")
     return lines
-
-
-def _normalize(s: str) -> str:
-    """Collapse long downgrade-reason strings into short keys."""
-    low = s.lower()
-    if "exhausted" in low: return "opus_sub_budget_exhausted"
-    if "not include" in low: return "tier_excludes_opus"
-    if "confidence" in low: return "confidence_low"
-    return s.replace(" ", "_")[:30]
 
 
 def _fmt_uvt(v: int) -> str:

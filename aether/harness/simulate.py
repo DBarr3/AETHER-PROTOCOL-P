@@ -255,7 +255,6 @@ def _record_for_success(
         uvt_charged=total_uvt,
         underlying_cost_usd=round(cost_cents / 100, 6),
         allowed=True, http_status=200,
-        downgrade_reason=body.get("downgrade_reason") or "",
         reclassified=bool(body.get("reclassified")),
         detail_code="",
     )
@@ -274,7 +273,7 @@ def _record_for_denial(
         input_tokens=0, output_tokens=0, cached_input_tokens=0,
         uvt_charged=0, underlying_cost_usd=0.0,
         allowed=False, http_status=status,
-        downgrade_reason="", reclassified=False,
+        reclassified=False,
         detail_code=str(detail.get("error") or body.get("detail") or f"http_{status}"),
     )
 

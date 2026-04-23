@@ -1,7 +1,10 @@
-"""PoC 2.10 — ROUTER_POLICY_BYPASS log suppression after first hit.
+"""PoC 2.10 / Red Team #2 M4 — ROUTER_POLICY_BYPASS log suppression
++ un-locked policy_bypass_by_gate increments.
 
-lib/router.py:75 `_warned_once: bool = False` + the block at :189-199:
+Pre-fix pattern (now removed):
 
+    _warned_once: bool = False
+    ...
     global policy_bypass_detected, _warned_once
     policy_bypass_detected += 1
     if not _warned_once:
@@ -9,41 +12,24 @@ lib/router.py:75 `_warned_once: bool = False` + the block at :189-199:
         _warned_once = True
 
 After the first Router.route() call per process, the ROUTER_POLICY_BYPASS
-WARN log is suppressed for the life of the process. The module counter
-`policy_bypass_detected` still increments, so SRE alerting that counts
-*occurrences* via OTel/Prometheus continues to work.
+WARN log was suppressed for the life of the process — `journalctl ... |
+grep ROUTER_POLICY_BYPASS` workflows missed every bypass after the first
+per worker lifetime.
 
-BUT: SRE runbook / architecture doc (line 146):
-    SRE alert: any occurrence of ModelRouter.policy_bypass_detected
-    OTel counter > 0 → page immediately.
+Separately, `policy_bypass_by_gate` dict increments were a plain
+`d[k] += 1` with no lock — under uvicorn --workers N --threads M>1 or
+Gunicorn gthread, the read-modify-write raced and lost increments.
 
-The architecture doc alert is on the COUNTER, so this design is consistent
-with it. The risk is when humans grep journalctl — a SECOND bypass (or
-third, or ten thousandth) produces ZERO new log lines. Only the first
-bypass in a process has a log trace; subsequent bypasses are invisible
-to log-line-based detection.
+Post-fix (Group C M4):
 
-Compounding: `_warned_once` is not reset on gunicorn/uvicorn worker
-respawn; each worker has its own. But a long-lived worker that's been
-serving 1 day could have had 1 bypass on day 0 and N more on day 1 with
-no additional logs.
+  - `_warned_once` removed entirely; WARN logs EVERY bypass
+  - `threading.Lock()` (`_policy_bypass_lock`) guards writes to both
+    `policy_bypass_detected` and `policy_bypass_by_gate[...]`
 
-Separately, `policy_bypass_by_gate` dict increments are not thread-safe
-under threadpool executor models. On CPython single-threaded asyncio,
-the `d[k] += 1` operation completes in a single bytecode (BINARY_ADD on
-an int followed by STORE_SUBSCR) — the GIL keeps it atomic. But if
-uvicorn is configured with `--workers N --threads M` (M>1) or under
-Gunicorn's `gthread` worker, the read-modify-write can lose increments.
-A lost increment = an un-alerted bypass.
+This file is the post-fix regression guard. If either protection is
+removed, these assertions fail.
 
-Severity: LOW-MEDIUM — depends on SRE's observability wiring; if alerts
-are on OTel counters, MEDIUM. If alerts grep logs, HIGH.
-Fix:
-    - Remove the `_warned_once` short-circuit; log EVERY bypass at WARN
-      with rate-limiting delegated to the log handler (python-json-logger
-      or OTel sampler), not an all-or-nothing flag.
-    - Guard the `policy_bypass_by_gate` increment with `threading.Lock()`
-      (or use atomic counters from `opentelemetry.metrics`).
+Aether Systems LLC — Patent Pending
 """
 from __future__ import annotations
 
@@ -54,42 +40,71 @@ REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
 
 
-def test_warned_once_behavior_documented() -> None:
-    """Reads lib/router.py to confirm the short-circuit pattern exists.
-    Pure AST-free grep — keeps the PoC portable across Python versions."""
+def test_warned_once_pattern_is_removed() -> None:
+    """The pre-fix log-suppression pattern must NOT reappear. If any
+    future PR reintroduces `_warned_once`, this test fails — which is
+    the whole point."""
     text = (REPO / "lib" / "router.py").read_text(encoding="utf-8")
 
-    assert "_warned_once: bool = False" in text, (
-        "Expected module-level `_warned_once` flag — if removed, revisit "
-        "this PoC. If still present, log suppression is live."
+    # The exact three phrases from the vulnerable implementation.
+    forbidden_patterns = (
+        "_warned_once: bool = False",
+        "if not _warned_once:",
+        "_warned_once = True",
     )
-    assert "if not _warned_once:" in text, (
-        "Expected the `if not _warned_once:` gate around the WARN log."
-    )
-    assert "_warned_once = True" in text, (
-        "Expected the flag to be set True after the first log — this is "
-        "the line that suppresses subsequent ROUTER_POLICY_BYPASS lines."
+    survivors = [p for p in forbidden_patterns if p in text]
+    assert not survivors, (
+        "Red Team #2 M4 regression: the log-suppression pattern has "
+        "reappeared in lib/router.py. Each bypass must produce a WARN "
+        f"line — remove the short-circuit. Found: {survivors}"
     )
 
 
-def test_counter_is_plain_dict_no_lock() -> None:
-    """Confirms lib/router.py.policy_bypass_by_gate is a plain dict with
-    NO locking. Under multi-thread workers, increments can race."""
+def test_policy_bypass_by_gate_writes_are_locked() -> None:
+    """Every `policy_bypass_by_gate[...] += 1` site must be wrapped by
+    `with _policy_bypass_lock:`. Under threaded workers (uvicorn
+    --threads M>1, Gunicorn gthread), an unlocked read-modify-write
+    loses increments; a lost increment is an un-alerted bypass."""
+    lines = (REPO / "lib" / "router.py").read_text(encoding="utf-8").splitlines()
+
+    # Find every increment site (both dict keys).
+    increment_lines = [
+        (i, ln) for i, ln in enumerate(lines)
+        if "policy_bypass_by_gate[" in ln and "+= 1" in ln
+    ]
+    assert increment_lines, (
+        "Expected at least one `policy_bypass_by_gate[...] += 1` site. "
+        "If the counter was removed entirely, update this test."
+    )
+
+    # Each increment must be preceded (within the 3 lines above) by the
+    # `with _policy_bypass_lock:` context manager.
+    for idx, ln in increment_lines:
+        window = "\n".join(lines[max(0, idx - 3): idx + 1])
+        assert "with _policy_bypass_lock:" in window, (
+            f"lib/router.py:{idx + 1} increments "
+            f"policy_bypass_by_gate without a surrounding "
+            f"`with _policy_bypass_lock:` — race-lossy under "
+            f"threaded workers. Line: {ln.strip()}"
+        )
+
+
+def test_module_counter_lock_exists() -> None:
+    """The module-level lock itself must remain. If any PR drops
+    `_policy_bypass_lock = threading.Lock()`, the `with` blocks above
+    would `NameError` at runtime."""
     text = (REPO / "lib" / "router.py").read_text(encoding="utf-8")
-    # The counter is declared as `policy_bypass_by_gate: dict[str, int] = {...}`
-    # with per-gate keys. No threading.Lock / RLock / asyncio.Lock near it.
-    assert "policy_bypass_by_gate: dict[str, int]" in text
-    # Look at a 20-line window around the declaration for any lock import
-    idx = text.index("policy_bypass_by_gate: dict[str, int]")
-    window = text[max(0, idx - 200): idx + 400]
-    assert "Lock" not in window, (
-        "If a Lock has been added around policy_bypass_by_gate, this "
-        "PoC's concern is resolved — update the assertion."
+    assert "_policy_bypass_lock = threading.Lock()" in text, (
+        "Missing module-level `_policy_bypass_lock`; the with-statements "
+        "in the bypass-increment paths depend on it."
+    )
+    assert "import threading" in text, (
+        "Missing `import threading`; the Lock() reference would NameError."
     )
 
 
 if __name__ == "__main__":
-    test_warned_once_behavior_documented()
-    test_counter_is_plain_dict_no_lock()
-    print("Confirmed: ROUTER_POLICY_BYPASS suppresses after first hit; "
-          "counter dict has no lock.")
+    test_warned_once_pattern_is_removed()
+    test_policy_bypass_by_gate_writes_are_locked()
+    test_module_counter_lock_exists()
+    print("Group C M4 regression guards: all three checks pass.")

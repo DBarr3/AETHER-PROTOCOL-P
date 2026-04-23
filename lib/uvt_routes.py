@@ -37,6 +37,23 @@ from lib.router import PlanConfig, Router
 
 log = logging.getLogger("aethercloud.uvt_routes")
 
+
+# Red Team #2 L1 — strip ASCII control characters (0x00-0x1F + DEL 0x7F)
+# from any string we interpolate into a log line. Python's logging does
+# NOT escape these, and a newline inside an attacker-controlled field
+# (e.g., chosen_model from a future compromised AETHER_ROUTER_URL — see
+# M2) can forge log lines that look like legit router events. Unicode
+# outside the control range passes through unchanged.
+_LOG_CONTROL_CHARS = "".join(chr(c) for c in list(range(0x00, 0x20)) + [0x7F])
+_LOG_SANITIZE_TABLE = str.maketrans("", "", _LOG_CONTROL_CHARS)
+
+
+def _sanitize_log_value(s: str) -> str:
+    """Return `s` with all ASCII control characters removed. Safe for
+    use inside log.info/info/warning %s substitution. Non-ASCII
+    printable unicode is preserved."""
+    return s.translate(_LOG_SANITIZE_TABLE) if s else s
+
 # ── Injected by api_server at startup ─────────────────────────────────────
 supabase_client: Optional[Any] = None
 router_instance: Optional[Router] = None
@@ -235,7 +252,11 @@ async def agent_run(
                 "requestId": str(_uuid.uuid4()),
                 "traceId": str(_uuid.uuid4()),
             })
-            log.info("router_would_pick: %s", shadow.chosen_model)
+            # Red Team #2 L1 — sanitize before interpolation. A hostile
+            # AETHER_ROUTER_URL (M2 precondition) could return chosen_model
+            # containing \n + a forged log line; _sanitize_log_value
+            # strips control chars to block that injection.
+            log.info("router_would_pick: %s", _sanitize_log_value(shadow.chosen_model))
         except Exception:
             log.debug("shadow dispatch failed", exc_info=True)
 

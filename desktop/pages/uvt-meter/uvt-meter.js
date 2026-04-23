@@ -81,13 +81,16 @@
 
   function ingestRouterResponse(body) {
     if (!body || typeof body !== 'object') return;
+    // The buried-fallback field was removed from the backend response in
+    // PR 1 v5 (see diagrams/docs_router_architecture.md § "Philosophy —
+    // honest limits"). The UI must NOT re-read it — resurrecting the
+    // field here silently re-enables the UX the arch doc forbids.
     state.lastCall = {
       model: body.orchestrator_model || body.model || null,
       load: body.load || body.qopc_load || null,
       confidence: typeof body.confidence === 'number' ? body.confidence : null,
       total_uvt: n(body.total_uvt),
       classifier_uvt: n(body.classifier_uvt),
-      downgrade_reason: body.downgrade_reason || null,
       reclassified: !!body.reclassified,
       at: Date.now(),
     };
