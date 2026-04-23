@@ -24,6 +24,20 @@ updates:
       - dependency-name: "next"
         update-types:
           - "version-update:semver-major"
+      # zod v4 breaks schema API — tracked in issue #29
+      - dependency-name: "zod"
+        versions: ["4.x"]
+      # eslint-config-next v16 requires eslint v9+ (flat config) — tracked in issue #30
+      - dependency-name: "eslint-config-next"
+        versions: ["16.x"]
+      # react v19 + @types/react v19 require coordinated upgrade with react-dom — tracked in issue #32
+      - dependency-name: "react"
+        versions: ["19.x"]
+      - dependency-name: "@types/react"
+        versions: ["19.x"]
+      # @vitest/ui v4 requires vitest v4 as peer; both must move together — tracked in issue #33
+      - dependency-name: "@vitest/ui"
+        versions: ["4.x"]
 
   - package-ecosystem: "pip"
     directory: "/"
