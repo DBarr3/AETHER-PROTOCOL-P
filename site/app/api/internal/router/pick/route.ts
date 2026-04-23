@@ -46,8 +46,14 @@ const RoutingContextSchema = z
       "agent_plan",
       "agent_execute",
     ]),
-    estimatedInputTokens: z.number().int().nonnegative().finite(),
-    estimatedOutputTokens: z.number().int().nonnegative().finite(),
+    // Red Team #1 H2 — defense-in-depth ceiling against integer-overflow audit
+    // evasion + general DoS prevention. Claude's context window is 200 k; no
+    // legitimate caller needs more than 2 M input tokens. Column-type migration
+    // to bigint (20260423_routing_decisions_bigint.sql) is the primary fix;
+    // this upper bound rejects over-large requests at the edge before any
+    // DB insert happens.
+    estimatedInputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
+    estimatedOutputTokens: z.number().int().nonnegative().max(2_000_000).finite(),
     requestId: z.string().min(1).max(256),
     traceId: z.string().min(1).max(256),
   })
