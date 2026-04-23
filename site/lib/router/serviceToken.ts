@@ -9,6 +9,28 @@
 // branch also takes the full compare's worth of time.
 
 import { timingSafeEqual } from "node:crypto";
+import { metrics } from "@opentelemetry/api";
+
+// Red Team #1 M3 — counter emitted every time the rotation-overlap token
+// (_PREV) is the one that matches. SRE alert: any traffic on this counter
+// AFTER the rotation window + grace period → page (operator forgot to
+// unset _PREV).
+const _serviceTokenMeter = metrics.getMeter("aether.router.service_token");
+const _prevTokenAcceptedCounter = _serviceTokenMeter.createCounter(
+  "router.prev_token_accepted",
+  {
+    description:
+      "Times the AETHER_INTERNAL_SERVICE_TOKEN_PREV rotation-overlap token matched a request. Expected zero outside a rotation window; any traffic after _PREV_EXPIRES_AT passes should also be zero (TTL blocks it).",
+  },
+);
+
+function isPrevExpired(): boolean {
+  const raw = process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV_EXPIRES_AT;
+  if (!raw) return false; // unset = no deadline, legacy behavior (valid until unset)
+  const epoch = Date.parse(raw);
+  if (Number.isNaN(epoch)) return true; // unparseable = fail-closed (reject PREV)
+  return Date.now() >= epoch;
+}
 
 /**
  * Constant-time string compare. Uses node:crypto.timingSafeEqual under
@@ -56,8 +78,20 @@ export function isValidServiceTokenHeader(header: string | null): boolean {
   if (!header) return false;
   const current = process.env.AETHER_INTERNAL_SERVICE_TOKEN ?? "";
   const prev = process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV ?? "";
-  return (
-    (current !== "" && serviceTokenEquals(header, current)) ||
-    (prev !== "" && serviceTokenEquals(header, prev))
-  );
+
+  if (current !== "" && serviceTokenEquals(header, current)) return true;
+
+  // PREV path — M3: honor _PREV_EXPIRES_AT TTL + emit OTel counter
+  // whenever PREV is the match, so SRE can alert if traffic persists
+  // beyond the rotation grace period (or the operator forgot to unset).
+  if (prev !== "" && !isPrevExpired() && serviceTokenEquals(header, prev)) {
+    try {
+      _prevTokenAcceptedCounter.add(1, {});
+    } catch {
+      // counter add should never throw; defensive
+    }
+    return true;
+  }
+
+  return false;
 }
