@@ -80,11 +80,32 @@ const RoutingContextSchema = z
 // with pad-to-longer on unequal-length inputs so the length branch can't
 // be observed via timing).
 
+// Red Team #1 L3 — HTTP body size ceiling. Vercel's default bodyParser
+// (App Router) is 4.5 MB; the RoutingContext shape is a few hundred bytes.
+// 16 KB gives ample headroom for future fields without inviting any
+// realistic large-body DoS.
+const BODY_MAX_BYTES = 16_384;
+
 export async function POST(req: Request): Promise<Response> {
   assertRouterWired();
 
   if (!isValidServiceTokenHeader(req.headers.get("x-aether-internal"))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Red Team #1 L3 — reject oversize bodies BEFORE req.json() materializes
+  // them. Trusts the Content-Length header (chunked/missing → fall through
+  // to the JSON parser which has its own protections). Legit callers send
+  // tiny RoutingContexts; anything over 16 KB is a bug or an attack.
+  const cl = req.headers.get("content-length");
+  if (cl !== null) {
+    const clNum = Number(cl);
+    if (Number.isFinite(clNum) && clNum > BODY_MAX_BYTES) {
+      return Response.json(
+        { error: "payload_too_large", limit_bytes: BODY_MAX_BYTES },
+        { status: 413 },
+      );
+    }
   }
 
   let body: unknown;
