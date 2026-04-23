@@ -13,6 +13,7 @@ import {
   RATE_WINDOW_MS,
   USER_LIMIT_PER_MIN,
 } from "@/lib/router/rateLimit";
+import { isValidServiceTokenHeader } from "@/lib/router/serviceToken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,27 +65,16 @@ const RoutingContextSchema = z
   })
   .strict();
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-function isValidServiceToken(header: string | null): boolean {
-  if (!header) return false;
-  const current = process.env.AETHER_INTERNAL_SERVICE_TOKEN ?? "";
-  const prev = process.env.AETHER_INTERNAL_SERVICE_TOKEN_PREV ?? "";
-  return (
-    (current !== "" && constantTimeEqual(header, current)) ||
-    (prev !== "" && constantTimeEqual(header, prev))
-  );
-}
+// Red Team #1 M2 — constantTimeEqual + isValidServiceToken previously lived
+// here AND in middleware.ts. Both have been consolidated into
+// @/lib/router/serviceToken (node:crypto.timingSafeEqual under the hood,
+// with pad-to-longer on unequal-length inputs so the length branch can't
+// be observed via timing).
 
 export async function POST(req: Request): Promise<Response> {
   assertRouterWired();
 
-  if (!isValidServiceToken(req.headers.get("x-aether-internal"))) {
+  if (!isValidServiceTokenHeader(req.headers.get("x-aether-internal"))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
