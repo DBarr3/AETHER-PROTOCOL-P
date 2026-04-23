@@ -8,6 +8,11 @@ import {
   resolveOpusPctMtd,
   resolveUvtBalance,
 } from "@/lib/router/gateInputs";
+import {
+  rateCheck,
+  RATE_WINDOW_MS,
+  USER_LIMIT_PER_MIN,
+} from "@/lib/router/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,6 +100,25 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json(
       { error: "validation_failed", details: parse.error.issues },
       { status: 400 },
+    );
+  }
+
+  // Red Team #1 H3 — per-user rate limit, 600 req/user/min. Runs AFTER Zod
+  // so we have a validated userId to key on; the IP bucket (in middleware)
+  // already rejected the caller if they tried to flood before validation.
+  const userRate = rateCheck(
+    `user:${parse.data.userId}`,
+    Date.now(),
+    RATE_WINDOW_MS,
+    USER_LIMIT_PER_MIN,
+  );
+  if (!userRate.allowed) {
+    return Response.json(
+      { error: "rate_limited", retry_after_seconds: userRate.retry_after_seconds },
+      {
+        status: 429,
+        headers: { "retry-after": String(userRate.retry_after_seconds ?? 60) },
+      },
     );
   }
 
