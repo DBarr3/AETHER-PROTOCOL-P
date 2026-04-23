@@ -81,6 +81,66 @@ Electron Desktop App
 
 **Total: ~68 Python files, ~23,000+ lines of application code**
 
+**Authoritative router architecture:** [`diagrams/docs_router_architecture.md`](diagrams/docs_router_architecture.md)
+
+The router architecture doc covers the two-layer request routing system that governs every AI call: the **PolicyGate** (TypeScript, Layer 1 — enforces plan caps, UVT balance, and concurrency limits at the HTTP edge) and the **ModelRouter** (Python, Layer 2 — classifies task load via the QOPC bridge and selects the final model). When code and the doc disagree, the doc wins — code is drift. See the doc for the dual-formula shadow mode, environment variable table, token rotation runbook, and the complete PolicyGate → ModelRouter → TokenAccountant call flow.
+
+---
+
+## Quickstart
+
+For contributors setting up a local dev environment.
+
+**Prerequisites:** Node 20, Python 3.12 (see `site/package.json` engines and `requirements.txt` for exact version floors).
+
+```bash
+# 1. Clone
+git clone https://github.com/DBarr3/AETHER-CLOUD.git
+cd AETHER-CLOUD
+
+# 2. Env setup — copy the template and fill in required values
+cp .env.example .env
+# Minimum for local dev: ANTHROPIC_API_KEY, AETHER_VAULT_ROOT
+# See .env.example for the full variable reference including PolicyGate tokens
+
+# 3. TypeScript dev server (Next.js frontend + API routes)
+cd site && npm ci && npm run dev
+
+# 4. Python API server (FastAPI, 24 endpoints)
+#    Run from the repo root in a separate terminal
+python api_server.py
+```
+
+---
+
+## Testing
+
+```bash
+# TypeScript suite (Vitest)
+npm test --prefix site
+
+# Python router / UVT / parity / invariant / accountant (7-file suite)
+python -m pytest \
+  tests/test_router.py \
+  tests/test_uvt_routes.py \
+  tests/test_router_client.py \
+  tests/test_pricing_guard.py \
+  tests/test_uvt_parity.py \
+  tests/test_model_router_invariant.py \
+  tests/test_token_accountant.py \
+  -q
+
+# OTel PII lint
+bash tests/lint/no_pii_in_otel.sh
+
+# Anthropic import-isolation (ensures only TokenAccountant calls Anthropic)
+python -m pytest tests/security/test_anthropic_import_isolation.py -v
+```
+
+See [`tests/security/README.md`](tests/security/README.md) for the full security test suite, per-finding PoC runners, and the findings status matrix across both red-team sweeps.
+
+**CI: coming soon** — a GitHub Actions workflow is planned to run all of the above automatically on every PR.
+
 ---
 
 ## Core Capabilities
@@ -350,6 +410,34 @@ python -m pytest tests/ -q
   2. Real-time intrusion detection with cryptographic sealing
   3. Cryptographically verified AI reasoning with session binding
 - **Proprietary. All rights reserved.**
+
+---
+
+## Deployment
+
+Cutover checklist derived from PR #8 — required before flipping PolicyGate from shadow to enforce mode.
+
+### Vercel environment variables (set on the `site/` deployment)
+
+| Variable | Purpose |
+|---|---|
+| `AETHER_INTERNAL_SERVICE_TOKEN` | Primary service token for PolicyGate auth (generate: `openssl rand -hex 32`) |
+| `AETHER_INTERNAL_SERVICE_TOKEN_PREV` | 24-hour rotation overlap; leave blank until a rotation is in progress |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only — never expose to the client bundle) |
+
+### VPS environment variables (set in `/etc/aethercloud/.env`)
+
+| Variable | Purpose |
+|---|---|
+| `AETHER_ROUTER_URL` | Full URL of the PolicyGate endpoint, e.g. `https://app.aethersystems.net/api/internal/router/pick` |
+| `AETHER_INTERNAL_SERVICE_TOKEN` | Must match the Vercel value exactly; restart the orchestrator after changing |
+
+### Shadow → enforce flip
+
+`ROUTER_CONFIG.shadow_mode = false` is **PR 2 scope, not PR 1**. Do not flip this constant until all PR 2 prerequisites are complete (see `diagrams/docs_router_architecture.md` § "Deferrals" and the open findings in `tests/security/README.md` § "PR 2 Prerequisites").
+
+For version-by-version change history see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ---
 
