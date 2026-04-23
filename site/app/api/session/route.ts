@@ -44,16 +44,24 @@ export async function OPTIONS(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const requestId = crypto.randomUUID();
+  const startMs = Date.now();
   const headers = corsHeaders(req);
+
+  function log(status: number, extra?: Record<string, unknown>) {
+    console.log(JSON.stringify({ requestId, route: "GET /api/session", status, latency_ms: Date.now() - startMs, ...extra }));
+  }
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (!id) {
+    log(400, { error: "missing_id" });
     return NextResponse.json({ error: "missing id" }, { status: 400, headers });
   }
   // Defensive: Stripe session IDs start with "cs_". Reject anything else
   // to avoid accidentally exposing a lookup API for arbitrary resource ids.
   if (!id.startsWith("cs_")) {
+    log(400, { error: "invalid_id_format" });
     return NextResponse.json({ error: "invalid id" }, { status: 400, headers });
   }
 
@@ -72,6 +80,7 @@ export async function GET(req: Request) {
       (session.metadata?.tier as string | undefined) ||
       null;
 
+    log(200, { session_status: session.status, tier: tier ?? "unknown" });
     return NextResponse.json(
       {
         status: session.status,
@@ -82,6 +91,7 @@ export async function GET(req: Request) {
     );
   } catch (e: unknown) {
     console.error("session retrieve failed:", e);
+    log(404, { error: "stripe_lookup_failed" });
     // Don't leak Stripe error internals to the client.
     return NextResponse.json({ error: "session lookup failed" }, { status: 404, headers });
   }

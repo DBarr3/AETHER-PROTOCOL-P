@@ -38,22 +38,31 @@ export async function OPTIONS(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
+  const startMs = Date.now();
   const headers = corsHeaders(req);
+
+  function log(status: number, extra?: Record<string, unknown>) {
+    console.log(JSON.stringify({ requestId, route: "POST /api/checkout", status, latency_ms: Date.now() - startMs, ...extra }));
+  }
 
   let body: { tier?: string };
   try {
     body = await req.json();
   } catch {
+    log(400, { error: "invalid_json" });
     return NextResponse.json({ error: "invalid JSON" }, { status: 400, headers });
   }
 
   const tier = body.tier as TierKey | undefined;
   if (!tier || !PAID_TIERS.has(tier)) {
+    log(400, { error: "invalid_tier" });
     return NextResponse.json({ error: "invalid tier" }, { status: 400, headers });
   }
 
   const priceId = priceIdForTier(tier as Exclude<TierKey, "free">);
   if (!priceId) {
+    log(500, { error: "price_not_configured", tier });
     return NextResponse.json({ error: `price ID for ${tier} not configured` }, { status: 500, headers });
   }
 
@@ -74,9 +83,11 @@ export async function POST(req: Request) {
       cancel_url: `${appUrl}/canceled`,
       allow_promotion_codes: true,
     });
+    log(200, { tier });
     return NextResponse.json({ url: session.url }, { headers });
   } catch (e) {
     console.error("checkout session create failed:", e);
+    log(500, { error: "stripe_error", tier });
     return NextResponse.json({ error: "could not create checkout session" }, { status: 500, headers });
   }
 }
