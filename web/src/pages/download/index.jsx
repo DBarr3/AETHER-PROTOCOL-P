@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { DOWNLOAD_URL } from "../../lib/config.js";
+import { DOWNLOAD_URL, CHECKOUT_URL, TIER_CHECKOUT_LINKS } from "../../lib/config.js";
 
 /**
  * Direct-download landing page (free tier).
@@ -129,11 +129,65 @@ export default function Download() {
             NEED MORE TOKENS?
           </p>
           <p style={{ fontSize: 13, color: "#95a2c8", margin: 0, lineHeight: 1.6 }}>
-            Free tier is capped at 15,000 tokens/month.{" "}
-            <Link to="/aether-cloud#ac-how-it-works" style={{ color: "#00d4ff" }}>
-              Compare plans
-            </Link>{" "}
-            &mdash; upgrade anytime from the desktop app.
+            Free tier is capped at 15,000 tokens/month. Upgrade paths:
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
+            <a
+              href={TIER_CHECKOUT_LINKS.Solo}
+              style={{
+                display: "inline-block",
+                padding: "0.55rem 1rem",
+                background: "#00d4ff",
+                color: "#0a0a0f",
+                fontWeight: 700,
+                fontSize: 12,
+                textDecoration: "none",
+                borderRadius: 4,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Solo $19.99/mo
+            </a>
+            <a
+              href={TIER_CHECKOUT_LINKS.Professional}
+              style={{
+                display: "inline-block",
+                padding: "0.55rem 1rem",
+                background: "transparent",
+                color: "#e8e6e0",
+                fontWeight: 600,
+                fontSize: 12,
+                textDecoration: "none",
+                borderRadius: 4,
+                border: "1px solid #2a3350",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Pro $49/mo
+            </a>
+            <a
+              href={TIER_CHECKOUT_LINKS.Team}
+              style={{
+                display: "inline-block",
+                padding: "0.55rem 1rem",
+                background: "transparent",
+                color: "#e8e6e0",
+                fontWeight: 600,
+                fontSize: 12,
+                textDecoration: "none",
+                borderRadius: 4,
+                border: "1px solid #2a3350",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Team $89/mo
+            </a>
+          </div>
+          <p style={{ fontSize: 11, color: "#6b7280", margin: "0.6rem 0 0", lineHeight: 1.5 }}>
+            Opens {new URL(CHECKOUT_URL).host} &mdash; Stripe-hosted checkout.
           </p>
         </div>
 
