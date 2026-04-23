@@ -3,6 +3,15 @@ Tests for /vault/browse endpoint and directory browsing helpers.
 All filesystem interactions are mocked — no real paths touched.
 """
 
+import sys as _sys
+# test_uvt_routes.py installs a minimal api_server stub into sys.modules to
+# avoid importing the real api_server (which lacked security/prompt_guard at
+# that time). That stub exposes only `svc`, not `app`. Evict it so this
+# module always binds to the real api_server.
+if "api_server" in _sys.modules and not hasattr(_sys.modules["api_server"], "app"):
+    del _sys.modules["api_server"]
+del _sys
+
 import os
 import stat
 import pytest
