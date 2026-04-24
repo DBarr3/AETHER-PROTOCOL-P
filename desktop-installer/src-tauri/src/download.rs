@@ -14,6 +14,13 @@ const STALL_TIMEOUT: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(2);
 const STALE_PART_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
 
+// Session I drive-by: `#[derive(Debug)]` unblocks `cargo test --lib`,
+// which currently fails because `download_verified(...).unwrap_err()` in
+// the rejects_http_url test at line ~321 requires the Ok-side type to be
+// Debug. Pre-existing issue; adding Debug here is the minimum fix that
+// unblocks the new telemetry integration tests (cargo builds all test
+// targets together).
+#[derive(Debug)]
 pub struct DownloadResult {
     pub path: PathBuf,
     pub sha256: String,

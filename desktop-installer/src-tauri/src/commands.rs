@@ -1,5 +1,6 @@
 use aethercloud_installer::errors::InstallerError;
 use aethercloud_installer::installer::{self, InstallerState, ProgressEvent};
+use aethercloud_installer::telemetry::{self, Event, EventProperties};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -33,6 +34,17 @@ pub async fn start_install(
 
     let state_inner = state.inner().clone();
     *state_inner.cancelled.lock().await = false;
+
+    // Session I (PR #50): InstallerStarted fires AFTER consent re-verify
+    // passes but BEFORE the heavy work begins. Matches the moment the
+    // user commits to the install. Rust-side so a compromised WebView
+    // can't suppress it. Fire-and-forget — a telemetry stall must not
+    // delay the install.
+    telemetry::capture_fire_and_forget(
+        Event::InstallerStarted,
+        EventProperties::new(),
+    );
+
     let app_for_emit = app.clone();
     let result = installer::run_install(state_inner.clone(), move |ev: ProgressEvent| {
         tracing::debug!(state = ev.state, percent = ev.percent, "cmd: emitting progress");
@@ -45,6 +57,16 @@ pub async fn start_install(
     match result {
         Ok(path) => {
             tracing::info!(installed_path = %path.display(), "cmd: start_install completed successfully");
+            // Session I (PR #50): terminal success event. `redact_path`
+            // reduces the concrete user-home path to a static layout
+            // label so we learn which NSIS install layout the wizard
+            // ended on without leaking user names.
+            telemetry::capture_fire_and_forget(
+                Event::InstallCompleted,
+                EventProperties::new()
+                    .with_percent(100)
+                    .with_error_code(telemetry::redact_path(&path)),
+            );
             Ok(())
         }
         Err(err) => {
@@ -54,6 +76,18 @@ pub async fn start_install(
                 variant = variant_name,
                 user_message = %err.user_message(),
                 "cmd: start_install returning Err"
+            );
+            // Session I (PR #50): terminal failure event. `variant_name`
+            // is `InstallerError::state_label()` — a `&'static str`
+            // from a fixed enum (NOT the Display string, which may
+            // contain URLs/paths). Cancellations get their own
+            // closed_reason so the dashboard can separate voluntary
+            // abandon from hard failure.
+            telemetry::capture_fire_and_forget(
+                Event::InstallFailed,
+                EventProperties::new()
+                    .with_error_code(variant_name)
+                    .with_closed_reason(if is_cancel { "cancelled" } else { "error" }),
             );
             // A user-initiated cancel is not a failure — emit a distinct
             // "cancelled" progress event so the frontend can route it to

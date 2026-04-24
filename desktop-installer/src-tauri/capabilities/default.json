@@ -34,7 +34,8 @@
       "allow": [
         { "url": "https://api.aethersystems.net/*" },
         { "url": "https://license.aethersystems.net/*" },
-        { "url": "https://app.aethersystems.net/*" }
+        { "url": "https://app.aethersystems.net/*" },
+        { "url": "https://us.i.posthog.com/*" }
       ]
     },
     "notification:default",

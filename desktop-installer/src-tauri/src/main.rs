@@ -4,6 +4,7 @@ mod commands;
 
 use aethercloud_installer::cleanup;
 use aethercloud_installer::installer::InstallerState;
+use aethercloud_installer::telemetry::{self, Event, EventProperties};
 use std::sync::Arc;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -90,11 +91,19 @@ fn main() {
         return;
     }
 
-    // TODO(#50 telemetry re-port): a future session will add a telemetry
-    // command to the handler list below. That slot is intentionally left
-    // empty by Session F — do not populate here.
-    //
-    // Session H (PR-this): plugin registration. In Tauri v2 each plugin
+    // Session I (PR #50 funnel re-port): fire the top-of-funnel
+    // WizardLaunched event before the Tauri event loop spins up. Uses
+    // capture_fire_and_forget — no runtime yet exists, so this takes
+    // the pre-runtime branch (detached OS thread w/ current-thread
+    // runtime). Zero chance of blocking the wizard render; the POST
+    // is network-bound and telemetry is disabled entirely in debug
+    // builds and when no PostHog key is configured.
+    telemetry::capture_fire_and_forget(
+        Event::WizardLaunched,
+        EventProperties::new(),
+    );
+
+    // Session H (PR #60): plugin registration. In Tauri v2 each plugin
     // crate must be explicitly `.plugin(...)` registered at Builder time;
     // the old v1 `allowlist` config is gone. Actual permission scoping
     // lives in `capabilities/*.json`. Order: plugins first (so their
@@ -117,6 +126,17 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running AetherCloud Setup");
+
+    // Session I (PR #50): bottom-of-funnel WizardClosed event. The Tauri
+    // runtime has exited at this point so we take the pre-runtime branch
+    // again (detached OS thread). `closed_reason=normal_exit` means the
+    // event loop returned cleanly — error/cancel paths already emitted
+    // InstallFailed / cancelled events from commands.rs, so "normal_exit"
+    // here captures the union of success and user-closed-after-success.
+    telemetry::capture_fire_and_forget(
+        Event::WizardClosed,
+        EventProperties::new().with_closed_reason("normal_exit"),
+    );
 
     // Session F: flush pending state on normal exit. Note: Tauri's `.run()`
     // blocks until the window closes, so this runs after the UI teardown.

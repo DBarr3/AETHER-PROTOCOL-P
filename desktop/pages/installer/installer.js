@@ -1,3 +1,4 @@
+// POST-INSTALL events only. Wizard funnel is instrumented in desktop-installer/src-tauri/. See issue #50.
 const root = document.documentElement
 
 const kicker = document.querySelector('[data-kicker]')

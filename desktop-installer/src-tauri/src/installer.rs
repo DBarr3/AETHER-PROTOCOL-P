@@ -3,6 +3,7 @@ use crate::errors::{InstallerError, Result};
 use crate::install_manifest::{HealthStatus, InstallManifest};
 use crate::manifest::{self, Manifest};
 use crate::payload;
+use crate::telemetry::{self, Event, EventProperties};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -152,12 +153,33 @@ where
         error: None,
     });
 
+    // Session I (PR #50): VerifyStarted fires RUST-SIDE because a
+    // compromised WebView cannot skip this event — signature verify is
+    // the wizard's core trust boundary. PINNED_PUBKEY is unchanged
+    // (sacred per task constraint).
+    telemetry::capture_fire_and_forget(
+        Event::VerifyStarted,
+        EventProperties::new().with_percent(6),
+    );
+
     tracing::info!("install: verifying Ed25519 signature");
-    manifest::verify_signature(&manifest_bytes, &sig_bytes, PINNED_PUBKEY).map_err(|e| {
+    if let Err(e) = manifest::verify_signature(&manifest_bytes, &sig_bytes, PINNED_PUBKEY) {
         tracing::error!(error = ?e, "install: signature verify FAILED");
-        e
-    })?;
+        // Session I: VerifyFailed is the one signature-mismatch signal
+        // the funnel MUST see. error_code is the static state label —
+        // never the `Display` string, which would include user-facing
+        // copy.
+        telemetry::capture_fire_and_forget(
+            Event::VerifyFailed,
+            EventProperties::new().with_error_code(e.state_label()),
+        );
+        return Err(e);
+    }
     tracing::info!("install: signature OK");
+    telemetry::capture_fire_and_forget(
+        Event::VerifyCompleted,
+        EventProperties::new().with_percent(6),
+    );
 
     let manifest = Manifest::parse(&manifest_bytes).map_err(|e| {
         tracing::error!(error = ?e, "install: manifest parse failed");
@@ -184,11 +206,26 @@ where
         error: None,
     });
 
+    // Session I (PR #50): DownloadStarted fires Rust-side so a
+    // compromised WebView can't suppress it. No bytes-written yet.
+    telemetry::capture_fire_and_forget(
+        Event::DownloadStarted,
+        EventProperties::new().with_percent(8),
+    );
+
     let temp_path = payload::temp_payload_path();
     tracing::info!(temp_path = %temp_path.display(), "install: staging payload to temp");
     *state.in_flight_temp.lock().await = Some(temp_path.clone());
 
     let max_bytes = manifest.payload_size_bytes.min(MAX_PAYLOAD_BYTES);
+
+    // Session I: rate-limit DownloadProgress so we don't ship one
+    // PostHog event per byte. We fire when the percent crosses a 25%
+    // boundary (25, 50, 75) — funnel granularity without telemetry
+    // spam. Using an AtomicU32 because the closure below is FnMut and
+    // the thresholds live across ticks.
+    use std::sync::atomic::{AtomicU32, Ordering};
+    let last_progress_bucket = std::sync::Arc::new(AtomicU32::new(0));
 
     // Session F (PR #59): gate the NSIS spawn on Session B's `download_verified`.
     // Single call downloads to a `.part` file, streams through SHA-256, compares
@@ -197,6 +234,7 @@ where
     // payload can ever reach the NSIS path.
     let verified = {
         let emit_ref = &mut emit;
+        let bucket = last_progress_bucket.clone();
         download::download_verified(
             &manifest.payload_url,
             &temp_path,
@@ -220,16 +258,62 @@ where
                     speed: "Receiving packages".into(),
                     error: None,
                 });
+                // Session I (PR #50): fire DownloadProgress once per
+                // 25% bucket (25/50/75) to keep the funnel readable
+                // without event spam. bytes_written is always safe to
+                // log (just a count).
+                let raw = if p.total_bytes > 0 {
+                    (100 * p.bytes_written / p.total_bytes.max(1)) as u32
+                } else {
+                    0
+                };
+                let new_bucket = raw / 25; // 0..=4
+                let prev = bucket.load(Ordering::Relaxed);
+                if new_bucket > prev && new_bucket < 4 {
+                    // Only fire for 25, 50, 75 — DownloadCompleted handles 100.
+                    if bucket
+                        .compare_exchange(prev, new_bucket, Ordering::Relaxed, Ordering::Relaxed)
+                        .is_ok()
+                    {
+                        telemetry::capture_fire_and_forget(
+                            Event::DownloadProgress,
+                            EventProperties::new()
+                                .with_percent(new_bucket * 25)
+                                .with_bytes_written(p.bytes_written)
+                                .with_attempt(p.attempt),
+                        );
+                    }
+                }
             },
         )
         .await
         .map_err(|e| {
             tracing::error!(error = ?e, "install: payload download_verified failed");
+            // Session I: terminal failure during download — surfaces as
+            // InstallFailed in the funnel. error_code is the static
+            // state label, never the Display string.
+            telemetry::capture_fire_and_forget(
+                Event::InstallFailed,
+                EventProperties::new()
+                    .with_error_code(e.state_label())
+                    .with_closed_reason("download_failed"),
+            );
             // `download_verified` already removed the .part file; clear
             // in_flight_temp so cancel() doesn't race a non-existent path.
             e
         })?
     };
+    // Session I (PR #50): DownloadCompleted after download_verified's
+    // atomic rename + SHA-256 match. Sha256_prefix is the first 16 hex
+    // of the verified hash — enough to bucket in the dashboard without
+    // leaking the full signature-verified hash.
+    telemetry::capture_fire_and_forget(
+        Event::DownloadCompleted,
+        EventProperties::new()
+            .with_percent(85)
+            .with_bytes_written(verified.bytes_written)
+            .with_sha256_prefix(&verified.sha256),
+    );
     tracing::info!(
         sha256 = %verified.sha256,
         bytes = verified.bytes_written,
@@ -267,8 +351,22 @@ where
     *state.in_flight_temp.lock().await = None;
 
     tracing::info!(path = %temp_path.display(), "install: spawning NSIS with /S");
+    // Session I (PR #50): InstallStarted == NSIS spawn point. This
+    // separates "download/verify done" (DownloadCompleted/VerifyCompleted)
+    // from "NSIS is now writing files to disk". The dashboard uses this
+    // gap to measure NSIS duration specifically.
+    telemetry::capture_fire_and_forget(
+        Event::InstallStarted,
+        EventProperties::new().with_percent(92),
+    );
     let code = payload::run_payload_silent(&temp_path).await.map_err(|e| {
         tracing::error!(error = ?e, "install: NSIS spawn failed");
+        telemetry::capture_fire_and_forget(
+            Event::InstallFailed,
+            EventProperties::new()
+                .with_error_code(e.state_label())
+                .with_closed_reason("nsis_spawn_failed"),
+        );
         e
     })?;
     tracing::info!(exit_code = code, "install: NSIS exited");
@@ -297,6 +395,16 @@ where
     let app_path = installed_app_path();
     let install_dir = app_path.parent().map(PathBuf::from).unwrap_or_else(|| app_path.clone());
     let scanned = InstallManifest::scan_installed_files(&manifest.version, &install_dir);
+    // Session I (PR #50): InstallProgress fires after the manifest scan
+    // but BEFORE the health-check verdict. file_count lets the dashboard
+    // flag "NSIS exited 0 but 0 files were installed" regressions even
+    // if health_check somehow misses it.
+    telemetry::capture_fire_and_forget(
+        Event::InstallProgress,
+        EventProperties::new()
+            .with_percent(96)
+            .with_file_count(scanned.files.len()),
+    );
     if let Err(e) = scanned.save() {
         tracing::warn!(error = ?e, "install: install_manifest.json save failed (non-fatal)");
     }
@@ -335,6 +443,20 @@ where
                 status = ?health.status,
                 missing = ?health.missing_files,
                 "install: health check FAILED — surfacing retry event"
+            );
+            // Session I (PR #50): health-check-path InstallFailed carries
+            // missing_count so the dashboard can distinguish "NSIS ran
+            // but left the disk incomplete" from "NSIS itself errored".
+            // commands.rs Err arm will also fire InstallFailed (closed_reason
+            // = "error"); these two events are intentional — filter by
+            // closed_reason to dedupe in the dashboard.
+            telemetry::capture_fire_and_forget(
+                Event::InstallFailed,
+                EventProperties::new()
+                    .with_error_code("install_verify_failed")
+                    .with_missing_count(health.missing_files.len())
+                    .with_file_count(health.total_files)
+                    .with_closed_reason("health_check_failed"),
             );
             emit(ProgressEvent {
                 state: "install_verify_failed",
