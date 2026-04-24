@@ -2,6 +2,7 @@
 
 mod commands;
 
+use aethercloud_installer::cleanup;
 use aethercloud_installer::installer::InstallerState;
 use std::sync::Arc;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -68,6 +69,30 @@ fn main() {
 
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "AetherCloud Setup starting");
 
+    // Session F wiring (PR #59): drain stale `.part` files from %TEMP% before
+    // the wizard renders. Session B's `startup_cleanup()` is synchronous and
+    // swallows its own errors (logs via tracing), but we guard with
+    // catch_unwind anyway — cleanup failure MUST NOT prevent the wizard from
+    // launching. If cleanup panics, log and continue so the user can still
+    // retry or bypass.
+    if let Err(panic) = std::panic::catch_unwind(cleanup::startup_cleanup) {
+        tracing::error!(
+            ?panic,
+            "startup_cleanup panicked — continuing to launch wizard"
+        );
+    }
+
+    // CLI --purge shortcut (QA aid; matches Session B's lifecycle contract).
+    // If invoked, run a full teardown and exit without rendering the wizard.
+    if cleanup::check_purge_flag() {
+        let report = cleanup::purge();
+        tracing::info!(?report, "purge: exiting after CLI teardown");
+        return;
+    }
+
+    // TODO(#50 telemetry re-port): a future session will add a telemetry
+    // command to the handler list below. That slot is intentionally left
+    // empty by Session F — do not populate here.
     tauri::Builder::default()
         .manage(Arc::new(InstallerState::default()))
         .invoke_handler(tauri::generate_handler![
@@ -78,4 +103,8 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running AetherCloud Setup");
+
+    // Session F: flush pending state on normal exit. Note: Tauri's `.run()`
+    // blocks until the window closes, so this runs after the UI teardown.
+    cleanup::shutdown_cleanup();
 }

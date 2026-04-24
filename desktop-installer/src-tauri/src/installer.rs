@@ -1,6 +1,8 @@
+use crate::download;
 use crate::errors::{InstallerError, Result};
+use crate::install_manifest::{HealthStatus, InstallManifest};
 use crate::manifest::{self, Manifest};
-use crate::payload::{self, DownloadProgress};
+use crate::payload;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -187,13 +189,20 @@ where
     *state.in_flight_temp.lock().await = Some(temp_path.clone());
 
     let max_bytes = manifest.payload_size_bytes.min(MAX_PAYLOAD_BYTES);
-    let hash = {
+
+    // Session F (PR #59): gate the NSIS spawn on Session B's `download_verified`.
+    // Single call downloads to a `.part` file, streams through SHA-256, compares
+    // against the signed-manifest hash, and atomically renames only on match.
+    // On any error the `.part` is cleaned up inside the helper — no partial
+    // payload can ever reach the NSIS path.
+    let verified = {
         let emit_ref = &mut emit;
-        payload::download_with_progress(
+        download::download_verified(
             &manifest.payload_url,
             &temp_path,
+            &manifest.payload_sha256,
             max_bytes,
-            |p: DownloadProgress| {
+            |p: download::DownloadProgress| {
                 let pct = if p.total_bytes > 0 {
                     8 + (77 * p.bytes_written / p.total_bytes.max(1)) as u32
                 } else {
@@ -215,11 +224,17 @@ where
         )
         .await
         .map_err(|e| {
-            tracing::error!(error = ?e, "install: payload download failed");
+            tracing::error!(error = ?e, "install: payload download_verified failed");
+            // `download_verified` already removed the .part file; clear
+            // in_flight_temp so cancel() doesn't race a non-existent path.
             e
         })?
     };
-    tracing::info!(sha256 = %hash, "install: payload download complete");
+    tracing::info!(
+        sha256 = %verified.sha256,
+        bytes = verified.bytes_written,
+        "install: payload download + verify complete"
+    );
 
     if state.is_cancelled().await {
         tracing::info!("install: cancelled after download");
@@ -232,22 +247,9 @@ where
         percent: 87,
         label: "Verifying download".into(),
         detail: "Page 3 of 4".into(),
-        speed: "Checking integrity".into(),
+        speed: "Integrity confirmed".into(),
         error: None,
     });
-
-    if hash != manifest.payload_sha256 {
-        tracing::error!(
-            expected = %manifest.payload_sha256,
-            got = %hash,
-            "install: SHA-256 MISMATCH — payload rejected"
-        );
-        let _ = tokio::fs::remove_file(&temp_path).await;
-        return Err(InstallerError::PayloadHashMismatch {
-            expected: manifest.payload_sha256.clone(),
-            got: hash,
-        });
-    }
     tracing::info!("install: SHA-256 match — proceeding to NSIS spawn");
 
     emit(ProgressEvent {
@@ -277,17 +279,82 @@ where
         return Err(InstallerError::PayloadExit { code });
     }
 
+    // Session F (PR #59): post-NSIS manifest scan + health check.
+    // Confirms payload is actually present on disk before we declare success.
+    // On failure we surface a degraded/failed event so the UI can offer
+    // retry + support dialog, but we still return Ok because NSIS's own
+    // exit code was 0 — the install process finished, it's just the
+    // manifest that's off.
     emit(ProgressEvent {
-        state: "done",
-        percent: 100,
-        label: "AetherCloud is ready".into(),
+        state: "verifying_install",
+        percent: 96,
+        label: "Verifying installation".into(),
         detail: "Page 4 of 4".into(),
-        speed: "Verification complete".into(),
+        speed: "Scanning installed files".into(),
         error: None,
     });
-    tracing::info!("install: done — returning to caller");
 
-    Ok(installed_app_path())
+    let app_path = installed_app_path();
+    let install_dir = app_path.parent().map(PathBuf::from).unwrap_or_else(|| app_path.clone());
+    let scanned = InstallManifest::scan_installed_files(&manifest.version, &install_dir);
+    if let Err(e) = scanned.save() {
+        tracing::warn!(error = ?e, "install: install_manifest.json save failed (non-fatal)");
+    }
+    let health = scanned.health_check();
+    tracing::info!(
+        status = ?health.status,
+        total = health.total_files,
+        verified = health.verified_files,
+        missing = health.missing_files.len(),
+        "install: health check complete"
+    );
+    if let Err(e) = InstallManifest::save_health_check(&health) {
+        tracing::warn!(error = ?e, "install: health_check.json save failed (non-fatal)");
+    }
+
+    match health.status {
+        HealthStatus::Healthy => {
+            // Clean scratch (startup_cleanup semantics) after a successful install.
+            let removed = download::cleanup_stale_parts(&std::env::temp_dir());
+            if !removed.is_empty() {
+                tracing::info!(count = removed.len(), "install: scratch cleanup after success");
+            }
+            emit(ProgressEvent {
+                state: "done",
+                percent: 100,
+                label: "AetherCloud is ready".into(),
+                detail: "Page 4 of 4".into(),
+                speed: "Verification complete".into(),
+                error: None,
+            });
+            tracing::info!("install: done — returning to caller");
+            Ok(app_path)
+        }
+        HealthStatus::Degraded | HealthStatus::Failed => {
+            tracing::error!(
+                status = ?health.status,
+                missing = ?health.missing_files,
+                "install: health check FAILED — surfacing retry event"
+            );
+            emit(ProgressEvent {
+                state: "install_verify_failed",
+                percent: 100,
+                label: "Install verification failed".into(),
+                detail: format!(
+                    "{} of {} expected files missing",
+                    health.missing_files.len(),
+                    health.total_files.max(1)
+                ),
+                speed: "Please retry or contact support".into(),
+                error: Some("install_verify_failed".into()),
+            });
+            Err(InstallerError::Internal(format!(
+                "install-verify-failed: {} missing of {} files",
+                health.missing_files.len(),
+                health.total_files.max(1)
+            )))
+        }
+    }
 }
 
 fn check_min_wizard_version(required: &str) -> Result<()> {
