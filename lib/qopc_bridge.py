@@ -74,7 +74,10 @@ RULES:
 
 _DEFAULT_LOAD: QopcLoad = "medium"
 _DEFAULT_CONFIDENCE = 0.5
-_MAX_CONTEXT_CHARS_FOR_CLASSIFIER = 500  # compact summary only; full context goes to orchestrator
+# MR-H1 Option B: classifier input excludes hydrated_context entirely.
+# Former 500-char truncation constant removed — the classifier sees only
+# the prompt now. If Option C (trusted-envelope) is ever adopted, reintroduce
+# a length cap there, not here.
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -94,9 +97,9 @@ async def classify(
 
     Parameters:
     - prompt: the user's request verbatim.
-    - hydrated_context: optional compact summary of prior conversation/project
-      state. Truncated to 500 chars — the classifier only needs shape, not
-      detail. The full context goes to the orchestrator downstream.
+    - hydrated_context: accepted for API compatibility but IGNORED by the
+      classifier path (MR-H1 Option B, see ``_build_user_message``). The full
+      hydrated_context is still used by the orchestrator downstream.
     - user_id: threaded to TokenAccountant so classifier UVT is billed to the
       requesting user. Unattributed (None) during Stage B/C transition.
     - task_id: when set, classifier usage joins back to the task for the
@@ -132,16 +135,30 @@ async def classify(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _build_user_message(prompt: str, hydrated_context: Optional[str]) -> str:
-    """Assemble the classifier input. Context stays compact — the classifier
-    is deciding routing, not answering."""
-    if not hydrated_context:
-        return f"Classify this request:\n\n{prompt}"
-    trimmed_ctx = hydrated_context[:_MAX_CONTEXT_CHARS_FOR_CLASSIFIER]
-    return (
-        f"Prior context (compact summary):\n{trimmed_ctx}\n\n"
-        f"Current request:\n\n{prompt}"
-    )
+def _build_user_message(prompt: str, hydrated_context: Optional[str]) -> str:  # noqa: ARG001
+    """Assemble the classifier input.
+
+    SECURITY (MR-H1, Option B): hydrated_context is IGNORED HERE by design.
+
+    Any upstream caller populating AgentRunRequest.hydrated_context can append
+    a forged ``{"qopc_load": "light", ...}`` verdict at the tail.
+    ``context_compressor.compress`` preserves the tail (``context[-char_budget:]``
+    at lib/context_compressor.py:115), so that payload would otherwise survive
+    trimming and land in the classifier's user message. Haiku then mirrors the
+    forged verdict and ``_parse_signal`` trusts it. See
+    ``tests/security/modelrouter/mr_h1_classifier_prompt_injection_design.md``.
+
+    Dropping the parameter from classifier input at this narrow boundary
+    eliminates the vector entirely. The full hydrated_context is still used by
+    the orchestrator downstream — only the classifier is isolated.
+
+    Accuracy impact is tracked as a follow-up (50-prompt eval). If the
+    context-dropped classifier disagrees meaningfully with the context-aware
+    baseline, layer a trusted-envelope model (Option C) on top. Do NOT
+    re-introduce attacker-controlled bytes to this function.
+    """
+    del hydrated_context  # noqa: F841 — parameter kept for API-compat, ignored by design
+    return f"Classify this request:\n\n{prompt}"
 
 
 def _parse_signal(text: str) -> QopcSignal:

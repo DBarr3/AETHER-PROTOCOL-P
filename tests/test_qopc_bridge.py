@@ -220,13 +220,29 @@ async def test_user_id_threaded_to_token_accountant(mock_call):
 
 
 @pytest.mark.asyncio
-async def test_hydrated_context_included_compactly(mock_call):
-    long_context = "x" * 2000  # way bigger than classifier's budget
-    await qopc_bridge.classify("Do the thing", hydrated_context=long_context)
+async def test_hydrated_context_is_dropped_from_classifier_input(mock_call):
+    """MR-H1 Option B: hydrated_context must NOT reach the classifier's
+    user message, regardless of content. See
+    tests/security/modelrouter/mr_h1_classifier_prompt_injection_design.md.
+
+    Renamed + re-asserted from the previous
+    ``test_hydrated_context_included_compactly`` which predates the fix.
+    """
+    marker = "HYDRATED-CONTEXT-MARKER-" + "x" * 2000
+    await qopc_bridge.classify("Do the thing", hydrated_context=marker)
     sent = mock_call.call_args.kwargs["messages"][0]["content"]
-    # Compact summary only — classifier doesn't need full context
-    assert len(sent) < 1500  # prompt + truncated context
+    assert marker not in sent, (
+        "MR-H1 REGRESSION: hydrated_context reached the classifier's user "
+        f"message. Option B requires the parameter to be fully ignored. "
+        f"Got: {sent!r}"
+    )
+    assert "Prior context" not in sent, (
+        "Classifier envelope reintroduced the 'Prior context' header — "
+        "this only appeared on the pre-fix path."
+    )
     assert "Do the thing" in sent
+    # Post-fix envelope is tiny (prompt + fixed wrapper), not budget-gated.
+    assert len(sent) < 200
 
 
 @pytest.mark.asyncio
