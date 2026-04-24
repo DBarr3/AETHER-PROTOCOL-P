@@ -1,9 +1,45 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Baseline permissions for the AetherCloud Setup wizard window. Grants the frontend the ability to invoke our #[tauri::command] handlers AND to listen for backend-emitted events (installer://progress). Without core:event:default, Tauri v2 silently blocks listen() and the UI never receives progress updates even though the backend emits them correctly. That was the 'Backend not responding' bug.",
+  "description": "Baseline permissions for the AetherCloud Setup wizard main window. Enforces PR #57 (tauri.conf.json hardening) — scopes each plugin's default surface down to what the installer actually needs and nothing more. Each permission entry is paired with an explicit allow-scope where the plugin supports it, so a post-compromise RCE in the WebView cannot reach arbitrary files, shells, or hosts. `core:event:default` is required for Tauri v2 to deliver backend-emitted `installer://progress` events to the frontend's listen() calls — without it the UI silently never receives progress updates (the 'Backend not responding' bug from Session E's audit).",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    {
+      "identifier": "fs:default",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$LOCALDATA/AetherCloud/**" },
+        { "path": "$LOCALDATA/AetherCloud-Setup/**" },
+        { "path": "$TEMP/AetherCloud-*/**" }
+      ]
+    },
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "https://aethersystems.net/*" },
+        { "url": "https://*.aethersystems.net/*" }
+      ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.aethersystems.net/*" },
+        { "url": "https://license.aethersystems.net/*" },
+        { "url": "https://app.aethersystems.net/*" }
+      ]
+    },
+    "notification:default",
+    "process:allow-exit",
+    "process:allow-restart",
+    "updater:default"
   ]
 }

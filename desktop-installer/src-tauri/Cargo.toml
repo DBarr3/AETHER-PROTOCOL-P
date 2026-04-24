@@ -19,6 +19,18 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+# Tauri v2 moves the old v1 `allowlist` into per-plugin crates + capability
+# ACL files. Each crate registers its command handlers + permissions at
+# Builder-init time, then `capabilities/*.json` declares which permissions
+# each window is allowed to use. See docs/launch/tauri_v2_plugins_capabilities.md
+# for the rationale per plugin.
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-http = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "process", "io-util"] }

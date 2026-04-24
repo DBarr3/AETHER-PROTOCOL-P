@@ -93,7 +93,21 @@ fn main() {
     // TODO(#50 telemetry re-port): a future session will add a telemetry
     // command to the handler list below. That slot is intentionally left
     // empty by Session F — do not populate here.
+    //
+    // Session H (PR-this): plugin registration. In Tauri v2 each plugin
+    // crate must be explicitly `.plugin(...)` registered at Builder time;
+    // the old v1 `allowlist` config is gone. Actual permission scoping
+    // lives in `capabilities/*.json`. Order: plugins first (so their
+    // state is available when `.manage()` / invoke handlers fire), then
+    // app state, then our own invoke handlers.
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Arc::new(InstallerState::default()))
         .invoke_handler(tauri::generate_handler![
             commands::start_install,
