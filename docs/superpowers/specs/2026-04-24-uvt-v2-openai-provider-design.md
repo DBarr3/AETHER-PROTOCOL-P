@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | Draft — pending final review |
+| **Status** | **FROZEN — DO NOT IMPLEMENT** (was: Draft — pending final review, 2026-04-24) |
 | **Date** | 2026-04-24 |
 | **Supersedes** | PR2 ("weighted formula flip") from `docs/superpowers/plans/2026-04-22-router-pr1-v5.md` §8 |
 | **Target rollout** | Days 0–14 shadow, Day 14 flip, Day 104 full cleanup |
