@@ -15,7 +15,8 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const webhookSecretLive = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const webhookSecretTest = Deno.env.get("STRIPE_WEBHOOK_SECRET_TEST") ?? "";
 const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
 const appUrl = Deno.env.get("APP_URL") ?? "https://aethersystems.net";
 const fromEmail = Deno.env.get("FROM_EMAIL") ?? "no-reply@aethersystems.net";
@@ -180,6 +181,32 @@ Deno.serve(async (req) => {
     return new Response("missing stripe-signature", { status: 400 });
   }
   const body = await req.text();
+
+  // Peek at event.livemode (unverified JSON) to pick the signing secret.
+  // Safe: the chosen secret still has to verify the signature, so an attacker
+  // cannot forge a valid event by spoofing livemode.
+  let livemode: boolean;
+  try {
+    const peeked = JSON.parse(body) as { livemode?: unknown };
+    if (typeof peeked.livemode !== "boolean") {
+      return new Response("missing or invalid livemode", { status: 400 });
+    }
+    livemode = peeked.livemode;
+  } catch (_err) {
+    return new Response("invalid json body", { status: 400 });
+  }
+
+  const webhookSecret = livemode ? webhookSecretLive : webhookSecretTest;
+  if (!webhookSecret) {
+    const errorCode = livemode
+      ? "webhook_secret_missing_for_mode_live"
+      : "webhook_secret_missing_for_mode_test";
+    console.error(errorCode);
+    return new Response(JSON.stringify({ error: errorCode }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   let event: Stripe.Event;
   try {
