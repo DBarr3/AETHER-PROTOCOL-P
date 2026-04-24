@@ -14,6 +14,14 @@ import {
   USER_LIMIT_PER_MIN,
 } from "@/lib/router/rateLimit";
 import { isValidServiceTokenHeader } from "@/lib/router/serviceToken";
+import { captureServerEvent } from "@/lib/posthog-server";
+
+// Pre-token-validation distinctId for the two early-exit events
+// (unauthorized / oversize / invalid_json / validation_failed) — we
+// don't have a validated userId yet and must NOT pass raw strings
+// into PostHog. "anonymous" keeps those events groupable for the
+// router-health dashboard without leaking attacker input.
+const ANON_DISTINCT = "anonymous";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,7 +97,40 @@ const BODY_MAX_BYTES = 16_384;
 export async function POST(req: Request): Promise<Response> {
   assertRouterWired();
 
+  const startMs = Date.now();
+
+  // Per-request telemetry state filled in as we validate the request.
+  // `tier` + `userId` stay null until Zod parses the body; emitting those
+  // pre-validation would risk putting attacker-shaped strings into
+  // PostHog properties (see sanitization note in PR #35 audit).
+  let tier: string | null = null;
+  let userId: string | null = null;
+  let chosenModel: string | null = null;
+  let gateType: string | null = null;
+  let reasonCode: string | null = null;
+
+  // Capture the terminal `router_pick_request` event with everything
+  // we know at the time the response is built. Follow-on events
+  // (`router_gate_tripped`, `router_rate_limited`) are emitted inline
+  // where they apply. Telemetry failures are swallowed inside
+  // captureServerEvent — they NEVER throw back into the request path.
+  const emitRequestEvent = (statusCode: number): Promise<void> => {
+    return captureServerEvent(userId ?? ANON_DISTINCT, "router_pick_request", {
+      status_code: statusCode,
+      latency_ms: Date.now() - startMs,
+      // All three of these are either trusted enum/table values or
+      // null — never raw user input.
+      gate_type: gateType,
+      reason_code: reasonCode,
+      chosen_model: chosenModel,
+      tier,
+      // userId is either a Zod-validated UUID or null — safe.
+      userId,
+    });
+  };
+
   if (!isValidServiceTokenHeader(req.headers.get("x-aether-internal"))) {
+    void emitRequestEvent(401);
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -101,6 +142,7 @@ export async function POST(req: Request): Promise<Response> {
   if (cl !== null) {
     const clNum = Number(cl);
     if (Number.isFinite(clNum) && clNum > BODY_MAX_BYTES) {
+      void emitRequestEvent(413);
       return Response.json(
         { error: "payload_too_large", limit_bytes: BODY_MAX_BYTES },
         { status: 413 },
@@ -112,16 +154,22 @@ export async function POST(req: Request): Promise<Response> {
   try {
     body = await req.json();
   } catch {
+    void emitRequestEvent(400);
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
 
   const parse = RoutingContextSchema.safeParse(stripLegacyKeys(body));
   if (!parse.success) {
+    void emitRequestEvent(400);
     return Response.json(
       { error: "validation_failed", details: parse.error.issues },
       { status: 400 },
     );
   }
+
+  // Safe to surface now — both are enum/UUID-validated.
+  tier = parse.data.tier;
+  userId = parse.data.userId;
 
   // Red Team #1 H3 — per-user rate limit, 600 req/user/min. Runs AFTER Zod
   // so we have a validated userId to key on; the IP bucket (in middleware)
@@ -133,6 +181,13 @@ export async function POST(req: Request): Promise<Response> {
     USER_LIMIT_PER_MIN,
   );
   if (!userRate.allowed) {
+    reasonCode = "rate_limited";
+    // Dashboard 1: 429-specific counter.
+    void captureServerEvent(userId, "router_rate_limited", {
+      tier,
+      userId,
+    });
+    void emitRequestEvent(429);
     return Response.json(
       { error: "rate_limited", retry_after_seconds: userRate.retry_after_seconds },
       {
@@ -155,9 +210,29 @@ export async function POST(req: Request): Promise<Response> {
       uvtBalance,
       activeConcurrentTasks,
     });
+    // `chosen_model` comes from deterministic.ts's trusted model table
+    // lookup and `reason_code` is an internal enum — safe to emit.
+    chosenModel = decision.chosen_model ?? null;
+    reasonCode = decision.reason_code ?? null;
+    void emitRequestEvent(200);
     return Response.json(decision, { status: 200 });
   } catch (e) {
     if (e instanceof RouterGateError) {
+      // gateType is a class-level readonly string on each RouterGateError
+      // subclass — never derived from user input. See errors.ts.
+      gateType = e.gateType;
+      reasonCode = "gate_rejected";
+      // Dashboard 1: gate-rejection counter. NOTE we deliberately do
+      // NOT include gate_cap_key / observed_value / plan_cap_value
+      // here — those can contain attacker-shaped strings per the
+      // PR #35 sanitization audit. gate_type (enum) is sufficient
+      // for the dashboard's rejection-reason breakdown.
+      void captureServerEvent(userId, "router_gate_tripped", {
+        gate_type: gateType,
+        tier,
+        userId,
+      });
+      void emitRequestEvent(e.httpStatus);
       return Response.json(
         {
           error: "router_gate",
@@ -171,6 +246,8 @@ export async function POST(req: Request): Promise<Response> {
         { status: e.httpStatus },
       );
     }
+    reasonCode = "internal_error";
+    void emitRequestEvent(500);
     return Response.json(
       { error: "internal", trace_id: parse.data.traceId },
       { status: 500 },

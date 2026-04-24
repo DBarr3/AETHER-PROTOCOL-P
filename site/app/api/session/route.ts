@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { requireStripe } from "@/lib/stripe";
+import { captureServerEvent } from "@/lib/posthog-server";
 
 export const runtime = "nodejs";
+
+// Static error-code enum for session_retrieve_failed. NEVER pass the
+// raw Stripe exception string through PostHog.
+type SessionErrorCode =
+  | "missing_id"
+  | "invalid_id_format"
+  | "stripe_lookup_failed";
+
+const ANON_DISTINCT = "anonymous";
 
 /**
  * GET /api/session?id=cs_test_...
@@ -52,16 +62,25 @@ export async function GET(req: Request) {
     console.log(JSON.stringify({ requestId, route: "GET /api/session", status, latency_ms: Date.now() - startMs, ...extra }));
   }
 
+  const emitFailed = (code: SessionErrorCode): void => {
+    void captureServerEvent(ANON_DISTINCT, "session_retrieve_failed", {
+      error_code: code,
+      requestId,
+    });
+  };
+
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (!id) {
     log(400, { error: "missing_id" });
+    emitFailed("missing_id");
     return NextResponse.json({ error: "missing id" }, { status: 400, headers });
   }
   // Defensive: Stripe session IDs start with "cs_". Reject anything else
   // to avoid accidentally exposing a lookup API for arbitrary resource ids.
   if (!id.startsWith("cs_")) {
     log(400, { error: "invalid_id_format" });
+    emitFailed("invalid_id_format");
     return NextResponse.json({ error: "invalid id" }, { status: 400, headers });
   }
 
@@ -81,6 +100,12 @@ export async function GET(req: Request) {
       null;
 
     log(200, { session_status: session.status, tier: tier ?? "unknown" });
+    // Emit only the 8-char prefix — NEVER the full Stripe session id.
+    void captureServerEvent(ANON_DISTINCT, "session_retrieved", {
+      session_id_prefix: id.slice(0, 8),
+      latency_ms: Date.now() - startMs,
+      requestId,
+    });
     return NextResponse.json(
       {
         status: session.status,
@@ -92,6 +117,7 @@ export async function GET(req: Request) {
   } catch (e: unknown) {
     console.error("session retrieve failed:", e);
     log(404, { error: "stripe_lookup_failed" });
+    emitFailed("stripe_lookup_failed");
     // Don't leak Stripe error internals to the client.
     return NextResponse.json({ error: "session lookup failed" }, { status: 404, headers });
   }
