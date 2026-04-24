@@ -2,14 +2,14 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AetherCloud Setup",
   "version": "1.0.0",
-  "identifier": "com.aethersystems.aethercloud.setup",
+  "identifier": "net.aethersystems.aethercloud",
   "build": {
     "frontendDist": "../src",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "AetherCloud Setup",
@@ -22,12 +22,35 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' ipc: http://ipc.localhost;"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://*.aethersystems.net https://*.posthog.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
-    "active": false,
-    "targets": ["app"],
-    "icon": ["../../desktop/assets/icon.ico"]
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "identifier": "net.aethersystems.aethercloud",
+    "icon": ["../../desktop/assets/icon.ico"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "wix": {
+        "language": ["en-US"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://license.aethersystems.net/updater/{{target}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    }
   }
 }
