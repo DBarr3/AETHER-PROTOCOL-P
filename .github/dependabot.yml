@@ -38,6 +38,9 @@ updates:
       # @vitest/ui v4 requires vitest v4 as peer; both must move together — tracked in issue #33
       - dependency-name: "@vitest/ui"
         versions: ["4.x"]
+      # stripe v22 pins apiVersion literal to "2026-03-25.dahlia"; requires coordinated API-version bump + E2E verification — tracked in issue #51
+      - dependency-name: "stripe"
+        versions: ["15.x", "16.x", "17.x", "18.x", "19.x", "20.x", "21.x", "22.x"]
 
   - package-ecosystem: "pip"
     directory: "/"
