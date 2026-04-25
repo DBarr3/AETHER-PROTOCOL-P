@@ -1,0 +1,36 @@
+{
+  "max_tokens": 4096,
+  "messages": [
+    {
+      "content": "hi",
+      "role": "user"
+    }
+  ],
+  "model": "claude-sonnet-4-6",
+  "system": [
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "text": "You are an AetherCloud orchestrator.",
+      "type": "text"
+    }
+  ],
+  "tools": [
+    {
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "search"
+    },
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "read_file"
+    }
+  ]
+}

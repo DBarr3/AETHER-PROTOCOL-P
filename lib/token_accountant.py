@@ -1,23 +1,25 @@
 """
-TokenAccountant — the ONLY file in the codebase that calls api.anthropic.com.
+TokenAccountant — the SOLE file that dispatches provider HTTP calls.
 
 Every request through the system goes through `call()`:
-    1. Apply prompt caching (`cache_control: ephemeral`) to system + tool schemas
-    2. POST to /v1/messages
-    3. Compute UVT + cost_usd_cents via ModelRegistry
-    4. Atomic ledger write via Supabase rpc_record_usage
-    5. Return the parsed response
+    1. Pick the provider adapter (Anthropic, DeepSeek, etc.)
+    2. Build the request via the adapter
+    3. POST to the provider's endpoint
+    4. Parse usage + response via the adapter
+    5. Compute UVT + cost_usd_cents via ModelRegistry
+    6. Atomic ledger write via Supabase rpc_record_usage
+    7. Return the parsed response
 
 Callers (Router, legacy direct paths in api_server.py, etc.) must never do
-their own httpx.post to Anthropic. Stage B of the UVT migration rips the
+their own httpx.post to any provider. Stage B of the UVT migration rips the
 direct call sites out of agent_pipeline / project_orchestrator /
 task_decomposer / agent/claude_agent / agent/hardened_claude_agent /
 agent/task_scheduler / api_server.py:1966 and replaces them with calls
 through this module.
 
 Invariants:
-- Anthropic API key read ONCE at module import from $ANTHROPIC_API_KEY.
-  Never from function args, never from user state. Server-side key only.
+- Provider API keys read from env at call time. Never from function args,
+  never from user state. Server-side keys only.
 - Usage accounting is best-effort durable: if rpc_record_usage fails, the
   event is appended to a local JSONL dead-letter at
   $AETHER_USAGE_DLQ (default /var/lib/aethercloud/usage_dlq.jsonl) so a
@@ -32,41 +34,31 @@ Aether Systems LLC - Patent Pending
 from __future__ import annotations
 
 import asyncio
-import copy
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 import httpx
 
 from lib import model_registry
+from lib.providers import anthropic as _anthropic_adapter
 
 log = logging.getLogger("aethercloud.token_accountant")
 
-# ─── Module-level config (read once) ─────────────────────────────────────
-_ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
-_ANTHROPIC_VERSION = "2023-06-01"
-_ANTHROPIC_CACHE_BETA = "prompt-caching-2024-07-31"
-_ANTHROPIC_MCP_BETA = "mcp-client-2025-04-04"
+# ─── Module-level config ──────────────────────────────────────────────────
 _DEFAULT_DLQ_PATH = Path("/var/lib/aethercloud/usage_dlq.jsonl")
 _HTTPX_TIMEOUT_SECONDS = 90.0
 
 QopcLoad = Literal["light", "medium", "heavy"]
 
 
-def _api_key() -> str:
-    """Read ANTHROPIC_API_KEY at call time so hot-rotation via
-    /etc/aethercloud/.env + systemctl restart picks up new values."""
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY not set. TokenAccountant cannot call Anthropic without it. "
-            "Set in /etc/aethercloud/.env on VPS2."
-        )
-    return key
+# ─── Provider adapter dispatch ────────────────────────────────────────────
+_ADAPTERS: dict[str, Any] = {
+    "anthropic": _anthropic_adapter,
+}
 
 
 def _dlq_path() -> Path:
@@ -75,7 +67,7 @@ def _dlq_path() -> Path:
 
 # ─── Response envelope ───────────────────────────────────────────────────
 @dataclass
-class AnthropicResponse:
+class ProviderResponse:
     """What TokenAccountant.call() returns. Raw-ish pass-through with the
     bits the router + tool loop need pulled into named fields."""
     raw: dict[str, Any]
@@ -84,14 +76,21 @@ class AnthropicResponse:
     input_tokens: int
     output_tokens: int
     cached_input_tokens: int
-    uvt_consumed: int
-    cost_usd_cents: float
-    stop_reason: str
-    tool_uses: list[dict]
+    reasoning_tokens: int = 0
+    cache_write_tokens: int = 0
+    uvt_consumed: int = 0
+    cost_usd_cents: float = 0.0
+    stop_reason: str = ""
+    tool_uses: list[dict] = field(default_factory=list)
 
     @property
     def content(self) -> list[dict]:
         return self.raw.get("content", [])
+
+
+# DEPRECATED: rename to ProviderResponse. Alias kept one release per
+# Phase 0 (issue #82). Will be removed after Phase 2 ships.
+AnthropicResponse = ProviderResponse
 
 
 # ─── Public API ──────────────────────────────────────────────────────────
@@ -109,8 +108,8 @@ async def call(
     qopc_load: Optional[QopcLoad] = None,
     supabase_client: Optional[Any] = None,
     _http_client: Optional[httpx.AsyncClient] = None,
-) -> AnthropicResponse:
-    """Single-entrypoint Anthropic call with UVT accounting.
+) -> ProviderResponse:
+    """Single-entrypoint provider call with UVT accounting.
 
     Parameters that matter:
     - model: ModelRegistry key. Not the model_id; the logical role.
@@ -123,8 +122,8 @@ async def call(
     - qopc_load: threaded through to usage_events for post-hoc margin analysis.
 
     Raises:
-    - RuntimeError if ANTHROPIC_API_KEY unset or model disabled.
-    - httpx.HTTPStatusError on Anthropic 4xx/5xx (caller's responsibility to
+    - RuntimeError if provider API key unset or model disabled.
+    - httpx.HTTPStatusError on provider 4xx/5xx (caller's responsibility to
       translate to user-facing errors).
     """
 
@@ -132,40 +131,36 @@ async def call(
     if not spec.enabled:
         raise RuntimeError(f"Model {model!r} is disabled in ModelRegistry. Enable it first.")
 
-    payload = _build_payload(spec, messages, system, tools, max_tokens)
+    # ─── Adapter dispatch ─────────────────────────────────────
+    adapter = _ADAPTERS.get(spec.provider)
+    if adapter is None:
+        raise RuntimeError(
+            f"No provider adapter registered for {spec.provider!r}. "
+            f"Available: {list(_ADAPTERS.keys())}"
+        )
 
-    headers = _build_headers(api_key=_api_key(), has_mcp=bool(mcp_servers))
-    if mcp_servers:
-        payload["mcp_servers"] = mcp_servers
+    url, headers, payload = adapter.build_request(
+        spec, messages, system, tools, max_tokens,
+        mcp_servers=mcp_servers,
+    )
 
     # ─── The one HTTPS call ────────────────────────────────────
     owns_client = _http_client is None
     client = _http_client or httpx.AsyncClient(timeout=_HTTPX_TIMEOUT_SECONDS)
     try:
-        resp = await client.post(_ANTHROPIC_URL, headers=headers, json=payload)
+        resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data: dict[str, Any] = resp.json()
     finally:
         if owns_client:
             await client.aclose()
 
-    # ─── Usage extraction ──────────────────────────────────────
-    usage = data.get("usage", {}) or {}
-    input_tokens = int(usage.get("input_tokens", 0))
-    output_tokens = int(usage.get("output_tokens", 0))
-    # Anthropic reports cached reads separately — they count against the 90%-off
-    # rate, not the full input rate.
-    cached_input_tokens = int(usage.get("cache_read_input_tokens", 0))
+    # ─── Usage extraction (via adapter) ────────────────────────
+    usage = adapter.parse_usage(data)
+    parsed = adapter.parse_response(data)
 
-    uvt = model_registry.uvt(input_tokens, output_tokens, cached_input_tokens)
-    cost = model_registry.cost_usd_cents(model, input_tokens, output_tokens, cached_input_tokens)
-
-    text = "".join(
-        block.get("text", "")
-        for block in data.get("content", [])
-        if block.get("type") == "text"
-    ).strip()
-    tool_uses = [b for b in data.get("content", []) if b.get("type") == "tool_use"]
+    uvt = model_registry.uvt(usage.input_tokens, usage.output_tokens, usage.cached_input_tokens)
+    cost = model_registry.cost_usd_cents(model, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens)
 
     # ─── Ledger commit (best-effort-durable) ───────────────────
     await _commit_usage(
@@ -173,81 +168,27 @@ async def call(
         user_id=user_id,
         task_id=task_id,
         model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cached_input_tokens=cached_input_tokens,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cached_input_tokens=usage.cached_input_tokens,
         cost_usd_cents_fractional=cost,
         qopc_load=qopc_load,
     )
 
-    return AnthropicResponse(
+    return ProviderResponse(
         raw=data,
-        text=text,
+        text=parsed["text"],
         model=spec.model_id,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cached_input_tokens=cached_input_tokens,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cached_input_tokens=usage.cached_input_tokens,
+        reasoning_tokens=usage.reasoning_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
         uvt_consumed=uvt,
         cost_usd_cents=cost,
-        stop_reason=data.get("stop_reason", ""),
-        tool_uses=tool_uses,
+        stop_reason=parsed["stop_reason"],
+        tool_uses=parsed["tool_uses"],
     )
-
-
-# ─── Payload + header builders ───────────────────────────────────────────
-
-def _build_payload(
-    spec: model_registry.ModelSpec,
-    messages: list[dict],
-    system: Optional[str],
-    tools: Optional[list[dict]],
-    max_tokens: int,
-) -> dict[str, Any]:
-    """Constructs the /v1/messages body with prompt caching applied to stable
-    prompts (system, tool schemas). User messages are never cached."""
-    payload: dict[str, Any] = {
-        "model": spec.model_id,
-        "max_tokens": max_tokens,
-        "messages": messages,
-    }
-
-    if system and spec.supports_prompt_caching:
-        # Anthropic accepts `system` as either a string OR a list of content
-        # blocks. We use the list form so we can attach cache_control.
-        payload["system"] = [
-            {
-                "type": "text",
-                "text": system,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-    elif system:
-        payload["system"] = system
-
-    if tools:
-        if spec.supports_prompt_caching:
-            # Cache the ENTIRE tool schema block — it's the biggest stable
-            # prompt fragment most agents carry.
-            cached_tools = [copy.deepcopy(t) for t in tools]
-            if cached_tools:
-                cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
-            payload["tools"] = cached_tools
-        else:
-            payload["tools"] = tools
-
-    return payload
-
-
-def _build_headers(*, api_key: str, has_mcp: bool) -> dict[str, str]:
-    betas: list[str] = [_ANTHROPIC_CACHE_BETA]
-    if has_mcp:
-        betas.append(_ANTHROPIC_MCP_BETA)
-    return {
-        "x-api-key": api_key,
-        "anthropic-version": _ANTHROPIC_VERSION,
-        "anthropic-beta": ",".join(betas),
-        "content-type": "application/json",
-    }
 
 
 # ─── Ledger commit path ──────────────────────────────────────────────────
@@ -294,9 +235,6 @@ async def _commit_usage(
         return
 
     try:
-        # supabase-py: .rpc(name, params) returns a builder. Running it
-        # yields the function result. We don't need the return value here —
-        # we only care that the write succeeded.
         rpc_call = supabase_client.rpc(
             "rpc_record_usage",
             {
@@ -310,8 +248,6 @@ async def _commit_usage(
                 "p_qopc_load": qopc_load,
             },
         )
-        # Async supabase-py exposes .execute() as awaitable; sync client
-        # returns a response object directly. Support both.
         result = rpc_call.execute()
         if asyncio.iscoroutine(result):
             result = await result
@@ -336,11 +272,6 @@ def _append_to_dlq(event: dict[str, Any]) -> None:
         return
 
     # ─── DLQ size gauge + threshold alert (Red Team #2 H3) ────────────────
-    # Emit a gauge on every enqueue + a CRITICAL line tagged DLQ_OVER_THRESHOLD
-    # once the queue crosses AETHER_DLQ_ALERT_THRESHOLD (default 50). Ops can
-    # grep journalctl for the tag; Prometheus scrapes log_messages_total
-    # filtered by the tag. Stage K will replace this with a proper replay
-    # cron (see deploy/replay_dlq.py for the manual path that exists today).
     try:
         line_count = 0
         with path.open("r", encoding="utf-8") as f:
@@ -373,7 +304,7 @@ def _append_to_dlq(event: dict[str, Any]) -> None:
 # used to call Anthropic directly, bypassing every invariant this module
 # enforces. They're now required to route through `call()` (async) or
 # `call_sync()` (the sync bridge below). Do NOT add a fourth helper that
-# hits Anthropic — extend this module instead.
+# hits a provider — extend this module instead.
 
 
 def resolve_model_key(raw: str) -> model_registry.ModelKey:
@@ -412,7 +343,7 @@ def call_sync(
     max_tokens: int = 2048,
     qopc_load: Optional[QopcLoad] = None,
     supabase_client: Optional[Any] = None,
-) -> AnthropicResponse:
+) -> ProviderResponse:
     """Synchronous bridge around `call()` for legacy sync call sites.
 
     Behavior:
@@ -435,13 +366,11 @@ def call_sync(
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        # No running loop → safe to asyncio.run()
         return asyncio.run(coro_factory())
 
-    # Running loop present → execute on a worker thread with its own loop.
     import concurrent.futures as _cf
 
-    def _runner() -> AnthropicResponse:
+    def _runner() -> ProviderResponse:
         return asyncio.run(coro_factory())
 
     with _cf.ThreadPoolExecutor(max_workers=1) as ex:

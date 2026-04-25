@@ -1,0 +1,42 @@
+{
+  "max_tokens": 2048,
+  "mcp_servers": [
+    {
+      "type": "url",
+      "url": "https://mcp.example.com"
+    }
+  ],
+  "messages": [
+    {
+      "content": "hi",
+      "role": "user"
+    }
+  ],
+  "model": "claude-haiku-4-5-20251001",
+  "system": [
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "text": "You are an AetherCloud orchestrator.",
+      "type": "text"
+    }
+  ],
+  "tools": [
+    {
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "search"
+    },
+    {
+      "cache_control": {
+        "type": "ephemeral"
+      },
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "read_file"
+    }
+  ]
+}
