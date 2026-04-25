@@ -1,0 +1,273 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AetherCloud â€” Choose Your Plan</title>
+<meta name="description" content="Autonomous agents that sound like you, plug into the tools you already use, and ship work while you sleep. Pick the power you need.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500;1,9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<!-- Interactive glowing-dot field (cursor-reactive) -->
+<canvas class="bg-dots" id="bg-dots" aria-hidden="true"></canvas>
+
+<!-- Soft cursor halo -->
+<div class="cursor-halo" id="cursor-halo" aria-hidden="true"></div>
+
+<!-- Ambient layers -->
+<div class="bg-glow" aria-hidden="true"></div>
+
+<main class="wrap">
+
+  <!-- Header -->
+  <header class="hero">
+
+    <h1 class="hero-title">
+      <span class="hero-eyebrow">Welcome&nbsp;to</span>
+
+      <!-- Interactive wordmark: cursor moves the gradient hot-spot -->
+      <span class="hero-wordmark" id="hero-wordmark" tabindex="0" aria-label="AetherCloud">
+        <span class="hero-wordmark-text" data-text="AetherCloud">AetherCloud</span>
+        <span class="hero-wordmark-glow" aria-hidden="true"></span>
+        <span class="hero-wordmark-underline" aria-hidden="true"></span>
+      </span>
+
+      <span class="hero-tagline">
+        The quiet engine behind <em>your best&nbsp;work.</em>
+      </span>
+    </h1>
+
+    <p class="hero-sub">
+      Autonomous agents that sound like you, plug into the tools you already use, and ship work while you sleep. Pick the power you need â€” upgrade, downgrade, or cancel anytime.
+    </p>
+
+    <div class="hero-toggle" role="tablist" aria-label="Billing cycle">
+      <button class="toggle-btn active" data-cycle="monthly" role="tab" aria-selected="true">Monthly</button>
+      <button class="toggle-btn is-disabled" data-cycle="annual" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1" title="Annual billing is coming soon">Annual Â· <span class="toggle-badge soon">coming soon</span></button>
+    </div>
+
+    <div class="hero-trust">
+      <span class="trust-item"><span class="trust-dot"></span>No credit card to start</span>
+      <span class="trust-divider"></span>
+      <span class="trust-item"><span class="trust-dot"></span>Cancel in one click</span>
+      <span class="trust-divider"></span>
+      <span class="trust-item"><span class="trust-dot"></span>Cryptographically signed for secure AI</span>
+    </div>
+  </header>
+
+  <!-- Plan cards -->
+  <section class="plans" aria-label="Pricing plans">
+
+    <!-- FREE â€” green octopus, friendly explorer -->
+    <article class="plan" data-plan="free" data-agent="green" tabindex="0">
+      <div class="plan-orb" aria-hidden="true"></div>
+      <div class="plan-inner">
+        <div class="plan-mascot" aria-hidden="true">
+          <canvas class="agent-canvas" data-agent="green" data-sequence="idle"></canvas>
+        </div>
+
+        <div class="plan-head">
+          <div class="plan-name">Free</div>
+          <div class="plan-tag">Try it</div>
+        </div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount" data-monthly="0" data-annual="0">0</span>
+          <span class="plan-price-period">/mo</span>
+        </div>
+        <p class="plan-desc">No card, no commitment. See what agents can do.</p>
+
+        <div class="plan-meter">
+          <div class="plan-meter-label">
+            <span>Monthly tokens</span>
+            <span class="plan-meter-val">15K</span>
+          </div>
+          <div class="plan-meter-bar"><div class="plan-meter-fill" style="width:4%"></div></div>
+        </div>
+
+        <ul class="plan-features">
+          <li><span class="check">âœ“</span> 15,000 UVT / month</li>
+          <li><span class="check">âœ“</span> 1 connected MCP</li>
+          <li><span class="check">âœ“</span> Community support</li>
+          <li class="muted"><span class="check muted">âˆ’</span> Voice-match off</li>
+          <li class="muted"><span class="check muted">âˆ’</span> No pipelines</li>
+        </ul>
+
+        <form class="plan-email" onsubmit="event.preventDefault(); alert('Sign-up hook â€” wire to Supabase auth');">
+          <input type="email" placeholder="you@example.com" required>
+          <button type="submit" class="plan-cta ghost">Get started free â†’</button>
+        </form>
+      </div>
+    </article>
+
+    <!-- SOLO â€” silver robot, dependable workhorse -->
+    <article class="plan" data-plan="solo" data-agent="silver" tabindex="0">
+      <div class="plan-orb" aria-hidden="true"></div>
+      <div class="plan-inner">
+        <div class="plan-mascot" aria-hidden="true">
+          <canvas class="agent-canvas" data-agent="silver" data-sequence="idle"></canvas>
+        </div>
+
+        <div class="plan-head">
+          <div class="plan-name">Solo</div>
+          <div class="plan-tag">Get more out of Aether</div>
+        </div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount" data-monthly="19" data-annual="19">19</span>
+          <span class="plan-price-period">/mo</span>
+        </div>
+        <p class="plan-desc">For individuals running daily agent workflows.</p>
+
+        <div class="plan-meter">
+          <div class="plan-meter-label">
+            <span>Monthly tokens</span>
+            <span class="plan-meter-val">400K</span>
+          </div>
+          <div class="plan-meter-bar"><div class="plan-meter-fill" style="width:13%"></div></div>
+        </div>
+
+        <ul class="plan-features">
+          <li><span class="check">âœ“</span> 400,000 UVT / month</li>
+          <li><span class="check">âœ“</span> Unlimited MCPs</li>
+          <li><span class="check">âœ“</span> Voice-match on Gmail</li>
+          <li><span class="check">âœ“</span> Email support</li>
+          <li class="muted"><span class="check muted">âˆ’</span> No agent pipelines</li>
+        </ul>
+
+        <button type="button" class="plan-cta" onclick="subscribe('solo')">
+          <span>Subscribe</span>
+          <span class="plan-cta-arrow">â†’</span>
+        </button>
+      </div>
+    </article>
+
+    <!-- PRO â€” electric bolt, power user -->
+    <article class="plan recommended" data-plan="pro" data-agent="bolt" tabindex="0">
+      <div class="plan-ribbon">â˜… Most popular</div>
+      <div class="plan-orb" aria-hidden="true"></div>
+      <div class="plan-glow"></div>
+      <div class="plan-inner">
+        <div class="plan-mascot" aria-hidden="true">
+          <canvas class="agent-canvas" data-agent="bolt" data-sequence="zap"></canvas>
+        </div>
+
+        <div class="plan-head">
+          <div class="plan-name">Pro</div>
+          <div class="plan-tag accent">For heavy users</div>
+        </div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount" data-monthly="49" data-annual="49">49</span>
+          <span class="plan-price-period">/mo</span>
+        </div>
+        <p class="plan-desc">For power users and small teams running heavy automations.</p>
+
+        <div class="plan-meter">
+          <div class="plan-meter-label">
+            <span>Monthly tokens</span>
+            <span class="plan-meter-val">1.5M</span>
+          </div>
+          <div class="plan-meter-bar"><div class="plan-meter-fill" style="width:50%"></div></div>
+        </div>
+
+        <ul class="plan-features">
+          <li><span class="check">âœ“</span> 1,500,000 UVT / month</li>
+          <li><span class="check">âœ“</span> Everything in Solo</li>
+          <li><span class="check">âœ“</span> Agent pipelines</li>
+          <li><span class="check">âœ“</span> Overage billing (opt-in)</li>
+          <li><span class="check">âœ“</span> Priority support</li>
+        </ul>
+
+        <button type="button" class="plan-cta primary" onclick="subscribe('pro')">
+          <span>Subscribe</span>
+          <span class="plan-cta-arrow">â†’</span>
+        </button>
+      </div>
+    </article>
+
+    <!-- TEAM â€” sky-blue cloud, collective -->
+    <article class="plan" data-plan="team" data-agent="cloud" tabindex="0">
+      <div class="plan-orb" aria-hidden="true"></div>
+      <div class="plan-inner">
+        <div class="plan-mascot" aria-hidden="true">
+          <canvas class="agent-canvas" data-agent="cloud" data-sequence="idle"></canvas>
+        </div>
+
+        <div class="plan-head">
+          <div class="plan-name">Team</div>
+          <div class="plan-tag vip">Aether VIP</div>
+        </div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount" data-monthly="89" data-annual="89">89</span>
+          <span class="plan-price-period">/mo</span>
+        </div>
+        <p class="plan-desc">For teams running shared automations and knowledge bases.</p>
+
+        <div class="plan-meter">
+          <div class="plan-meter-label">
+            <span>Monthly tokens</span>
+            <span class="plan-meter-val">3M</span>
+          </div>
+          <div class="plan-meter-bar"><div class="plan-meter-fill" style="width:100%"></div></div>
+        </div>
+
+        <ul class="plan-features">
+          <li><span class="check">âœ“</span> 3,000,000 UVT / month</li>
+          <li><span class="check">âœ“</span> Everything in Pro</li>
+          <li><span class="check">âœ“</span> Shared agent library</li>
+          <li><span class="check">âœ“</span> 6 concurrent runs</li>
+          <li><span class="check">âœ“</span> Dedicated support</li>
+        </ul>
+
+        <button type="button" class="plan-cta" onclick="subscribe('team')">
+          <span>Subscribe</span>
+          <span class="plan-cta-arrow">â†’</span>
+        </button>
+      </div>
+    </article>
+
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq">
+    <details>
+      <summary>What's a UVT?</summary>
+      <p>Unified Value Token. One UVT â‰ˆ one unit of AI work across Haiku, Sonnet, and Opus. You don't pick the model; we route automatically to the cheapest one that can do the job.</p>
+    </details>
+    <details>
+      <summary>What happens if I hit my cap?</summary>
+      <p>By default, requests pause until next cycle. Turn on overage billing (Pro+) to keep going â€” you'll pay per-1M-UVT at a transparent rate, capped at a limit you set.</p>
+    </details>
+    <details>
+      <summary>Can I change plans later?</summary>
+      <p>Yes, anytime. Upgrades are prorated instantly; downgrades apply next cycle. Your UVT cap updates automatically.</p>
+    </details>
+    <details>
+      <summary>Is there a free trial on paid plans?</summary>
+      <p>Start on Free to try the product with zero commitment. If you need more headroom before upgrading, email us â€” we'll spot you a week of Solo credit.</p>
+    </details>
+  </section>
+
+  <!-- Footer -->
+  <footer class="foot">
+    <div class="foot-row">
+      <span class="foot-badge"><span class="dot"></span>All systems normal</span>
+      <span class="foot-mono">v3.0 Â· UVT-metered</span>
+    </div>
+    <div class="foot-row">
+      Questions? <a href="mailto:breakouttradersc@gmail.com">breakouttradersc@gmail.com</a>
+    </div>
+  </footer>
+
+</main>
+
+<script src="./agents.data.js"></script>
+<script src="./app.js"></script></body>
+</html>
+
