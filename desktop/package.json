@@ -55,6 +55,12 @@
       "!**/.git/**",
       "!**/node_modules/.cache/**"
     ],
+    "extraResources": [
+      {
+        "from": "../agent/skills",
+        "to": "skills"
+      }
+    ],
     "win": {
       "target": [
         {

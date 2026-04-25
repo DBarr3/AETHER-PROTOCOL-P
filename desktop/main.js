@@ -737,6 +737,30 @@ ipcMain.handle('agent:saveToolRegistry', async (_e, registry) => {
   }
 });
 
+// ── IPC: Skills ────────────────────────────────────
+const skillLoader = require('../agent/skill-loader');
+
+ipcMain.handle('agent:listSkills', async () => {
+  try {
+    return skillLoader.listSkills();
+  } catch (e) {
+    console.error('[agent:listSkills]', e.message);
+    return [];
+  }
+});
+
+ipcMain.handle('agent:loadSkill', async (_e, name) => {
+  try {
+    const content = skillLoader.loadSkill(name);
+    if (!content) return { success: false, error: `Skill not found: ${name}` };
+    const meta = skillLoader.parseSkillMeta(content);
+    return { success: true, name, meta, content };
+  } catch (e) {
+    console.error('[agent:loadSkill]', e.message);
+    return { success: false, error: e.message };
+  }
+});
+
 // ── IPC: Terminal Windows ───────────────────────────
 ipcMain.handle('terminal:open', async (_e, config) => {
   const key = config.type === 'agent'
