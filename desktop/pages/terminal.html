@@ -256,6 +256,7 @@ async function sendToAgent(agent, msg, agentName) {
 }
 
 async function sendToAgentRaw(agent, msg) {
+  agent = agent || { name: _cfg.agentName || 'Agent' };
   var systemPrompt = agent.systemPrompt || 'You are ' + (agent.name || 'an AI agent') + '.';
   var fullQuery = systemPrompt + '\n\nUSER: ' + msg;
 
@@ -278,7 +279,7 @@ async function sendToAgentRaw(agent, msg) {
   // Direct fetch for MCP or fallback
   var token = null;
   try {
-    var authData = await window.aether.authGet();
+    var authData = await window.aetherAPI.authGet();
     if (authData) token = authData.sessionToken;
   } catch(e) {}
 

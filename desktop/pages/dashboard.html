@@ -11156,8 +11156,12 @@ function v3HandleCtxAction(action) {
   if (!agent) return;
   switch (action) {
     case 'terminal':
-      showToast('Agent Terminal for ' + agent.name + ' \u2014 coming soon', 'info');
-      console.log('agent terminal: TODO', agent);
+      if (window.aether && window.aether.terminalOpen) {
+        window.aether.terminalOpen({ type: 'agent', agentId: String(agent.id), agentName: agent.name || 'Agent' })
+          .catch(function(err) { showToast('Terminal error: ' + ((err && err.message) ? err.message : String(err)), 'error'); });
+      } else {
+        showToast('Terminal IPC not available', 'error');
+      }
       break;
     case 'edit':
       // Bridge to the existing team-tab editor when possible; fall back to the
@@ -11448,10 +11452,13 @@ const AgentPresence = (function () {
   function onCardClick(agentIdStr) {
     const agent = activeAgents.find(a => String(a.id) === String(agentIdStr));
     if (!agent) return;
-    // TODO: wire to V6 agent terminal bridge when available
-    console.log('agent terminal: TODO', agent);
-    if (typeof showToast === 'function') {
-      showToast('Agent Terminal for ' + (agent.name || 'agent') + ' \u2014 coming soon', 'info');
+    if (window.aether && window.aether.terminalOpen) {
+      window.aether.terminalOpen({ type: 'agent', agentId: String(agent.id), agentName: agent.name || 'Agent' })
+        .catch(function(err) {
+          if (typeof showToast === 'function') showToast('Terminal error: ' + ((err && err.message) ? err.message : String(err)), 'error');
+        });
+    } else {
+      if (typeof showToast === 'function') showToast('Terminal IPC not available', 'error');
     }
   }
 
