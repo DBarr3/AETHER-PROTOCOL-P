@@ -305,6 +305,7 @@ async def test_rpc_record_usage_called_with_exact_param_names(dlq_path):
         "p_user_id", "p_task_id", "p_model", "p_input_tokens",
         "p_output_tokens", "p_cached_input_tokens",
         "p_cost_usd_cents_fractional", "p_qopc_load",
+        "p_reasoning_tokens", "p_cache_write_tokens",
     }
     assert params["p_user_id"] == "11111111-1111-1111-1111-111111111111"
     assert params["p_task_id"] == "22222222-2222-2222-2222-222222222222"
@@ -469,3 +470,109 @@ def test_dlq_threshold_defaults_to_fifty(dlq_path, caplog, monkeypatch):
     token_accountant._append_to_dlq({"user_id": "u49", "model": "haiku"})
     criticals = [r for r in caplog.records if r.levelno == logging.CRITICAL]
     assert len(criticals) >= 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 1+2 — reasoning/cache_write params, adapter registration,
+#              resolve_model_key deepseek branches
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_rpc_params_include_reasoning_and_cache_write_values(dlq_path):
+    """The new Phase 1 params must pass through to rpc_record_usage with
+    correct default values (0 for Anthropic, which doesn't emit them)."""
+    transport = _MockTransport(_fake_anthropic_response())
+    supabase = MagicMock()
+    rpc_builder = MagicMock()
+    rpc_builder.execute.return_value = MagicMock(error=None)
+    supabase.rpc.return_value = rpc_builder
+
+    async with httpx.AsyncClient(transport=transport) as client:
+        await token_accountant.call(
+            model="haiku",
+            messages=[{"role": "user", "content": "hi"}],
+            user_id="11111111-1111-1111-1111-111111111111",
+            supabase_client=supabase,
+            _http_client=client,
+        )
+
+    _, params = supabase.rpc.call_args.args
+    # Anthropic adapter sets these to 0
+    assert params["p_reasoning_tokens"] == 0
+    assert params["p_cache_write_tokens"] == 0
+
+
+def test_deepseek_adapter_registered():
+    """The deepseek adapter must be in the _ADAPTERS dispatch dict."""
+    assert "deepseek" in token_accountant._ADAPTERS
+    adapter = token_accountant._ADAPTERS["deepseek"]
+    assert hasattr(adapter, "build_request")
+    assert hasattr(adapter, "parse_usage")
+    assert hasattr(adapter, "parse_response")
+
+
+def test_resolve_model_key_deepseek_flash():
+    assert token_accountant.resolve_model_key("dsv4_flash") == "dsv4_flash"
+    assert token_accountant.resolve_model_key("deepseek-v4-flash") == "dsv4_flash"
+
+
+def test_resolve_model_key_deepseek_pro():
+    assert token_accountant.resolve_model_key("dsv4_pro") == "dsv4_pro"
+    assert token_accountant.resolve_model_key("deepseek-v4-pro") == "dsv4_pro"
+
+
+def test_resolve_model_key_deepseek_reasoner():
+    """Legacy deepseek-reasoner alias should map to dsv4_pro."""
+    assert token_accountant.resolve_model_key("deepseek-reasoner") == "dsv4_pro"
+    assert token_accountant.resolve_model_key("deepseek-chat") == "dsv4_flash"
+
+
+def test_resolve_model_key_empty_defaults_sonnet():
+    assert token_accountant.resolve_model_key("") == "sonnet"
+    assert token_accountant.resolve_model_key("unknown-model-xyz") == "sonnet"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 1+2 Amendment — OpenAI adapter + resolve_model_key GPT-5 family
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_openai_adapter_registered():
+    """The openai adapter must be in the _ADAPTERS dispatch dict."""
+    assert "openai" in token_accountant._ADAPTERS
+    adapter = token_accountant._ADAPTERS["openai"]
+    assert hasattr(adapter, "build_request")
+    assert hasattr(adapter, "parse_usage")
+    assert hasattr(adapter, "parse_response")
+
+
+def test_all_three_providers_registered():
+    """_ADAPTERS must have exactly anthropic, deepseek, and openai."""
+    assert set(token_accountant._ADAPTERS.keys()) == {"anthropic", "deepseek", "openai"}
+
+
+def test_resolve_model_key_gpt55():
+    assert token_accountant.resolve_model_key("gpt-5.5") == "gpt55"
+    assert token_accountant.resolve_model_key("gpt55") == "gpt55"
+
+
+def test_resolve_model_key_gpt54():
+    assert token_accountant.resolve_model_key("gpt-5.4") == "gpt54"
+    assert token_accountant.resolve_model_key("gpt54") == "gpt54"
+
+
+def test_resolve_model_key_gpt54_mini():
+    assert token_accountant.resolve_model_key("gpt-5.4-mini") == "gpt54_mini"
+    assert token_accountant.resolve_model_key("gpt54_mini") == "gpt54_mini"
+
+
+def test_resolve_model_key_gpt_mini_takes_precedence():
+    """Any gpt string with 'mini' in it should resolve to gpt54_mini."""
+    assert token_accountant.resolve_model_key("gpt-mini") == "gpt54_mini"
+
+
+def test_resolve_model_key_gpt_ambiguous_defaults_gpt54():
+    """A bare 'gpt' or ambiguous gpt string defaults to mid-tier gpt54."""
+    assert token_accountant.resolve_model_key("gpt") == "gpt54"
+    assert token_accountant.resolve_model_key("gpt-unknown") == "gpt54"

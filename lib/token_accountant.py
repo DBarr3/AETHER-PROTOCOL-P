@@ -45,6 +45,8 @@ import httpx
 
 from lib import model_registry
 from lib.providers import anthropic as _anthropic_adapter
+from lib.providers import deepseek as _deepseek_adapter
+from lib.providers import openai as _openai_adapter
 
 log = logging.getLogger("aethercloud.token_accountant")
 
@@ -58,6 +60,8 @@ QopcLoad = Literal["light", "medium", "heavy"]
 # ─── Provider adapter dispatch ────────────────────────────────────────────
 _ADAPTERS: dict[str, Any] = {
     "anthropic": _anthropic_adapter,
+    "deepseek": _deepseek_adapter,
+    "openai": _openai_adapter,
 }
 
 
@@ -173,6 +177,8 @@ async def call(
         cached_input_tokens=usage.cached_input_tokens,
         cost_usd_cents_fractional=cost,
         qopc_load=qopc_load,
+        reasoning_tokens=usage.reasoning_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
     )
 
     return ProviderResponse(
@@ -204,6 +210,8 @@ async def _commit_usage(
     cached_input_tokens: int,
     cost_usd_cents_fractional: float,
     qopc_load: Optional[QopcLoad],
+    reasoning_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> None:
     """Calls rpc_record_usage. On failure, writes the event to a local DLQ
     so a replay job can commit it later. We never lose billing data silently.
@@ -228,6 +236,8 @@ async def _commit_usage(
         "cached_input_tokens": cached_input_tokens,
         "cost_usd_cents_fractional": cost_usd_cents_fractional,
         "qopc_load": qopc_load,
+        "reasoning_tokens": reasoning_tokens,
+        "cache_write_tokens": cache_write_tokens,
     }
     if supabase_client is None:
         log.warning("TokenAccountant: no supabase_client provided — writing usage to DLQ only")
@@ -246,6 +256,8 @@ async def _commit_usage(
                 "p_cached_input_tokens": cached_input_tokens,
                 "p_cost_usd_cents_fractional": cost_usd_cents_fractional,
                 "p_qopc_load": qopc_load,
+                "p_reasoning_tokens": reasoning_tokens,
+                "p_cache_write_tokens": cache_write_tokens,
             },
         )
         result = rpc_call.execute()
@@ -325,9 +337,26 @@ def resolve_model_key(raw: str) -> model_registry.ModelKey:
     if "sonnet" in r:
         return "sonnet"
     if "gpt" in r:
-        return "gpt5"
+        # GPT-5 family: gpt-5.5 → gpt55, gpt-5.4 → gpt54, gpt-5.4-mini → gpt54_mini
+        if "mini" in r:
+            return "gpt54_mini"
+        if "5.5" in r or "55" in r:
+            return "gpt55"
+        if "5.4" in r or "54" in r:
+            return "gpt54"
+        return "gpt54"  # default to mid-tier if ambiguous
     if "gemma" in r:
         return "gemma"
+    # DeepSeek V4 — match model_id patterns and legacy aliases
+    if "dsv4" in r or "deepseek-v4" in r:
+        if "pro" in r or "reasoner" in r:
+            return "dsv4_pro"
+        return "dsv4_flash"
+    if "deepseek" in r:
+        # Legacy deepseek-chat / deepseek-reasoner aliases
+        if "reasoner" in r or "pro" in r:
+            return "dsv4_pro"
+        return "dsv4_flash"
     return "sonnet"
 
 

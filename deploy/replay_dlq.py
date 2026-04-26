@@ -65,7 +65,14 @@ SUPPORTED_KEYS = (
     "user_id", "task_id", "model",
     "input_tokens", "output_tokens", "cached_input_tokens",
     "cost_usd_cents_fractional", "qopc_load",
+    "reasoning_tokens", "cache_write_tokens",
 )
+
+# Keys that must default to 0 when absent from old DLQ event shapes (Phase 0).
+_INTEGER_DEFAULTS: dict[str, int] = {
+    "reasoning_tokens": 0,
+    "cache_write_tokens": 0,
+}
 
 
 def _dlq_path() -> Path:
@@ -119,7 +126,10 @@ def _replay_one(client, event: dict) -> str | None:
     """Fire rpc_record_usage for a single DLQ event.
     Returns None on success; an error string on failure."""
     try:
-        params = {f"p_{k}": event.get(k) for k in SUPPORTED_KEYS}
+        params = {
+            f"p_{k}": event.get(k, _INTEGER_DEFAULTS.get(k))
+            for k in SUPPORTED_KEYS
+        }
         resp = client.rpc("rpc_record_usage", params).execute()
         err = getattr(resp, "error", None)
         if err:
