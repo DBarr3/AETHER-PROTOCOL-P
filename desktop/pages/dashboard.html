@@ -5075,6 +5075,12 @@
   <div class="main-panel">
     <div class="canvas-wrap" id="canvas-wrap">
       <canvas id="circuit-canvas"></canvas>
+      <!-- VAULT 3D KNOWLEDGE-GRAPH HOST — vanilla three/3d-force-graph mount.
+           Overlays the legacy 2D circuit canvas only when currentViewMode === 'vault'.
+           Toggled by the vault-graph-3d mount block at end of <body>. Other modes
+           (project / agent / logs / automate) hide this and let the original
+           overlays show normally — no other markup is touched. -->
+      <div id="vault3dHost" style="position:absolute;inset:0;z-index:10;display:none;background:#000;"></div>
       <div class="loading-overlay" id="loading-overlay">
         <div class="loading-spinner"></div>
         <div class="loading-text" id="loading-text">Analyzing vault structure...</div>
@@ -17984,5 +17990,29 @@ document.addEventListener('wheel', function(e) {
 }, { passive: true, capture: true });
 
 </script>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     VAULT 3D KNOWLEDGE-GRAPH — vanilla drop-in (issue: vault 3D matrix)
+     Surface area:
+       • UMD globals from vendored bundles (offline; no CDN)
+       • ES-module mount script that swaps the 2D circuit canvas with a
+         3D force-directed graph ONLY when currentViewMode === 'vault'.
+     Outside scope (untouched): titlebar, tabbar, sidebar, agent pulse-dot,
+     CONVERSATIONS list, prompt bar, status bar, IPC, store, theme, all
+     other tabs and overlays. drawCircuit() and CS.nodes/CS.edges remain
+     the source of truth — the 3D scene reads from CS.nodes via update().
+     ════════════════════════════════════════════════════════════════════ -->
+<!-- Single bundled vendor: three + 3d-force-graph + three-spritetext sharing
+     ONE Three.js instance. The previous three-separate-script approach broke
+     because 3d-force-graph's UMD bundles its own Three internally, and
+     standalone three.min.js created textures of a different Three.Texture
+     class that the bundled WebGLRenderer silently dropped (every Sprite.map
+     rendered invisible). Build via: cd desktop && node build/build-vault-3d.mjs -->
+<script src="./vault-graph-3d/vendor/v3d-bundle.iife.js"></script>
+<script src="./vault-graph-3d/vault-graph-3d.js"></script>
+<!-- Galaxy multi-repo view (Phase B). Reuses the v3d-bundle's THREE/ForceGraph3D/SpriteText.
+     Auto-mounts when switchViewMode('galaxy') is called. No-op when galaxy mode isn't active. -->
+<script src="./galaxy/galaxy-app.js"></script>
+
 </body>
 </html>

@@ -274,3 +274,37 @@ contextBridge.exposeInMainWorld('installerAPI', {
   cancelInstall: ()   => ipcRenderer.send('installer:cancel'),
   launchApp:     ()   => ipcRenderer.send('installer:launch'),
 });
+
+// ═══════════════════════════════════════════════════
+// GALAXY BRIDGE — window.aetherGalaxy
+// Forwards renderer → main IPC for the Galaxy multi-repo subsystem
+// (VectorIndex, AuthScope, memory watchdog, repo manifests). All channels
+// are routed through ipcMain.handle on the main side (galaxy/galaxy-bridge.js).
+// Rejected calls (e.g. unauthorized canRead) return falsey results — never
+// throw — so renderer code can fail open or blocked without try/catch noise.
+// ═══════════════════════════════════════════════════
+contextBridge.exposeInMainWorld('aetherGalaxy', {
+  vector: {
+    embed:         (text)                          => ipcRenderer.invoke('galaxy:vector:embed', text),
+    listRepos:     ()                              => ipcRenderer.invoke('galaxy:vector:listRepos'),
+    hasRepo:       (repoId)                        => ipcRenderer.invoke('galaxy:vector:hasRepo', repoId),
+    indexRepo:     (repoId, files)                 => ipcRenderer.invoke('galaxy:vector:indexRepo', repoId, files),
+    searchRepo:    (repoId, embedding, k)          => ipcRenderer.invoke('galaxy:vector:searchRepo', repoId, embedding, k),
+    readFileSlice: (repoId, fileId, maxBytes)      => ipcRenderer.invoke('galaxy:vector:readFileSlice', repoId, fileId, maxBytes),
+    closeRepo:     (repoId)                        => ipcRenderer.invoke('galaxy:vector:closeRepo', repoId),
+  },
+  auth: {
+    canRead:     (agentId, repoId)                 => ipcRenderer.invoke('galaxy:auth:canRead', agentId, repoId),
+    grant:       (agentId, repoId)                 => ipcRenderer.invoke('galaxy:auth:grant', agentId, repoId),
+    revoke:      (agentId, repoId)                 => ipcRenderer.invoke('galaxy:auth:revoke', agentId, repoId),
+    listAllowed: (agentId)                         => ipcRenderer.invoke('galaxy:auth:listAllowed', agentId),
+    audit:       (entry)                           => ipcRenderer.invoke('galaxy:auth:audit', entry),
+    recentAudit: (limit)                           => ipcRenderer.invoke('galaxy:auth:recentAudit', limit),
+  },
+  memory: {
+    usage: () => ipcRenderer.invoke('galaxy:memory:usage'),
+  },
+  repo: {
+    manifests: () => ipcRenderer.invoke('galaxy:repo:manifests'),
+  },
+});

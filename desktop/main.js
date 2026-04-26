@@ -14,6 +14,19 @@ const http  = require('http');
 const fs    = require('fs');
 const os    = require('os');
 
+// ── WebGL backend: force ANGLE → OpenGL (Phase B v3 fix) ─────────────
+// The 3D vault + galaxy use Three.js Sprite/Mesh with PNG textures.
+// Under Electron's default Windows ANGLE D3D11 backend, the texture
+// upload pipeline silently rejects the bind for these materials and
+// every textured sprite renders invisible (verified by Chrome bisect:
+// the IDENTICAL preview HTML loaded via CDN renders icons perfectly in
+// Chrome, where ANGLE uses GL by default). Forcing GL here matches
+// Chrome's behavior exactly. MUST be set before app.whenReady().
+// If GL is unavailable on a given GPU, ANGLE falls back to D3D11 with
+// a console warning — app still boots, icons stay invisible (back to
+// the Phase B v2 colored-primitive look).
+app.commandLine.appendSwitch('use-angle', 'gl');
+
 // Cloudflare provides valid SSL — reject all cert errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   callback(false);
@@ -394,6 +407,18 @@ function installCspHeader() {
 
 app.whenReady().then(async () => {
   installCspHeader();
+
+  // Galaxy multi-repo IPC bridge (VectorIndex, AuthScope, memory).
+  // Idempotent — safe to call once at app start. Renderer reaches it via
+  // window.aetherGalaxy.* exposed in preload.js. Wrapped in try so a
+  // missing native dep (hnswlib-node) degrades gracefully instead of
+  // blocking app startup.
+  try {
+    const { installGalaxyBridge } = require('./galaxy/galaxy-bridge');
+    installGalaxyBridge(app);
+  } catch (e) {
+    console.warn('[AetherCloud] Galaxy bridge unavailable:', e && e.message);
+  }
 
   // First-run: show the branded installer IMMEDIATELY. Do NOT block on
   // backend probing — the installer UX is fully offline-capable, and a
