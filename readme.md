@@ -61,45 +61,6 @@ Autonomous penetration testing platform integrating live IBM Quantum hardware fo
 
 ### Aether Terminal
 Institutional-grade trading platform with quantum middleware verifying every AI-generated trade decision before execution.
-
-### Live Statistics (March 16, 2026)
-
-```
-═══════════════════════════════════════════════════════════
-  U-SCORE    27.2 / 100  ↑  [ACTIVE]
-═══════════════════════════════════════════════════════════
-  Q  Quantum Entropy    0.123   IBM Quantum — live hardware
-  S  Session Depth      0.548   43 sessions accumulated
-  D  Mutation Diversity 0.200   Defense rotations active
-  R  Resilience         1.000   3,371 probes / 0 breaches
-  A  Attack Coverage    0.111   Categories defended
-═══════════════════════════════════════════════════════════
-```
-
-**R = 1.000**: 3,371 probe attempts across 43 sessions. Zero breaches. Zero vulnerabilities confirmed.
-
-Combined test coverage: **3,705 passing tests** across both systems.
-
----
-
-## The U-Score: Deployment Maturity
-
-The Unlearnability Score measures the demonstrated difficulty of attacking a specific deployment given its documented operational history. Unlike static certifications, it reflects real adversarial pressure absorbed over time.
-
-```
-U = 5th-root(Q × S × D × R × A) × 100
-```
-
-| Level | Range | Characteristic |
-|---|---|---|
-| Nascent | 0–20 | Quantum entropy active, no operational history |
-| **Active** | **20–40** | **Real adversarial pressure absorbed — current deployment** |
-| Mature | 40–60 | Broad attack category coverage proven |
-| Hardened | 60–80 | Demonstrated resilience across all dimensions |
-| Sovereign | 80–100 | Maximum documented immunity |
-
-A system built from scratch today starts at **Nascent (0)**. This deployment is at **Active (27.2)** with 43 sessions of documented adversarial history that cannot be simulated or recreated — only earned.
-
 ---
 
 ## Security Properties
@@ -200,10 +161,11 @@ Type:           Utility Provisional — 35 U.S.C. § 111(b)
 
 ## Contact
 
-**Aether Systems LLC**
+**Aether Ai LLC**
 Brandon Barrante, Founder
 Bradenton, Florida, USA
 aetherterminals.carrd.co
+aethersystems.net
 
 Research collaboration, licensing inquiries, and demonstration requests welcome. Implementation details available under MNDA.
 
