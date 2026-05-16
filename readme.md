@@ -39,6 +39,7 @@ This is the **Ontological Root of Trust**: security grounded in physics, not mat
 ---
 
 ## How It Works
+<img width="1332" height="680" alt="image" src="https://github.com/user-attachments/assets/33ed247c-dd39-4b0f-9a85-40698e5cecea" />
 
 The Protocol operates on a three-phase session model: initialization, operation, and destruction.
 
