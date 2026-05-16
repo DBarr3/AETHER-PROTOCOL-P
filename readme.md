@@ -51,6 +51,14 @@ Full architecture is documented in the white paper: [`docs/AETHER_PROTOCOL_WHITE
 
 The white paper applies black box disclosure — architecture and results are shared openly. Implementation details are available under a Mutual Non-Disclosure Agreement.
 
+###Protocol-C: Commitment Infrastructure at Zero Cost
+###01: The Economics: Why $0 Matters at Scale
+IBM QPU time costs roughly $100/min. At 10,000 users generating commitments, that translates to ~$3,300/month for operations that don't need quantum entropy. Protocol-C eliminates that cost entirely by sourcing entropy from the OS kernel — same chain architecture, zero QPU overhead.
+
+###02: What It Guarantees: Same Chain, Different Source
+SHA-256 commitment chain. RFC 3161 trusted timestamps. Ephemeral key destruction after every signing operation. The output is computationally indistinguishable from quantum-seeded commitments — identical chain format, identical verification path.
+
+###03: Who Uses It: SaaS platforms, AI companies committing model outputs, financial institutions operating at scale. One environment variable switches any Protocol-C deployment to Protocol-L when quantum assurance becomes necessary.
 ---
 
 ## Proof: What Is Running Today
