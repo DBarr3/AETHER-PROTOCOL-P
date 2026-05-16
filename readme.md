@@ -61,7 +61,7 @@ This is not theoretical. Two production systems are running the Protocol today.
 Autonomous penetration testing platform integrating live IBM Quantum hardware for defense entropy, quantum-guided exploit search, and cryptographically signed agent decisions.
 
 ### Aether Terminal
-Institutional-grade trading platform with quantum middleware verifying every AI-generated trade decision before execution.
+trading platform with quantum middleware verifying every AI-generated trade decision before execution. (in-development)
 ---
 
 ## Security Properties
