@@ -1,4 +1,4 @@
-# AETHER PROTOCOL
+# ⬡ AETHER PROTOCOL    -  Aether Ai LLC. 2026
 
 **Cryptographically Verified Short-Lived Identity Infrastructure for Autonomous AI Systems**
 
