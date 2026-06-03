@@ -63,6 +63,12 @@ SHA-256 commitment chain. RFC 3161 trusted timestamps. Ephemeral key destruction
 **03 — Who Uses It**
 SaaS platforms, AI companies committing model outputs, financial institutions operating at scale. One environment variable switches any Protocol-C deployment to Protocol-L when quantum assurance becomes necessary.
 
+> **Protocol-C is open source — available now.** It is the free, classical (CSPRNG) implementation of the authentication layer whose absence made **CVE-2025-59536** possible: sign each AI decision with a one-shot key, verify before execution, keep a record nobody can forge.
+>
+> `pip install aether-protocol-c` · **Repository:** [github.com/DBarr3/protocol-c](https://github.com/DBarr3/protocol-c) · **White paper:** [Protocol-C: A Free, Auditable Authentication Layer for AI Decisions](https://github.com/DBarr3/protocol-c/blob/main/docs/WHITEPAPER.md)
+>
+> Honest scope: Protocol-C is classical cryptography with a *temporal* safety margin — not post-quantum and not quantum-sourced. The quantum-entropy variant is Protocol-L.
+
 ---
 
 ## Protocol-L — Cryptographic Accountability for Autonomous AI
