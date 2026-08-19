@@ -30,7 +30,7 @@ The complete, public technical white paper for the open-source variant:
 
 It covers the CVE-2025-59536 framing, the commit→sign-once→destroy design, the security properties (P1–P5), the economics of $0 entropy, and an explicit, honest statement of scope: Protocol-C is classical cryptography with a *temporal* safety margin — not post-quantum, not quantum-sourced.
 
-- **Source + CLI:** [github.com/DBarr3/protocol-c](https://github.com/DBarr3/protocol-c) · `pip install aether-protocol-c`
+- **Source + CLI:** [github.com/AetherAI3/PROTOCOL-C](https://github.com/AetherAI3/PROTOCOL-C) · `pip install git+https://github.com/AetherAI3/PROTOCOL-C.git` (not yet on PyPI)
 - **Protocol-L / Protocol-T** architecture beyond the public summaries above is available under MNDA.
 
 ---

@@ -65,7 +65,7 @@ SaaS platforms, AI companies committing model outputs, financial institutions op
 
 > **Protocol-C is open source — available now.** It is the free, classical (CSPRNG) implementation of the authentication layer whose absence made **CVE-2025-59536** possible: sign each AI decision with a one-shot key, verify before execution, keep a record nobody can forge.
 >
-> `pip install aether-protocol-c` · **Repository:** [github.com/DBarr3/protocol-c](https://github.com/DBarr3/protocol-c) · **White paper:** [Protocol-C: A Free, Auditable Authentication Layer for AI Decisions](https://github.com/DBarr3/protocol-c/blob/main/docs/WHITEPAPER.md)
+> `pip install git+https://github.com/AetherAI3/PROTOCOL-C.git` (not yet on PyPI) · **Repository:** [github.com/AetherAI3/PROTOCOL-C](https://github.com/AetherAI3/PROTOCOL-C) · **White paper:** [Protocol-C: A Free, Auditable Authentication Layer for AI Decisions](https://github.com/AetherAI3/PROTOCOL-C/blob/main/docs/WHITEPAPER.md)
 >
 > Honest scope: Protocol-C is classical cryptography with a *temporal* safety margin — not post-quantum and not quantum-sourced. The quantum-entropy variant is Protocol-L.
 
