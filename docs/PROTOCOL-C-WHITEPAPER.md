@@ -2,7 +2,7 @@
 
 **A technical white paper on closing the instruction-to-execution gap that CVE-2025-59536 exposed — with classical, dependency-free cryptography.**
 
-*Brandon Barrante · Aether AI · 2026 · Apache-2.0 · [github.com/DBarr3/protocol-c](https://github.com/DBarr3/protocol-c)*
+*Brandon Barrante · Aether AI · 2026 · Apache-2.0 · [github.com/AetherAI3/PROTOCOL-C](https://github.com/AetherAI3/PROTOCOL-C)*
 
 ---
 
@@ -103,7 +103,7 @@ No physical-unpredictability or quantum-hardware claims are made for Protocol-C.
 ## 8. Getting started
 
 ```bash
-pip install aether-protocol-c     # zero mandatory dependencies
+pip install git+https://github.com/AetherAI3/PROTOCOL-C.git   # not yet on PyPI; zero mandatory deps
 aether-protocol-c info            # version, Python, entropy source, key lifetime
 aether-protocol-c demo            # sample commit -> verify, end to end
 ```
@@ -152,4 +152,4 @@ CVE-2025-59536 was patched, but the gap it exposed — unauthenticated instructi
 
 ---
 
-*Protocol-C is open source under Apache-2.0. Source, tests, and CLI: [github.com/DBarr3/protocol-c](https://github.com/DBarr3/protocol-c). This document applies black-box disclosure: architecture and guarantees are public; it makes no claims beyond what the published implementation does.*
+*Protocol-C is open source under Apache-2.0. Source, tests, and CLI: [github.com/AetherAI3/PROTOCOL-C](https://github.com/AetherAI3/PROTOCOL-C). This document applies black-box disclosure: architecture and guarantees are public; it makes no claims beyond what the published implementation does.*
